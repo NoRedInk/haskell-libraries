@@ -48,6 +48,7 @@ import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
+import List (List)
 import qualified Log
 import qualified MySQL.Settings as Settings
 import Nri.Prelude
@@ -99,7 +100,9 @@ readiness =
   GenericDb.readiness go
   where
     go :: Simple.Connection -> Simple.Query -> IO ()
-    go c = Simple.execute_ c >> void
+    go c q = do
+      _ :: List (Simple.Only Int) <- Simple.query_ c q
+      pure ()
 
 -- | Find multiple rows.
 --
