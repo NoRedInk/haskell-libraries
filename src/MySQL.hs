@@ -1,17 +1,14 @@
-{-|
-Description : Helpers for running queries.
-
-This module expose some helpers for running postgresql-typed queries, but for
-MySQL. They return the correct amount of results in a Servant handler, or throw
-a Rollbarred error.
-
--}
+-- |
+-- Description : Helpers for running queries.
+--
+-- This module expose some helpers for running postgresql-typed queries, but for
+-- MySQL. They return the correct amount of results in a Servant handler, or throw
+-- a Rollbarred error.
 module MySQL
   ( -- Connection
     Connection,
     connection,
-    readiness,
-    -- ^ Creating a connection handler.
+    readiness, -- Creating a connection handler.
     -- Settings
     Settings.Settings,
     Settings.decoder,
@@ -29,8 +26,8 @@ module MySQL
     -- Reexposing useful MySQL.Simple types
     Simple.Result,
     Simple.ResultError (..),
-    Simple.convert
-    )
+    Simple.convert,
+  )
 where
 
 import Control.Exception.Safe (MonadCatch)
@@ -61,7 +58,7 @@ connection settings =
       GenericDb.maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings)),
       GenericDb.size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral,
       GenericDb.toConnectionString
-      }
+    }
 
 -- |
 -- Perform a database transaction.
@@ -72,22 +69,23 @@ transaction =
       GenericDb.commit = Simple.commit,
       GenericDb.rollback = Simple.rollback,
       GenericDb.rollbackAll = Simple.rollback -- there is no rollbackAll for mysql
-      }
+    }
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction
-  :: forall m a. (MonadIO m, MonadCatch m)
-  => Connection
-  -> (Connection -> m a)
-  -> m a
+inTestTransaction ::
+  forall m a.
+  (MonadIO m, MonadCatch m) =>
+  Connection ->
+  (Connection -> m a) ->
+  m a
 inTestTransaction =
   GenericDb.inTestTransaction GenericDb.Transaction
     { GenericDb.begin = \c -> void (Simple.execute_ c "start transaction"),
       GenericDb.commit = Simple.commit,
       GenericDb.rollback = Simple.rollback,
       GenericDb.rollbackAll = Simple.rollback -- there is no rollbackAll for mysql
-      }
+    }
 
 -- |
 -- Check that we are ready to be take traffic.
@@ -108,11 +106,11 @@ readiness =
 --         SELECT id, name FROM my_table
 --       |]
 --   @
-getMany
-  :: (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task e [a]
+getMany ::
+  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task e [a]
 getMany = withFrozenCallStack doQuery
 
 -- | returns one object!
@@ -123,18 +121,18 @@ getMany = withFrozenCallStack doQuery
 --         select title from my_table where id = 1
 --       |]
 --   @
-getOne
-  :: (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task Query.Error a
+getOne ::
+  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task Query.Error a
 getOne = withFrozenCallStack modifyExactlyOne
 
-doQuery
-  :: (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task e [a]
+doQuery ::
+  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task e [a]
 doQuery = Query.execute runQuery
 
 -- | Modify exactly one row or fail with a 500.
@@ -147,18 +145,18 @@ doQuery = Query.execute runQuery
 --         RETURNING id, name
 --       |]
 --   @
-modifyExactlyOne
-  :: (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task Query.Error a
+modifyExactlyOne ::
+  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task Query.Error a
 modifyExactlyOne = Query.modifyExactlyOne runQuery
 
-runQuery
-  :: (PGQuery q a, Simple.QueryResults r)
-  => q
-  -> Simple.Connection
-  -> IO [r]
+runQuery ::
+  (PGQuery q a, Simple.QueryResults r) =>
+  q ->
+  Simple.Connection ->
+  IO [r]
 runQuery query conn =
   query
     |> getQueryString unknownPGTypeEnv
@@ -177,7 +175,7 @@ toConnectionString
       Simple.connectUser,
       Simple.connectDatabase,
       Simple.connectPath
-      } =
+    } =
     [ connectUser,
       ":*****@",
       if connectHost == ""
@@ -188,8 +186,8 @@ toConnectionString
               ":",
               show connectPort,
               "/"
-              ],
+            ],
       connectDatabase
-      ]
+    ]
       |> mconcat
       |> toS

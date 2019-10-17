@@ -1,17 +1,14 @@
-{-|
-Description : Helpers for running queries.
-
-This module expose some helpers for running postgresql-typed queries. They
-return the correct amount of results in a Servant handler, or throw a
-Rollbarred error.
-
--}
+-- |
+-- Description : Helpers for running queries.
+--
+-- This module expose some helpers for running postgresql-typed queries. They
+-- return the correct amount of results in a Servant handler, or throw a
+-- Rollbarred error.
 module Postgres
   ( -- Connection
     Connection,
     connection,
-    readiness,
-    -- ^ Creating a connection handler.
+    readiness, -- Creating a connection handler.
     -- Settings
     Settings.Settings,
     Settings.decoder,
@@ -30,8 +27,8 @@ module Postgres
     PGArray.PGArray,
     PGQuery,
     PGTypes.PGColumn (pgDecode),
-    PGTypes.PGParameter (pgEncode)
-    )
+    PGTypes.PGParameter (pgEncode),
+  )
 where
 
 import Control.Exception.Safe (MonadCatch)
@@ -44,8 +41,8 @@ import Database.PostgreSQL.Typed
     pgDBName,
     pgDBUser,
     pgDisconnect,
-    pgQuery
-    )
+    pgQuery,
+  )
 -- Import orphan `postgresql-typed` array instances.
 -- By performing this import here, we're sure these instances will be in scope
 -- in every module that contains SQL, because all those modules import this one.
@@ -55,8 +52,8 @@ import Database.PostgreSQL.Typed.Protocol
   ( pgBegin,
     pgCommit,
     pgRollback,
-    pgRollbackAll
-    )
+    pgRollbackAll,
+  )
 import Database.PostgreSQL.Typed.Query (PGQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Health
@@ -77,7 +74,7 @@ connection settings =
       GenericDb.maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings)),
       GenericDb.size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral,
       GenericDb.toConnectionString
-      }
+    }
 
 -- |
 -- Perform a database transaction.
@@ -88,22 +85,23 @@ transaction =
       GenericDb.commit = pgCommit,
       GenericDb.rollback = pgRollback,
       GenericDb.rollbackAll = pgRollbackAll
-      }
+    }
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction
-  :: forall m a. (MonadIO m, MonadCatch m)
-  => Connection
-  -> (Connection -> m a)
-  -> m a
+inTestTransaction ::
+  forall m a.
+  (MonadIO m, MonadCatch m) =>
+  Connection ->
+  (Connection -> m a) ->
+  m a
 inTestTransaction =
   GenericDb.inTestTransaction GenericDb.Transaction
     { GenericDb.begin = pgBegin,
       GenericDb.commit = pgCommit,
       GenericDb.rollback = pgRollback,
       GenericDb.rollbackAll = pgRollbackAll
-      }
+    }
 
 -- |
 -- Check that we are ready to be take traffic.
@@ -121,11 +119,11 @@ readiness = GenericDb.readiness go
 --         SELECT id, name FROM my_table
 --       |]
 --   @
-getMany
-  :: (HasCallStack, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task e [a]
+getMany ::
+  (HasCallStack, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task e [a]
 getMany = withFrozenCallStack doQuery
 
 -- | returns one object!
@@ -136,18 +134,18 @@ getMany = withFrozenCallStack doQuery
 --         select title from my_table where id = 1
 --       |]
 --   @
-getOne
-  :: (HasCallStack, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task Query.Error a
+getOne ::
+  (HasCallStack, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task Query.Error a
 getOne = withFrozenCallStack modifyExactlyOne
 
-doQuery
-  :: (HasCallStack, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task e [a]
+doQuery ::
+  (HasCallStack, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task e [a]
 doQuery = Query.execute (flip pgQuery)
 
 -- | Modify exactly one row or fail with a 500.
@@ -160,11 +158,11 @@ doQuery = Query.execute (flip pgQuery)
 --         RETURNING id, name
 --       |]
 --   @
-modifyExactlyOne
-  :: (HasCallStack, PGQuery q a, Show q)
-  => Connection
-  -> Query.Query q
-  -> Task Query.Error a
+modifyExactlyOne ::
+  (HasCallStack, PGQuery q a, Show q) =>
+  Connection ->
+  Query.Query q ->
+  Task Query.Error a
 modifyExactlyOne = Query.modifyExactlyOne (flip pgQuery)
 
 toConnectionString :: PGDatabase -> Text
@@ -181,5 +179,5 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
             <> toS serviceName,
       "/",
       toS pgDBName
-      ]
-    :: Text
+    ] ::
+    Text
