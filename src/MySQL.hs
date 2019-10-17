@@ -27,11 +27,10 @@ module MySQL
     -- Handling transactions
     transaction,
     inTestTransaction,
-    -- Reexposing useful postgresql-typed types
-    PGArray.PGArray,
-    PGQuery,
-    PGTypes.PGColumn (pgDecode),
-    PGTypes.PGParameter (pgEncode)
+    -- Reexposing useful MySQL.Simple types
+    Simple.Result,
+    Simple.ResultError (..),
+    Simple.convert
     )
 where
 
@@ -40,11 +39,9 @@ import qualified Data.Acquire
 import Data.String (fromString)
 import qualified Database.MySQL.Simple as Simple
 import qualified Database.MySQL.Simple.QueryResults as Simple
-import Database.PostgreSQL.Typed.Array ()
-import qualified Database.PostgreSQL.Typed.Array as PGArray
+import qualified Database.MySQL.Simple.Result as Simple
 import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
 import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
-import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
