@@ -1,21 +1,19 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-{-|
-Description : Helpers for running queries.
-
-This module expose some helpers for running postgresql-typed queries. They
-return the correct amount of results in a Servant handler, or throw a
-Rollbarred error.
-
--}
+-- |
+-- Description : Helpers for running queries.
+--
+-- This module expose some helpers for running postgresql-typed queries. They
+-- return the correct amount of results in a Servant handler, or throw a
+-- Rollbarred error.
 module Internal.Query
   ( sql,
     Query,
     execute,
     modifyExactlyOne,
-    Error (ExpectChange, MoreRowsThanExpected)
-    )
+    Error (ExpectChange, MoreRowsThanExpected),
+  )
 where
 
 import Control.Monad (fail)
@@ -26,8 +24,8 @@ import qualified Environment
 import Internal.GenericDb (Connection, runTaskWithConnection)
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
-  ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType)
-    )
+  ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
+  )
 import Language.Haskell.TH.Syntax (runIO)
 import qualified Log
 import Nri.Prelude
@@ -55,7 +53,7 @@ sql =
       quoteType = fail "sql not supported in types",
       quotePat = fail "sql not supported in patterns",
       quoteDec = fail "sql not supported in declarations"
-      }
+    }
 
 data Error
   = ExpectChange Text
@@ -72,12 +70,12 @@ data Error
 --         RETURNING id, name
 --       |]
 --   @
-modifyExactlyOne
-  :: (HasCallStack, Show q)
-  => (q -> conn -> IO [a])
-  -> Connection conn
-  -> Query q
-  -> Task Error a
+modifyExactlyOne ::
+  (HasCallStack, Show q) =>
+  (q -> conn -> IO [a]) ->
+  Connection conn ->
+  Query q ->
+  Task Error a
 modifyExactlyOne runQuery c query = do
   row <- withFrozenCallStack execute runQuery c query
   case row of
@@ -85,13 +83,14 @@ modifyExactlyOne runQuery c query = do
     [x] -> pure x
     _ -> throwError <| MoreRowsThanExpected (show query)
 
-execute
-  :: (HasCallStack, Show q)
-  => (q -> conn -> IO [a])
-  -> Connection conn
-  -> Query q
-  -> Task e [a]
+execute ::
+  (HasCallStack, Show q) =>
+  (q -> conn -> IO [a]) ->
+  Connection conn ->
+  Query q ->
+  Task e [a]
 execute runQuery conn (Query query) = do
   withFrozenCallStack Log.debug (show query)
-  runTaskWithConnection conn
+  runTaskWithConnection
+    conn
     (runQuery query)

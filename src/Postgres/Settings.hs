@@ -3,7 +3,7 @@ module Postgres.Settings
       ( Settings,
         pgConnection,
         pgPool
-        ),
+      ),
     ConnectionSettings
       ( ConnectionSettings,
         pgDatabase,
@@ -11,13 +11,13 @@ module Postgres.Settings
         pgHost,
         pgPassword,
         pgPort
-        ),
+      ),
     PoolSettings
       ( PoolSettings,
         pgPoolStripes,
         pgPoolMaxIdleTime,
         pgPoolSize
-        ),
+      ),
     decoder,
     PgDatabase (PgDatabase, unPgDatabase),
     PgUser (PgUser, unPgUser),
@@ -28,8 +28,8 @@ module Postgres.Settings
     PgPoolMaxIdleTime (PgPoolMaxIdleTime, unPgPoolMaxIdleTime),
     PgPoolSize (PgPoolSize, unPgPoolSize),
     defaultSettings,
-    toPGDatabase
-    )
+    toPGDatabase,
+  )
 where
 
 import qualified Data.Text as Text (isPrefixOf)
@@ -40,8 +40,8 @@ import Database.PostgreSQL.Typed
     pgDBAddr,
     pgDBName,
     pgDBPass,
-    pgDBUser
-    )
+    pgDBUser,
+  )
 import qualified Environment
 import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
@@ -53,7 +53,7 @@ data Settings
   = Settings
       { pgConnection :: ConnectionSettings,
         pgPool :: PoolSettings
-        }
+      }
   deriving (Eq, Show, Generic)
 
 defaultSettings :: Settings
@@ -64,13 +64,13 @@ defaultSettings = Settings
         pgHost = PgHost "localhost",
         pgPassword = PgPassword (Log.mkSecret ""),
         pgPort = PgPort 8088
-        },
+      },
     pgPool = PoolSettings
       { pgPoolSize = PgPoolSize 2,
         pgPoolMaxIdleTime = PgPoolMaxIdleTime (toNominalDiffTime 3600),
         pgPoolStripes = PgPoolStripes 1
-        }
-    }
+      }
+  }
 
 data ConnectionSettings
   = ConnectionSettings
@@ -79,7 +79,7 @@ data ConnectionSettings
         pgHost :: PgHost,
         pgPassword :: PgPassword,
         pgPort :: PgPort
-        }
+      }
   deriving (Eq, Show, Generic)
 
 data PoolSettings
@@ -87,7 +87,7 @@ data PoolSettings
       { pgPoolSize :: PgPoolSize,
         pgPoolMaxIdleTime :: PgPoolMaxIdleTime,
         pgPoolStripes :: PgPoolStripes
-        }
+      }
   deriving (Eq, Show, Generic)
 
 decoder :: Environment.Decoder Settings
@@ -118,11 +118,12 @@ newtype PgPort
 
 pgPortDecoder :: Environment.Decoder PgPort
 pgPortDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PGPORT",
-      Environment.description = "The port postgres is running on.",
-      Environment.defaultValue =
-        defaultSettings |> pgConnection |> pgPort |> unPgPort |> show
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PGPORT",
+        Environment.description = "The port postgres is running on.",
+        Environment.defaultValue =
+          defaultSettings |> pgConnection |> pgPort |> unPgPort |> show
       }
     (Environment.int |> map PgPort)
 
@@ -132,11 +133,12 @@ newtype PgPassword
 
 pgPasswordDecoder :: Environment.Decoder PgPassword
 pgPasswordDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PGPASSWORD",
-      Environment.description = "The postgres user password.",
-      Environment.defaultValue =
-        defaultSettings |> pgConnection |> pgPassword |> unPgPassword |> Log.unSecret
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PGPASSWORD",
+        Environment.description = "The postgres user password.",
+        Environment.defaultValue =
+          defaultSettings |> pgConnection |> pgPassword |> unPgPassword |> Log.unSecret
       }
     (Environment.secret Environment.text |> map PgPassword)
 
@@ -146,11 +148,12 @@ newtype PgHost
 
 pgHostDecoder :: Environment.Decoder PgHost
 pgHostDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PGHOST",
-      Environment.description = "The hostname of the postgres server to connect to.",
-      Environment.defaultValue =
-        defaultSettings |> pgConnection |> pgHost |> unPgHost
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PGHOST",
+        Environment.description = "The hostname of the postgres server to connect to.",
+        Environment.defaultValue =
+          defaultSettings |> pgConnection |> pgHost |> unPgHost
       }
     (Environment.text |> map PgHost)
 
@@ -160,11 +163,12 @@ newtype PgUser
 
 pgUserDecoder :: Environment.Decoder PgUser
 pgUserDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PGUSER",
-      Environment.description = "The postgres user to connect with.",
-      Environment.defaultValue =
-        defaultSettings |> pgConnection |> pgUser |> unPgUser
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PGUSER",
+        Environment.description = "The postgres user to connect with.",
+        Environment.defaultValue =
+          defaultSettings |> pgConnection |> pgUser |> unPgUser
       }
     (Environment.text |> map PgUser)
 
@@ -174,11 +178,12 @@ newtype PgDatabase
 
 pgDatabaseDecoder :: Environment.Decoder PgDatabase
 pgDatabaseDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PGDATABASE",
-      Environment.description = "The postgres database to connect to.",
-      Environment.defaultValue =
-        defaultSettings |> pgConnection |> pgDatabase |> unPgDatabase
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PGDATABASE",
+        Environment.description = "The postgres database to connect to.",
+        Environment.defaultValue =
+          defaultSettings |> pgConnection |> pgDatabase |> unPgDatabase
       }
     (map PgDatabase Environment.text)
 
@@ -188,11 +193,12 @@ newtype PgPoolStripes
 
 pgPoolStripesDecoder :: Environment.Decoder PgPoolStripes
 pgPoolStripesDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PG_POOL_STRIPES",
-      Environment.description = "The amount of sub-connection pools to create. Best refer to the resource-pool package for more info on this one. 1 is a good value for most applications.",
-      Environment.defaultValue =
-        defaultSettings |> pgPool |> pgPoolStripes |> unPgPoolStripes |> show
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PG_POOL_STRIPES",
+        Environment.description = "The amount of sub-connection pools to create. Best refer to the resource-pool package for more info on this one. 1 is a good value for most applications.",
+        Environment.defaultValue =
+          defaultSettings |> pgPool |> pgPoolStripes |> unPgPoolStripes |> show
       }
     (Environment.int |> map PgPoolStripes)
 
@@ -202,11 +208,12 @@ newtype PgPoolMaxIdleTime
 
 pgPoolMaxIdleTimeDecoder :: Environment.Decoder PgPoolMaxIdleTime
 pgPoolMaxIdleTimeDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PG_POOL_MAX_IDLE_TIME",
-      Environment.description = "The maximum time a database connection will be able remain idle until it is closed.",
-      Environment.defaultValue =
-        defaultSettings |> pgPool |> pgPoolMaxIdleTime |> unPgPoolMaxIdleTime |> fromNominalDiffTime |> show
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PG_POOL_MAX_IDLE_TIME",
+        Environment.description = "The maximum time a database connection will be able remain idle until it is closed.",
+        Environment.defaultValue =
+          defaultSettings |> pgPool |> pgPoolMaxIdleTime |> unPgPoolMaxIdleTime |> fromNominalDiffTime |> show
       }
     (Environment.int |> map (PgPoolMaxIdleTime << toNominalDiffTime))
 
@@ -222,11 +229,12 @@ newtype PgPoolSize
 
 pgPoolSizeDecoder :: Environment.Decoder PgPoolSize
 pgPoolSizeDecoder =
-  Environment.variable Environment.Variable
-    { Environment.name = "PG_POOL_SIZE",
-      Environment.description = "The size of the postgres connection pool. This is the maximum amount of parallel database connections the app will be able to use.",
-      Environment.defaultValue =
-        defaultSettings |> pgPool |> pgPoolSize |> unPgPoolSize |> show
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PG_POOL_SIZE",
+        Environment.description = "The size of the postgres connection pool. This is the maximum amount of parallel database connections the app will be able to use.",
+        Environment.defaultValue =
+          defaultSettings |> pgPool |> pgPoolSize |> unPgPoolSize |> show
       }
     (Environment.int |> map PgPoolSize)
 
@@ -240,8 +248,8 @@ toPGDatabase
             pgHost,
             pgPassword,
             pgPort
-            }
-      } =
+          }
+    } =
     defaultPGDatabase
       { pgDBName = toS (unPgDatabase pgDatabase),
         pgDBUser = toS (unPgUser pgUser),
@@ -260,7 +268,7 @@ toPGDatabase
                 |> SockAddrUnix
                 |> Right
             else Left (toS host, show port)
-        }
+      }
     where
       host = unPgHost pgHost
       port = unPgPort pgPort

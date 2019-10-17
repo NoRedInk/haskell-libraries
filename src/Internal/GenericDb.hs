@@ -8,8 +8,8 @@ module Internal.GenericDb
     Transaction (Transaction, begin, commit, rollback, rollbackAll),
     transaction,
     inTestTransaction,
-    readiness
-    )
+    readiness,
+  )
 where
 
 import qualified Control.Exception
@@ -18,8 +18,8 @@ import qualified Control.Exception.Safe
 import qualified Control.Monad.Catch
 import Control.Monad.Catch
   ( ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess),
-    throwM
-    )
+    throwM,
+  )
 import qualified Data.Acquire
 import qualified Data.Int
 import qualified Data.Pool
@@ -35,7 +35,7 @@ data Connection c
   = Connection
       { doAnything :: Task.DoAnythingHandler,
         singleOrPool :: SingleOrPool c
-        }
+      }
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -57,7 +57,7 @@ data PoolConfig db conn
         maxIdleTime :: NominalDiffTime,
         size :: Data.Int.Int,
         toConnectionString :: db -> Text
-        }
+      }
 
 connection :: db -> PoolConfig db conn -> Data.Acquire.Acquire (Connection conn)
 connection database PoolConfig {connect, disconnect, stripes, maxIdleTime, size, toConnectionString} = Data.Acquire.mkAcquire acquire release
@@ -67,11 +67,11 @@ connection database PoolConfig {connect, disconnect, stripes, maxIdleTime, size,
       pool <-
         map Pool
           <| Data.Pool.createPool
-               (connect database `catch` handleError (toConnectionString database))
-               disconnect
-               stripes
-               maxIdleTime
-               size
+            (connect database `catch` handleError (toConnectionString database))
+            disconnect
+            stripes
+            maxIdleTime
+            size
       pure (Connection doAnything pool)
     release Connection {singleOrPool} =
       case singleOrPool of
@@ -80,12 +80,14 @@ connection database PoolConfig {connect, disconnect, stripes, maxIdleTime, size,
 
 runTaskWithConnection :: Connection t -> (t -> IO a) -> Task e a
 runTaskWithConnection conn f =
-  withConnection conn
+  withConnection
+    conn
     ( \c ->
         Task.fromIO (doAnything conn) (map Right (f c))
-      )
+    )
 
 --
+
 -- | by default, queries pull a connection from the connection pool.
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
@@ -108,7 +110,7 @@ withConnection Connection {doAnything, singleOrPool} f =
                      ExitCaseException _ ->
                        Data.Pool.destroyResource pool localPool c
                      ExitCaseAbort -> Data.Pool.destroyResource pool localPool c
-                 )
+               )
 
 -- | A version of `withConnection` that doesn't use `Data.Pool.withResource`.
 --   This has the advantage it doesn't put a `MonadBaseControl IO m` constraint
@@ -116,8 +118,8 @@ withConnection Connection {doAnything, singleOrPool} f =
 --   useful (reason: `PropertyT` does not implement a `MonadBaseControl IO a`
 --   instance). The trade-off is that this function isn't quite as safe, and has
 --   a small chance to leek database connections. For tests that seems okay.
-withConnectionUnsafe
-  :: (MonadIO m, MonadCatch m) => Connection conn -> (conn -> m a) -> m a
+withConnectionUnsafe ::
+  (MonadIO m, MonadCatch m) => Connection conn -> (conn -> m a) -> m a
 withConnectionUnsafe Connection {singleOrPool} f =
   case singleOrPool of
     (Pool pool) -> do
@@ -171,19 +173,20 @@ handleError connectionString err = do
                 |]
       [ Oops.extra "Exception" err,
         Oops.extra "Attempted to connect to" connectionString
-        ]
+      ]
   Control.Exception.displayException err
     |> toS
     |> die
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction
-  :: forall conn m a. (MonadIO m, MonadCatch m)
-  => Transaction conn
-  -> Connection conn
-  -> (Connection conn -> m a)
-  -> m a
+inTestTransaction ::
+  forall conn m a.
+  (MonadIO m, MonadCatch m) =>
+  Transaction conn ->
+  Connection conn ->
+  (Connection conn -> m a) ->
+  m a
 inTestTransaction t@Transaction {begin} conn f =
   withConnectionUnsafe conn <| \c -> do
     rollbackAllSafe t c
@@ -200,7 +203,7 @@ data Transaction conn
         begin :: conn -> IO (),
         rollback :: conn -> IO (),
         rollbackAll :: conn -> IO ()
-        }
+      }
 
 -- |
 -- Perform a database transaction.
@@ -209,9 +212,9 @@ transaction Transaction {commit, begin, rollback} conn f =
   withConnection conn <| \c ->
     map Tuple.first
       <| Task.generalBracket
-           (start c)
-           end
-           (f << (\c_ -> conn {singleOrPool = Single c_}))
+        (start c)
+        end
+        (f << (\c_ -> conn {singleOrPool = Single c_}))
   where
     start :: conn -> Task e conn
     start c =
@@ -226,13 +229,14 @@ transaction Transaction {commit, begin, rollback} conn f =
                  ExitCaseSuccess _ -> commit c
                  ExitCaseException _ -> rollback c
                  ExitCaseAbort -> rollback c
-             )
+           )
 
-rollbackAllSafe
-  :: forall conn m. (MonadIO m)
-  => Transaction conn
-  -> conn
-  -> m ()
+rollbackAllSafe ::
+  forall conn m.
+  (MonadIO m) =>
+  Transaction conn ->
+  conn ->
+  m ()
 rollbackAllSafe Transaction {begin, rollbackAll} c =
   liftIO <| do
     -- Because calling `rollbackAllTransactions` when no transactions are

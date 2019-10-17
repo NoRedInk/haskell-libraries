@@ -8,15 +8,17 @@ import Test (Test, describe, test)
 
 tests :: Test
 tests =
-  describe "Internal PostgreSQL settings tests"
+  describe
+    "Internal PostgreSQL settings tests"
     [ decodingTests
-      ]
+    ]
 
 decodingTests :: Test
 decodingTests =
-  describe "decoding"
+  describe
+    "decoding"
     [ test "default connection settings are decoded" <| \() ->
         Expect.equal
           (Right Postgres.Settings.defaultSettings :: Either Text Postgres.Settings.Settings) -- expected
           (Environment.decodeDefaults Postgres.Settings.decoder) -- observed
-      ]
+    ]
