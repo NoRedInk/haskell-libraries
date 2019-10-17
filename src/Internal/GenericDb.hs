@@ -34,7 +34,7 @@ import qualified Tuple
 data Connection c
   = Connection
       { doAnything :: Task.DoAnythingHandler,
-        connectionOrPool :: SingleOrPool c
+        singleOrPool :: SingleOrPool c
         }
 
 -- | A database connection type.
@@ -73,8 +73,8 @@ connection database PoolConfig {connect, disconnect, stripes, maxIdleTime, size,
                maxIdleTime
                size
       pure (Connection doAnything pool)
-    release Connection {connectionOrPool} =
-      case connectionOrPool of
+    release Connection {singleOrPool} =
+      case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
         Single single -> disconnect single
 
@@ -91,8 +91,8 @@ runTaskWithConnection conn f =
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
 withConnection :: Connection conn -> (conn -> Task e a) -> Task e a
-withConnection Connection {doAnything, connectionOrPool} f =
-  case connectionOrPool of
+withConnection Connection {doAnything, singleOrPool} f =
+  case singleOrPool of
     (Single c) -> f c
     (Pool pool) -> map Tuple.first <| Task.generalBracket acquire release (f << Tuple.first)
       where
@@ -118,8 +118,8 @@ withConnection Connection {doAnything, connectionOrPool} f =
 --   a small chance to leek database connections. For tests that seems okay.
 withConnectionUnsafe
   :: (MonadIO m, MonadCatch m) => Connection conn -> (conn -> m a) -> m a
-withConnectionUnsafe Connection {connectionOrPool} f =
-  case connectionOrPool of
+withConnectionUnsafe Connection {singleOrPool} f =
+  case singleOrPool of
     (Pool pool) -> do
       (c, localPool) <- liftIO <| Data.Pool.takeResource pool
       x <-
@@ -133,9 +133,9 @@ withConnectionUnsafe Connection {connectionOrPool} f =
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: IsString s => (conn -> s -> IO ()) -> Log.Handler -> Connection conn -> IO Health.Status
-readiness f log' conn = do
+readiness runQuery log' conn = do
   result <-
-    (flip f "SELECT 1" >> map (const Health.Good))
+    (flip runQuery "SELECT 1" >> map (const Health.Good))
       |> runTaskWithConnection conn
       |> Task.run log'
       |> throwEither
@@ -189,7 +189,7 @@ inTestTransaction t@Transaction {begin} conn f =
     rollbackAllSafe t c
     liftIO <| begin c
     x <-
-      f (conn {connectionOrPool = Single c})
+      f (conn {singleOrPool = Single c})
         `Control.Monad.Catch.onException` rollbackAllSafe t c
     rollbackAllSafe t c
     pure x
@@ -211,7 +211,7 @@ transaction Transaction {commit, begin, rollback} conn f =
       <| Task.generalBracket
            (start c)
            end
-           (f << (\c_ -> conn {connectionOrPool = Single c_}))
+           (f << (\c_ -> conn {singleOrPool = Single c_}))
   where
     start :: conn -> Task e conn
     start c =

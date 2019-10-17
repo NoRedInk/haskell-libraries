@@ -78,8 +78,8 @@ modifyExactlyOne
   -> Connection conn
   -> Query q
   -> Task Error a
-modifyExactlyOne f c query = do
-  row <- withFrozenCallStack execute f c query
+modifyExactlyOne runQuery c query = do
+  row <- withFrozenCallStack execute runQuery c query
   case row of
     [] -> throwError <| ExpectChange (show query)
     [x] -> pure x
@@ -91,7 +91,7 @@ execute
   -> Connection conn
   -> Query q
   -> Task e [a]
-execute f conn (Query query) = do
+execute runQuery conn (Query query) = do
   withFrozenCallStack Log.debug (show query)
   runTaskWithConnection conn
-    (f query)
+    (runQuery query)
