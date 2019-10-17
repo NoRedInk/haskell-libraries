@@ -11,7 +11,7 @@ Rollbarred error.
 -}
 module Internal.Query
   ( sql,
-    Query (Query),
+    Query,
     execute,
     modifyExactlyOne,
     Error (ExpectChange, MoreRowsThanExpected)
