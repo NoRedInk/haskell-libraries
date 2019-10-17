@@ -1,0 +1,46 @@
+<<: !include ../package-yaml-support/base-package.yaml
+name: database
+synopsis: NRI helper for database queries
+extra-source-files:
+- README.md
+dependencies:
+- base
+- directory
+- env-parser
+- exceptions
+- filepath
+- health
+- mysql-simple
+- network
+- nri-prelude
+- oops
+- postgresql-simple
+- postgresql-typed
+- process
+- resource-pool
+- resourcet
+- safe-exceptions
+- template-haskell
+- text
+- time
+- typed-process
+- unix
+library:
+  exposed-modules:
+  - MySQL
+  - Postgres
+  - PostgresSpecs
+  source-dirs: src
+tests:
+  unit:
+    dependencies:
+    - hedgehog
+    - database
+    - tasty
+    - tasty-ant-xml
+    - tasty-hedgehog
+    - tasty-hunit
+    main: Main.hs
+    source-dirs:
+    - test/unit
+    ghc-options: *test-ghc-options
