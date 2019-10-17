@@ -164,6 +164,7 @@ runQuery query conn =
   query
     |> getQueryString unknownPGTypeEnv
     |> toS
+    -- We need this prefix on tables to allow compile-time checks of the query.
     |> Text.replace "monolith." ""
     |> toS
     |> fromString
