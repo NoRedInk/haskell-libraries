@@ -23,7 +23,6 @@ module MySQL
     getMany,
     getOne,
     modifyExactlyOne,
-    Simple.convertResults,
     -- Handling transactions
     transaction,
     inTestTransaction,
