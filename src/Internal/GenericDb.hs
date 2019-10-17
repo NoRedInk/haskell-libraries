@@ -126,7 +126,7 @@ withConnectionUnsafe Connection {connectionOrPool} f =
         Data.Pool.destroyResource pool localPool c
           |> liftIO
           |> Control.Monad.Catch.onException (f c)
-      liftIO <| Data.Pool.putResource localPool c
+      liftIO (Data.Pool.putResource localPool c)
       pure x
     (Single c) -> f c
 
@@ -135,15 +135,18 @@ withConnectionUnsafe Connection {connectionOrPool} f =
 readiness :: IsString s => (conn -> s -> IO ()) -> Log.Handler -> Connection conn -> IO Health.Status
 readiness f log' conn = do
   result <-
-    Control.Exception.Safe.tryIO
-      ( throwEither <| Task.run log' <| runTaskWithConnection conn <| \c ->
-          f c "SELECT 1"
-            |> map (const Health.Good)
-        )
-  pure (Health.fromEither <| first (toS << displayException) result)
+    (flip f "SELECT 1" >> map (const Health.Good))
+      |> runTaskWithConnection conn
+      |> Task.run log'
+      |> throwEither
+      |> Control.Exception.Safe.tryIO
+  result
+    |> first (toS << displayException)
+    |> Health.fromEither
+    |> pure
 
 throwEither :: IO (Either SomeException a) -> IO a
-throwEither x = x |> andThen (either throwM pure)
+throwEither = andThen (either throwM pure)
 
 handleError :: Text -> IOException -> IO a
 handleError connectionString err = do
@@ -169,7 +172,9 @@ handleError connectionString err = do
       [ Oops.extra "Exception" err,
         Oops.extra "Attempted to connect to" connectionString
         ]
-  die (toS <| Control.Exception.displayException err)
+  Control.Exception.displayException err
+    |> toS
+    |> die
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
