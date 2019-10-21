@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -- |
 -- Description : Helpers for running queries.
 --
@@ -25,14 +27,23 @@ module Postgres
     inTestTransaction,
     -- Reexposing useful postgresql-typed types
     PGArray.PGArray,
+    PGArray.PGArrayType,
     PGQuery,
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
+    pgJsonDecode,
   )
 where
 
 import Control.Exception.Safe (MonadCatch)
 import qualified Data.Acquire
+-- Import orphan `postgresql-typed` array instances.
+-- By performing this import here, we're sure these instances will be in scope
+-- in every module that contains SQL, because all those modules import this one.
+
+import qualified Data.Aeson as Aeson
+import Data.ByteString.Lazy (fromStrict)
+import qualified Data.Int
 import Database.PostgreSQL.Typed
   ( PGConnection,
     PGDatabase (PGDatabase),
@@ -43,9 +54,6 @@ import Database.PostgreSQL.Typed
     pgDisconnect,
     pgQuery,
   )
--- Import orphan `postgresql-typed` array instances.
--- By performing this import here, we're sure these instances will be in scope
--- in every module that contains SQL, because all those modules import this one.
 import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.Array as PGArray
 import Database.PostgreSQL.Typed.Protocol
@@ -181,3 +189,19 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
       toS pgDBName
     ] ::
     Text
+
+instance PGTypes.PGColumn "integer" Int where
+  pgDecode tid tv =
+    let (i :: Data.Int.Int32) = PGTypes.pgDecode tid tv
+     in fromIntegral i
+
+instance PGTypes.PGParameter "integer" Int where
+  pgEncode tid tv =
+    let (i :: Data.Int.Int32) = fromIntegral tv
+     in PGTypes.pgEncode tid i
+
+pgJsonDecode :: (Aeson.FromJSON a) => PGTypes.PGTypeID "text" -> ByteString -> a
+pgJsonDecode _ tv =
+  case Aeson.eitherDecode (fromStrict tv) of
+    Right a' -> a'
+    Left err -> panic (toS ("Failed to decode JSON in column: " ++ err))

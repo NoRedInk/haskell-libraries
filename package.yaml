@@ -5,6 +5,7 @@ extra-source-files:
 - README.md
 dependencies:
 - base
+- bytestring
 - directory
 - env-parser
 - exceptions
