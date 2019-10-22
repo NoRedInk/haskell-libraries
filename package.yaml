@@ -25,6 +25,7 @@ dependencies:
 - time
 - typed-process
 - unix
+- webserver
 library:
   exposed-modules:
   - MySQL
