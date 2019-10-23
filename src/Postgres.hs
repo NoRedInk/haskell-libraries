@@ -54,13 +54,13 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollback,
     pgRollbackAll,
   )
-import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
-import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
+import Database.PostgreSQL.Typed.Query (PGQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import qualified Log
+import Network.Socket (SockAddr (..))
 import Nri.Prelude
 import qualified Postgres.Settings as Settings
 
@@ -76,7 +76,8 @@ connection settings =
           GenericDb.stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral,
           GenericDb.maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings)),
           GenericDb.size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral,
-          GenericDb.toConnectionString = toConnectionString
+          GenericDb.toConnectionString = toConnectionString,
+          GenericDb.toConnectionLogContext = toConnectionLogContext
         }
     )
 
@@ -152,7 +153,7 @@ doQuery ::
   Task e [a]
 doQuery conn query =
   Query.execute (flip pgQuery) conn query
-    |> wrapWithQueryContext query
+    |> Query.withLogContext conn query
 
 -- | Modify exactly one row or fail with a 500.
 --
@@ -171,16 +172,7 @@ modifyExactlyOne ::
   Task Query.Error a
 modifyExactlyOne conn query =
   Query.modifyExactlyOne (flip pgQuery) conn query
-    |> wrapWithQueryContext query
-
-wrapWithQueryContext :: PGQuery q a => Query.Query q -> Task e b -> Task e b
-wrapWithQueryContext (Query.Query query) task =
-  Log.withContext "database-query" [Log.context "query" queryInfo] task
-  where
-    queryInfo = Log.QueryInfo
-      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
-        Log.queryEngine = Log.Postgres
-      }
+    |> Query.withLogContext conn query
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
@@ -198,3 +190,23 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
       toS pgDBName
     ] ::
     Text
+
+toConnectionLogContext :: PGDatabase -> Log.QueryEngine
+toConnectionLogContext db =
+  Log.Postgres dbAddr dbPort dbName
+  where
+    dbName = pgDBName db |> toS
+    (dbAddr, dbPort) =
+      case pgDBAddr db of
+        Left (hostName, serviceName) ->
+          (toS hostName, toS serviceName)
+        Right (SockAddrInet portNum hostAddr) ->
+          (show hostAddr, show portNum)
+        Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
+          (show hostAddr, show portNum)
+        Right (SockAddrUnix sockPath) ->
+          (sockPath |> toS, "")
+        Right somethingElse ->
+          -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
+          -- Not sure what it is, so we show it in the address field.
+          (show somethingElse, "")

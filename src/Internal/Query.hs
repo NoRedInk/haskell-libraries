@@ -13,6 +13,7 @@ module Internal.Query
     execute,
     modifyExactlyOne,
     Error (ExpectChange, MoreRowsThanExpected),
+    withLogContext,
   )
 where
 
@@ -20,8 +21,10 @@ import Control.Monad (fail)
 import Data.String (String)
 import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
+import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
+import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Environment
-import Internal.GenericDb (Connection, runTaskWithConnection)
+import Internal.GenericDb (Connection, logContext, runTaskWithConnection)
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
@@ -91,6 +94,15 @@ execute ::
   Task e [a]
 execute runQuery conn (Query query) = do
   withFrozenCallStack Log.debug (show query)
-  runTaskWithConnection
-    conn
-    (runQuery query)
+  runTaskWithConnection conn (runQuery query)
+
+-- TODO: Figure out if there's a way to get this into `execute` above without
+-- causing errors about constraints, etc.
+withLogContext :: PGQuery q a => Connection c -> Query q -> Task e b -> Task e b
+withLogContext conn (Query query) task =
+  Log.withContext "database-query" [Log.context "query" queryInfo] task
+  where
+    queryInfo = Log.QueryInfo
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+        Log.queryEngine = logContext conn
+      }
