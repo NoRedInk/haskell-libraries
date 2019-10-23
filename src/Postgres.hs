@@ -63,6 +63,7 @@ import qualified Log
 import Network.Socket (SockAddr (..))
 import Nri.Prelude
 import qualified Postgres.Settings as Settings
+import Prelude (error)
 
 type Connection = GenericDb.Connection PGConnection
 
@@ -191,22 +192,23 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
     ] ::
     Text
 
-toConnectionLogContext :: PGDatabase -> Log.QueryEngine
+toConnectionLogContext :: PGDatabase -> Log.QueryConnectionInfo
 toConnectionLogContext db =
-  Log.Postgres dbAddr dbPort dbName
+  case pgDBAddr db of
+    Left (hostName, serviceName) ->
+      Log.TcpSocket Log.Postgres (toS hostName) (toS serviceName) databaseName
+    Right (SockAddrInet portNum hostAddr) ->
+      Log.TcpSocket Log.Postgres (show hostAddr) (show portNum) databaseName
+    Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
+      Log.TcpSocket Log.Postgres (show hostAddr) (show portNum) databaseName
+    Right (SockAddrUnix sockPath) ->
+      Log.UnixSocket Log.Postgres (toS sockPath) databaseName
+    Right somethingElse ->
+      -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
+      error
+        ( "Failed to convert PostgreSQL database address; no idea what a "
+            ++ (show somethingElse)
+            ++ " is."
+        )
   where
-    dbName = pgDBName db |> toS
-    (dbAddr, dbPort) =
-      case pgDBAddr db of
-        Left (hostName, serviceName) ->
-          (toS hostName, toS serviceName)
-        Right (SockAddrInet portNum hostAddr) ->
-          (show hostAddr, show portNum)
-        Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-          (show hostAddr, show portNum)
-        Right (SockAddrUnix sockPath) ->
-          (sockPath |> toS, "")
-        Right somethingElse ->
-          -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
-          -- Not sure what it is, so we show it in the address field.
-          (show somethingElse, "")
+    databaseName = pgDBName db |> toS

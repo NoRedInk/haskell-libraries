@@ -44,7 +44,7 @@ data Connection c
   = Connection
       { doAnything :: Task.DoAnythingHandler,
         singleOrPool :: SingleOrPool c,
-        logContext :: Log.QueryEngine
+        logContext :: Log.QueryConnectionInfo
       }
 
 -- | A database connection type.
@@ -67,7 +67,7 @@ data PoolConfig db conn
         maxIdleTime :: NominalDiffTime,
         size :: Data.Int.Int,
         toConnectionString :: db -> Text,
-        toConnectionLogContext :: db -> Log.QueryEngine
+        toConnectionLogContext :: db -> Log.QueryConnectionInfo
       }
 
 connection :: db -> PoolConfig db conn -> Data.Acquire.Acquire (Connection conn)

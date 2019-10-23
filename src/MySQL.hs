@@ -200,7 +200,7 @@ toConnectionString
       |> mconcat
       |> toS
 
-toConnectionLogContext :: Simple.ConnectInfo -> Log.QueryEngine
+toConnectionLogContext :: Simple.ConnectInfo -> Log.QueryConnectionInfo
 toConnectionLogContext
   Simple.ConnectInfo
     { Simple.connectHost,
@@ -208,10 +208,8 @@ toConnectionLogContext
       Simple.connectDatabase,
       Simple.connectPath
     } =
-    Log.MySQL dbAddr dbPort dbName
+    if connectHost == ""
+      then Log.UnixSocket Log.MySQL (toS connectPath) databaseName
+      else Log.TcpSocket Log.MySQL (toS connectHost) (show connectPort) databaseName
     where
-      dbName = toS connectDatabase
-      (dbAddr, dbPort) =
-        if connectHost == ""
-          then (toS connectPath, "")
-          else (toS connectHost, show connectPort)
+      databaseName = toS connectDatabase

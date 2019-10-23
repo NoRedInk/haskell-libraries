@@ -104,5 +104,5 @@ withLogContext conn (Query query) task =
   where
     queryInfo = Log.QueryInfo
       { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
-        Log.queryEngine = logContext conn
+        Log.queryConn = logContext conn
       }
