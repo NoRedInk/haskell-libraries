@@ -63,7 +63,6 @@ import qualified Internal.Query as Query
 import qualified Log
 import Nri.Prelude
 import qualified Postgres.Settings as Settings
-import qualified Tracer.NewRelic
 
 type Connection = GenericDb.Connection PGConnection
 
@@ -175,9 +174,9 @@ wrapWithQueryContext :: PGQuery q a => Query.Query q -> Task e b -> Task e b
 wrapWithQueryContext (Query.Query query) task =
   Log.withContext "database-query" [Log.context "query" queryInfo] task
   where
-    queryInfo = Tracer.NewRelic.QueryInfo
-      { Tracer.NewRelic.query = toS <| getQueryString unknownPGTypeEnv query,
-        Tracer.NewRelic.engine = Tracer.NewRelic.Postgres
+    queryInfo = Log.QueryInfo
+      { Log.query = toS <| getQueryString unknownPGTypeEnv query,
+        Log.engine = Log.Postgres
       }
 
 toConnectionString :: PGDatabase -> Text
