@@ -133,7 +133,9 @@ doQuery ::
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery = Query.execute runQuery
+doQuery conn query =
+  Query.execute runQuery conn query
+    |> wrapWithQueryContext query
 
 -- | Modify exactly one row or fail with a 500.
 --
@@ -150,7 +152,9 @@ modifyExactlyOne ::
   Connection ->
   Query.Query q ->
   Task Query.Error a
-modifyExactlyOne = Query.modifyExactlyOne runQuery
+modifyExactlyOne conn query =
+  Query.modifyExactlyOne runQuery conn query
+    |> wrapWithQueryContext query
 
 runQuery ::
   (PGQuery q a, Simple.QueryResults r) =>
@@ -166,6 +170,15 @@ runQuery query conn =
     |> toS
     |> fromString
     |> Simple.query_ conn
+
+wrapWithQueryContext :: PGQuery q a => Query.Query q -> Task e b -> Task e b
+wrapWithQueryContext (Query.Query query) task =
+  Log.withContext "database-query" [Log.context "query" queryInfo] task
+  where
+    queryInfo = Log.QueryInfo
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+        Log.queryEngine = Log.MySQL
+      }
 
 toConnectionString :: Simple.ConnectInfo -> Text
 toConnectionString
