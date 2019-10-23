@@ -51,14 +51,17 @@ type Connection = GenericDb.Connection Simple.Connection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  GenericDb.connection (Settings.toConnectInfo settings) GenericDb.PoolConfig
-    { GenericDb.connect = Simple.connect,
-      GenericDb.disconnect = Simple.close,
-      GenericDb.stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral,
-      GenericDb.maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings)),
-      GenericDb.size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral,
-      GenericDb.toConnectionString
-    }
+  GenericDb.connection
+    (Settings.toConnectInfo settings)
+    ( GenericDb.PoolConfig
+        { GenericDb.connect = Simple.connect,
+          GenericDb.disconnect = Simple.close,
+          GenericDb.stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral,
+          GenericDb.maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings)),
+          GenericDb.size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral,
+          GenericDb.toConnectionString = toConnectionString
+        }
+    )
 
 -- |
 -- Perform a database transaction.

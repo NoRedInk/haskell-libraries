@@ -68,14 +68,17 @@ type Connection = GenericDb.Connection PGConnection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  GenericDb.connection (Settings.toPGDatabase settings) GenericDb.PoolConfig
-    { GenericDb.connect = pgConnect,
-      GenericDb.disconnect = pgDisconnect,
-      GenericDb.stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral,
-      GenericDb.maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings)),
-      GenericDb.size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral,
-      GenericDb.toConnectionString
-    }
+  GenericDb.connection
+    (Settings.toPGDatabase settings)
+    ( GenericDb.PoolConfig
+        { GenericDb.connect = pgConnect,
+          GenericDb.disconnect = pgDisconnect,
+          GenericDb.stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral,
+          GenericDb.maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings)),
+          GenericDb.size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral,
+          GenericDb.toConnectionString = toConnectionString
+        }
+    )
 
 -- |
 -- Perform a database transaction.
