@@ -201,5 +201,17 @@ toConnectionString
       |> toS
 
 toConnectionLogContext :: Simple.ConnectInfo -> Log.QueryEngine
-toConnectionLogContext _db =
-  Log.MySQL -- TODO: Include more information.
+toConnectionLogContext
+  Simple.ConnectInfo
+    { Simple.connectHost,
+      Simple.connectPort,
+      Simple.connectDatabase,
+      Simple.connectPath
+    } =
+    Log.MySQL dbAddr dbPort dbName
+    where
+      dbName = toS connectDatabase
+      (dbAddr, dbPort) =
+        if connectHost == ""
+          then (toS connectPath, "")
+          else (toS connectHost, show connectPort)
