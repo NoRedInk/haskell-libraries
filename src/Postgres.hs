@@ -175,8 +175,8 @@ wrapWithQueryContext (Query.Query query) task =
   Log.withContext "database-query" [Log.context "query" queryInfo] task
   where
     queryInfo = Log.QueryInfo
-      { Log.query = toS <| getQueryString unknownPGTypeEnv query,
-        Log.engine = Log.Postgres
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+        Log.queryEngine = Log.Postgres
       }
 
 toConnectionString :: PGDatabase -> Text
