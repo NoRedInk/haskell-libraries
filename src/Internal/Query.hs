@@ -12,7 +12,6 @@ module Internal.Query
     Query (Query),
     expectOne,
     Error (ExpectChange, MoreRowsThanExpected),
-    withLogContext,
   )
 where
 
@@ -20,16 +19,12 @@ import Control.Monad (fail)
 import Data.String (String)
 import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
-import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
-import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Environment
-import Internal.GenericDb (Connection, logContext)
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
   )
 import Language.Haskell.TH.Syntax (runIO)
-import qualified Log
 import Nri.Prelude
 import qualified Postgres.Settings
 
@@ -71,14 +66,3 @@ expectOne queryString rows =
     [] -> throwError <| ExpectChange queryString
     [x] -> pure x
     _ -> throwError <| MoreRowsThanExpected queryString
-
--- TODO: Figure out if there's a way to get this into `execute` above without
--- causing errors about constraints, etc.
-withLogContext :: PGQuery q a => Connection c -> Query q -> Task e b -> Task e b
-withLogContext conn (Query query) task =
-  Log.withContext "database-query" [Log.context "query" queryInfo] task
-  where
-    queryInfo = Log.QueryInfo
-      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
-        Log.queryConn = logContext conn
-      }

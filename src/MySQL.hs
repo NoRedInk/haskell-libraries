@@ -140,7 +140,12 @@ doQuery ::
 doQuery conn (Query.Query query) = do
   withFrozenCallStack Log.debug (show query)
   GenericDb.runTaskWithConnection conn (runQuery query)
-    |> Query.withLogContext conn (Query.Query query)
+    |> Log.withContext "mysql-query" [Log.context "query" queryInfo]
+  where
+    queryInfo = Log.QueryInfo
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+        Log.queryConn = GenericDb.logContext conn
+      }
 
 -- | Modify exactly one row or fail with a 500.
 --

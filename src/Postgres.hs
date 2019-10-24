@@ -54,8 +54,9 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollback,
     pgRollbackAll,
   )
-import Database.PostgreSQL.Typed.Query (PGQuery)
+import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
+import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
@@ -155,7 +156,12 @@ doQuery ::
 doQuery conn (Query.Query query) = do
   withFrozenCallStack Log.debug (show query)
   GenericDb.runTaskWithConnection conn (\c -> pgQuery c query)
-    |> Query.withLogContext conn (Query.Query query)
+    |> Log.withContext "postgresql-query" [Log.context "query" queryInfo]
+  where
+    queryInfo = Log.QueryInfo
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+        Log.queryConn = GenericDb.logContext conn
+      }
 
 -- | Modify exactly one row or fail with a 500.
 --
