@@ -17,6 +17,7 @@ module MySQL
     Query.sql,
     Query.Error (..),
     doQuery,
+    doQueryWithMySQLHack,
     getMany,
     getOne,
     modifyExactlyOne,
@@ -133,7 +134,15 @@ doQuery ::
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery = Query.execute runQuery
+doQuery = Query.execute (runQuery identity)
+
+doQueryWithMySQLHack ::
+  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  Connection ->
+  (Text -> Text) ->
+  Query.Query q ->
+  Task e [a]
+doQueryWithMySQLHack c f = Query.execute (runQuery f) c
 
 -- | Modify exactly one row or fail with a 500.
 --
@@ -150,19 +159,21 @@ modifyExactlyOne ::
   Connection ->
   Query.Query q ->
   Task Query.Error a
-modifyExactlyOne = Query.modifyExactlyOne runQuery
+modifyExactlyOne = Query.modifyExactlyOne (runQuery identity)
 
 runQuery ::
   (PGQuery q a, Simple.QueryResults r) =>
+  (Text -> Text) ->
   q ->
   Simple.Connection ->
   IO [r]
-runQuery query conn =
+runQuery f query conn =
   query
     |> getQueryString unknownPGTypeEnv
     |> toS
     -- We need this prefix on tables to allow compile-time checks of the query.
     |> Text.replace "monolith." ""
+    |> f
     |> toS
     |> fromString
     |> Simple.query_ conn
