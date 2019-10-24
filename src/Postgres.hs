@@ -214,7 +214,7 @@ toConnectionLogContext db =
       -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
       error
         ( "Failed to convert PostgreSQL database address; no idea what a "
-            ++ (show somethingElse)
+            ++ show somethingElse
             ++ " is."
         )
   where
