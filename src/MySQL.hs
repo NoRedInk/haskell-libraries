@@ -137,9 +137,10 @@ doQuery ::
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery conn query =
-  Query.execute runQuery conn query
-    |> Query.withLogContext conn query
+doQuery conn (Query.Query query) = do
+  withFrozenCallStack Log.debug (show query)
+  GenericDb.runTaskWithConnection conn (runQuery query)
+    |> Query.withLogContext conn (Query.Query query)
 
 -- | Modify exactly one row or fail with a 500.
 --

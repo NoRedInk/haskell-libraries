@@ -10,7 +10,6 @@
 module Internal.Query
   ( sql,
     Query (Query),
-    execute,
     expectOne,
     Error (ExpectChange, MoreRowsThanExpected),
     withLogContext,
@@ -24,7 +23,7 @@ import Database.PostgreSQL.Typed.Array ()
 import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
 import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Environment
-import Internal.GenericDb (Connection, logContext, runTaskWithConnection)
+import Internal.GenericDb (Connection, logContext)
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
@@ -72,16 +71,6 @@ expectOne queryString rows =
     [] -> throwError <| ExpectChange queryString
     [x] -> pure x
     _ -> throwError <| MoreRowsThanExpected queryString
-
-execute ::
-  (HasCallStack, Show q) =>
-  (q -> conn -> IO [a]) ->
-  Connection conn ->
-  Query q ->
-  Task e [a]
-execute runQuery conn (Query query) = do
-  withFrozenCallStack Log.debug (show query)
-  runTaskWithConnection conn (runQuery query)
 
 -- TODO: Figure out if there's a way to get this into `execute` above without
 -- causing errors about constraints, etc.

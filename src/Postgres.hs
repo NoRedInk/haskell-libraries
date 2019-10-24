@@ -152,9 +152,10 @@ doQuery ::
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery conn query =
-  Query.execute (flip pgQuery) conn query
-    |> Query.withLogContext conn query
+doQuery conn (Query.Query query) = do
+  withFrozenCallStack Log.debug (show query)
+  GenericDb.runTaskWithConnection conn (\c -> pgQuery c query)
+    |> Query.withLogContext conn (Query.Query query)
 
 -- | Modify exactly one row or fail with a 500.
 --
