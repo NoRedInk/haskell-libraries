@@ -157,7 +157,8 @@ modifyExactlyOne ::
   Query.Query q ->
   Task Query.Error a
 modifyExactlyOne conn query =
-  Query.modifyExactlyOne runQuery conn query
+  doQuery conn query
+    |> andThen (Query.expectOne (show query))
     |> Query.withLogContext conn query
 
 runQuery ::

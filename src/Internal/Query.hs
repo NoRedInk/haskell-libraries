@@ -11,7 +11,7 @@ module Internal.Query
   ( sql,
     Query (Query),
     execute,
-    modifyExactlyOne,
+    expectOne,
     Error (ExpectChange, MoreRowsThanExpected),
     withLogContext,
   )
@@ -63,28 +63,15 @@ data Error
   | MoreRowsThanExpected Text
   deriving (Show)
 
--- | Modify exactly one row or fail with a 500.
---
---   @
---     modifyExactlyOne c
---       [pgSQL|
---         INSERT INTO my_table (name)
---           VALUES ($1)
---         RETURNING id, name
---       |]
---   @
-modifyExactlyOne ::
-  (HasCallStack, Show q) =>
-  (q -> conn -> IO [a]) ->
-  Connection conn ->
-  Query q ->
+expectOne ::
+  Text ->
+  [a] ->
   Task Error a
-modifyExactlyOne runQuery c query = do
-  row <- withFrozenCallStack execute runQuery c query
-  case row of
-    [] -> throwError <| ExpectChange (show query)
+expectOne queryString rows =
+  case rows of
+    [] -> throwError <| ExpectChange queryString
     [x] -> pure x
-    _ -> throwError <| MoreRowsThanExpected (show query)
+    _ -> throwError <| MoreRowsThanExpected queryString
 
 execute ::
   (HasCallStack, Show q) =>

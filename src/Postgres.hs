@@ -172,7 +172,8 @@ modifyExactlyOne ::
   Query.Query q ->
   Task Query.Error a
 modifyExactlyOne conn query =
-  Query.modifyExactlyOne (flip pgQuery) conn query
+  doQuery conn query
+    |> andThen (Query.expectOne (show query))
     |> Query.withLogContext conn query
 
 toConnectionString :: PGDatabase -> Text
