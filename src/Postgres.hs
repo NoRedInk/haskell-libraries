@@ -175,7 +175,6 @@ modifyExactlyOne ::
 modifyExactlyOne conn query =
   doQuery conn query
     |> andThen (Query.expectOne (show query))
-    |> Query.withLogContext conn query
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =

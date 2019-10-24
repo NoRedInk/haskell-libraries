@@ -160,7 +160,6 @@ modifyExactlyOne ::
 modifyExactlyOne conn query =
   doQuery conn query
     |> andThen (Query.expectOne (show query))
-    |> Query.withLogContext conn query
 
 runQuery ::
   (PGQuery q a, Simple.QueryResults r) =>
