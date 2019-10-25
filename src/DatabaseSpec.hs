@@ -9,11 +9,14 @@ module DatabaseSpec
   )
 where
 
+import qualified MySQL.InternalSpec
 import qualified Postgres.SettingsSpec
 import Test (Test, describe)
 
 tests :: Test
 tests =
   describe
-    "Nri PostgreSQL lib"
-    [Postgres.SettingsSpec.tests]
+    "lib/database"
+    [ Postgres.SettingsSpec.tests,
+      MySQL.InternalSpec.tests
+    ]

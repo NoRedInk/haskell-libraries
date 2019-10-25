@@ -9,7 +9,7 @@ import Test (Test, describe, test)
 tests :: Test
 tests =
   describe
-    "Internal PostgreSQL settings tests"
+    "Postgres.Settings"
     [ decodingTests
     ]
 
