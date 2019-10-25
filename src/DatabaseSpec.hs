@@ -9,6 +9,7 @@ module DatabaseSpec
   )
 where
 
+import qualified Internal.Query.ParserSpec
 import qualified MySQL.InternalSpec
 import qualified Postgres.SettingsSpec
 import Test (Test, describe)
@@ -18,5 +19,6 @@ tests =
   describe
     "lib/database"
     [ Postgres.SettingsSpec.tests,
-      MySQL.InternalSpec.tests
+      MySQL.InternalSpec.tests,
+      Internal.Query.ParserSpec.tests
     ]
