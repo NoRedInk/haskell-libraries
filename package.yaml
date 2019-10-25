@@ -34,7 +34,7 @@ library:
   exposed-modules:
   - MySQL
   - Postgres
-  - PostgresSpecs
+  - DatabaseSpec
   source-dirs: src
 tests:
   unit:

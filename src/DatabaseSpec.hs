@@ -4,7 +4,7 @@
 -- be written for internal modules without exposing either publicly.
 --
 -- The specs themselves don't live in here.
-module PostgresSpecs
+module DatabaseSpec
   ( tests,
   )
 where
