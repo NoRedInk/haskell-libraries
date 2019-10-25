@@ -27,6 +27,7 @@ module MySQL
     Simple.Result,
     Simple.ResultError (..),
     Simple.convert,
+    Simple.Only (..),
   )
 where
 

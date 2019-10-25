@@ -4,9 +4,7 @@ synopsis: NRI helper for database queries
 extra-source-files:
 - README.md
 dependencies:
-- aeson
 - base
-- bytestring
 - directory
 - env-parser
 - exceptions

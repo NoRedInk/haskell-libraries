@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
 -- Description : Helpers for running queries.
@@ -16,9 +17,12 @@ module Internal.Query
 where
 
 import Control.Monad (fail)
+import qualified Data.Int
 import Data.String (String)
+import qualified Database.MySQL.Simple as MySQL.Simple
 import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
+import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
@@ -66,3 +70,27 @@ expectOne queryString rows =
     [] -> throwError <| ExpectChange queryString
     [x] -> pure x
     _ -> throwError <| MoreRowsThanExpected queryString
+
+-- |
+-- The default `Int` type we use in our Haskell code is an `Int64`. This
+-- corresponds to a `bigint` in SQL. Most of our MySQL tables use regular
+-- `integers` though, which are 32 bits.
+--
+-- In our Postgres databases we default to using `bigint` for columns, but in
+-- our legacy MySQL database we have missed that boat. We'd still like to be
+-- able to write our Haskell default Ints to/from MySQL without ceremony, so
+-- we add these instances to make it possible.
+instance PGTypes.PGColumn "integer" Int where
+  pgDecode tid tv =
+    let (i :: Data.Int.Int32) = PGTypes.pgDecode tid tv
+     in fromIntegral i
+
+instance PGTypes.PGParameter "integer" Int where
+  pgEncode tid tv =
+    let (i :: Data.Int.Int32) = fromIntegral tv
+     in PGTypes.pgEncode tid i
+
+instance PGTypes.PGColumn t a => PGTypes.PGColumn t (MySQL.Simple.Only a) where
+  pgDecode tid tv =
+    PGTypes.pgDecode tid tv
+      |> MySQL.Simple.Only
