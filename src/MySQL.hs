@@ -141,7 +141,7 @@ doQuery ::
 doQuery conn query = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query)
   GenericDb.runTaskWithConnection conn (runQuery query)
-    |> Log.withContext "mysql-query" [Log.context "query" queryInfo]
+    |> Log.withContext "mysql-query" [Log.Query queryInfo]
   where
     queryInfo = Log.QueryInfo
       { Log.queryText = toS <| Query.sqlString query,

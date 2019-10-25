@@ -155,7 +155,7 @@ doQuery ::
 doQuery conn query = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query)
   GenericDb.runTaskWithConnection conn (Query.runQuery query)
-    |> Log.withContext "postgresql-query" [Log.context "query" queryInfo]
+    |> Log.withContext "postgresql-query" [Log.Query queryInfo]
   where
     queryInfo = Log.QueryInfo
       { Log.queryText = Query.sqlString query,
