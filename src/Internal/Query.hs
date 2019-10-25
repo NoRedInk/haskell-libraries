@@ -19,10 +19,12 @@ where
 import Control.Monad (fail)
 import qualified Data.Int
 import Data.String (String)
-import qualified Data.Text as T
+import qualified Data.Text
+import qualified Data.Text.Encoding
 import qualified Database.MySQL.Simple as MySQL.Simple
-import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
+import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
+import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
 import qualified Internal.Query.Parser as Parser
@@ -34,13 +36,27 @@ import Language.Haskell.TH.Syntax (runIO)
 import Nri.Prelude
 import qualified Postgres.Settings
 
--- | A wrapper around a `postgresql-typed` query. This will ensure all queries
---   we handle in this module will be created using helpers in this module.
---   I.E.: It will be impossible to use the `pgSql` function from the
---   `postgresql-typed` library directly.
-data Query q
+-- |
+-- A wrapper around a `postgresql-typed` query. This type has a number of
+-- different purposes.
+--
+-- 1. By not using the native `postgresql-typed` Query type we ensure all our
+--    queries are made through the `database` package, which in turn ensures
+--    they're all logged and traced.
+-- 2. The `postgresql-typed` query type is parametrized over `q`. It's not
+--    immediately clear what this `q` means. Our query type is parametrized over
+--    `row`, the type of the rows this query returns. That's conceptually much
+--    easier to gok.
+-- 3. We attach a bunch of meta data that can be derived from the wrapped
+--    `postgresql-typed` query type. Although this information could be
+--    calculated on the fly for each query, attaching it to our own `Query`
+--    type ensures we only need to calculate the metadata once, at compile time.
+data Query row
   = Query
-      { query :: q,
+      { -- | Run a query against Postgres
+        runQuery :: PGConnection -> IO [row],
+        -- | The raw SQL string
+        sqlString :: Text,
         -- | The query string as extracted from an `sql` quasi quote.
         quasiQuotedString :: Text,
         -- | SELECT / INSERT / UPDATE / ...
@@ -48,7 +64,6 @@ data Query q
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
-  deriving (Show)
 
 qqSQL :: String -> ExpQ
 qqSQL query = do
@@ -56,9 +71,18 @@ qqSQL query = do
   db' <- runIO db
   void (useTPGDatabase db')
   let meta = Parser.parse (toS query)
-  let op = T.unpack (Parser.sqlOperation meta)
-  let rel = T.unpack (Parser.queriedRelation meta)
-  [e|Query $(quoteExp pgSQL query) query op rel|]
+  let op = Data.Text.unpack (Parser.sqlOperation meta)
+  let rel = Data.Text.unpack (Parser.queriedRelation meta)
+  [e|
+    let q = $(quoteExp pgSQL query)
+     in Query
+          { runQuery = \c -> pgQuery c q,
+            sqlString = Data.Text.Encoding.decodeUtf8 (getQueryString PGTypes.unknownPGTypeEnv q),
+            quasiQuotedString = query,
+            sqlOperation = op,
+            queriedRelation = rel
+          }
+    |]
 
 sql :: QuasiQuoter
 sql =

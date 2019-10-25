@@ -26,7 +26,6 @@ module Postgres
     -- Reexposing useful postgresql-typed types
     PGArray.PGArray,
     PGArray.PGArrayType,
-    PGQuery,
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
   )
@@ -56,9 +55,7 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollback,
     pgRollbackAll,
   )
-import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
-import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
@@ -129,10 +126,10 @@ readiness = GenericDb.readiness go
 --       |]
 --   @
 getMany ::
-  (HasCallStack, PGQuery q a) =>
+  (HasCallStack) =>
   Connection ->
-  Query.Query q ->
-  Task e [a]
+  Query.Query row ->
+  Task e [row]
 getMany = withFrozenCallStack doQuery
 
 -- | returns one object!
@@ -144,24 +141,24 @@ getMany = withFrozenCallStack doQuery
 --       |]
 --   @
 getOne ::
-  (HasCallStack, PGQuery q a) =>
+  (HasCallStack) =>
   Connection ->
-  Query.Query q ->
-  Task Query.Error a
+  Query.Query row ->
+  Task Query.Error row
 getOne = withFrozenCallStack modifyExactlyOne
 
 doQuery ::
-  (HasCallStack, PGQuery q a) =>
+  (HasCallStack) =>
   Connection ->
-  Query.Query q ->
-  Task e [a]
+  Query.Query row ->
+  Task e [row]
 doQuery conn query = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query)
-  GenericDb.runTaskWithConnection conn (\c -> pgQuery c (Query.query query))
+  GenericDb.runTaskWithConnection conn (Query.runQuery query)
     |> Log.withContext "postgresql-query" [Log.context "query" queryInfo]
   where
     queryInfo = Log.QueryInfo
-      { Log.queryText = toS <| getQueryString unknownPGTypeEnv (Query.query query),
+      { Log.queryText = Query.sqlString query,
         Log.queryConn = GenericDb.logContext conn,
         Log.queryOperation = Query.sqlOperation query,
         Log.queryCollection = Query.queriedRelation query
@@ -178,10 +175,10 @@ doQuery conn query = do
 --       |]
 --   @
 modifyExactlyOne ::
-  (HasCallStack, PGQuery q a) =>
+  (HasCallStack) =>
   Connection ->
-  Query.Query q ->
-  Task Query.Error a
+  Query.Query row ->
+  Task Query.Error row
 modifyExactlyOne conn query =
   doQuery conn query
     |> andThen (Query.expectOne (Query.quasiQuotedString query))

@@ -38,8 +38,6 @@ import Data.String (fromString)
 import qualified Database.MySQL.Simple as Simple
 import qualified Database.MySQL.Simple.QueryResults as Simple
 import qualified Database.MySQL.Simple.Result as Simple
-import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
-import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
@@ -114,10 +112,10 @@ readiness =
 --       |]
 --   @
 getMany ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
+  (HasCallStack, Simple.QueryResults row) =>
   Connection ->
-  Query.Query q ->
-  Task e [a]
+  Query.Query row ->
+  Task e [row]
 getMany = withFrozenCallStack doQuery
 
 -- | returns one object!
@@ -129,24 +127,24 @@ getMany = withFrozenCallStack doQuery
 --       |]
 --   @
 getOne ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
+  (HasCallStack, Simple.QueryResults row) =>
   Connection ->
-  Query.Query q ->
-  Task Query.Error a
+  Query.Query row ->
+  Task Query.Error row
 getOne = withFrozenCallStack modifyExactlyOne
 
 doQuery ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
+  (HasCallStack, Simple.QueryResults row) =>
   Connection ->
-  Query.Query q ->
-  Task e [a]
+  Query.Query row ->
+  Task e [row]
 doQuery conn query = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query)
-  GenericDb.runTaskWithConnection conn (runQuery (Query.query query))
+  GenericDb.runTaskWithConnection conn (runQuery query)
     |> Log.withContext "mysql-query" [Log.context "query" queryInfo]
   where
     queryInfo = Log.QueryInfo
-      { Log.queryText = toS <| getQueryString unknownPGTypeEnv (Query.query query),
+      { Log.queryText = toS <| Query.sqlString query,
         Log.queryConn = GenericDb.logContext conn,
         Log.queryOperation = Query.sqlOperation query,
         Log.queryCollection = Query.queriedRelation query
@@ -163,22 +161,22 @@ doQuery conn query = do
 --       |]
 --   @
 modifyExactlyOne ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
+  (HasCallStack, Simple.QueryResults row) =>
   Connection ->
-  Query.Query q ->
-  Task Query.Error a
+  Query.Query row ->
+  Task Query.Error row
 modifyExactlyOne conn query =
   doQuery conn query
     |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 runQuery ::
-  (PGQuery q a, Simple.QueryResults r) =>
-  q ->
+  (Simple.QueryResults row) =>
+  Query.Query row ->
   Simple.Connection ->
-  IO [r]
+  IO [row]
 runQuery query conn =
   query
-    |> getQueryString unknownPGTypeEnv
+    |> Query.sqlString
     |> toS
     -- We need this prefix on tables to allow compile-time checks of the query.
     |> Text.replace "monolith." ""
