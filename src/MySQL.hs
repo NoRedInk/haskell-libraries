@@ -1,5 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
-
 -- |
 -- Description : Helpers for running queries.
 --
@@ -29,12 +27,10 @@ module MySQL
     Simple.Result,
     Simple.ResultError (..),
     Simple.convert,
-    anyToIn,
   )
 where
 
 import Control.Exception.Safe (MonadCatch)
-import qualified Control.Lens as Lens
 import qualified Data.Acquire
 import Data.String (fromString)
 import qualified Database.MySQL.Simple as Simple
@@ -43,11 +39,11 @@ import qualified Database.MySQL.Simple.Result as Simple
 import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
 import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Health
-import qualified Internal.CaselessRegex as R
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import List (List)
 import qualified Log
+import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
 import Nri.Prelude
 import qualified Text
@@ -140,26 +136,6 @@ doQuery ::
   Task e [a]
 doQuery = Query.execute runQuery
 
--- | MySQL doesn't support `= ANY`, we can use `IN` instead.
--- We need to write the query with `ANY` though, because postgres-typed is
--- expecting that. The code won't compile otherwise.
-anyToIn :: Text -> Text
-anyToIn =
-  Lens.over
-    ( -- Matches `= ANY ('{1,2,3,4}')`
-      [R.caselessRegex|=\s*any\s*\(\s*'{.*}'\s*\)|]
-        << R.match -- Get the matched text
-    )
-    -- Replace with `IN (1,2,3,4)
-    ( \matched ->
-        matched
-          |> Text.replace "= any" "IN"
-          -- It can also be upper-cased
-          |> Text.replace "= ANY" "IN"
-          |> Text.replace "'{" ""
-          |> Text.replace "}'" ""
-    )
-
 -- | Modify exactly one row or fail with a 500.
 --
 --   @
@@ -188,7 +164,7 @@ runQuery query conn =
     |> toS
     -- We need this prefix on tables to allow compile-time checks of the query.
     |> Text.replace "monolith." ""
-    |> anyToIn
+    |> Internal.anyToIn
     |> toS
     |> fromString
     |> Simple.query_ conn
