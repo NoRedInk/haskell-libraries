@@ -20,7 +20,7 @@ tests =
               [ "SELECT hat FROM royalty",
                 "WHERE hat IN (\"crown\", \"fedora\", \"cap\")"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "royalty" "SELECT")),
+              |> Expect.equal (Parser.QueryMeta "royalty" "SELECT"),
           test "subquery in FROM" <| \_ ->
             parseTest
               [ "SELECT draft_id, title, updated_at, created_at",
@@ -29,12 +29,13 @@ tests =
                 "      WHERE id = ANY (${draftIds}::uuid[])",
                 "      ) draft_data;"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "draft_data" "SELECT")),
+              |> Expect.equal (Parser.QueryMeta "draft_data" "SELECT"),
           test "unparseable string" <| \_ ->
             parseTest
-              [ "Hello, World!"
+              [ "Hello,",
+                "World!"
               ]
-              |> Expect.equal Nothing,
+              |> Expect.equal (Parser.QueryMeta "Hello," "UNKNOWN"),
           test "preceded by WITH statement" <| \_ ->
             parseTest
               [ "WITH answers AS (",
@@ -65,7 +66,7 @@ tests =
                 "  ON answers.index = draggables.answer_index",
                 "ORDER BY answers.index ASC"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "answers" "SELECT")),
+              |> Expect.equal (Parser.QueryMeta "answers" "SELECT"),
           test "simple insert" <| \_ ->
             parseTest
               [ "INSERT INTO drafts.deltas (",
@@ -80,7 +81,7 @@ tests =
                 ")",
                 "RETURNING id, created_at;"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "drafts.deltas" "INSERT")),
+              |> Expect.equal (Parser.QueryMeta "drafts.deltas" "INSERT"),
           test "insert preceded by WITH statement" <| \_ ->
             parseTest
               [ "WITH insert_text_blocks AS (",
@@ -123,30 +124,30 @@ tests =
                 "  unnest(${map sectionImage sections}::text[]),",
                 "  unnest(${map sectionNextCaption sections}::text[])"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "tutorials.sections" "INSERT")),
+              |> Expect.equal (Parser.QueryMeta "tutorials.sections" "INSERT"),
           test "simple delete" <| \_ ->
             parseTest
               [ "DELETE FROM todo.todos",
                 "WHERE user_id = ${userId}",
                 "AND id = ${todoId}"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "todo.todos" "DELETE")),
+              |> Expect.equal (Parser.QueryMeta "todo.todos" "DELETE"),
           test "simple update" <| \_ ->
             parseTest
               [ "UPDATE tutorials.tutorials",
                 "  SET archived = true",
                 "  WHERE public_id = ${toDBPublicId publicId}"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "tutorials.tutorials" "UPDATE")),
+              |> Expect.equal (Parser.QueryMeta "tutorials.tutorials" "UPDATE"),
           test "simple truncate" <| \_ ->
             parseTest
               [ "TRUNCATE ONLY roses"
               ]
-              |> Expect.equal (Just (Parser.QueryMeta "roses" "TRUNCATE"))
+              |> Expect.equal (Parser.QueryMeta "roses" "TRUNCATE")
         ]
     ]
 
-parseTest :: [Text] -> Maybe Parser.QueryMeta
+parseTest :: [Text] -> Parser.QueryMeta
 parseTest queryLines =
   Text.join "\n" queryLines
     |> Parser.parse

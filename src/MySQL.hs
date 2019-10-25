@@ -113,7 +113,7 @@ readiness =
 --       |]
 --   @
 getMany ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task e [a]
@@ -128,24 +128,24 @@ getMany = withFrozenCallStack doQuery
 --       |]
 --   @
 getOne ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task Query.Error a
 getOne = withFrozenCallStack modifyExactlyOne
 
 doQuery ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery conn (Query.Query query) = do
-  withFrozenCallStack Log.debug (show query)
-  GenericDb.runTaskWithConnection conn (runQuery query)
+doQuery conn query = do
+  withFrozenCallStack Log.debug (Query.quasiQuotedString query)
+  GenericDb.runTaskWithConnection conn (runQuery (Query.query query))
     |> Log.withContext "mysql-query" [Log.context "query" queryInfo]
   where
     queryInfo = Log.QueryInfo
-      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv (Query.query query),
         Log.queryConn = GenericDb.logContext conn
       }
 
@@ -160,13 +160,13 @@ doQuery conn (Query.Query query) = do
 --       |]
 --   @
 modifyExactlyOne ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
+  (HasCallStack, Simple.QueryResults a, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task Query.Error a
 modifyExactlyOne conn query =
   doQuery conn query
-    |> andThen (Query.expectOne (show query))
+    |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 runQuery ::
   (PGQuery q a, Simple.QueryResults r) =>

@@ -13,18 +13,28 @@ where
 import Control.Applicative
 import Data.Attoparsec.Text (Parser, anyChar, asciiCI, char, inClass, manyTill, skipSpace, space, takeWhile)
 import qualified Data.Attoparsec.Text as Attoparsec
+import qualified List
+import qualified Maybe
 import Nri.Prelude
+import qualified Text
 
-parse :: Text -> Maybe QueryMeta
+parse :: Text -> QueryMeta
 parse query =
   case Attoparsec.parseOnly parser query of
-    Left _ -> Nothing
-    Right result -> Just result
+    Left _ ->
+      QueryMeta
+        { queriedRelation =
+            Text.lines query
+              |> List.head
+              |> Maybe.withDefault "",
+          sqlOperation = "UNKNOWN"
+        }
+    Right result -> result
 
 data QueryMeta
   = QueryMeta
-      { queriedTable :: Text,
-        queryOperation :: Text
+      { queriedRelation :: Text,
+        sqlOperation :: Text
       }
   deriving (Eq, Show)
 
@@ -66,8 +76,8 @@ delete = do
   skipSpace
   void <| asciiCI "FROM"
   skipSpace
-  queriedTable <- tableName
-  pure QueryMeta {queriedTable, queryOperation = "DELETE"}
+  queriedRelation <- tableName
+  pure QueryMeta {queriedRelation, sqlOperation = "DELETE"}
 
 insert :: Parser QueryMeta
 insert = do
@@ -75,8 +85,8 @@ insert = do
   skipSpace
   void <| asciiCI "INTO"
   skipSpace
-  queriedTable <- tableName
-  pure QueryMeta {queriedTable, queryOperation = "INSERT"}
+  queriedRelation <- tableName
+  pure QueryMeta {queriedRelation, sqlOperation = "INSERT"}
 
 select :: Parser QueryMeta
 select = do
@@ -84,8 +94,8 @@ select = do
   keepLooking <| do
     void <| asciiCI "FROM"
     keepLooking <| do
-      queriedTable <- tableName
-      pure QueryMeta {queriedTable, queryOperation = "SELECT"}
+      queriedRelation <- tableName
+      pure QueryMeta {queriedRelation, sqlOperation = "SELECT"}
 
 tableName :: Parser Text
 tableName =
@@ -97,8 +107,8 @@ truncate' = do
   skipSpace
   (asciiCI "ONLY" |> void) <|> pure ()
   skipSpace
-  queriedTable <- tableName
-  pure QueryMeta {queriedTable, queryOperation = "UPDATE"}
+  queriedRelation <- tableName
+  pure QueryMeta {queriedRelation, sqlOperation = "UPDATE"}
 
 update :: Parser QueryMeta
 update = do
@@ -107,5 +117,5 @@ update = do
   (asciiCI "TABLE" |> void) <|> pure ()
   (asciiCI "ONLY" |> void) <|> pure ()
   skipSpace
-  queriedTable <- tableName
-  pure QueryMeta {queriedTable, queryOperation = "TRUNCATE"}
+  queriedRelation <- tableName
+  pure QueryMeta {queriedRelation, sqlOperation = "TRUNCATE"}

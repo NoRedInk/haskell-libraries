@@ -10,7 +10,7 @@
 -- Rollbarred error.
 module Internal.Query
   ( sql,
-    Query (Query),
+    Query (..),
     expectOne,
     Error (ExpectChange, MoreRowsThanExpected),
   )
@@ -19,11 +19,13 @@ where
 import Control.Monad (fail)
 import qualified Data.Int
 import Data.String (String)
+import qualified Data.Text as T
 import qualified Database.MySQL.Simple as MySQL.Simple
 import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
+import qualified Internal.Query.Parser as Parser
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
@@ -36,8 +38,16 @@ import qualified Postgres.Settings
 --   we handle in this module will be created using helpers in this module.
 --   I.E.: It will be impossible to use the `pgSql` function from the
 --   `postgresql-typed` library directly.
-newtype Query q
-  = Query q
+data Query q
+  = Query
+      { query :: q,
+        -- | The query string as extracted from an `sql` quasi quote.
+        quasiQuotedString :: Text,
+        -- | SELECT / INSERT / UPDATE / ...
+        sqlOperation :: Text,
+        -- | The main table/view/.. queried.
+        queriedRelation :: Text
+      }
   deriving (Show)
 
 qqSQL :: String -> ExpQ
@@ -45,7 +55,10 @@ qqSQL query = do
   let db = map (either panic Postgres.Settings.toPGDatabase) (Environment.decode Postgres.Settings.decoder)
   db' <- runIO db
   void (useTPGDatabase db')
-  [e|Query $(quoteExp pgSQL query)|]
+  let meta = Parser.parse (toS query)
+  let op = T.unpack (Parser.sqlOperation meta)
+  let rel = T.unpack (Parser.queriedRelation meta)
+  [e|Query $(quoteExp pgSQL query) query op rel|]
 
 sql :: QuasiQuoter
 sql =

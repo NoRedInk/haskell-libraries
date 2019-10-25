@@ -129,7 +129,7 @@ readiness = GenericDb.readiness go
 --       |]
 --   @
 getMany ::
-  (HasCallStack, PGQuery q a, Show q) =>
+  (HasCallStack, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task e [a]
@@ -144,24 +144,24 @@ getMany = withFrozenCallStack doQuery
 --       |]
 --   @
 getOne ::
-  (HasCallStack, PGQuery q a, Show q) =>
+  (HasCallStack, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task Query.Error a
 getOne = withFrozenCallStack modifyExactlyOne
 
 doQuery ::
-  (HasCallStack, PGQuery q a, Show q) =>
+  (HasCallStack, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery conn (Query.Query query) = do
-  withFrozenCallStack Log.debug (show query)
-  GenericDb.runTaskWithConnection conn (\c -> pgQuery c query)
+doQuery conn query = do
+  withFrozenCallStack Log.debug (Query.quasiQuotedString query)
+  GenericDb.runTaskWithConnection conn (\c -> pgQuery c (Query.query query))
     |> Log.withContext "postgresql-query" [Log.context "query" queryInfo]
   where
     queryInfo = Log.QueryInfo
-      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv (Query.query query),
         Log.queryConn = GenericDb.logContext conn
       }
 
@@ -176,13 +176,13 @@ doQuery conn (Query.Query query) = do
 --       |]
 --   @
 modifyExactlyOne ::
-  (HasCallStack, PGQuery q a, Show q) =>
+  (HasCallStack, PGQuery q a) =>
   Connection ->
   Query.Query q ->
   Task Query.Error a
 modifyExactlyOne conn query =
   doQuery conn query
-    |> andThen (Query.expectOne (show query))
+    |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
