@@ -162,7 +162,9 @@ doQuery conn query = do
   where
     queryInfo = Log.QueryInfo
       { Log.queryText = toS <| getQueryString unknownPGTypeEnv (Query.query query),
-        Log.queryConn = GenericDb.logContext conn
+        Log.queryConn = GenericDb.logContext conn,
+        Log.queryOperation = Query.sqlOperation query,
+        Log.queryCollection = Query.queriedRelation query
       }
 
 -- | Modify exactly one row or fail with a 500.
