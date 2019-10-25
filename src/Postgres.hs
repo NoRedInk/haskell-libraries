@@ -158,7 +158,7 @@ doQuery conn query = do
     |> Log.withContext "postgresql-query" [Log.Query queryInfo]
   where
     queryInfo = Log.QueryInfo
-      { Log.queryText = Query.sqlString query,
+      { Log.queryText = Log.mkSecret (Query.sqlString query),
         Log.queryConn = GenericDb.logContext conn,
         Log.queryOperation = Query.sqlOperation query,
         Log.queryCollection = Query.queriedRelation query

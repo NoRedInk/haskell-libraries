@@ -144,7 +144,7 @@ doQuery conn query = do
     |> Log.withContext "mysql-query" [Log.Query queryInfo]
   where
     queryInfo = Log.QueryInfo
-      { Log.queryText = toS <| Query.sqlString query,
+      { Log.queryText = Log.mkSecret (Query.sqlString query),
         Log.queryConn = GenericDb.logContext conn,
         Log.queryOperation = Query.sqlOperation query,
         Log.queryCollection = Query.queriedRelation query
