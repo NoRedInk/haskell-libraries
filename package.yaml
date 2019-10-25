@@ -4,6 +4,7 @@ synopsis: NRI helper for database queries
 extra-source-files:
 - README.md
 dependencies:
+- aeson
 - base
 - bytestring
 - directory
@@ -11,10 +12,13 @@ dependencies:
 - exceptions
 - filepath
 - health
+- lens
+- lens-regex-pcre
 - mysql-simple
 - network
 - nri-prelude
 - oops
+- pcre-light
 - postgresql-simple
 - postgresql-typed
 - process

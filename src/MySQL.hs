@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 -- |
 -- Description : Helpers for running queries.
 --
@@ -17,7 +19,6 @@ module MySQL
     Query.sql,
     Query.Error (..),
     doQuery,
-    doQueryWithMySQLHack,
     getMany,
     getOne,
     modifyExactlyOne,
@@ -28,10 +29,12 @@ module MySQL
     Simple.Result,
     Simple.ResultError (..),
     Simple.convert,
+    anyToIn,
   )
 where
 
 import Control.Exception.Safe (MonadCatch)
+import qualified Control.Lens as Lens
 import qualified Data.Acquire
 import Data.String (fromString)
 import qualified Database.MySQL.Simple as Simple
@@ -40,6 +43,7 @@ import qualified Database.MySQL.Simple.Result as Simple
 import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
 import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Health
+import qualified Internal.CaselessRegex as R
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import List (List)
@@ -134,15 +138,27 @@ doQuery ::
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery = Query.execute (runQuery identity)
+doQuery = Query.execute runQuery
 
-doQueryWithMySQLHack ::
-  (HasCallStack, Simple.QueryResults a, PGQuery q a, Show q) =>
-  Connection ->
-  (Text -> Text) ->
-  Query.Query q ->
-  Task e [a]
-doQueryWithMySQLHack c f = Query.execute (runQuery f) c
+-- | MySQL doesn't support `= ANY`, we can use `IN` instead.
+-- We need to write the query with `ANY` though, because postgres-typed is
+-- expecting that. The code won't compile otherwise.
+anyToIn :: Text -> Text
+anyToIn =
+  Lens.over
+    ( -- Matches `= ANY ('{1,2,3,4}')`
+      [R.caselessRegex|=\s*any\s*\(\s*'{.*}'\s*\)|]
+        << R.match -- Get the matched text
+    )
+    -- Replace with `IN (1,2,3,4)
+    ( \matched ->
+        matched
+          |> Text.replace "= any" "IN"
+          -- It can also be upper-cased
+          |> Text.replace "= ANY" "IN"
+          |> Text.replace "'{" ""
+          |> Text.replace "}'" ""
+    )
 
 -- | Modify exactly one row or fail with a 500.
 --
@@ -159,21 +175,20 @@ modifyExactlyOne ::
   Connection ->
   Query.Query q ->
   Task Query.Error a
-modifyExactlyOne = Query.modifyExactlyOne (runQuery identity)
+modifyExactlyOne = Query.modifyExactlyOne runQuery
 
 runQuery ::
   (PGQuery q a, Simple.QueryResults r) =>
-  (Text -> Text) ->
   q ->
   Simple.Connection ->
   IO [r]
-runQuery f query conn =
+runQuery query conn =
   query
     |> getQueryString unknownPGTypeEnv
     |> toS
     -- We need this prefix on tables to allow compile-time checks of the query.
     |> Text.replace "monolith." ""
-    |> f
+    |> anyToIn
     |> toS
     |> fromString
     |> Simple.query_ conn
