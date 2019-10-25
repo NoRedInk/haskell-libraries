@@ -52,14 +52,18 @@ type Connection = GenericDb.Connection Simple.Connection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  GenericDb.connection (Settings.toConnectInfo settings) GenericDb.PoolConfig
-    { GenericDb.connect = Simple.connect,
-      GenericDb.disconnect = Simple.close,
-      GenericDb.stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral,
-      GenericDb.maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings)),
-      GenericDb.size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral,
-      GenericDb.toConnectionString
-    }
+  GenericDb.connection
+    (Settings.toConnectInfo settings)
+    ( GenericDb.PoolConfig
+        { GenericDb.connect = Simple.connect,
+          GenericDb.disconnect = Simple.close,
+          GenericDb.stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral,
+          GenericDb.maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings)),
+          GenericDb.size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral,
+          GenericDb.toConnectionString = toConnectionString,
+          GenericDb.toConnectionLogContext = toConnectionLogContext
+        }
+    )
 
 -- |
 -- Perform a database transaction.
@@ -134,7 +138,15 @@ doQuery ::
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery = Query.execute runQuery
+doQuery conn (Query.Query query) = do
+  withFrozenCallStack Log.debug (show query)
+  GenericDb.runTaskWithConnection conn (runQuery query)
+    |> Log.withContext "mysql-query" [Log.context "query" queryInfo]
+  where
+    queryInfo = Log.QueryInfo
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+        Log.queryConn = GenericDb.logContext conn
+      }
 
 -- | Modify exactly one row or fail with a 500.
 --
@@ -151,7 +163,9 @@ modifyExactlyOne ::
   Connection ->
   Query.Query q ->
   Task Query.Error a
-modifyExactlyOne = Query.modifyExactlyOne runQuery
+modifyExactlyOne conn query =
+  doQuery conn query
+    |> andThen (Query.expectOne (show query))
 
 runQuery ::
   (PGQuery q a, Simple.QueryResults r) =>
@@ -193,3 +207,17 @@ toConnectionString
     ]
       |> mconcat
       |> toS
+
+toConnectionLogContext :: Simple.ConnectInfo -> Log.QueryConnectionInfo
+toConnectionLogContext
+  Simple.ConnectInfo
+    { Simple.connectHost,
+      Simple.connectPort,
+      Simple.connectDatabase,
+      Simple.connectPath
+    } =
+    if connectHost == ""
+      then Log.UnixSocket Log.MySQL (toS connectPath) databaseName
+      else Log.TcpSocket Log.MySQL (toS connectHost) (show connectPort) databaseName
+    where
+      databaseName = toS connectDatabase

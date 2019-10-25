@@ -9,9 +9,8 @@
 -- Rollbarred error.
 module Internal.Query
   ( sql,
-    Query,
-    execute,
-    modifyExactlyOne,
+    Query (Query),
+    expectOne,
     Error (ExpectChange, MoreRowsThanExpected),
   )
 where
@@ -21,13 +20,11 @@ import Data.String (String)
 import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
 import qualified Environment
-import Internal.GenericDb (Connection, runTaskWithConnection)
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
   )
 import Language.Haskell.TH.Syntax (runIO)
-import qualified Log
 import Nri.Prelude
 import qualified Postgres.Settings
 
@@ -60,37 +57,12 @@ data Error
   | MoreRowsThanExpected Text
   deriving (Show)
 
--- | Modify exactly one row or fail with a 500.
---
---   @
---     modifyExactlyOne c
---       [pgSQL|
---         INSERT INTO my_table (name)
---           VALUES ($1)
---         RETURNING id, name
---       |]
---   @
-modifyExactlyOne ::
-  (HasCallStack, Show q) =>
-  (q -> conn -> IO [a]) ->
-  Connection conn ->
-  Query q ->
+expectOne ::
+  Text ->
+  [a] ->
   Task Error a
-modifyExactlyOne runQuery c query = do
-  row <- withFrozenCallStack execute runQuery c query
-  case row of
-    [] -> throwError <| ExpectChange (show query)
+expectOne queryString rows =
+  case rows of
+    [] -> throwError <| ExpectChange queryString
     [x] -> pure x
-    _ -> throwError <| MoreRowsThanExpected (show query)
-
-execute ::
-  (HasCallStack, Show q) =>
-  (q -> conn -> IO [a]) ->
-  Connection conn ->
-  Query q ->
-  Task e [a]
-execute runQuery conn (Query query) = do
-  withFrozenCallStack Log.debug (show query)
-  runTaskWithConnection
-    conn
-    (runQuery query)
+    _ -> throwError <| MoreRowsThanExpected queryString

@@ -62,27 +62,34 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollback,
     pgRollbackAll,
   )
-import Database.PostgreSQL.Typed.Query (PGQuery)
+import Database.PostgreSQL.Typed.Query (PGQuery, getQueryString)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
+import Database.PostgreSQL.Typed.Types (unknownPGTypeEnv)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import qualified Log
+import Network.Socket (SockAddr (..))
 import Nri.Prelude
 import qualified Postgres.Settings as Settings
+import Prelude (error)
 
 type Connection = GenericDb.Connection PGConnection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  GenericDb.connection (Settings.toPGDatabase settings) GenericDb.PoolConfig
-    { GenericDb.connect = pgConnect,
-      GenericDb.disconnect = pgDisconnect,
-      GenericDb.stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral,
-      GenericDb.maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings)),
-      GenericDb.size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral,
-      GenericDb.toConnectionString
-    }
+  GenericDb.connection
+    (Settings.toPGDatabase settings)
+    ( GenericDb.PoolConfig
+        { GenericDb.connect = pgConnect,
+          GenericDb.disconnect = pgDisconnect,
+          GenericDb.stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral,
+          GenericDb.maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings)),
+          GenericDb.size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral,
+          GenericDb.toConnectionString = toConnectionString,
+          GenericDb.toConnectionLogContext = toConnectionLogContext
+        }
+    )
 
 -- |
 -- Perform a database transaction.
@@ -154,7 +161,15 @@ doQuery ::
   Connection ->
   Query.Query q ->
   Task e [a]
-doQuery = Query.execute (flip pgQuery)
+doQuery conn (Query.Query query) = do
+  withFrozenCallStack Log.debug (show query)
+  GenericDb.runTaskWithConnection conn (\c -> pgQuery c query)
+    |> Log.withContext "postgresql-query" [Log.context "query" queryInfo]
+  where
+    queryInfo = Log.QueryInfo
+      { Log.queryText = toS <| getQueryString unknownPGTypeEnv query,
+        Log.queryConn = GenericDb.logContext conn
+      }
 
 -- | Modify exactly one row or fail with a 500.
 --
@@ -171,7 +186,9 @@ modifyExactlyOne ::
   Connection ->
   Query.Query q ->
   Task Query.Error a
-modifyExactlyOne = Query.modifyExactlyOne (flip pgQuery)
+modifyExactlyOne conn query =
+  doQuery conn query
+    |> andThen (Query.expectOne (show query))
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
@@ -205,3 +222,24 @@ pgJsonDecode _ tv =
   case Aeson.eitherDecode (fromStrict tv) of
     Right a' -> a'
     Left err -> panic (toS ("Failed to decode JSON in column: " ++ err))
+
+toConnectionLogContext :: PGDatabase -> Log.QueryConnectionInfo
+toConnectionLogContext db =
+  case pgDBAddr db of
+    Left (hostName, serviceName) ->
+      Log.TcpSocket Log.Postgres (toS hostName) (toS serviceName) databaseName
+    Right (SockAddrInet portNum hostAddr) ->
+      Log.TcpSocket Log.Postgres (show hostAddr) (show portNum) databaseName
+    Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
+      Log.TcpSocket Log.Postgres (show hostAddr) (show portNum) databaseName
+    Right (SockAddrUnix sockPath) ->
+      Log.UnixSocket Log.Postgres (toS sockPath) databaseName
+    Right somethingElse ->
+      -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
+      error
+        ( "Failed to convert PostgreSQL database address; no idea what a "
+            ++ show somethingElse
+            ++ " is."
+        )
+  where
+    databaseName = pgDBName db |> toS
