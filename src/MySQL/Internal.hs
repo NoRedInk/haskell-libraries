@@ -16,16 +16,25 @@ import qualified Text
 anyToIn :: Text -> Text
 anyToIn =
   Lens.over
-    ( -- Matches `= ANY ('{1,2,3,4}')`
-      [R.caselessRegex|=\s*any\s*\(\s*'{.*}'\s*\)|]
-        << R.match -- Get the matched text
+    ( [R.caselessRegex|(=\s*any)\s*\(\s*('{.*}')\s*\)|]
+        --             ^^^^^^^^^    ^^^^^^^^^^^^
+        -- "...where id  = ANY      ('{1,2,3,4}')  ..."
+        -- Matches       ["= ANY",    "'{1,2,3,4}'"]
+        << R.groups
     )
-    -- Replace with `IN (1,2,3,4)
-    ( \matched ->
-        matched
-          |> Text.replace "= any" "IN"
-          -- It can also be upper-cased
-          |> Text.replace "= ANY" "IN"
-          |> Text.replace "'{" ""
-          |> Text.replace "}'" ""
-    )
+    replaceAny
+  where
+    -- Replace matched groups with SQL that MySQL understands.
+    -- Example groupes from regex:
+    --   Groups:    ["= ANY", "'{1,2,3,4}'"]
+    --   Converted: ["IN", "1,2,3,4"]
+    replaceAny :: [Text] -> [Text]
+    replaceAny groups =
+      case groups of
+        [_, elems] ->
+          [ "IN",
+            elems
+              |> Text.dropLeft 2 -- '{
+              |> Text.dropRight 2 -- }'
+          ]
+        _ -> groups -- Didn't match the right groups.
