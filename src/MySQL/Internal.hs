@@ -1,5 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
-
 module MySQL.Internal
   ( anyToIn,
   )
