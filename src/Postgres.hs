@@ -33,10 +33,6 @@ where
 
 import Control.Exception.Safe (MonadCatch)
 import qualified Data.Acquire
--- Import orphan `postgresql-typed` array instances.
--- By performing this import here, we're sure these instances will be in scope
--- in every module that contains SQL, because all those modules import this one.
-
 import Database.PostgreSQL.Typed
   ( PGConnection,
     PGDatabase (PGDatabase),
@@ -47,7 +43,6 @@ import Database.PostgreSQL.Typed
     pgDisconnect,
     pgQuery,
   )
-import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.Array as PGArray
 import Database.PostgreSQL.Typed.Protocol
   ( pgBegin,
