@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Internal.GenericDb
   ( Connection (logContext),
     PoolConfig
