@@ -32,6 +32,7 @@ import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
   )
 import Language.Haskell.TH.Syntax (runIO)
+import MySQL.Internal (inToAny)
 import Nri.Prelude
 import qualified Postgres.Settings
 
@@ -73,11 +74,14 @@ qqSQL query = do
   let op = Data.Text.unpack (Parser.sqlOperation meta)
   let rel = Data.Text.unpack (Parser.queriedRelation meta)
   [e|
-    let q = $(quoteExp pgSQL query)
+    let q = $(quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack query))))
      in Query
           { runQuery = \c -> pgQuery c q,
             sqlString = Data.Text.Encoding.decodeUtf8 (getQueryString PGTypes.unknownPGTypeEnv q),
-            quasiQuotedString = query,
+            quasiQuotedString =
+              query
+                |> Data.Text.pack
+                |> inToAny,
             sqlOperation = op,
             queriedRelation = rel
           }
