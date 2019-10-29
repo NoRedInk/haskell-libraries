@@ -14,8 +14,8 @@ tests =
       inToAnyTests
     ]
 
-queryIn :: Text
-queryIn =
+queryInFixValues :: Text
+queryInFixValues =
   Text.join
     "\n"
     [ "SELECT hat FROM royalty",
@@ -32,21 +32,45 @@ anyToInTests =
         ]
           |> Text.join "\n"
           |> MySQL.Internal.anyToIn
-          |> Expect.equal queryIn
+          |> Expect.equal queryInFixValues
     ]
 
 inToAnyTests :: Test
 inToAnyTests =
   describe
     "inToAny"
-    [ test "Replaces IN query with ANY query" <| \_ ->
-        queryIn
+    [ test "DON'T replaces IN with fix values." <| \_ ->
+        queryInFixValues
+          |> MySQL.Internal.inToAny
+          |> Expect.equal queryInFixValues,
+      test "Replaces IN query with ANY query" <| \_ ->
+        Text.join
+          "\n"
+          [ "SELECT hat FROM royalty",
+            "WHERE hat IN (${ids});"
+          ]
           |> MySQL.Internal.inToAny
           |> Expect.equal
             ( Text.join
                 "\n"
                 [ "SELECT hat FROM royalty",
-                  "WHERE hat = ANY (\"crown\", \"fedora\", \"cap\");"
+                  "WHERE hat = ANY (${ids});"
+                ]
+            ),
+      test "Multiple INs" <| \_ ->
+        Text.join
+          "\n"
+          [ "SELECT hat FROM royalty",
+            "WHERE hat IN (${ids})",
+            "AND hat IN (${hats});"
+          ]
+          |> MySQL.Internal.inToAny
+          |> Expect.equal
+            ( Text.join
+                "\n"
+                [ "SELECT hat FROM royalty",
+                  "WHERE hat = ANY (${ids})",
+                  "AND hat = ANY (${hats});"
                 ]
             ),
       test "Select in brackets" <| \_ ->
