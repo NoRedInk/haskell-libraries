@@ -15,11 +15,10 @@ import qualified Text
 inToAny :: Text -> Text
 inToAny =
   Lens.set
-    ( [R.caselessRegex|\b(in)\s+\(\${.*}\)|]
-        --                ^^      ^^^^^^^^
-        -- "...where id   IN      (${ids})  ..."
-        -- Matches       "IN"
-        << R.group 0
+    ( [R.caselessRegex|\b(in)\s+\(\${.*}\)|] << R.group 0
+      --                ^^      ^^^^^^^^
+      -- "...where id   IN      (${ids})  ..."
+      -- Matches       "IN"
     )
     -- Replace `IN` with `= ANY`
     "= ANY"
@@ -28,11 +27,10 @@ inToAny =
 anyToIn :: Text -> Text
 anyToIn =
   Lens.over
-    ( [R.caselessRegex|(=\s*any)\s*\(\s*('{.*}')\s*\)|]
-        --             ^^^^^^^^^    ^^^^^^^^^^^^
-        -- "...where id  = ANY      ('{1,2,3,4}')  ..."
-        -- Matches       ["= ANY",    "'{1,2,3,4}'"]
-        << R.groups
+    ( [R.caselessRegex|(=\s*any)\s*\(\s*('{.*}')\s*\)|] << R.groups
+      --             ^^^^^^^^^    ^^^^^^^^^^^^
+      -- "...where id  = ANY      ('{1,2,3,4}')  ..."
+      -- Matches       ["= ANY",    "'{1,2,3,4}'"]
     )
     replaceAny
   where
