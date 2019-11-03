@@ -94,9 +94,9 @@ inTestTransaction =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: Log.Handler -> Connection -> IO Health.Status
-readiness =
-  GenericDb.readiness go
+readiness :: Log.Handler -> Connection -> Health.Check
+readiness log conn =
+  Health.Check "mysql" (GenericDb.readiness go log conn)
   where
     go :: Simple.Connection -> Simple.Query -> IO ()
     go c q = do
