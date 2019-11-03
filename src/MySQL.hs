@@ -139,7 +139,7 @@ doQuery ::
   Query.Query row ->
   Task e [row]
 doQuery conn query = do
-  withFrozenCallStack Log.debug (Query.quasiQuotedString query)
+  withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
   GenericDb.runTaskWithConnection conn (runQuery query)
     |> Log.withContext "mysql-query" [Log.Query queryInfo]
   where
