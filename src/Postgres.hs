@@ -154,6 +154,7 @@ doQuery conn query = do
   where
     queryInfo = Log.QueryInfo
       { Log.queryText = Log.mkSecret (Query.sqlString query),
+        Log.queryTemplate = Query.quasiQuotedString query,
         Log.queryConn = GenericDb.logContext conn,
         Log.queryOperation = Query.sqlOperation query,
         Log.queryCollection = Query.queriedRelation query
