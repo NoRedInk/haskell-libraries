@@ -13,10 +13,12 @@ dependencies:
 - health
 - lens
 - lens-regex-pcre
-- mysql-simple
+- monad-logger
+- mysql-haskell
 - network
 - nri-prelude
 - oops
+- persistent-mysql-haskell
 - pcre-light
 - postgresql-simple
 - postgresql-typed

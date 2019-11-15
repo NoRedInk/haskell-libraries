@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- |
 -- Description : Helpers for running queries.
 --
@@ -20,29 +22,21 @@ module MySQL
     getMany,
     getOne,
     modifyExactlyOne,
-    -- Handling transactions
-    transaction,
-    inTestTransaction,
-    -- Reexposing useful MySQL.Simple types
-    Simple.Result,
-    Simple.ResultError (..),
-    Simple.convert,
-    Simple.Only (..),
-    Simple.QueryResults,
+    -- Reexposing useful Database.Persist.MySQL types
+    MySQL.RawSql (..),
+    MySQL.Single (..),
   )
 where
 
-import Control.Exception.Safe (MonadCatch)
+import qualified Control.Monad.Logger
 import qualified Data.Acquire
 import qualified Data.Pool
 import Data.String (fromString)
-import qualified Database.MySQL.Simple as Simple
-import qualified Database.MySQL.Simple.QueryResults as Simple
-import qualified Database.MySQL.Simple.Result as Simple
+import qualified Database.MySQL.Connection
+import qualified Database.Persist.MySQL as MySQL
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
-import List (List)
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
@@ -50,7 +44,7 @@ import Nri.Prelude
 import qualified Nri.Task as Task
 import qualified Text
 
-type Connection = GenericDb.Connection Simple.Connection
+type Connection = GenericDb.Connection MySQL.SqlBackend
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
@@ -59,49 +53,17 @@ connection settings =
     acquire = do
       doAnything <- Task.handler
       pool <-
-        map GenericDb.Pool
-          <| Data.Pool.createPool
-            (Simple.connect database `catch` GenericDb.handleError (toConnectionString database))
-            Simple.close
-            stripes
-            maxIdleTime
-            size
-      pure (GenericDb.Connection doAnything pool (toConnectionLogContext database))
+        MySQL.createMySQLPool database size
+          -- TODO: Log at the Debug level here.
+          |> Control.Monad.Logger.runNoLoggingT
+          |> map GenericDb.Pool
+      pure (GenericDb.Connection doAnything pool (toConnectionLogContext settings))
     release GenericDb.Connection {GenericDb.singleOrPool} =
       case singleOrPool of
         GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
-        GenericDb.Single single -> Simple.close single
-    stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral
-    maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings))
+        GenericDb.Single _ -> pure ()
     size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
-    database = Settings.toConnectInfo settings
-
--- |
--- Perform a database transaction.
-transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction =
-  GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = \c -> void (Simple.execute_ c "start transaction"),
-      GenericDb.commit = Simple.commit,
-      GenericDb.rollback = Simple.rollback,
-      GenericDb.rollbackAll = Simple.rollback -- there is no rollbackAll for mysql
-    }
-
--- | Run code in a transaction, then roll that transaction back.
---   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction ::
-  forall m a.
-  (MonadIO m, MonadCatch m) =>
-  Connection ->
-  (Connection -> m a) ->
-  m a
-inTestTransaction =
-  GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = \c -> void (Simple.execute_ c "start transaction"),
-      GenericDb.commit = Simple.commit,
-      GenericDb.rollback = Simple.rollback,
-      GenericDb.rollbackAll = Simple.rollback -- there is no rollbackAll for mysql
-    }
+    database = toConnectInfo settings
 
 -- |
 -- Check that we are ready to be take traffic.
@@ -109,10 +71,10 @@ readiness :: Log.Handler -> Connection -> Health.Check
 readiness log conn =
   Health.Check "mysql" Health.Fatal (GenericDb.readiness go log conn)
   where
-    go :: Simple.Connection -> Simple.Query -> IO ()
-    go c q = do
-      _ :: List (Simple.Only Int) <- Simple.query_ c q
-      pure ()
+    go :: MySQL.SqlBackend -> Text -> IO ()
+    go c q =
+      MySQL.rawExecute q []
+        |> (\reader -> runReaderT reader c)
 
 -- | Find multiple rows.
 --
@@ -123,7 +85,7 @@ readiness log conn =
 --       |]
 --   @
 getMany ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, MySQL.RawSql row) =>
   Connection ->
   Query.Query row ->
   Task e [row]
@@ -138,14 +100,14 @@ getMany = withFrozenCallStack doQuery
 --       |]
 --   @
 getOne ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, MySQL.RawSql row) =>
   Connection ->
   Query.Query row ->
   Task Query.Error row
 getOne = withFrozenCallStack modifyExactlyOne
 
 doQuery ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, MySQL.RawSql row) =>
   Connection ->
   Query.Query row ->
   Task e [row]
@@ -173,7 +135,7 @@ doQuery conn query = do
 --       |]
 --   @
 modifyExactlyOne ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, MySQL.RawSql row) =>
   Connection ->
   Query.Query row ->
   Task Query.Error row
@@ -182,9 +144,9 @@ modifyExactlyOne conn query =
     |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 runQuery ::
-  (Simple.QueryResults row) =>
+  (MySQL.RawSql row) =>
   Query.Query row ->
-  Simple.Connection ->
+  MySQL.SqlBackend ->
   IO [row]
 runQuery query conn =
   query
@@ -195,43 +157,45 @@ runQuery query conn =
     |> Internal.anyToIn
     |> toS
     |> fromString
-    |> Simple.query_ conn
+    |> (\query' -> MySQL.rawSql query' [])
+    |> (\reader -> runReaderT reader conn)
 
-toConnectionString :: Simple.ConnectInfo -> Text
-toConnectionString
-  Simple.ConnectInfo
-    { Simple.connectHost,
-      Simple.connectPort,
-      Simple.connectUser,
-      Simple.connectDatabase,
-      Simple.connectPath
-    } =
-    [ connectUser,
-      ":*****@",
-      if connectHost == ""
-        then connectPath
-        else
-          mconcat
-            [ connectHost,
-              ":",
-              show connectPort,
-              "/"
-            ],
-      connectDatabase
-    ]
-      |> mconcat
-      |> toS
+toConnectionLogContext :: Settings.Settings -> Log.QueryConnectionInfo
+toConnectionLogContext settings =
+  let connectionSettings = Settings.mysqlConnection settings
+      database = Settings.unDatabase (Settings.database connectionSettings)
+   in case Settings.connection connectionSettings of
+        Settings.ConnectSocket socket ->
+          Log.UnixSocket
+            Log.MySQL
+            (toS (Settings.unSocket socket))
+            database
+        Settings.ConnectTcp host port ->
+          Log.TcpSocket
+            Log.MySQL
+            (Settings.unHost host)
+            (show (Settings.unPort port))
+            database
 
-toConnectionLogContext :: Simple.ConnectInfo -> Log.QueryConnectionInfo
-toConnectionLogContext
-  Simple.ConnectInfo
-    { Simple.connectHost,
-      Simple.connectPort,
-      Simple.connectDatabase,
-      Simple.connectPath
-    } =
-    if connectHost == ""
-      then Log.UnixSocket Log.MySQL (toS connectPath) databaseName
-      else Log.TcpSocket Log.MySQL (toS connectHost) (show connectPort) databaseName
-    where
-      databaseName = toS connectDatabase
+toConnectInfo :: Settings.Settings -> MySQL.MySQLConnectInfo
+toConnectInfo settings =
+  let connectionSettings = Settings.mysqlConnection settings
+      database = toS (Settings.unDatabase (Settings.database connectionSettings))
+      user = toS (Settings.unUser (Settings.user connectionSettings))
+      password = toS (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
+   in case Settings.connection connectionSettings of
+        Settings.ConnectSocket socket ->
+          MySQL.mkMySQLConnectInfo
+            (Settings.unSocket socket)
+            user
+            password
+            database
+            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+        Settings.ConnectTcp host port ->
+          MySQL.mkMySQLConnectInfo
+            (toS (Settings.unHost host))
+            user
+            password
+            database
+            |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
+            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci

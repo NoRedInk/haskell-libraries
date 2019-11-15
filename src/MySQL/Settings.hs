@@ -10,25 +10,17 @@ module MySQL.Settings
     Socket (..),
     PoolSettings
       ( PoolSettings,
-        mysqlPoolStripes,
-        mysqlPoolMaxIdleTime,
         mysqlPoolSize
       ),
-    MysqlPoolStripes (MysqlPoolStripes, unMysqlPoolStripes),
-    MysqlPoolMaxIdleTime (MysqlPoolMaxIdleTime, unMysqlPoolMaxIdleTime),
     MysqlPoolSize (MysqlPoolSize, unMysqlPoolSize),
     decoder,
     defaultSettings,
-    toConnectInfo,
   )
 where
 
-import qualified Data.Time
-import qualified Database.MySQL.Simple as Simple
 import qualified Environment
 import qualified Log
 import Nri.Prelude
-import qualified Prelude (round)
 
 data Settings
   = Settings
@@ -50,9 +42,7 @@ data ConnectionType
 
 data PoolSettings
   = PoolSettings
-      { mysqlPoolSize :: MysqlPoolSize,
-        mysqlPoolMaxIdleTime :: MysqlPoolMaxIdleTime,
-        mysqlPoolStripes :: MysqlPoolStripes
+      { mysqlPoolSize :: MysqlPoolSize
       }
   deriving (Eq, Show, Generic)
 
@@ -61,9 +51,7 @@ defaultSettings =
   Settings
     { mysqlConnection = defaultConnectionSettings,
       mysqlPool = PoolSettings
-        { mysqlPoolSize = MysqlPoolSize 2,
-          mysqlPoolMaxIdleTime = MysqlPoolMaxIdleTime (toNominalDiffTime 3600),
-          mysqlPoolStripes = MysqlPoolStripes 1
+        { mysqlPoolSize = MysqlPoolSize 2
         }
     }
 
@@ -100,8 +88,6 @@ poolDecoder :: Environment.Decoder PoolSettings
 poolDecoder =
   pure PoolSettings
     |> andMap mysqlPoolSizeDecoder
-    |> andMap mysqlPoolMaxIdleTimeDecoder
-    |> andMap mysqlPoolStripesDecoder
 
 decoderTcp :: Environment.Decoder ConnectionType
 decoderTcp =
@@ -204,42 +190,6 @@ socketDecoder =
       }
     (map (toS >> Socket) Environment.text)
 
-newtype MysqlPoolStripes
-  = MysqlPoolStripes {unMysqlPoolStripes :: Int}
-  deriving (Eq, Show, Generic)
-
-mysqlPoolStripesDecoder :: Environment.Decoder MysqlPoolStripes
-mysqlPoolStripesDecoder =
-  Environment.variable
-    Environment.Variable
-      { Environment.name = "MYSQL_POOL_STRIPES",
-        Environment.description = "The amount of sub-connection pools to create. Best refer to the resource-pool package for more info on this one. 1 is a good value for most applications.",
-        Environment.defaultValue =
-          defaultSettings |> mysqlPool |> mysqlPoolStripes |> unMysqlPoolStripes |> show
-      }
-    (Environment.int |> map MysqlPoolStripes)
-
-newtype MysqlPoolMaxIdleTime
-  = MysqlPoolMaxIdleTime {unMysqlPoolMaxIdleTime :: Data.Time.NominalDiffTime}
-  deriving (Eq, Show, Generic)
-
-mysqlPoolMaxIdleTimeDecoder :: Environment.Decoder MysqlPoolMaxIdleTime
-mysqlPoolMaxIdleTimeDecoder =
-  Environment.variable
-    Environment.Variable
-      { Environment.name = "MYSQL_POOL_MAX_IDLE_TIME",
-        Environment.description = "The maximum time a database connection will be able remain idle until it is closed.",
-        Environment.defaultValue =
-          defaultSettings |> mysqlPool |> mysqlPoolMaxIdleTime |> unMysqlPoolMaxIdleTime |> fromNominalDiffTime |> show
-      }
-    (Environment.int |> map (MysqlPoolMaxIdleTime << toNominalDiffTime))
-
-toNominalDiffTime :: Int -> Data.Time.NominalDiffTime
-toNominalDiffTime = realToFrac
-
-fromNominalDiffTime :: Data.Time.NominalDiffTime -> Int
-fromNominalDiffTime = Prelude.round
-
 newtype MysqlPoolSize
   = MysqlPoolSize {unMysqlPoolSize :: Int}
   deriving (Eq, Show, Generic)
@@ -254,37 +204,3 @@ mysqlPoolSizeDecoder =
           defaultSettings |> mysqlPool |> mysqlPoolSize |> unMysqlPoolSize |> show
       }
     (Environment.int |> map MysqlPoolSize)
-
-toConnectInfo :: Settings -> Simple.ConnectInfo
-toConnectInfo
-  settings@Settings
-    { mysqlConnection =
-        ConnectionSettings
-          { database,
-            user,
-            password
-          }
-    } =
-    case connection (mysqlConnection settings) of
-      ConnectSocket socket ->
-        Simple.ConnectInfo
-          { Simple.connectHost = "",
-            Simple.connectPort = 0,
-            Simple.connectUser = toS (unUser user),
-            Simple.connectPassword = toS (Log.unSecret (unPassword password)),
-            Simple.connectDatabase = toS (unDatabase database),
-            Simple.connectOptions = [],
-            Simple.connectPath = unSocket socket,
-            Simple.connectSSL = Nothing
-          }
-      ConnectTcp host port ->
-        Simple.ConnectInfo
-          { Simple.connectHost = toS (unHost host),
-            Simple.connectPort = fromIntegral (unPort port),
-            Simple.connectUser = toS (unUser user),
-            Simple.connectPassword = toS (Log.unSecret (unPassword password)),
-            Simple.connectDatabase = toS (unDatabase database),
-            Simple.connectOptions = [],
-            Simple.connectPath = "",
-            Simple.connectSSL = Nothing
-          }

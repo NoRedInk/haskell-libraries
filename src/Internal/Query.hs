@@ -21,7 +21,7 @@ import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
 import qualified Data.Text.Encoding
-import qualified Database.MySQL.Simple as MySQL.Simple
+import qualified Database.Persist.MySQL as MySQL
 import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
 import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
@@ -131,7 +131,7 @@ instance PGTypes.PGParameter "integer" Int where
     let (i :: Data.Int.Int32) = fromIntegral tv
      in PGTypes.pgEncode tid i
 
-instance PGTypes.PGColumn t a => PGTypes.PGColumn t (MySQL.Simple.Only a) where
+instance PGTypes.PGColumn t a => PGTypes.PGColumn t (MySQL.Single a) where
   pgDecode tid tv =
     PGTypes.pgDecode tid tv
-      |> MySQL.Simple.Only
+      |> MySQL.Single
