@@ -25,10 +25,7 @@ import qualified Control.Exception
 import Control.Exception.Safe (MonadCatch)
 import qualified Control.Exception.Safe
 import qualified Control.Monad.Catch
-import Control.Monad.Catch
-  ( ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess),
-    throwM,
-  )
+import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import qualified Data.Acquire
 import qualified Data.Int
 import qualified Data.Pool
@@ -36,13 +33,14 @@ import Data.Time.Clock (NominalDiffTime)
 import qualified Health
 import qualified Log
 import Nri.Prelude
-import qualified Task as Task
 import qualified Oops
+import qualified Platform
+import qualified Task
 import qualified Tuple
 
 data Connection c
   = Connection
-      { doAnything :: Task.DoAnythingHandler,
+      { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool c,
         logContext :: Log.QueryConnectionInfo
       }
@@ -84,7 +82,7 @@ connection
     } = Data.Acquire.mkAcquire acquire release
     where
       acquire = do
-        doAnything <- Task.handler
+        doAnything <- Platform.doAnythingHandler
         pool <-
           map Pool
             <| Data.Pool.createPool
@@ -104,7 +102,7 @@ runTaskWithConnection conn f =
   withConnection
     conn
     ( \c ->
-        Task.fromIO (doAnything conn) (map Right (f c))
+        Platform.doAnything (doAnything conn) (map Ok (f c))
     )
 
 --
@@ -117,14 +115,14 @@ withConnection :: Connection conn -> (conn -> Task e a) -> Task e a
 withConnection Connection {doAnything, singleOrPool} f =
   case singleOrPool of
     (Single c) -> f c
-    (Pool pool) -> map Tuple.first <| Task.generalBracket acquire release (f << Tuple.first)
+    (Pool pool) -> map Tuple.first <| Platform.generalBracket acquire release (f << Tuple.first)
       where
         acquire =
           Data.Pool.takeResource pool
-            |> map Right
-            |> Task.fromIO doAnything
+            |> map Ok
+            |> Platform.doAnything doAnything
         release (c, localPool) =
-          Task.fromIO doAnything << map Right
+          Platform.doAnything doAnything << map Ok
             << ( \exitCase ->
                    case exitCase of
                      ExitCaseSuccess _ -> Data.Pool.putResource localPool c
@@ -157,19 +155,15 @@ withConnectionUnsafe Connection {singleOrPool} f =
 -- Check that we are ready to be take traffic.
 readiness :: IsString s => (conn -> s -> IO ()) -> Log.Handler -> Connection conn -> IO Health.Status
 readiness runQuery log' conn = do
-  result <-
-    (flip runQuery "SELECT 1" >> map (const Health.Good))
+  response <-
+    flip runQuery "SELECT 1"
       |> runTaskWithConnection conn
-      |> Task.run log'
-      |> throwEither
-      |> Control.Exception.Safe.tryIO
-  result
-    |> first (toS << displayException)
-    |> Health.fromEither
-    |> pure
-
-throwEither :: IO (Either SomeException a) -> IO a
-throwEither = andThen (either throwM pure)
+      |> Task.perform identity
+      |> Platform.runCmd log'
+      |> Control.Exception.Safe.tryAny
+  pure <| Health.fromResult <| case response of
+    Left err -> Err (toS (displayException err))
+    Right x -> Ok x
 
 handleError :: Text -> IOException -> IO a
 handleError connectionString err = do
@@ -232,19 +226,19 @@ transaction :: forall conn e a. Transaction conn -> Connection conn -> (Connecti
 transaction Transaction {commit, begin, rollback} conn f =
   withConnection conn <| \c ->
     map Tuple.first
-      <| Task.generalBracket
+      <| Platform.generalBracket
         (start c)
         end
         (f << (\c_ -> conn {singleOrPool = Single c_}))
   where
     start :: conn -> Task e conn
     start c =
-      Task.fromIO (doAnything conn) <| map Right <| do
+      Platform.doAnything (doAnything conn) <| map Ok <| do
         begin c
         pure c
     end :: conn -> ExitCase a -> Task e ()
     end c =
-      Task.fromIO (doAnything conn) << map Right
+      Platform.doAnything (doAnything conn) << map Ok
         << ( \exitCase ->
                case exitCase of
                  ExitCaseSuccess _ -> commit c
