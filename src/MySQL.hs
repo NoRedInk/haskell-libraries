@@ -34,6 +34,7 @@ where
 
 import Control.Exception.Safe (MonadCatch)
 import qualified Data.Acquire
+import qualified Data.Pool
 import Data.String (fromString)
 import qualified Database.MySQL.Simple as Simple
 import qualified Database.MySQL.Simple.QueryResults as Simple
@@ -46,24 +47,34 @@ import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
 import Nri.Prelude
+import qualified Nri.Task as Task
 import qualified Text
 
 type Connection = GenericDb.Connection Simple.Connection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  GenericDb.connection
-    (Settings.toConnectInfo settings)
-    ( GenericDb.PoolConfig
-        { GenericDb.connect = Simple.connect,
-          GenericDb.disconnect = Simple.close,
-          GenericDb.stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral,
-          GenericDb.maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings)),
-          GenericDb.size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral,
-          GenericDb.toConnectionString = toConnectionString,
-          GenericDb.toConnectionLogContext = toConnectionLogContext
-        }
-    )
+  Data.Acquire.mkAcquire acquire release
+  where
+    acquire = do
+      doAnything <- Task.handler
+      pool <-
+        map GenericDb.Pool
+          <| Data.Pool.createPool
+            (Simple.connect database `catch` GenericDb.handleError (toConnectionString database))
+            Simple.close
+            stripes
+            maxIdleTime
+            size
+      pure (GenericDb.Connection doAnything pool (toConnectionLogContext database))
+    release GenericDb.Connection {GenericDb.singleOrPool} =
+      case singleOrPool of
+        GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
+        GenericDb.Single single -> Simple.close single
+    stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral
+    maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings))
+    size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
+    database = Settings.toConnectInfo settings
 
 -- |
 -- Perform a database transaction.

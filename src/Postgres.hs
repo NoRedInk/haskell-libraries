@@ -33,6 +33,7 @@ where
 
 import Control.Exception.Safe (MonadCatch)
 import qualified Data.Acquire
+import qualified Data.Pool
 import Database.PostgreSQL.Typed
   ( PGConnection,
     PGDatabase (PGDatabase),
@@ -57,6 +58,7 @@ import qualified Internal.Query as Query
 import qualified Log
 import Network.Socket (SockAddr (..))
 import Nri.Prelude
+import qualified Nri.Task as Task
 import qualified Postgres.Settings as Settings
 import Prelude (error)
 
@@ -64,18 +66,27 @@ type Connection = GenericDb.Connection PGConnection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  GenericDb.connection
-    (Settings.toPGDatabase settings)
-    ( GenericDb.PoolConfig
-        { GenericDb.connect = pgConnect,
-          GenericDb.disconnect = pgDisconnect,
-          GenericDb.stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral,
-          GenericDb.maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings)),
-          GenericDb.size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral,
-          GenericDb.toConnectionString = toConnectionString,
-          GenericDb.toConnectionLogContext = toConnectionLogContext
-        }
-    )
+  Data.Acquire.mkAcquire acquire release
+  where
+    acquire = do
+      doAnything <- Task.handler
+      pool <-
+        map GenericDb.Pool
+          <| Data.Pool.createPool
+            (pgConnect database `catch` GenericDb.handleError (toConnectionString database))
+            pgDisconnect
+            stripes
+            maxIdleTime
+            size
+      pure (GenericDb.Connection doAnything pool (toConnectionLogContext database))
+    release GenericDb.Connection {GenericDb.singleOrPool} =
+      case singleOrPool of
+        GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
+        GenericDb.Single single -> pgDisconnect single
+    stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral
+    maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings))
+    size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral
+    database = Settings.toPGDatabase settings
 
 -- |
 -- Perform a database transaction.
