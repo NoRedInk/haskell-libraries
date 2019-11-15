@@ -57,7 +57,6 @@ connection settings =
       doAnything <- Task.handler
       pool <-
         MySQL.createMySQLPool database size
-          -- TODO: Log at the Debug level here.
           |> Control.Monad.Logger.runNoLoggingT
           |> map GenericDb.Pool
       pure (GenericDb.Connection doAnything pool (toConnectionLogContext settings))
