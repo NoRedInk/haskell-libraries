@@ -40,7 +40,7 @@ data ConnectionType
   = ConnectTcp Host Port
   | ConnectSocket Socket
 
-data PoolSettings
+newtype PoolSettings
   = PoolSettings
       { mysqlPoolSize :: MysqlPoolSize
       }
