@@ -1,4 +1,5 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- |
 -- Description : Helpers for running queries.
@@ -23,13 +24,15 @@ module MySQL
     getOne,
     modifyExactlyOne,
     -- Reexposing useful Database.Persist.MySQL types
-    MySQL.RawSql (..),
+    QueryResults,
+    MySQL.PersistField (..),
     MySQL.Single (..),
   )
 where
 
 import qualified Control.Monad.Logger
 import qualified Data.Acquire
+import qualified Data.Coerce
 import qualified Data.Pool
 import Data.String (fromString)
 import qualified Database.MySQL.Connection
@@ -72,8 +75,10 @@ readiness log conn =
   Health.Check "mysql" Health.Fatal (GenericDb.readiness go log conn)
   where
     go :: MySQL.SqlBackend -> Text -> IO ()
-    go c q =
-      MySQL.rawExecute q []
+    go backend q = void <| go' backend q
+    go' :: MySQL.SqlBackend -> Text -> IO [MySQL.Single Int]
+    go' c q =
+      MySQL.rawSql q []
         |> (\reader -> runReaderT reader c)
 
 -- | Find multiple rows.
@@ -85,7 +90,7 @@ readiness log conn =
 --       |]
 --   @
 getMany ::
-  (HasCallStack, MySQL.RawSql row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task e [row]
@@ -100,14 +105,14 @@ getMany = withFrozenCallStack doQuery
 --       |]
 --   @
 getOne ::
-  (HasCallStack, MySQL.RawSql row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task Query.Error row
 getOne = withFrozenCallStack modifyExactlyOne
 
 doQuery ::
-  (HasCallStack, MySQL.RawSql row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task e [row]
@@ -135,7 +140,7 @@ doQuery conn query = do
 --       |]
 --   @
 modifyExactlyOne ::
-  (HasCallStack, MySQL.RawSql row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task Query.Error row
@@ -144,7 +149,7 @@ modifyExactlyOne conn query =
     |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 runQuery ::
-  (MySQL.RawSql row) =>
+  (QueryResults row) =>
   Query.Query row ->
   MySQL.SqlBackend ->
   IO [row]
@@ -159,6 +164,7 @@ runQuery query conn =
     |> fromString
     |> (\query' -> MySQL.rawSql query' [])
     |> (\reader -> runReaderT reader conn)
+    |> map (map toQueryResult)
 
 toConnectionLogContext :: Settings.Settings -> Log.QueryConnectionInfo
 toConnectionLogContext settings =
@@ -199,3 +205,179 @@ toConnectInfo settings =
             database
             |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
             |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+
+-- |
+-- The persistent library gives us back types matching the constaint `RawSql`.
+-- These instances are tuples correspoding to rows, as we like, but
+-- unfortunately every field is wrapped in a `Single` constructor. The purpose
+-- of this typeclass is to unwrap these constructors so we can return records
+-- of plain unwrapped values from this module.
+class MySQL.RawSql (FromRawSql a) => QueryResults a where
+
+  type FromRawSql a
+
+  toQueryResult :: FromRawSql a -> a
+
+-- |
+-- It would be really sweet if we could get rid of the `Single` wrapper here,
+-- and allow single-column values to be QueryResults by themselves without the
+-- need for the wrapper. This is how it works on the Postgres side too.
+--
+-- The straight-forward attempt to remove the `MySQL.Single` wrapper here will
+-- result in overlapping instances. Pretty certain there's type-level trickery
+-- to work around that, which might be worth exploring at some point to get a
+-- cleaner API.
+instance (MySQL.PersistField a) => QueryResults (MySQL.Single a) where
+
+  type
+    FromRawSql (MySQL.Single a) =
+      MySQL.Single a
+
+  toQueryResult = identity
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b
+  ) =>
+  QueryResults (a, b)
+  where
+
+  type
+    FromRawSql (a, b) =
+      ( MySQL.Single a,
+        MySQL.Single b
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c
+  ) =>
+  QueryResults (a, b, c)
+  where
+
+  type
+    FromRawSql (a, b, c) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d
+  ) =>
+  QueryResults (a, b, c, d)
+  where
+
+  type
+    FromRawSql (a, b, c, d) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e
+  ) =>
+  QueryResults (a, b, c, d, e)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f
+  ) =>
+  QueryResults (a, b, c, d, e, f)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e, f) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g
+  ) =>
+  QueryResults (a, b, c, d, e, f, g)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e, f, g) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h
+  ) =>
+  QueryResults (a, b, c, d, e, f, g, h)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e, f, g, h) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h
+      )
+
+  toQueryResult = Data.Coerce.coerce
