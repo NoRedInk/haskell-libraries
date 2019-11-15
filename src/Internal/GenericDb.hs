@@ -36,7 +36,7 @@ import Data.Time.Clock (NominalDiffTime)
 import qualified Health
 import qualified Log
 import Nri.Prelude
-import qualified Nri.Task as Task
+import qualified Task as Task
 import qualified Oops
 import qualified Tuple
 
