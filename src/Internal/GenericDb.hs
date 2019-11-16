@@ -31,7 +31,6 @@ import qualified Data.Int
 import qualified Data.Pool
 import Data.Time.Clock (NominalDiffTime)
 import qualified Health
-import qualified Log
 import Nri.Prelude
 import qualified Oops
 import qualified Platform
@@ -42,7 +41,7 @@ data Connection c
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool c,
-        logContext :: Log.QueryConnectionInfo
+        logContext :: Platform.QueryConnectionInfo
       }
 
 -- | A database connection type.
@@ -65,7 +64,7 @@ data PoolConfig db conn
         maxIdleTime :: NominalDiffTime,
         size :: Data.Int.Int,
         toConnectionString :: db -> Text,
-        toConnectionLogContext :: db -> Log.QueryConnectionInfo
+        toConnectionLogContext :: db -> Platform.QueryConnectionInfo
       }
 
 connection :: db -> PoolConfig db conn -> Data.Acquire.Acquire (Connection conn)
@@ -153,7 +152,7 @@ withConnectionUnsafe Connection {singleOrPool} f =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: IsString s => (conn -> s -> IO ()) -> Log.Handler -> Connection conn -> IO Health.Status
+readiness :: IsString s => (conn -> s -> IO ()) -> Platform.LogHandler -> Connection conn -> IO Health.Status
 readiness runQuery log' conn = do
   response <-
     flip runQuery "SELECT 1"

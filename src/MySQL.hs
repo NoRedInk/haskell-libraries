@@ -46,6 +46,7 @@ import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
 import Nri.Prelude
+import qualified Platform
 import qualified Text
 
 type Connection = GenericDb.Connection Simple.Connection
@@ -94,7 +95,7 @@ inTestTransaction =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: Log.Handler -> Connection -> Health.Check
+readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
   Health.Check "mysql" Health.Fatal (GenericDb.readiness go log conn)
   where
@@ -141,14 +142,14 @@ doQuery ::
 doQuery conn query = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
   GenericDb.runTaskWithConnection conn (runQuery query)
-    |> Log.withContext "mysql-query" [Log.Query queryInfo]
+    |> Log.withContext "mysql-query" [Platform.Query queryInfo]
   where
-    queryInfo = Log.QueryInfo
-      { Log.queryText = Log.mkSecret (Query.sqlString query),
-        Log.queryTemplate = Query.quasiQuotedString query,
-        Log.queryConn = GenericDb.logContext conn,
-        Log.queryOperation = Query.sqlOperation query,
-        Log.queryCollection = Query.queriedRelation query
+    queryInfo = Platform.QueryInfo
+      { Platform.queryText = Log.mkSecret (Query.sqlString query),
+        Platform.queryTemplate = Query.quasiQuotedString query,
+        Platform.queryConn = GenericDb.logContext conn,
+        Platform.queryOperation = Query.sqlOperation query,
+        Platform.queryCollection = Query.queriedRelation query
       }
 
 -- | Modify exactly one row or fail with a 500.
@@ -211,7 +212,7 @@ toConnectionString
       |> mconcat
       |> toS
 
-toConnectionLogContext :: Simple.ConnectInfo -> Log.QueryConnectionInfo
+toConnectionLogContext :: Simple.ConnectInfo -> Platform.QueryConnectionInfo
 toConnectionLogContext
   Simple.ConnectInfo
     { Simple.connectHost,
@@ -220,7 +221,7 @@ toConnectionLogContext
       Simple.connectPath
     } =
     if connectHost == ""
-      then Log.UnixSocket Log.MySQL (toS connectPath) databaseName
-      else Log.TcpSocket Log.MySQL (toS connectHost) (show connectPort) databaseName
+      then Platform.UnixSocket Platform.MySQL (toS connectPath) databaseName
+      else Platform.TcpSocket Platform.MySQL (toS connectHost) (show connectPort) databaseName
     where
       databaseName = toS connectDatabase

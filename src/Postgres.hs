@@ -57,6 +57,7 @@ import qualified Internal.Query as Query
 import qualified Log
 import Network.Socket (SockAddr (..))
 import Nri.Prelude
+import qualified Platform
 import qualified Postgres.Settings as Settings
 import Prelude (error)
 
@@ -106,7 +107,7 @@ inTestTransaction =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: Log.Handler -> Connection -> Health.Check
+readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn = Health.Check "postgres" Health.Fatal (GenericDb.readiness go log conn)
   where
     go :: PGConnection -> ByteString -> IO ()
@@ -150,14 +151,14 @@ doQuery ::
 doQuery conn query = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
   GenericDb.runTaskWithConnection conn (Query.runQuery query)
-    |> Log.withContext "postgresql-query" [Log.Query queryInfo]
+    |> Log.withContext "postgresql-query" [Platform.Query queryInfo]
   where
-    queryInfo = Log.QueryInfo
-      { Log.queryText = Log.mkSecret (Query.sqlString query),
-        Log.queryTemplate = Query.quasiQuotedString query,
-        Log.queryConn = GenericDb.logContext conn,
-        Log.queryOperation = Query.sqlOperation query,
-        Log.queryCollection = Query.queriedRelation query
+    queryInfo = Platform.QueryInfo
+      { Platform.queryText = Log.mkSecret (Query.sqlString query),
+        Platform.queryTemplate = Query.quasiQuotedString query,
+        Platform.queryConn = GenericDb.logContext conn,
+        Platform.queryOperation = Query.sqlOperation query,
+        Platform.queryCollection = Query.queriedRelation query
       }
 
 -- | Modify exactly one row or fail with a 500.
@@ -196,17 +197,17 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
     ] ::
     Text
 
-toConnectionLogContext :: PGDatabase -> Log.QueryConnectionInfo
+toConnectionLogContext :: PGDatabase -> Platform.QueryConnectionInfo
 toConnectionLogContext db =
   case pgDBAddr db of
     Left (hostName, serviceName) ->
-      Log.TcpSocket Log.Postgres (toS hostName) (toS serviceName) databaseName
+      Platform.TcpSocket Platform.Postgres (toS hostName) (toS serviceName) databaseName
     Right (SockAddrInet portNum hostAddr) ->
-      Log.TcpSocket Log.Postgres (show hostAddr) (show portNum) databaseName
+      Platform.TcpSocket Platform.Postgres (show hostAddr) (show portNum) databaseName
     Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-      Log.TcpSocket Log.Postgres (show hostAddr) (show portNum) databaseName
+      Platform.TcpSocket Platform.Postgres (show hostAddr) (show portNum) databaseName
     Right (SockAddrUnix sockPath) ->
-      Log.UnixSocket Log.Postgres (toS sockPath) databaseName
+      Platform.UnixSocket Platform.Postgres (toS sockPath) databaseName
     Right somethingElse ->
       -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
       error
