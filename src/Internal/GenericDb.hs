@@ -1,23 +1,14 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module Internal.GenericDb
-  ( Connection (logContext),
-    PoolConfig
-      ( PoolConfig,
-        connect,
-        disconnect,
-        stripes,
-        maxIdleTime,
-        size,
-        toConnectionString,
-        toConnectionLogContext
-      ),
-    connection,
+  ( Connection (..),
+    SingleOrPool (..),
     runTaskWithConnection,
     Transaction (Transaction, begin, commit, rollback, rollbackAll),
     transaction,
     inTestTransaction,
     readiness,
+    handleError,
   )
 where
 
@@ -26,10 +17,7 @@ import Control.Exception.Safe (MonadCatch)
 import qualified Control.Exception.Safe
 import qualified Control.Monad.Catch
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
-import qualified Data.Acquire
-import qualified Data.Int
 import qualified Data.Pool
-import Data.Time.Clock (NominalDiffTime)
 import qualified Health
 import Nri.Prelude
 import qualified Oops
@@ -55,46 +43,6 @@ data SingleOrPool c
   | -- | A single connection is only used in the context of a transaction, where
     --   we need to insure several SQL statements happen on the same connection.
     Single c
-
-data PoolConfig db conn
-  = PoolConfig
-      { connect :: db -> IO conn,
-        disconnect :: conn -> IO (),
-        stripes :: Data.Int.Int,
-        maxIdleTime :: NominalDiffTime,
-        size :: Data.Int.Int,
-        toConnectionString :: db -> Text,
-        toConnectionLogContext :: db -> Platform.QueryConnectionInfo
-      }
-
-connection :: db -> PoolConfig db conn -> Data.Acquire.Acquire (Connection conn)
-connection
-  database
-  PoolConfig
-    { connect,
-      disconnect,
-      stripes,
-      maxIdleTime,
-      size,
-      toConnectionString,
-      toConnectionLogContext
-    } = Data.Acquire.mkAcquire acquire release
-    where
-      acquire = do
-        doAnything <- Platform.doAnythingHandler
-        pool <-
-          map Pool
-            <| Data.Pool.createPool
-              (connect database `catch` handleError (toConnectionString database))
-              disconnect
-              stripes
-              maxIdleTime
-              size
-        pure (Connection doAnything pool (toConnectionLogContext database))
-      release Connection {singleOrPool} =
-        case singleOrPool of
-          Pool pool -> Data.Pool.destroyAllResources pool
-          Single single -> disconnect single
 
 runTaskWithConnection :: Connection t -> (t -> IO a) -> Task e a
 runTaskWithConnection conn f =

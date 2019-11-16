@@ -1,3 +1,6 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+
 -- |
 -- Description : Helpers for running queries.
 --
@@ -20,28 +23,23 @@ module MySQL
     getMany,
     getOne,
     modifyExactlyOne,
-    -- Handling transactions
-    transaction,
-    inTestTransaction,
-    -- Reexposing useful MySQL.Simple types
-    Simple.Result,
-    Simple.ResultError (..),
-    Simple.convert,
-    Simple.Only (..),
-    Simple.QueryResults,
+    -- Reexposing useful Database.Persist.MySQL types
+    QueryResults,
+    MySQL.PersistField (..),
+    MySQL.Single (..),
   )
 where
 
-import Control.Exception.Safe (MonadCatch)
+import qualified Control.Monad.Logger
 import qualified Data.Acquire
+import qualified Data.Coerce
+import qualified Data.Pool
 import Data.String (fromString)
-import qualified Database.MySQL.Simple as Simple
-import qualified Database.MySQL.Simple.QueryResults as Simple
-import qualified Database.MySQL.Simple.Result as Simple
+import qualified Database.MySQL.Connection
+import qualified Database.Persist.MySQL as MySQL
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
-import List (List)
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
@@ -49,49 +47,25 @@ import Nri.Prelude
 import qualified Platform
 import qualified Text
 
-type Connection = GenericDb.Connection Simple.Connection
+type Connection = GenericDb.Connection MySQL.SqlBackend
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  GenericDb.connection
-    (Settings.toConnectInfo settings)
-    ( GenericDb.PoolConfig
-        { GenericDb.connect = Simple.connect,
-          GenericDb.disconnect = Simple.close,
-          GenericDb.stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral,
-          GenericDb.maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings)),
-          GenericDb.size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral,
-          GenericDb.toConnectionString = toConnectionString,
-          GenericDb.toConnectionLogContext = toConnectionLogContext
-        }
-    )
-
--- |
--- Perform a database transaction.
-transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction =
-  GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = \c -> void (Simple.execute_ c "start transaction"),
-      GenericDb.commit = Simple.commit,
-      GenericDb.rollback = Simple.rollback,
-      GenericDb.rollbackAll = Simple.rollback -- there is no rollbackAll for mysql
-    }
-
--- | Run code in a transaction, then roll that transaction back.
---   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction ::
-  forall m a.
-  (MonadIO m, MonadCatch m) =>
-  Connection ->
-  (Connection -> m a) ->
-  m a
-inTestTransaction =
-  GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = \c -> void (Simple.execute_ c "start transaction"),
-      GenericDb.commit = Simple.commit,
-      GenericDb.rollback = Simple.rollback,
-      GenericDb.rollbackAll = Simple.rollback -- there is no rollbackAll for mysql
-    }
+  Data.Acquire.mkAcquire acquire release
+  where
+    acquire = do
+      doAnything <- Platform.doAnythingHandler
+      pool <-
+        MySQL.createMySQLPool database size
+          |> Control.Monad.Logger.runNoLoggingT
+          |> map GenericDb.Pool
+      pure (GenericDb.Connection doAnything pool (toConnectionLogContext settings))
+    release GenericDb.Connection {GenericDb.singleOrPool} =
+      case singleOrPool of
+        GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
+        GenericDb.Single _ -> pure ()
+    size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
+    database = toConnectInfo settings
 
 -- |
 -- Check that we are ready to be take traffic.
@@ -99,10 +73,12 @@ readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
   Health.Check "mysql" Health.Fatal (GenericDb.readiness go log conn)
   where
-    go :: Simple.Connection -> Simple.Query -> IO ()
-    go c q = do
-      _ :: List (Simple.Only Int) <- Simple.query_ c q
-      pure ()
+    go :: MySQL.SqlBackend -> Text -> IO ()
+    go backend q = void <| go' backend q
+    go' :: MySQL.SqlBackend -> Text -> IO [MySQL.Single Int]
+    go' c q =
+      MySQL.rawSql q []
+        |> (\reader -> runReaderT reader c)
 
 -- | Find multiple rows.
 --
@@ -113,7 +89,7 @@ readiness log conn =
 --       |]
 --   @
 getMany ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task e [row]
@@ -128,14 +104,14 @@ getMany = withFrozenCallStack doQuery
 --       |]
 --   @
 getOne ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task Query.Error row
 getOne = withFrozenCallStack modifyExactlyOne
 
 doQuery ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task e [row]
@@ -163,7 +139,7 @@ doQuery conn query = do
 --       |]
 --   @
 modifyExactlyOne ::
-  (HasCallStack, Simple.QueryResults row) =>
+  (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
   Task Query.Error row
@@ -172,9 +148,9 @@ modifyExactlyOne conn query =
     |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 runQuery ::
-  (Simple.QueryResults row) =>
+  (QueryResults row) =>
   Query.Query row ->
-  Simple.Connection ->
+  MySQL.SqlBackend ->
   IO [row]
 runQuery query conn =
   query
@@ -185,43 +161,222 @@ runQuery query conn =
     |> Internal.anyToIn
     |> toS
     |> fromString
-    |> Simple.query_ conn
+    |> (\query' -> MySQL.rawSql query' [])
+    |> (\reader -> runReaderT reader conn)
+    |> map (map toQueryResult)
 
-toConnectionString :: Simple.ConnectInfo -> Text
-toConnectionString
-  Simple.ConnectInfo
-    { Simple.connectHost,
-      Simple.connectPort,
-      Simple.connectUser,
-      Simple.connectDatabase,
-      Simple.connectPath
-    } =
-    [ connectUser,
-      ":*****@",
-      if connectHost == ""
-        then connectPath
-        else
-          mconcat
-            [ connectHost,
-              ":",
-              show connectPort,
-              "/"
-            ],
-      connectDatabase
-    ]
-      |> mconcat
-      |> toS
+toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
+toConnectionLogContext settings =
+  let connectionSettings = Settings.mysqlConnection settings
+      database = Settings.unDatabase (Settings.database connectionSettings)
+   in case Settings.connection connectionSettings of
+        Settings.ConnectSocket socket ->
+          Platform.UnixSocket
+            Platform.MySQL
+            (toS (Settings.unSocket socket))
+            database
+        Settings.ConnectTcp host port ->
+          Platform.TcpSocket
+            Platform.MySQL
+            (Settings.unHost host)
+            (show (Settings.unPort port))
+            database
 
-toConnectionLogContext :: Simple.ConnectInfo -> Platform.QueryConnectionInfo
-toConnectionLogContext
-  Simple.ConnectInfo
-    { Simple.connectHost,
-      Simple.connectPort,
-      Simple.connectDatabase,
-      Simple.connectPath
-    } =
-    if connectHost == ""
-      then Platform.UnixSocket Platform.MySQL (toS connectPath) databaseName
-      else Platform.TcpSocket Platform.MySQL (toS connectHost) (show connectPort) databaseName
-    where
-      databaseName = toS connectDatabase
+toConnectInfo :: Settings.Settings -> MySQL.MySQLConnectInfo
+toConnectInfo settings =
+  let connectionSettings = Settings.mysqlConnection settings
+      database = toS (Settings.unDatabase (Settings.database connectionSettings))
+      user = toS (Settings.unUser (Settings.user connectionSettings))
+      password = toS (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
+   in case Settings.connection connectionSettings of
+        Settings.ConnectSocket socket ->
+          MySQL.mkMySQLConnectInfo
+            (Settings.unSocket socket)
+            user
+            password
+            database
+            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+        Settings.ConnectTcp host port ->
+          MySQL.mkMySQLConnectInfo
+            (toS (Settings.unHost host))
+            user
+            password
+            database
+            |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
+            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+
+-- |
+-- The persistent library gives us back types matching the constaint `RawSql`.
+-- These instances are tuples correspoding to rows, as we like, but
+-- unfortunately every field is wrapped in a `Single` constructor. The purpose
+-- of this typeclass is to unwrap these constructors so we can return records
+-- of plain unwrapped values from this module.
+class MySQL.RawSql (FromRawSql a) => QueryResults a where
+
+  type FromRawSql a
+
+  toQueryResult :: FromRawSql a -> a
+
+-- |
+-- It would be really sweet if we could get rid of the `Single` wrapper here,
+-- and allow single-column values to be QueryResults by themselves without the
+-- need for the wrapper. This is how it works on the Postgres side too.
+--
+-- The straight-forward attempt to remove the `MySQL.Single` wrapper here will
+-- result in overlapping instances. Pretty certain there's type-level trickery
+-- to work around that, which might be worth exploring at some point to get a
+-- cleaner API.
+instance (MySQL.PersistField a) => QueryResults (MySQL.Single a) where
+
+  type
+    FromRawSql (MySQL.Single a) =
+      MySQL.Single a
+
+  toQueryResult = identity
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b
+  ) =>
+  QueryResults (a, b)
+  where
+
+  type
+    FromRawSql (a, b) =
+      ( MySQL.Single a,
+        MySQL.Single b
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c
+  ) =>
+  QueryResults (a, b, c)
+  where
+
+  type
+    FromRawSql (a, b, c) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d
+  ) =>
+  QueryResults (a, b, c, d)
+  where
+
+  type
+    FromRawSql (a, b, c, d) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e
+  ) =>
+  QueryResults (a, b, c, d, e)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f
+  ) =>
+  QueryResults (a, b, c, d, e, f)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e, f) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g
+  ) =>
+  QueryResults (a, b, c, d, e, f, g)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e, f, g) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g
+      )
+
+  toQueryResult = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h
+  ) =>
+  QueryResults (a, b, c, d, e, f, g, h)
+  where
+
+  type
+    FromRawSql (a, b, c, d, e, f, g, h) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h
+      )
+
+  toQueryResult = Data.Coerce.coerce
