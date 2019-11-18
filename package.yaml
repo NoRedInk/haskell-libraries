@@ -1,0 +1,14 @@
+<<: !include ../package-yaml-support/base-package.yaml
+name: http
+synopsis: Make Elm style HTTP requests
+extra-source-files:
+- README.md
+library:
+  dependencies:
+  - aeson
+  - http-client
+  - http-client-tls
+  - nri-prelude
+  exposed-modules:
+  - Http
+  source-dirs: src
