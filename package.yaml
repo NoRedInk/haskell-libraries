@@ -6,8 +6,12 @@ extra-source-files:
 library:
   dependencies:
   - aeson
+  - base
+  - bytestring
+  - conduit
   - http-client
   - http-client-tls
+  - http-types
   - nri-prelude
   exposed-modules:
   - Http
