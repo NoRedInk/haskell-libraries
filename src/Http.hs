@@ -2,14 +2,12 @@ module Http (Handler, handler, withThirdParty, Anything (..), Http.get, post, re
 
 import qualified Conduit
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy as BL
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
 import Nri.Prelude
-import qualified Prelude
 
 -- |
 newtype Handler
@@ -37,8 +35,8 @@ instance Aeson.FromJSON Anything where
 
 -- |
 get :: Aeson.FromJSON expect => Handler -> Text -> IO (Result Error expect)
-get handler url =
-  request handler Settings
+get handler' url =
+  request handler' Settings
     { _method = "GET",
       _headers = [],
       _url = url,
@@ -48,8 +46,8 @@ get handler url =
 
 -- |
 post :: Aeson.FromJSON expect => Handler -> Text -> IO (Result Error expect)
-post handler url =
-  request handler Settings
+post handler' url =
+  request handler' Settings
     { _method = "POST",
       _headers = [],
       _url = url,
