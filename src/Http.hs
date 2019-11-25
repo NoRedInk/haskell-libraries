@@ -15,9 +15,8 @@ newtype Handler
 
 -- |
 handler :: Conduit.Acquire Handler
-handler = do
-  manager <- TLS.newTlsManager
-  pure (Handler manager)
+handler =
+  map Handler TLS.newTlsManager
 
 -- | This is for external libraries only!
 withThirdParty :: Handler -> (HTTP.Manager -> a) -> a
