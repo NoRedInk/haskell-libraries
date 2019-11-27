@@ -7,8 +7,8 @@ import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
-import qualified Platform
 import Nri.Prelude
+import qualified Platform
 
 -- |
 data Handler
