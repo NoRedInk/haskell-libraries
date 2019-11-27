@@ -7,8 +7,8 @@ import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
+import qualified Platform
 import Nri.Prelude
-import Platform
 
 -- |
 data Handler
@@ -70,7 +70,7 @@ data Settings body
 -- |
 request :: (Aeson.ToJSON body, Aeson.FromJSON expect) => Handler -> Settings body -> Task Error expect
 request (Handler doAnythingHandler manager) settings =
-  doAnything doAnythingHandler <| do
+  Platform.doAnything doAnythingHandler <| do
     basicRequest <-
       HTTP.parseRequest <| toS (_url settings)
     let finalRequest =
