@@ -82,27 +82,27 @@ request (Handler doAnythingHandler manager) settings =
             }
     response <- try (HTTP.httpLbs finalRequest manager)
     pure <| case response of
-        Right okResponse ->
-          case Aeson.eitherDecode (HTTP.responseBody okResponse) of
-            Right decodedBody ->
-              Ok decodedBody
-            Left message ->
-              Err (BadBody (toS message))
-        Left (HTTP.HttpExceptionRequest _ content) ->
-          case content of
-            HTTP.StatusCodeException res _ ->
-              let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
-               in Err (BadStatus (statusCode res))
-            HTTP.ResponseTimeout ->
-              Err Timeout
-            HTTP.ConnectionTimeout ->
-              Err NetworkError
-            HTTP.ConnectionFailure _ ->
-              Err NetworkError
-            _ ->
-              Err BadResponse
-        Left (HTTP.InvalidUrlException _ message) ->
-          Err (BadUrl (toS message))
+      Right okResponse ->
+        case Aeson.eitherDecode (HTTP.responseBody okResponse) of
+          Right decodedBody ->
+            Ok decodedBody
+          Left message ->
+            Err (BadBody (toS message))
+      Left (HTTP.HttpExceptionRequest _ content) ->
+        case content of
+          HTTP.StatusCodeException res _ ->
+            let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
+             in Err (BadStatus (statusCode res))
+          HTTP.ResponseTimeout ->
+            Err Timeout
+          HTTP.ConnectionTimeout ->
+            Err NetworkError
+          HTTP.ConnectionFailure _ ->
+            Err NetworkError
+          _ ->
+            Err BadResponse
+      Left (HTTP.InvalidUrlException _ message) ->
+        Err (BadUrl (toS message))
 
 -- |
 data Error
