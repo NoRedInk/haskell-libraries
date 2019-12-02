@@ -2,6 +2,7 @@ module Http (Handler, handler, withThirdParty, Anything (..), Http.get, post, re
 
 import qualified Conduit
 import qualified Data.Aeson as Aeson
+import qualified Debug
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as TLS
@@ -78,10 +79,10 @@ request (Handler doAnythingHandler manager) settings =
             { HTTP.method = toS (_method settings),
               HTTP.requestHeaders = _headers settings,
               HTTP.requestBody = HTTP.RequestBodyLBS <| Aeson.encode (_body settings),
-              HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault 30 (_timeout settings)
+              HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
             }
     response <- try (HTTP.httpLbs finalRequest manager)
-    pure <| case response of
+    pure <| case Debug.log "HELP HELP" response of
       Right okResponse ->
         case Aeson.eitherDecode (HTTP.responseBody okResponse) of
           Right decodedBody ->
