@@ -5,7 +5,7 @@ module Http
     Http.get,
     post,
     request,
-    Settings,
+    Settings (..),
     Expect,
     expectJson,
     expectText,
