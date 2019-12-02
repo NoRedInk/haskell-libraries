@@ -17,7 +17,6 @@ where
 import qualified Conduit
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
-import qualified Debug
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as TLS
@@ -93,7 +92,7 @@ request (Handler doAnythingHandler manager) settings =
               HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
             }
     response <- try (HTTP.httpLbs finalRequest manager)
-    pure <| case Debug.log "HELP HELP" response of
+    pure <| case response of
       Right okResponse ->
         case decode (_expect settings) (HTTP.responseBody okResponse) of
           Ok decodedBody ->
