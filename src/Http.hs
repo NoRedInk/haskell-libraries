@@ -1,7 +1,22 @@
-module Http (Handler, handler, withThirdParty, Anything (..), Http.get, post, request, Settings, Error (..)) where
+module Http
+  ( Handler,
+    handler,
+    withThirdParty,
+    Http.get,
+    post,
+    request,
+    Settings,
+    Expect,
+    expectJson,
+    expectText,
+    expectWhatever,
+    Error (..),
+  )
+where
 
 import qualified Conduit
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy
 import qualified Debug
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
@@ -27,49 +42,45 @@ withThirdParty (Handler _ manager) library =
 
 -- QUICKS
 
--- | Use this if your response body should succeed no matter what it contains.
-data Anything
-  = Anything
-
-instance Aeson.FromJSON Anything where
-  parseJSON _ = pure Anything
-
 -- |
-get :: Aeson.FromJSON expect => Handler -> Text -> Task Error expect
-get handler' url =
+get :: Handler -> Text -> Expect a -> Task Error a
+get handler' url expect =
   request handler' Settings
     { _method = "GET",
       _headers = [],
       _url = url,
       _body = (),
-      _timeout = Nothing
+      _timeout = Nothing,
+      _expect = expect
     }
 
 -- |
-post :: Aeson.FromJSON expect => Handler -> Text -> Task Error expect
-post handler' url =
+post :: Handler -> Text -> Expect a -> Task Error a
+post handler' url expect =
   request handler' Settings
     { _method = "POST",
       _headers = [],
       _url = url,
       _body = (),
-      _timeout = Nothing
+      _timeout = Nothing,
+      _expect = expect
     }
 
 -- REQUEST
 
 -- |
-data Settings body
+data Settings body a
   = Settings
       { _method :: Text,
         _headers :: [Header.Header],
         _url :: Text,
         _body :: body,
-        _timeout :: Maybe Int
+        _timeout :: Maybe Int,
+        _expect :: Expect a
       }
 
 -- |
-request :: (Aeson.ToJSON body, Aeson.FromJSON expect) => Handler -> Settings body -> Task Error expect
+request :: (Aeson.ToJSON body) => Handler -> Settings body expect -> Task Error expect
 request (Handler doAnythingHandler manager) settings =
   Platform.doAnything doAnythingHandler <| do
     basicRequest <-
@@ -84,10 +95,10 @@ request (Handler doAnythingHandler manager) settings =
     response <- try (HTTP.httpLbs finalRequest manager)
     pure <| case Debug.log "HELP HELP" response of
       Right okResponse ->
-        case Aeson.eitherDecode (HTTP.responseBody okResponse) of
-          Right decodedBody ->
+        case decode (_expect settings) (HTTP.responseBody okResponse) of
+          Ok decodedBody ->
             Ok decodedBody
-          Left message ->
+          Err message ->
             Err (BadBody (toS message))
       Left (HTTP.HttpExceptionRequest _ content) ->
         case content of
@@ -104,6 +115,29 @@ request (Handler doAnythingHandler manager) settings =
             Err BadResponse
       Left (HTTP.InvalidUrlException _ message) ->
         Err (BadUrl (toS message))
+
+-- |
+-- Logic for interpreting a response body.
+newtype Expect a = Expect {decode :: Data.ByteString.Lazy.ByteString -> Result Text a}
+
+-- |
+-- Expect the response body to be JSON.
+expectJson :: Aeson.FromJSON a => Expect a
+expectJson =
+  Expect <| \bytestring ->
+    case Aeson.eitherDecode bytestring of
+      Left err -> Err (toS err)
+      Right x -> Ok x
+
+-- |
+-- Expect the response body to be a `Text`.
+expectText :: Expect Text
+expectText = Expect (Ok << toS)
+
+-- |
+-- Expect the response body to be whatever. It does not matter. Ignore it!
+expectWhatever :: Expect ()
+expectWhatever = Expect (\_ -> Ok ())
 
 -- |
 data Error
