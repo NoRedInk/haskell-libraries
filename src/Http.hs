@@ -146,3 +146,6 @@ data Error
   | BadResponse
   | Timeout
   | NetworkError
+  deriving (Show)
+
+instance Exception Error
