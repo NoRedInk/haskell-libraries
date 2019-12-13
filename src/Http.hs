@@ -15,8 +15,14 @@ module Http
 where
 
 import qualified Conduit
+import qualified Control.Exception as Exception
+import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
+import qualified Data.Text
+import qualified Data.Text.Encoding
+import qualified Data.Text.Lazy
+import qualified Data.Text.Lazy.Encoding
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as TLS
@@ -24,6 +30,7 @@ import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
 import Nri.Prelude
 import qualified Platform
+import Prelude (Either (Left, Right), fromIntegral, pure)
 
 -- |
 data Handler
@@ -83,22 +90,22 @@ request :: (Aeson.ToJSON body) => Handler -> Settings body expect -> Task Error 
 request (Handler doAnythingHandler manager) settings =
   Platform.doAnything doAnythingHandler <| do
     basicRequest <-
-      HTTP.parseRequest <| toS (_url settings)
+      HTTP.parseRequest <| Data.Text.unpack (_url settings)
     let finalRequest =
           basicRequest
-            { HTTP.method = toS (_method settings),
+            { HTTP.method = Data.Text.Encoding.encodeUtf8 (_method settings),
               HTTP.requestHeaders = _headers settings,
               HTTP.requestBody = HTTP.RequestBodyLBS <| Aeson.encode (_body settings),
               HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
             }
-    response <- try (HTTP.httpLbs finalRequest manager)
+    response <- Exception.try (HTTP.httpLbs finalRequest manager)
     pure <| case response of
       Right okResponse ->
         case decode (_expect settings) (HTTP.responseBody okResponse) of
           Ok decodedBody ->
             Ok decodedBody
           Err message ->
-            Err (BadBody (toS message))
+            Err (BadBody message)
       Left (HTTP.HttpExceptionRequest _ content) ->
         case content of
           HTTP.StatusCodeException res _ ->
@@ -113,7 +120,7 @@ request (Handler doAnythingHandler manager) settings =
           _ ->
             Err BadResponse
       Left (HTTP.InvalidUrlException _ message) ->
-        Err (BadUrl (toS message))
+        Err (BadUrl (Data.Text.pack message))
 
 -- |
 -- Logic for interpreting a response body.
@@ -125,13 +132,13 @@ expectJson :: Aeson.FromJSON a => Expect a
 expectJson =
   Expect <| \bytestring ->
     case Aeson.eitherDecode bytestring of
-      Left err -> Err (toS err)
+      Left err -> Err (Data.Text.pack err)
       Right x -> Ok x
 
 -- |
 -- Expect the response body to be a `Text`.
 expectText :: Expect Text
-expectText = Expect (Ok << toS)
+expectText = Expect (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8)
 
 -- |
 -- Expect the response body to be whatever. It does not matter. Ignore it!

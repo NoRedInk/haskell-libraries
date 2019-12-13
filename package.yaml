@@ -13,6 +13,7 @@ library:
   - http-client-tls
   - http-types
   - nri-prelude
+  - text
   exposed-modules:
   - Http
   source-dirs: src
