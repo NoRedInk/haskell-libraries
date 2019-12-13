@@ -31,9 +31,14 @@ module Postgres
   )
 where
 
-import Control.Exception.Safe (MonadCatch)
+import Control.Exception.Safe (MonadCatch, catch)
+import Control.Monad (void)
+import Control.Monad.IO.Class (MonadIO)
 import qualified Data.Acquire
+import Data.ByteString (ByteString)
 import qualified Data.Pool
+import qualified Data.Text
+import qualified Data.Text.Encoding
 import Database.PostgreSQL.Typed
   ( PGConnection,
     PGDatabase (PGDatabase),
@@ -52,6 +57,7 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollbackAll,
   )
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
@@ -60,7 +66,7 @@ import Network.Socket (SockAddr (..))
 import Nri.Prelude
 import qualified Platform
 import qualified Postgres.Settings as Settings
-import Prelude (error)
+import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
 type Connection = GenericDb.Connection PGConnection
 
@@ -193,17 +199,17 @@ modifyExactlyOne conn query =
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
   mconcat
-    [ toS pgDBUser,
+    [ Data.Text.Encoding.decodeUtf8 pgDBUser,
       ":*****@",
       case pgDBAddr of
         Right sockAddr ->
-          show sockAddr
+          Data.Text.pack (show sockAddr)
         Left (hostName, serviceName) ->
-          toS hostName
+          Data.Text.pack hostName
             <> ":"
-            <> toS serviceName,
+            <> Data.Text.pack serviceName,
       "/",
-      toS pgDBName
+      Data.Text.Encoding.decodeUtf8 pgDBName
     ] ::
     Text
 
@@ -211,13 +217,13 @@ toConnectionLogContext :: PGDatabase -> Platform.QueryConnectionInfo
 toConnectionLogContext db =
   case pgDBAddr db of
     Left (hostName, serviceName) ->
-      Platform.TcpSocket Platform.Postgres (toS hostName) (toS serviceName) databaseName
+      Platform.TcpSocket Platform.Postgres (Data.Text.pack hostName) (Data.Text.pack serviceName) databaseName
     Right (SockAddrInet portNum hostAddr) ->
-      Platform.TcpSocket Platform.Postgres (show hostAddr) (show portNum) databaseName
+      Platform.TcpSocket Platform.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
     Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-      Platform.TcpSocket Platform.Postgres (show hostAddr) (show portNum) databaseName
+      Platform.TcpSocket Platform.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
     Right (SockAddrUnix sockPath) ->
-      Platform.UnixSocket Platform.Postgres (toS sockPath) databaseName
+      Platform.UnixSocket Platform.Postgres (Data.Text.pack sockPath) databaseName
     Right somethingElse ->
       -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
       error
@@ -226,4 +232,4 @@ toConnectionLogContext db =
             ++ " is."
         )
   where
-    databaseName = pgDBName db |> toS
+    databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8

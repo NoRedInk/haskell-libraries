@@ -18,9 +18,11 @@ module MySQL.Settings
   )
 where
 
+import qualified Data.Text
 import qualified Environment
 import qualified Log
 import Nri.Prelude
+import Prelude (FilePath, pure, show)
 
 data Settings
   = Settings
@@ -171,7 +173,7 @@ portDecoder =
     Environment.Variable
       { Environment.name = "MONOLITH_MYSQL_PORT",
         Environment.description = "The monolith port to connect to.",
-        Environment.defaultValue = unPort defaultPort |> show
+        Environment.defaultValue = unPort defaultPort |> show |> Data.Text.pack
       }
     (map Port Environment.int)
 
@@ -188,7 +190,7 @@ socketDecoder =
         Environment.description = "The monolith socket to connect to.",
         Environment.defaultValue = ""
       }
-    (map (toS >> Socket) Environment.text)
+    (map (Data.Text.unpack >> Socket) Environment.text)
 
 newtype MysqlPoolSize
   = MysqlPoolSize {unMysqlPoolSize :: Int}
@@ -201,6 +203,6 @@ mysqlPoolSizeDecoder =
       { Environment.name = "MYSQL_POOL_SIZE",
         Environment.description = "The size of the postgres connection pool. This is the maximum amount of parallel database connections the app will be able to use.",
         Environment.defaultValue =
-          defaultSettings |> mysqlPool |> mysqlPoolSize |> unMysqlPoolSize |> show
+          defaultSettings |> mysqlPool |> mysqlPoolSize |> unMysqlPoolSize |> show |> Data.Text.pack
       }
     (Environment.int |> map MysqlPoolSize)
