@@ -40,6 +40,7 @@ import Database.PostgreSQL.Typed
     defaultPGDatabase,
     pgDBAddr,
     pgDBName,
+    pgDBParams,
     pgDBPass,
     pgDBUser,
   )
@@ -252,12 +253,14 @@ toPGDatabase
             pgHost,
             pgPassword,
             pgPort
-          }
+          },
+      pgQueryTimeoutSeconds
     } =
     defaultPGDatabase
       { pgDBName = toS (unPgDatabase pgDatabase),
         pgDBUser = toS (unPgUser pgUser),
         pgDBPass = toS <| Log.unSecret (unPgPassword pgPassword),
+        pgDBParams = [("statement_timeout", pgQueryTimeoutSeconds * 1000 |> floor |> show)],
         pgDBAddr =
           -- The rule that PostgreSQL/libpq applies to `host`:
           --
