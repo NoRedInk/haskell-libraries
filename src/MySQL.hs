@@ -59,7 +59,13 @@ connection settings =
         MySQL.createMySQLPool database size
           |> Control.Monad.Logger.runNoLoggingT
           |> map GenericDb.Pool
-      pure (GenericDb.Connection doAnything pool (toConnectionLogContext settings))
+      pure
+        ( GenericDb.Connection
+            doAnything
+            pool
+            (toConnectionLogContext settings)
+            (floor (Settings.mysqlQueryTimeoutSeconds settings * 1000 * 1000))
+        )
     release GenericDb.Connection {GenericDb.singleOrPool} =
       case singleOrPool of
         GenericDb.Pool pool -> Data.Pool.destroyAllResources pool

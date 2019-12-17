@@ -12,6 +12,8 @@ module Internal.GenericDb
   )
 where
 
+import qualified Control.Concurrent
+import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception
 import Control.Exception.Safe (MonadCatch)
 import qualified Control.Exception.Safe
@@ -29,7 +31,8 @@ data Connection c
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool c,
-        logContext :: Platform.QueryConnectionInfo
+        logContext :: Platform.QueryConnectionInfo,
+        timeoutMicroSeconds :: Int
       }
 
 -- | A database connection type.
@@ -49,8 +52,24 @@ runTaskWithConnection conn f =
   withConnection
     conn
     ( \c ->
-        Platform.doAnything (doAnything conn) (map Ok (f c))
+        Platform.doAnything (doAnything conn) (withTimeout (timeoutMicroSeconds conn) (map Ok (f c)))
     )
+
+withTimeout :: Int -> IO a -> IO a
+withTimeout timeout io = do
+  res <- Async.race io (failAfter timeout)
+  case res of
+    Left x -> pure x
+    Right x -> pure x
+
+failAfter :: Int -> IO a
+failAfter timeout = do
+  Control.Concurrent.threadDelay (fromIntegral timeout)
+  throwIO (QueryTimeoutException timeout)
+
+newtype QueryTimeoutException = QueryTimeoutException Int deriving (Show)
+
+instance Exception QueryTimeoutException
 
 --
 

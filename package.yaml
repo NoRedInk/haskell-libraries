@@ -5,6 +5,7 @@ extra-source-files:
 - README.md
 dependencies:
 - attoparsec
+- async
 - base
 - directory
 - env-parser

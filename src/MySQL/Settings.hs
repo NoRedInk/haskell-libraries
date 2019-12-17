@@ -25,7 +25,8 @@ import Nri.Prelude
 data Settings
   = Settings
       { mysqlConnection :: ConnectionSettings,
-        mysqlPool :: PoolSettings
+        mysqlPool :: PoolSettings,
+        mysqlQueryTimeoutSeconds :: Float
       }
 
 data ConnectionSettings
@@ -52,7 +53,8 @@ defaultSettings =
     { mysqlConnection = defaultConnectionSettings,
       mysqlPool = PoolSettings
         { mysqlPoolSize = MysqlPoolSize 2
-        }
+        },
+      mysqlQueryTimeoutSeconds = 5
     }
 
 defaultConnectionSettings :: ConnectionSettings
@@ -75,6 +77,7 @@ decoder =
   pure Settings
     |> andMap connectionSettingsDecoder
     |> andMap poolDecoder
+    |> andMap queryTimeoutSecondsDecoder
 
 connectionSettingsDecoder :: Environment.Decoder ConnectionSettings
 connectionSettingsDecoder =
@@ -204,3 +207,13 @@ mysqlPoolSizeDecoder =
           defaultSettings |> mysqlPool |> mysqlPoolSize |> unMysqlPoolSize |> show
       }
     (Environment.int |> map MysqlPoolSize)
+
+queryTimeoutSecondsDecoder :: Environment.Decoder Float
+queryTimeoutSecondsDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "MYSQL_QUERY_TIMEOUT_SECONDS",
+        Environment.description = "The maximum time a query can run before it is cancelled.",
+        Environment.defaultValue = defaultSettings |> mysqlQueryTimeoutSeconds |> show
+      }
+    Environment.float

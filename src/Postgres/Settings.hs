@@ -2,7 +2,8 @@ module Postgres.Settings
   ( Settings
       ( Settings,
         pgConnection,
-        pgPool
+        pgPool,
+        pgQueryTimeoutSeconds
       ),
     ConnectionSettings
       ( ConnectionSettings,
@@ -52,7 +53,8 @@ import qualified Prelude (round)
 data Settings
   = Settings
       { pgConnection :: ConnectionSettings,
-        pgPool :: PoolSettings
+        pgPool :: PoolSettings,
+        pgQueryTimeoutSeconds :: Float
       }
   deriving (Eq, Show, Generic)
 
@@ -69,7 +71,8 @@ defaultSettings = Settings
       { pgPoolSize = PgPoolSize 2,
         pgPoolMaxIdleTime = PgPoolMaxIdleTime (toNominalDiffTime 3600),
         pgPoolStripes = PgPoolStripes 1
-      }
+      },
+    pgQueryTimeoutSeconds = 5
   }
 
 data ConnectionSettings
@@ -95,6 +98,7 @@ decoder =
   pure Settings
     |> andMap connectionDecoder
     |> andMap poolDecoder
+    |> andMap queryTimeoutSecondsDecoder
 
 connectionDecoder :: Environment.Decoder ConnectionSettings
 connectionDecoder =
@@ -272,3 +276,13 @@ toPGDatabase
     where
       host = unPgHost pgHost
       port = unPgPort pgPort
+
+queryTimeoutSecondsDecoder :: Environment.Decoder Float
+queryTimeoutSecondsDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "PG_QUERY_TIMEOUT_SECONDS",
+        Environment.description = "The maximum time a query can run before it is cancelled.",
+        Environment.defaultValue = defaultSettings |> pgQueryTimeoutSeconds |> show
+      }
+    Environment.float

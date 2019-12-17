@@ -78,7 +78,13 @@ connection settings =
             stripes
             maxIdleTime
             size
-      pure (GenericDb.Connection doAnything pool (toConnectionLogContext database))
+      pure
+        ( GenericDb.Connection
+            doAnything
+            pool
+            (toConnectionLogContext database)
+            (floor (Settings.pgQueryTimeoutSeconds settings * 1000 * 1000))
+        )
     release GenericDb.Connection {GenericDb.singleOrPool} =
       case singleOrPool of
         GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
