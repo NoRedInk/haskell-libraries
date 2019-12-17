@@ -9,6 +9,8 @@ module Internal.GenericDb
     inTestTransaction,
     readiness,
     handleError,
+    withTimeout,
+    QueryTimeoutException,
   )
 where
 
