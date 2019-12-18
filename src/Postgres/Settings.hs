@@ -260,7 +260,13 @@ toPGDatabase
       { pgDBName = toS (unPgDatabase pgDatabase),
         pgDBUser = toS (unPgUser pgUser),
         pgDBPass = toS <| Log.unSecret (unPgPassword pgPassword),
-        pgDBParams = [("statement_timeout", pgQueryTimeoutSeconds * 1000 |> floor |> show)],
+        pgDBParams =
+          [ -- We configure Postgres to automatically kill queries when they run
+            -- too long. That should offer some protection against queries
+            -- locking up the database.
+            -- https://www.postgresql.org/docs/9.4/runtime-config-client.html
+            ("statement_timeout", milli * pgQueryTimeoutSeconds |> floor |> show)
+          ],
         pgDBAddr =
           -- The rule that PostgreSQL/libpq applies to `host`:
           --
@@ -279,6 +285,7 @@ toPGDatabase
     where
       host = unPgHost pgHost
       port = unPgPort pgPort
+      milli = 1000
 
 queryTimeoutSecondsDecoder :: Environment.Decoder Float
 queryTimeoutSecondsDecoder =

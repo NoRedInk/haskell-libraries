@@ -83,7 +83,7 @@ connection settings =
             doAnything
             pool
             (toConnectionLogContext database)
-            (floor (Settings.pgQueryTimeoutSeconds settings * 1000 * 1000))
+            (floor (micro * Settings.pgQueryTimeoutSeconds settings))
         )
     release GenericDb.Connection {GenericDb.singleOrPool} =
       case singleOrPool of
@@ -93,6 +93,7 @@ connection settings =
     maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings))
     size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral
     database = Settings.toPGDatabase settings
+    micro = 1000 * 1000
 
 -- |
 -- Perform a database transaction.

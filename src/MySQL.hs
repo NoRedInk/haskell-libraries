@@ -64,7 +64,7 @@ connection settings =
             doAnything
             pool
             (toConnectionLogContext settings)
-            (floor (Settings.mysqlQueryTimeoutSeconds settings * 1000 * 1000))
+            (floor (micro * Settings.mysqlQueryTimeoutSeconds settings))
         )
     release GenericDb.Connection {GenericDb.singleOrPool} =
       case singleOrPool of
@@ -72,6 +72,7 @@ connection settings =
         GenericDb.Single _ -> pure ()
     size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
     database = toConnectInfo settings
+    micro = 1000 * 1000
 
 -- |
 -- Check that we are ready to be take traffic.
