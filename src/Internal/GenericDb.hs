@@ -21,13 +21,18 @@ import Control.Exception.Safe (MonadCatch)
 import qualified Control.Exception.Safe
 import qualified Control.Monad.Catch
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Pool
+import Data.String (IsString)
+import qualified Data.Text
 import qualified Health
 import Nri.Prelude
 import qualified Oops
 import qualified Platform
+import qualified System.Exit
 import qualified Task
 import qualified Tuple
+import Prelude (Either (Left, Right), IO, flip, fromIntegral, pure)
 
 data Connection c
   = Connection
@@ -67,11 +72,11 @@ withTimeout timeout io = do
 failAfter :: Int -> IO a
 failAfter timeout = do
   Control.Concurrent.threadDelay (fromIntegral timeout)
-  throwIO (QueryTimeoutException timeout)
+  Control.Exception.throwIO (QueryTimeoutException timeout)
 
 newtype QueryTimeoutException = QueryTimeoutException Int deriving (Show)
 
-instance Exception QueryTimeoutException
+instance Control.Exception.Exception QueryTimeoutException
 
 --
 
@@ -130,10 +135,10 @@ readiness runQuery log' conn = do
       |> Platform.runCmd log'
       |> Control.Exception.Safe.tryAny
   pure <| Health.fromResult <| case response of
-    Left err -> Err (toS (displayException err))
+    Left err -> Err (Data.Text.pack (Control.Exception.displayException err))
     Right x -> Ok x
 
-handleError :: Text -> IOException -> IO a
+handleError :: Text -> Control.Exception.IOException -> IO a
 handleError connectionString err = do
   _ <-
     Oops.putNiceError
@@ -158,8 +163,7 @@ handleError connectionString err = do
         Oops.extra "Attempted to connect to" connectionString
       ]
   Control.Exception.displayException err
-    |> toS
-    |> die
+    |> System.Exit.die
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.

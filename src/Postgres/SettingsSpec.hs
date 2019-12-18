@@ -5,6 +5,7 @@ import qualified Expect
 import Nri.Prelude
 import qualified Postgres.Settings
 import Test (Test, describe, test)
+import Prelude (Either (Right))
 
 tests :: Test
 tests =

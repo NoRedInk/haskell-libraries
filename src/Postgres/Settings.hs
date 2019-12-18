@@ -33,7 +33,9 @@ module Postgres.Settings
   )
 where
 
-import qualified Data.Text as Text (isPrefixOf)
+import qualified Data.ByteString.Char8
+import qualified Data.Text
+import qualified Data.Text.Encoding
 import qualified Data.Time
 import Database.PostgreSQL.Typed
   ( PGDatabase,
@@ -49,7 +51,7 @@ import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
 import Nri.Prelude
 import System.FilePath ((</>))
-import qualified Prelude (round)
+import Prelude (Either (Left, Right), pure, realToFrac, round, show)
 
 data Settings
   = Settings
@@ -128,7 +130,7 @@ pgPortDecoder =
       { Environment.name = "PGPORT",
         Environment.description = "The port postgres is running on.",
         Environment.defaultValue =
-          defaultSettings |> pgConnection |> pgPort |> unPgPort |> show
+          defaultSettings |> pgConnection |> pgPort |> unPgPort |> show |> Data.Text.pack
       }
     (Environment.int |> map PgPort)
 
@@ -203,7 +205,7 @@ pgPoolStripesDecoder =
       { Environment.name = "PG_POOL_STRIPES",
         Environment.description = "The amount of sub-connection pools to create. Best refer to the resource-pool package for more info on this one. 1 is a good value for most applications.",
         Environment.defaultValue =
-          defaultSettings |> pgPool |> pgPoolStripes |> unPgPoolStripes |> show
+          defaultSettings |> pgPool |> pgPoolStripes |> unPgPoolStripes |> show |> Data.Text.pack
       }
     (Environment.int |> map PgPoolStripes)
 
@@ -218,7 +220,7 @@ pgPoolMaxIdleTimeDecoder =
       { Environment.name = "PG_POOL_MAX_IDLE_TIME",
         Environment.description = "The maximum time a database connection will be able remain idle until it is closed.",
         Environment.defaultValue =
-          defaultSettings |> pgPool |> pgPoolMaxIdleTime |> unPgPoolMaxIdleTime |> fromNominalDiffTime |> show
+          defaultSettings |> pgPool |> pgPoolMaxIdleTime |> unPgPoolMaxIdleTime |> fromNominalDiffTime |> show |> Data.Text.pack
       }
     (Environment.int |> map (PgPoolMaxIdleTime << toNominalDiffTime))
 
@@ -239,7 +241,7 @@ pgPoolSizeDecoder =
       { Environment.name = "PG_POOL_SIZE",
         Environment.description = "The size of the postgres connection pool. This is the maximum amount of parallel database connections the app will be able to use.",
         Environment.defaultValue =
-          defaultSettings |> pgPool |> pgPoolSize |> unPgPoolSize |> show
+          defaultSettings |> pgPool |> pgPoolSize |> unPgPoolSize |> show |> Data.Text.pack
       }
     (Environment.int |> map PgPoolSize)
 
@@ -257,15 +259,15 @@ toPGDatabase
       pgQueryTimeoutSeconds
     } =
     defaultPGDatabase
-      { pgDBName = toS (unPgDatabase pgDatabase),
-        pgDBUser = toS (unPgUser pgUser),
-        pgDBPass = toS <| Log.unSecret (unPgPassword pgPassword),
+      { pgDBName = Data.Text.Encoding.encodeUtf8 (unPgDatabase pgDatabase),
+        pgDBUser = Data.Text.Encoding.encodeUtf8 (unPgUser pgUser),
+        pgDBPass = Data.Text.Encoding.encodeUtf8 <| Log.unSecret (unPgPassword pgPassword),
         pgDBParams =
           [ -- We configure Postgres to automatically kill queries when they run
             -- too long. That should offer some protection against queries
             -- locking up the database.
             -- https://www.postgresql.org/docs/9.4/runtime-config-client.html
-            ("statement_timeout", milli * pgQueryTimeoutSeconds |> floor |> show)
+            ("statement_timeout", milli * pgQueryTimeoutSeconds |> floor |> show |> Data.ByteString.Char8.pack)
           ],
         pgDBAddr =
           -- The rule that PostgreSQL/libpq applies to `host`:
@@ -275,12 +277,12 @@ toPGDatabase
           --   name of the directory in which the socket file is stored
           --
           -- https://www.postgresql.org/docs/9.6/libpq-connect.html#LIBPQ-CONNECT-HOST
-          if "/" `Text.isPrefixOf` host
+          if "/" `Data.Text.isPrefixOf` host
             then
-              toS host </> ".s.PGSQL." ++ show port
+              Data.Text.unpack host </> ".s.PGSQL." ++ show port
                 |> SockAddrUnix
                 |> Right
-            else Left (toS host, show port)
+            else Left (Data.Text.unpack host, show port)
       }
     where
       host = unPgHost pgHost
@@ -293,6 +295,6 @@ queryTimeoutSecondsDecoder =
     Environment.Variable
       { Environment.name = "PG_QUERY_TIMEOUT_SECONDS",
         Environment.description = "The maximum time a query can run before it is cancelled.",
-        Environment.defaultValue = defaultSettings |> pgQueryTimeoutSeconds |> show
+        Environment.defaultValue = defaultSettings |> pgQueryTimeoutSeconds |> show |> Data.Text.pack
       }
     Environment.float

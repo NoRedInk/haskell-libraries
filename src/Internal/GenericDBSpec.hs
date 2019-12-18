@@ -1,10 +1,12 @@
 module Internal.GenericDBSpec (tests) where
 
 import qualified Control.Concurrent
+import qualified Control.Exception
 import qualified Expect
 import Internal.GenericDb
 import Nri.Prelude
 import Test (Test, describe, test)
+import Prelude (Either (Left, Right), IO, pure)
 
 tests :: Test
 tests =
@@ -32,7 +34,7 @@ withTimeoutTests =
 
 throwsException :: IO a -> IO Bool
 throwsException io = do
-  result <- try io
+  result <- Control.Exception.try io
   case result of
     Left (_ :: QueryTimeoutException) -> pure True
     Right _ -> pure False

@@ -7,6 +7,7 @@ dependencies:
 - attoparsec
 - async
 - base
+- bytestring
 - directory
 - env-parser
 - exceptions
@@ -16,6 +17,7 @@ dependencies:
 - lens-regex-pcre
 - monad-logger
 - mysql-haskell
+- mtl
 - network
 - nri-prelude
 - oops

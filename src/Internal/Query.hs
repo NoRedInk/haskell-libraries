@@ -16,7 +16,8 @@ module Internal.Query
   )
 where
 
-import Control.Monad (fail)
+import Control.Monad (fail, void)
+import Control.Monad.Except (throwError)
 import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
@@ -36,6 +37,7 @@ import Language.Haskell.TH.Syntax (runIO)
 import MySQL.Internal (inToAny)
 import Nri.Prelude
 import qualified Postgres.Settings
+import Prelude (IO, either, fromIntegral, pure)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -68,10 +70,12 @@ data Query row
 
 qqSQL :: String -> ExpQ
 qqSQL query = do
-  let db = map (either panic Postgres.Settings.toPGDatabase) (Environment.decode Postgres.Settings.decoder)
+  let db =
+        Environment.decode Postgres.Settings.decoder
+          |> andThen (either (fail << Data.Text.unpack) (pure << Postgres.Settings.toPGDatabase))
   db' <- runIO db
   void (useTPGDatabase db')
-  let meta = Parser.parse (toS query)
+  let meta = Parser.parse (Data.Text.pack query)
   let op = Data.Text.unpack (Parser.sqlOperation meta)
   let rel = Data.Text.unpack (Parser.queriedRelation meta)
   [e|

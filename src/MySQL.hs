@@ -30,13 +30,18 @@ module MySQL
   )
 where
 
+import Control.Monad (void)
 import qualified Control.Monad.Logger
+import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
 import qualified Data.Coerce
 import qualified Data.Pool
 import Data.String (fromString)
+import qualified Data.Text
+import qualified Data.Text.Encoding
 import qualified Database.MySQL.Connection
 import qualified Database.Persist.MySQL as MySQL
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
@@ -46,6 +51,7 @@ import qualified MySQL.Settings as Settings
 import Nri.Prelude
 import qualified Platform
 import qualified Text
+import Prelude (IO, fromIntegral, pure, show)
 
 type Connection = GenericDb.Connection MySQL.SqlBackend
 
@@ -162,11 +168,10 @@ runQuery ::
 runQuery query conn =
   query
     |> Query.sqlString
-    |> toS
     -- We need this prefix on tables to allow compile-time checks of the query.
     |> Text.replace "monolith." ""
     |> Internal.anyToIn
-    |> toS
+    |> Data.Text.unpack
     |> fromString
     |> (\query' -> MySQL.rawSql query' [])
     |> (\reader -> runReaderT reader conn)
@@ -180,21 +185,21 @@ toConnectionLogContext settings =
         Settings.ConnectSocket socket ->
           Platform.UnixSocket
             Platform.MySQL
-            (toS (Settings.unSocket socket))
+            (Data.Text.pack (Settings.unSocket socket))
             database
         Settings.ConnectTcp host port ->
           Platform.TcpSocket
             Platform.MySQL
             (Settings.unHost host)
-            (show (Settings.unPort port))
+            (Data.Text.pack (show (Settings.unPort port)))
             database
 
 toConnectInfo :: Settings.Settings -> MySQL.MySQLConnectInfo
 toConnectInfo settings =
   let connectionSettings = Settings.mysqlConnection settings
-      database = toS (Settings.unDatabase (Settings.database connectionSettings))
-      user = toS (Settings.unUser (Settings.user connectionSettings))
-      password = toS (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
+      database = Data.Text.Encoding.encodeUtf8 (Settings.unDatabase (Settings.database connectionSettings))
+      user = Data.Text.Encoding.encodeUtf8 (Settings.unUser (Settings.user connectionSettings))
+      password = Data.Text.Encoding.encodeUtf8 (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
           MySQL.mkMySQLConnectInfo
@@ -205,7 +210,7 @@ toConnectInfo settings =
             |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
         Settings.ConnectTcp host port ->
           MySQL.mkMySQLConnectInfo
-            (toS (Settings.unHost host))
+            (Data.Text.unpack (Settings.unHost host))
             user
             password
             database
