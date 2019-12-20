@@ -19,7 +19,7 @@ dependencies:
 - mysql-haskell
 - mtl
 - network
-- nri-prelude
+- cherry-core
 - oops
 - persistent-mysql-haskell
 - pcre-light
