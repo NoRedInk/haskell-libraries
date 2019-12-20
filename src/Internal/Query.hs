@@ -37,7 +37,7 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import MySQL.Internal (inToAny)
 import qualified Postgres.Settings
-import Prelude (IO, either, fromIntegral, pure)
+import Prelude (IO, fromIntegral, pure)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -72,7 +72,14 @@ qqSQL :: String -> ExpQ
 qqSQL query = do
   let db =
         Environment.decode Postgres.Settings.decoder
-          |> andThen (either (fail << Data.Text.unpack) (pure << Postgres.Settings.toPGDatabase))
+          |> andThen
+            ( \result ->
+                case result of
+                  Err err ->
+                    fail (Data.Text.unpack err)
+                  Ok settings ->
+                    pure (Postgres.Settings.toPGDatabase settings)
+            )
   db' <- runIO db
   void (useTPGDatabase db')
   let meta = Parser.parse (Data.Text.pack query)
