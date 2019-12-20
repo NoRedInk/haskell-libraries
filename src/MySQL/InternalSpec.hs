@@ -2,7 +2,7 @@ module MySQL.InternalSpec (tests) where
 
 import qualified Expect
 import qualified MySQL.Internal
-import Nri.Prelude
+import Cherry.Prelude
 import Test (Test, describe, test)
 import qualified Text
 

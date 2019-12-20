@@ -49,7 +49,7 @@ import Database.PostgreSQL.Typed
 import qualified Environment
 import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
-import Nri.Prelude
+import Cherry.Prelude
 import System.FilePath ((</>))
 import Prelude (Either (Left, Right), pure, realToFrac, round, show)
 

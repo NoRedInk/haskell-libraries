@@ -21,7 +21,7 @@ where
 import qualified Data.Text
 import qualified Environment
 import qualified Log
-import Nri.Prelude
+import Cherry.Prelude
 import Prelude (FilePath, pure, show)
 
 data Settings

@@ -63,7 +63,7 @@ import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import qualified Log
 import Network.Socket (SockAddr (..))
-import Nri.Prelude
+import Cherry.Prelude
 import qualified Platform
 import qualified Postgres.Settings as Settings
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)

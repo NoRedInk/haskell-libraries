@@ -48,7 +48,7 @@ import qualified Internal.Query as Query
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
-import Nri.Prelude
+import Cherry.Prelude
 import qualified Platform
 import qualified Text
 import Prelude (IO, fromIntegral, pure, show)

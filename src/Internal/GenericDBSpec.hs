@@ -4,7 +4,7 @@ import qualified Control.Concurrent
 import qualified Control.Exception
 import qualified Expect
 import Internal.GenericDb
-import Nri.Prelude
+import Cherry.Prelude
 import Test (Test, describe, test)
 import Prelude (Either (Left, Right), IO, pure)
 

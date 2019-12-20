@@ -26,7 +26,7 @@ import qualified Data.Pool
 import Data.String (IsString)
 import qualified Data.Text
 import qualified Health
-import Nri.Prelude
+import Cherry.Prelude
 import qualified Oops
 import qualified Platform
 import qualified System.Exit

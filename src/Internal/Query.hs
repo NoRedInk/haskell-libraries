@@ -35,7 +35,7 @@ import Language.Haskell.TH.Quote
   )
 import Language.Haskell.TH.Syntax (runIO)
 import MySQL.Internal (inToAny)
-import Nri.Prelude
+import Cherry.Prelude
 import qualified Postgres.Settings
 import Prelude (IO, either, fromIntegral, pure)
 

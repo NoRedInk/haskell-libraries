@@ -8,7 +8,7 @@ where
 
 import qualified Control.Lens as Lens
 import qualified Internal.CaselessRegex as R
-import Nri.Prelude
+import Cherry.Prelude
 import qualified Text
 
 -- | MySQL doesn't support `= ANY`, we can use `IN` during compilation.
