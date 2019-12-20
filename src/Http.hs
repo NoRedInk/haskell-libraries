@@ -28,7 +28,7 @@ import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
-import Nri.Prelude
+import Cherry.Prelude
 import qualified Platform
 import Prelude (Either (Left, Right), fromIntegral, pure)
 
