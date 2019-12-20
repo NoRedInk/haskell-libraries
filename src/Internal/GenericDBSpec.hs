@@ -1,10 +1,10 @@
 module Internal.GenericDBSpec (tests) where
 
+import Cherry.Prelude
 import qualified Control.Concurrent
 import qualified Control.Exception
 import qualified Expect
 import Internal.GenericDb
-import Cherry.Prelude
 import Test (Test, describe, test)
 import Prelude (Either (Left, Right), IO, pure)
 

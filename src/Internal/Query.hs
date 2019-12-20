@@ -16,6 +16,7 @@ module Internal.Query
   )
 where
 
+import Cherry.Prelude
 import Control.Monad (fail, void)
 import Control.Monad.Except (throwError)
 import qualified Data.Int
@@ -35,7 +36,6 @@ import Language.Haskell.TH.Quote
   )
 import Language.Haskell.TH.Syntax (runIO)
 import MySQL.Internal (inToAny)
-import Cherry.Prelude
 import qualified Postgres.Settings
 import Prelude (IO, either, fromIntegral, pure)
 

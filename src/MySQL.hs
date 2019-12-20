@@ -30,6 +30,7 @@ module MySQL
   )
 where
 
+import Cherry.Prelude
 import Control.Monad (void)
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
@@ -48,7 +49,6 @@ import qualified Internal.Query as Query
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
-import Cherry.Prelude
 import qualified Platform
 import qualified Text
 import Prelude (IO, fromIntegral, pure, show)

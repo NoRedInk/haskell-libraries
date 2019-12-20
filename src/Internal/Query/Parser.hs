@@ -10,6 +10,7 @@ module Internal.Query.Parser
   )
 where
 
+import Cherry.Prelude
 import Control.Applicative
 import Control.Monad (void)
 import Data.Attoparsec.Text (Parser, anyChar, asciiCI, char, inClass, manyTill, skipSpace, space, takeWhile)
@@ -17,7 +18,6 @@ import qualified Data.Attoparsec.Text as Attoparsec
 import Data.Foldable (asum)
 import qualified List
 import qualified Maybe
-import Cherry.Prelude
 import qualified Text
 import Prelude (Either (Left, Right))
 

@@ -31,6 +31,7 @@ module Postgres
   )
 where
 
+import Cherry.Prelude
 import Control.Exception.Safe (MonadCatch, catch)
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO)
@@ -63,7 +64,6 @@ import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import qualified Log
 import Network.Socket (SockAddr (..))
-import Cherry.Prelude
 import qualified Platform
 import qualified Postgres.Settings as Settings
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)

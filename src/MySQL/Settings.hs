@@ -18,10 +18,10 @@ module MySQL.Settings
   )
 where
 
+import Cherry.Prelude
 import qualified Data.Text
 import qualified Environment
 import qualified Log
-import Cherry.Prelude
 import Prelude (FilePath, pure, show)
 
 data Settings

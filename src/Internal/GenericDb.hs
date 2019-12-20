@@ -14,6 +14,7 @@ module Internal.GenericDb
   )
 where
 
+import Cherry.Prelude
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception
@@ -26,7 +27,6 @@ import qualified Data.Pool
 import Data.String (IsString)
 import qualified Data.Text
 import qualified Health
-import Cherry.Prelude
 import qualified Oops
 import qualified Platform
 import qualified System.Exit

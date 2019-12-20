@@ -1,8 +1,8 @@
 module Internal.Query.ParserSpec (tests) where
 
+import Cherry.Prelude
 import qualified Expect
 import qualified Internal.Query.Parser as Parser
-import Cherry.Prelude
 import Test (Test, describe, test)
 import qualified Text
 
