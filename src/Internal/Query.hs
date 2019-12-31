@@ -11,8 +11,6 @@
 module Internal.Query
   ( sql,
     Query (..),
-    expectOne,
-    Error (ExpectChange, MoreRowsThanExpected),
   )
 where
 
@@ -107,20 +105,6 @@ sql =
       quotePat = fail "sql not supported in patterns",
       quoteDec = fail "sql not supported in declarations"
     }
-
-data Error
-  = ExpectChange
-  | MoreRowsThanExpected
-  deriving (Show)
-
-expectOne ::
-  [a] ->
-  Task Error a
-expectOne rows =
-  case rows of
-    [] -> throwError <| ExpectChange
-    [x] -> pure x
-    _ -> throwError <| MoreRowsThanExpected
 
 -- |
 -- The default `Int` type we use in our Haskell code is an `Int64`. This

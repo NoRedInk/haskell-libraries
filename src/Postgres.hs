@@ -15,9 +15,7 @@ module Postgres
     -- Querying
     Query.Query,
     Query.sql,
-    Query.Error (..),
     doQuery,
-    Query.expectOne,
     -- Handling transactions
     transaction,
     inTestTransaction,

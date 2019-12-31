@@ -18,9 +18,7 @@ module MySQL
     -- Querying
     Query.Query,
     Query.sql,
-    Query.Error (..),
     doQuery,
-    Query.expectOne,
     -- Reexposing useful Database.Persist.MySQL types
     QueryResults,
     MySQL.PersistField (..),
