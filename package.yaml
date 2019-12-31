@@ -8,11 +8,12 @@ library:
   - aeson
   - base
   - bytestring
+  - cherry-core
   - conduit
   - http-client
   - http-client-tls
   - http-types
-  - cherry-core
+  - network-uri
   - text
   exposed-modules:
   - Http

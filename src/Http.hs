@@ -24,13 +24,16 @@ import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
+import qualified Log
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.Internal as HTTP.Internal
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
+import qualified Network.URI
 import qualified Platform
+import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
 -- |
@@ -172,6 +175,7 @@ data Error
 -- moved to the stable API: https://github.com/snoyberg/http-client/issues/426
 prepareManagerForRequest :: HTTP.Manager -> Task e HTTP.Manager
 prepareManagerForRequest manager = do
+  log <- Platform.logHandler
   contexts <- Platform.getContexts
   pure
     manager
@@ -179,7 +183,14 @@ prepareManagerForRequest manager = do
         -- original user request we pass around a request ID on HTTP requests
         -- between services. Below we add this request ID to all outgoing HTTP
         -- requests.
-        HTTP.Internal.mModifyRequest = modifyRequest contexts
+        HTTP.Internal.mModifyRequest = modifyRequest contexts,
+        -- We trace outgoing HTTP requests. This comes down to measuring how
+        -- long they take and passing that information to some dashboard. This
+        -- dashboard can then draw nice graphs showing how the time responding
+        -- to a request it divided between different activities, such as sending
+        -- HTTP requests. We can use the `mWrapException` for this purpose,
+        -- although in our case we're not wrapping because of exceptions.
+        HTTP.Internal.mWrapException = wrapException log
       }
   where
     modifyRequest :: Platform.Contexts -> HTTP.Request -> IO HTTP.Request
@@ -193,3 +204,26 @@ prepareManagerForRequest manager = do
                   ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId)
                     : HTTP.requestHeaders request
               }
+    wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
+    wrapException log request io = do
+      doAnything <- Platform.doAnythingHandler
+      Log.withContext
+        "outoing http request"
+        [ Platform.HttpRequest Platform.HttpRequestInfo
+            { Platform.requestUri =
+                HTTP.getUri request
+                  |> Network.URI.uriToString (\_ -> "*****")
+                  |> (\showS -> Data.Text.pack (showS "")),
+              Platform.requestMethod =
+                HTTP.method request
+                  |> Data.Text.Encoding.decodeUtf8
+            }
+        ]
+        (Platform.doAnything doAnything (map Ok io))
+        |> Task.attempt
+          ( \result ->
+              case result of
+                Err err -> never err
+                Ok x -> x
+          )
+        |> Platform.runCmd log
