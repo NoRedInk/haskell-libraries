@@ -90,7 +90,7 @@ request :: (Aeson.ToJSON body) => Handler -> Settings body expect -> Task Error 
 request (Handler doAnythingHandler manager) settings =
   Platform.doAnything doAnythingHandler <| do
     basicRequest <-
-      HTTP.parseRequest <| Data.Text.unpack (_url settings)
+      HTTP.parseUrlThrow <| Data.Text.unpack (_url settings)
     let finalRequest =
           basicRequest
             { HTTP.method = Data.Text.Encoding.encodeUtf8 (_method settings),
