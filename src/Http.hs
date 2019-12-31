@@ -212,28 +212,28 @@ prepareManagerForRequest manager = do
       }
   where
     modifyRequest :: Platform.Contexts -> HTTP.Request -> IO HTTP.Request
-    modifyRequest contexts request =
+    modifyRequest contexts req =
       case Platform.requestId contexts of
-        Nothing -> pure request
+        Nothing -> pure req
         Just requestId ->
           pure
-            request
+            req
               { HTTP.requestHeaders =
                   ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId)
-                    : HTTP.requestHeaders request
+                    : HTTP.requestHeaders req
               }
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
-    wrapException log request io = do
+    wrapException log req io = do
       doAnything <- Platform.doAnythingHandler
       Log.withContext
         "outoing http request"
         [ Platform.HttpRequest Platform.HttpRequestInfo
             { Platform.requestUri =
-                HTTP.getUri request
+                HTTP.getUri req
                   |> Network.URI.uriToString (\_ -> "*****")
                   |> (\showS -> Data.Text.pack (showS "")),
               Platform.requestMethod =
-                HTTP.method request
+                HTTP.method req
                   |> Data.Text.Encoding.decodeUtf8
             }
         ]
