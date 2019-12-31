@@ -109,19 +109,18 @@ sql =
     }
 
 data Error
-  = ExpectChange Text
-  | MoreRowsThanExpected Text
+  = ExpectChange
+  | MoreRowsThanExpected
   deriving (Show)
 
 expectOne ::
-  Text ->
   [a] ->
   Task Error a
-expectOne queryString rows =
+expectOne rows =
   case rows of
-    [] -> throwError <| ExpectChange queryString
+    [] -> throwError <| ExpectChange
     [x] -> pure x
-    _ -> throwError <| MoreRowsThanExpected queryString
+    _ -> throwError <| MoreRowsThanExpected
 
 -- |
 -- The default `Int` type we use in our Haskell code is an `Int64`. This
