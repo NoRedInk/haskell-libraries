@@ -2,6 +2,7 @@ module Http
   ( Handler,
     handler,
     withThirdParty,
+    withThirdPartyIO,
     Http.get,
     post,
     request,
@@ -46,9 +47,26 @@ handler =
   map2 Handler (liftIO Platform.doAnythingHandler) TLS.newTlsManager
 
 -- | This is for external libraries only!
-withThirdParty :: Handler -> (HTTP.Manager -> a) -> a
-withThirdParty (Handler _ manager) library =
-  library manager
+withThirdParty :: Handler -> (HTTP.Manager -> Task e a) -> Task e a
+withThirdParty (Handler _ manager) library = do
+  requestManager <- prepareManagerForRequest manager
+  library requestManager
+
+-- | Like `withThirdParty`, but runs in `IO`. We'd rather this function didn't
+-- exist, and as we move more of our code to run in `Task` rather than `IO`
+-- there will should come a point we will be able to delete it.
+withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> IO a
+withThirdPartyIO log (Handler _ manager) library = do
+  requestManager <-
+    prepareManagerForRequest manager
+      |> Task.attempt
+        ( \result ->
+            case result of
+              Err err -> never err
+              Ok x -> x
+        )
+      |> Platform.runCmd log
+  library requestManager
 
 -- QUICKS
 
