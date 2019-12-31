@@ -136,10 +136,15 @@ doQuery ::
   (HasCallStack) =>
   Connection ->
   Query.Query row ->
-  Task e [row]
-doQuery conn query = do
+  ([row] -> Task e a) ->
+  Task e a
+doQuery conn query handleResponse = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
   GenericDb.runTaskWithConnection conn (Query.runQuery query)
+    -- Handle the response before wrapping the operation in a context. This way,
+    -- if the response handling logic creates errors, those errors can inherit
+    -- context values like the query string.
+    |> andThen handleResponse
     |> Log.withContext "postgresql-query" [Platform.Query queryInfo]
   where
     queryInfo = Platform.QueryInfo
