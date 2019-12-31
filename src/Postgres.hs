@@ -17,9 +17,7 @@ module Postgres
     Query.sql,
     Query.Error (..),
     doQuery,
-    getMany,
-    getOne,
-    modifyExactlyOne,
+    Query.expectOne,
     -- Handling transactions
     transaction,
     inTestTransaction,
@@ -136,36 +134,6 @@ readiness log conn = Health.Check "postgres" Health.Fatal (GenericDb.readiness g
     go :: PGConnection -> ByteString -> IO ()
     go c = pgQuery c >> void
 
--- | Find multiple rows.
---
---   @
---     getMany c
---       [Postgres.sql|
---         SELECT id, name FROM my_table
---       |]
---   @
-getMany ::
-  (HasCallStack) =>
-  Connection ->
-  Query.Query row ->
-  Task e [row]
-getMany = withFrozenCallStack doQuery
-
--- | returns one object!
---
---   @
---     getOne c
---       [Postgres.sql|
---         select title from my_table where id = 1
---       |]
---   @
-getOne ::
-  (HasCallStack) =>
-  Connection ->
-  Query.Query row ->
-  Task Query.Error row
-getOne = withFrozenCallStack modifyExactlyOne
-
 doQuery ::
   (HasCallStack) =>
   Connection ->
@@ -183,25 +151,6 @@ doQuery conn query = do
         Platform.queryOperation = Query.sqlOperation query,
         Platform.queryCollection = Query.queriedRelation query
       }
-
--- | Modify exactly one row or fail with a 500.
---
---   @
---     modifyExactlyOne c
---       [Postgres.sql|
---         INSERT INTO my_table (name)
---           VALUES ($1)
---         RETURNING id, name
---       |]
---   @
-modifyExactlyOne ::
-  (HasCallStack) =>
-  Connection ->
-  Query.Query row ->
-  Task Query.Error row
-modifyExactlyOne conn query =
-  doQuery conn query
-    |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =

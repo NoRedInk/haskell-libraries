@@ -20,9 +20,7 @@ module MySQL
     Query.sql,
     Query.Error (..),
     doQuery,
-    getMany,
-    getOne,
-    modifyExactlyOne,
+    Query.expectOne,
     -- Reexposing useful Database.Persist.MySQL types
     QueryResults,
     MySQL.PersistField (..),
@@ -93,36 +91,6 @@ readiness log conn =
       MySQL.rawSql q []
         |> (\reader -> runReaderT reader c)
 
--- | Find multiple rows.
---
---   @
---     getMany c
---       [MySQL.sql|
---         SELECT id, name FROM my_table
---       |]
---   @
-getMany ::
-  (HasCallStack, QueryResults row) =>
-  Connection ->
-  Query.Query row ->
-  Task e [row]
-getMany = withFrozenCallStack doQuery
-
--- | returns one object!
---
---   @
---     getOne c
---       [MySQL.sql|
---         select title from my_table where id = 1
---       |]
---   @
-getOne ::
-  (HasCallStack, QueryResults row) =>
-  Connection ->
-  Query.Query row ->
-  Task Query.Error row
-getOne = withFrozenCallStack modifyExactlyOne
-
 doQuery ::
   (HasCallStack, QueryResults row) =>
   Connection ->
@@ -140,25 +108,6 @@ doQuery conn query = do
         Platform.queryOperation = Query.sqlOperation query,
         Platform.queryCollection = Query.queriedRelation query
       }
-
--- | Modify exactly one row or fail with a 500.
---
---   @
---     modifyExactlyOne c
---       [MySQL.sql|
---         INSERT INTO my_table (name)
---           VALUES ($1)
---         RETURNING id, name
---       |]
---   @
-modifyExactlyOne ::
-  (HasCallStack, QueryResults row) =>
-  Connection ->
-  Query.Query row ->
-  Task Query.Error row
-modifyExactlyOne conn query =
-  doQuery conn query
-    |> andThen (Query.expectOne (Query.quasiQuotedString query))
 
 runQuery ::
   (QueryResults row) =>
