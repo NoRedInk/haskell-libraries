@@ -9,7 +9,6 @@ module Internal.GenericDb
     inTestTransaction,
     readiness,
     handleError,
-    withTimeout,
     toQueryError,
     eitherToResult,
   )
@@ -31,6 +30,7 @@ import qualified Oops
 import qualified Platform
 import qualified Result
 import qualified System.Exit
+import qualified System.Timeout
 import qualified Task
 import qualified Tuple
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
@@ -60,25 +60,23 @@ runTaskWithConnection ::
   (t -> IO (Result Query.Error a)) ->
   Task Query.Error a
 runTaskWithConnection conn f =
-  withConnection
-    conn
-    ( \c ->
-        f c
-          |> withTimeout (timeoutMicroSeconds conn)
-          |> Platform.doAnything (doAnything conn)
-    )
-
-withTimeout :: Int -> IO a -> IO a
-withTimeout timeout io = do
-  res <- Async.race io (failAfter timeout)
-  case res of
-    Left x -> pure x
-    Right x -> pure x
-
-failAfter :: Int -> IO a
-failAfter timeout = do
-  Control.Concurrent.threadDelay (fromIntegral timeout)
-  Exception.throwIO (Query.TimeoutAfterSeconds (fromIntegral timeout * 10e-6))
+  let timeoutInMicroSeconds = timeoutMicroSeconds conn
+   in withConnection
+        conn
+        ( \c ->
+            f c
+              |> System.Timeout.timeout (fromIntegral timeoutInMicroSeconds)
+              |> map
+                ( \maybe ->
+                    case maybe of
+                      Nothing ->
+                        fromIntegral timeoutInMicroSeconds / 10e6
+                          |> Query.TimeoutAfterSeconds Query.ClientTimeout
+                          |> Err
+                      Just x -> x
+                )
+              |> Platform.doAnything (doAnything conn)
+        )
 
 --
 

@@ -14,6 +14,7 @@ module Postgres
     Settings.decoder,
     -- Querying
     Query.Query,
+    Query.Error (..),
     Query.sql,
     doQuery,
     -- Handling transactions
@@ -148,7 +149,7 @@ doQuery conn query handleResponse = do
   let runQuery c =
         Query.runQuery query c
           |> Exception.try
-          |> map (Result.mapError fromPGError << GenericDb.eitherToResult)
+          |> map (Result.mapError (fromPGError conn) << GenericDb.eitherToResult)
   GenericDb.runTaskWithConnection conn runQuery
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
@@ -165,8 +166,8 @@ doQuery conn query handleResponse = do
         Platform.queryCollection = Query.queriedRelation query
       }
 
-fromPGError :: PGError -> Query.Error
-fromPGError pgError =
+fromPGError :: Connection -> PGError -> Query.Error
+fromPGError c pgError =
   -- There's a lot of errors Postgres might throw. For a couple we have custom
   -- `Error` constructors defined, because we've seen a couple of them and would
   -- like to handle them in special ways or define custom error messages for
@@ -174,7 +175,7 @@ fromPGError pgError =
   -- to add a special case for it to this list!
   case pgErrorCode pgError of
     "57014" ->
-      Query.TimeoutAfterSeconds _foo
+      Query.TimeoutAfterSeconds Query.ServerTimeout (fromIntegral (GenericDb.timeoutMicroSeconds c) / 10e6)
     _ ->
       Exception.displayException pgError
         |> Data.Text.pack

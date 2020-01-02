@@ -17,6 +17,7 @@ module MySQL
     Settings.decoder,
     -- Querying
     Query.Query,
+    Query.Error (..),
     Query.sql,
     doQuery,
     -- Reexposing useful Database.Persist.MySQL types

@@ -12,6 +12,7 @@ module Internal.Query
   ( sql,
     Query (..),
     Error (..),
+    TimeoutOrigin (..),
   )
 where
 
@@ -69,11 +70,14 @@ data Query row
       }
 
 data Error
-  = TimeoutAfterSeconds Float
+  = TimeoutAfterSeconds TimeoutOrigin Float
   | Other Text
   deriving (Show)
 
 instance Exception.Exception Error
+
+data TimeoutOrigin = ClientTimeout | ServerTimeout
+  deriving (Show)
 
 qqSQL :: String -> ExpQ
 qqSQL query = do
