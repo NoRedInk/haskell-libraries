@@ -10,16 +10,15 @@ module Internal.GenericDb
     readiness,
     handleError,
     withTimeout,
-    QueryTimeoutException,
+    toQueryError,
+    eitherToResult,
   )
 where
 
 import Cherry.Prelude
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
-import qualified Control.Exception
-import Control.Exception.Safe (MonadCatch)
-import qualified Control.Exception.Safe
+import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.Catch
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -27,12 +26,14 @@ import qualified Data.Pool
 import Data.String (IsString)
 import qualified Data.Text
 import qualified Health
+import qualified Internal.Query as Query
 import qualified Oops
 import qualified Platform
+import qualified Result
 import qualified System.Exit
 import qualified Task
 import qualified Tuple
-import Prelude (Either (Left, Right), IO, flip, fromIntegral, pure)
+import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
 data Connection c
   = Connection
@@ -54,12 +55,17 @@ data SingleOrPool c
     --   we need to insure several SQL statements happen on the same connection.
     Single c
 
-runTaskWithConnection :: Connection t -> (t -> IO a) -> Task e a
+runTaskWithConnection ::
+  Connection t ->
+  (t -> IO (Result Query.Error a)) ->
+  Task Query.Error a
 runTaskWithConnection conn f =
   withConnection
     conn
     ( \c ->
-        Platform.doAnything (doAnything conn) (withTimeout (timeoutMicroSeconds conn) (map Ok (f c)))
+        f c
+          |> withTimeout (timeoutMicroSeconds conn)
+          |> Platform.doAnything (doAnything conn)
     )
 
 withTimeout :: Int -> IO a -> IO a
@@ -72,11 +78,7 @@ withTimeout timeout io = do
 failAfter :: Int -> IO a
 failAfter timeout = do
   Control.Concurrent.threadDelay (fromIntegral timeout)
-  Control.Exception.throwIO (QueryTimeoutException timeout)
-
-newtype QueryTimeoutException = QueryTimeoutException Int deriving (Show)
-
-instance Control.Exception.Exception QueryTimeoutException
+  Exception.throwIO (Query.TimeoutAfterSeconds (fromIntegral timeout * 10e-6))
 
 --
 
@@ -111,7 +113,7 @@ withConnection Connection {doAnything, singleOrPool} f =
 --   instance). The trade-off is that this function isn't quite as safe, and has
 --   a small chance to leek database connections. For tests that seems okay.
 withConnectionUnsafe ::
-  (MonadIO m, MonadCatch m) => Connection conn -> (conn -> m a) -> m a
+  (MonadIO m, Exception.MonadCatch m) => Connection conn -> (conn -> m a) -> m a
 withConnectionUnsafe Connection {singleOrPool} f =
   case singleOrPool of
     (Pool pool) -> do
@@ -127,18 +129,29 @@ withConnectionUnsafe Connection {singleOrPool} f =
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: IsString s => (conn -> s -> IO ()) -> Platform.LogHandler -> Connection conn -> IO Health.Status
-readiness runQuery log' conn = do
-  response <-
-    flip runQuery "SELECT 1"
-      |> runTaskWithConnection conn
-      |> Task.perform identity
-      |> Platform.runCmd log'
-      |> Control.Exception.Safe.tryAny
-  pure <| Health.fromResult <| case response of
-    Left err -> Err (Data.Text.pack (Control.Exception.displayException err))
+readiness runQuery log' conn =
+  let query c =
+        runQuery c "SELECT 1"
+          |> Exception.tryAny
+          |> map (Result.mapError toQueryError << eitherToResult)
+   in runTaskWithConnection conn query
+        |> Task.mapError (Data.Text.pack << Exception.displayException)
+        |> Task.attempt Health.fromResult
+        |> Platform.runCmd log'
+
+toQueryError :: Exception.Exception e => e -> Query.Error
+toQueryError err =
+  Exception.displayException err
+    |> Data.Text.pack
+    |> Query.Other
+
+eitherToResult :: Either e a -> Result e a
+eitherToResult either =
+  case either of
+    Left err -> Err err
     Right x -> Ok x
 
-handleError :: Text -> Control.Exception.IOException -> IO a
+handleError :: Text -> Exception.IOException -> IO a
 handleError connectionString err = do
   _ <-
     Oops.putNiceError
@@ -162,14 +175,14 @@ handleError connectionString err = do
       [ Oops.extra "Exception" err,
         Oops.extra "Attempted to connect to" connectionString
       ]
-  Control.Exception.displayException err
+  Exception.displayException err
     |> System.Exit.die
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction ::
   forall conn m a.
-  (MonadIO m, MonadCatch m) =>
+  (MonadIO m, Exception.MonadCatch m) =>
   Transaction conn ->
   Connection conn ->
   (Connection conn -> m a) ->

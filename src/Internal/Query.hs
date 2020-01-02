@@ -11,10 +11,12 @@
 module Internal.Query
   ( sql,
     Query (..),
+    Error (..),
   )
 where
 
 import Cherry.Prelude
+import qualified Control.Exception.Safe as Exception
 import Control.Monad (fail, void)
 import Control.Monad.Except (throwError)
 import qualified Data.Int
@@ -35,7 +37,7 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import MySQL.Internal (inToAny)
 import qualified Postgres.Settings
-import Prelude (IO, fromIntegral, pure)
+import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -65,6 +67,13 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
+
+data Error
+  = TimeoutAfterSeconds Float
+  | Other Text
+  deriving (Show)
+
+instance Exception.Exception Error
 
 qqSQL :: String -> ExpQ
 qqSQL query = do

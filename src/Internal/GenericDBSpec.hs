@@ -5,6 +5,7 @@ import qualified Control.Concurrent
 import qualified Control.Exception
 import qualified Expect
 import Internal.GenericDb
+import qualified Internal.Query as Query
 import Test (Test, describe, test)
 import Prelude (Either (Left, Right), IO, pure)
 
@@ -36,5 +37,6 @@ throwsException :: IO a -> IO Bool
 throwsException io = do
   result <- Control.Exception.try io
   case result of
-    Left (_ :: QueryTimeoutException) -> pure True
+    Left ((Query.TimeoutAfterSeconds _) :: Query.Error) -> pure True
+    Left _ -> pure False
     Right _ -> pure False

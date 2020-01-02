@@ -27,6 +27,7 @@ module MySQL
 where
 
 import Cherry.Prelude
+import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
@@ -46,6 +47,8 @@ import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
 import qualified Platform
+import qualified Result
+import qualified Task
 import qualified Text
 import Prelude (IO, fromIntegral, pure, show)
 
@@ -93,7 +96,7 @@ doQuery ::
   (HasCallStack, QueryResults row) =>
   Connection ->
   Query.Query row ->
-  ([row] -> Task e a) ->
+  (Result Query.Error [row] -> Task e a) ->
   Task e a
 doQuery conn query handleResponse = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
@@ -101,6 +104,7 @@ doQuery conn query handleResponse = do
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
     -- context values like the query string.
+    |> intoResult
     |> andThen handleResponse
     |> Log.withContext "mysql-query" [Platform.Query queryInfo]
   where
@@ -112,11 +116,16 @@ doQuery conn query handleResponse = do
         Platform.queryCollection = Query.queriedRelation query
       }
 
+intoResult :: Task e a -> Task e2 (Result e a)
+intoResult task =
+  map Ok task
+    |> Task.onError (Task.succeed << Err)
+
 runQuery ::
   (QueryResults row) =>
   Query.Query row ->
   MySQL.SqlBackend ->
-  IO [row]
+  IO (Result Query.Error [row])
 runQuery query conn =
   query
     |> Query.sqlString
@@ -128,6 +137,8 @@ runQuery query conn =
     |> (\query' -> MySQL.rawSql query' [])
     |> (\reader -> runReaderT reader conn)
     |> map (map toQueryResult)
+    |> Exception.tryAny
+    |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
 
 toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
 toConnectionLogContext settings =

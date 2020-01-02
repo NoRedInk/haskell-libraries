@@ -28,7 +28,7 @@ module Postgres
 where
 
 import Cherry.Prelude
-import Control.Exception.Safe (MonadCatch, catch)
+import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Data.Acquire
@@ -47,9 +47,12 @@ import Database.PostgreSQL.Typed
     pgQuery,
   )
 import qualified Database.PostgreSQL.Typed.Array as PGArray
+import qualified Database.PostgreSQL.Typed.ErrCodes as ErrCodes
 import Database.PostgreSQL.Typed.Protocol
-  ( pgBegin,
+  ( PGError,
+    pgBegin,
     pgCommit,
+    pgErrorCode,
     pgRollback,
     pgRollbackAll,
   )
@@ -62,6 +65,8 @@ import qualified Log
 import Network.Socket (SockAddr (..))
 import qualified Platform
 import qualified Postgres.Settings as Settings
+import qualified Result
+import qualified Task
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
 type Connection = GenericDb.Connection PGConnection
@@ -75,7 +80,7 @@ connection settings =
       pool <-
         map GenericDb.Pool
           <| Data.Pool.createPool
-            (pgConnect database `catch` GenericDb.handleError (toConnectionString database))
+            (pgConnect database `Exception.catch` GenericDb.handleError (toConnectionString database))
             pgDisconnect
             stripes
             maxIdleTime
@@ -112,7 +117,7 @@ transaction =
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction ::
   forall m a.
-  (MonadIO m, MonadCatch m) =>
+  (MonadIO m, Exception.MonadCatch m) =>
   Connection ->
   (Connection -> m a) ->
   m a
@@ -136,14 +141,19 @@ doQuery ::
   (HasCallStack) =>
   Connection ->
   Query.Query row ->
-  ([row] -> Task e a) ->
+  (Result Query.Error [row] -> Task e a) ->
   Task e a
 doQuery conn query handleResponse = do
   withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
-  GenericDb.runTaskWithConnection conn (Query.runQuery query)
+  let runQuery c =
+        Query.runQuery query c
+          |> Exception.try
+          |> map (Result.mapError fromPGError << GenericDb.eitherToResult)
+  GenericDb.runTaskWithConnection conn runQuery
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
     -- context values like the query string.
+    |> intoResult
     |> andThen handleResponse
     |> Log.withContext "postgresql-query" [Platform.Query queryInfo]
   where
@@ -154,6 +164,26 @@ doQuery conn query handleResponse = do
         Platform.queryOperation = Query.sqlOperation query,
         Platform.queryCollection = Query.queriedRelation query
       }
+
+fromPGError :: PGError -> Query.Error
+fromPGError pgError =
+  -- There's a lot of errors Postgres might throw. For a couple we have custom
+  -- `Error` constructors defined, because we've seen a couple of them and would
+  -- like to handle them in special ways or define custom error messages for
+  -- them. If a Postgres error starts showing up in our log, please feel free
+  -- to add a special case for it to this list!
+  case pgErrorCode pgError of
+    "57014" ->
+      Query.TimeoutAfterSeconds _foo
+    _ ->
+      Exception.displayException pgError
+        |> Data.Text.pack
+        |> Query.Other
+
+intoResult :: Task e a -> Task e2 (Result e a)
+intoResult task =
+  map Ok task
+    |> Task.onError (Task.succeed << Err)
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
