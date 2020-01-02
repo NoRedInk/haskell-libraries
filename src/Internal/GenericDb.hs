@@ -15,8 +15,6 @@ module Internal.GenericDb
 where
 
 import Cherry.Prelude
-import qualified Control.Concurrent
-import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.Catch
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))

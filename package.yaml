@@ -5,7 +5,6 @@ extra-source-files:
 - README.md
 dependencies:
 - attoparsec
-- async
 - base
 - bytestring
 - directory
@@ -34,7 +33,6 @@ dependencies:
 - time
 - typed-process
 - unix
-- webserver
 library:
   exposed-modules:
   - MySQL

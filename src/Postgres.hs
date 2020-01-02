@@ -48,7 +48,6 @@ import Database.PostgreSQL.Typed
     pgQuery,
   )
 import qualified Database.PostgreSQL.Typed.Array as PGArray
-import qualified Database.PostgreSQL.Typed.ErrCodes as ErrCodes
 import Database.PostgreSQL.Typed.Protocol
   ( PGError,
     pgBegin,

@@ -19,7 +19,6 @@ where
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (fail, void)
-import Control.Monad.Except (throwError)
 import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
@@ -38,7 +37,7 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import MySQL.Internal (inToAny)
 import qualified Postgres.Settings
-import Prelude (Either (Left, Right), IO, fromIntegral, pure)
+import Prelude (IO, fromIntegral, pure)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
