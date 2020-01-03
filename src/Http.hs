@@ -2,6 +2,7 @@ module Http
   ( Handler,
     handler,
     withThirdParty,
+    withThirdPartyIO,
     Http.get,
     post,
     request,
@@ -24,13 +25,17 @@ import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
+import qualified Log
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
+import qualified Network.HTTP.Client.Internal as HTTP.Internal
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
+import qualified Network.URI
 import qualified Platform
-import Prelude (Either (Left, Right), fromIntegral, pure)
+import qualified Task
+import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
 -- |
 data Handler
@@ -42,9 +47,26 @@ handler =
   map2 Handler (liftIO Platform.doAnythingHandler) TLS.newTlsManager
 
 -- | This is for external libraries only!
-withThirdParty :: Handler -> (HTTP.Manager -> a) -> a
-withThirdParty (Handler _ manager) library =
-  library manager
+withThirdParty :: Handler -> (HTTP.Manager -> Task e a) -> Task e a
+withThirdParty (Handler _ manager) library = do
+  requestManager <- prepareManagerForRequest manager
+  library requestManager
+
+-- | Like `withThirdParty`, but runs in `IO`. We'd rather this function didn't
+-- exist, and as we move more of our code to run in `Task` rather than `IO`
+-- there will should come a point we will be able to delete it.
+withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> IO a
+withThirdPartyIO log (Handler _ manager) library = do
+  requestManager <-
+    prepareManagerForRequest manager
+      |> Task.attempt
+        ( \result ->
+            case result of
+              Err err -> never err
+              Ok x -> x
+        )
+      |> Platform.runCmd log
+  library requestManager
 
 -- QUICKS
 
@@ -87,10 +109,11 @@ data Settings body a
 
 -- |
 request :: (Aeson.ToJSON body) => Handler -> Settings body expect -> Task Error expect
-request (Handler doAnythingHandler manager) settings =
+request (Handler doAnythingHandler manager) settings = do
+  requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
     basicRequest <-
-      HTTP.parseRequest <| Data.Text.unpack (_url settings)
+      HTTP.parseUrlThrow <| Data.Text.unpack (_url settings)
     let finalRequest =
           basicRequest
             { HTTP.method = Data.Text.Encoding.encodeUtf8 (_method settings),
@@ -98,7 +121,7 @@ request (Handler doAnythingHandler manager) settings =
               HTTP.requestBody = HTTP.RequestBodyLBS <| Aeson.encode (_body settings),
               HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
             }
-    response <- Exception.try (HTTP.httpLbs finalRequest manager)
+    response <- Exception.try (HTTP.httpLbs finalRequest requestManager)
     pure <| case response of
       Right okResponse ->
         case decode (_expect settings) (HTTP.responseBody okResponse) of
@@ -156,3 +179,72 @@ data Error
   deriving (Show)
 
 instance Exception.Exception Error
+
+-- Our Task type carries around some context values which should influence in
+-- minor ways the logic of sending a request. In this function we modify a
+-- manager to apply these modifications (see the comments below for the exact
+-- nature of the modifications).
+--
+-- We're changing settings on the manager that originally get set during the
+-- creation of the manager. We cannot set these settings once during creation
+-- because they will be different for each outgoing request, and for performance
+-- reasons we're encouraged to reuse a manager as much as possible. Modifying a
+-- manager in this way does require use of the `Network.HTTP.Client.Internal`
+-- module, which on account of being an internal module increases the risk of
+-- this code breaking in future versions of the `http-client` package. There's
+-- an outstanding PR for motivating these Manager modification functions are
+-- moved to the stable API: https://github.com/snoyberg/http-client/issues/426
+prepareManagerForRequest :: HTTP.Manager -> Task e HTTP.Manager
+prepareManagerForRequest manager = do
+  log <- Platform.logHandler
+  contexts <- Platform.getContexts
+  pure
+    manager
+      { -- To be able to correlate events and logs belonging to a single
+        -- original user request we pass around a request ID on HTTP requests
+        -- between services. Below we add this request ID to all outgoing HTTP
+        -- requests.
+        HTTP.Internal.mModifyRequest = modifyRequest contexts,
+        -- We trace outgoing HTTP requests. This comes down to measuring how
+        -- long they take and passing that information to some dashboard. This
+        -- dashboard can then draw nice graphs showing how the time responding
+        -- to a request it divided between different activities, such as sending
+        -- HTTP requests. We can use the `mWrapException` for this purpose,
+        -- although in our case we're not wrapping because of exceptions.
+        HTTP.Internal.mWrapException = wrapException log
+      }
+  where
+    modifyRequest :: Platform.Contexts -> HTTP.Request -> IO HTTP.Request
+    modifyRequest contexts req =
+      case Platform.requestId contexts of
+        Nothing -> pure req
+        Just requestId ->
+          pure
+            req
+              { HTTP.requestHeaders =
+                  ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId)
+                    : HTTP.requestHeaders req
+              }
+    wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
+    wrapException log req io = do
+      doAnything <- Platform.doAnythingHandler
+      Log.withContext
+        "outoing http request"
+        [ Platform.HttpRequest Platform.HttpRequestInfo
+            { Platform.requestUri =
+                HTTP.getUri req
+                  |> Network.URI.uriToString (\_ -> "*****")
+                  |> (\showS -> Data.Text.pack (showS "")),
+              Platform.requestMethod =
+                HTTP.method req
+                  |> Data.Text.Encoding.decodeUtf8
+            }
+        ]
+        (Platform.doAnything doAnything (map Ok io))
+        |> Task.attempt
+          ( \result ->
+              case result of
+                Err err -> never err
+                Ok x -> x
+          )
+        |> Platform.runCmd log
