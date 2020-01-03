@@ -155,7 +155,7 @@ doQuery conn query handleResponse = do
     -- context values like the query string.
     |> intoResult
     |> andThen handleResponse
-    |> Log.withContext "postgresql-query" [Platform.Query queryInfo]
+    |> Log.withContext "postgresql-query" [Platform.queryContext queryInfo]
   where
     queryInfo = Platform.QueryInfo
       { Platform.queryText = Log.mkSecret (Query.sqlString query),
