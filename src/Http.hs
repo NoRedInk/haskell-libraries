@@ -194,7 +194,7 @@ data Error
 prepareManagerForRequest :: HTTP.Manager -> Task e HTTP.Manager
 prepareManagerForRequest manager = do
   log <- Platform.logHandler
-  contexts <- Platform.getContexts
+  contexts <- Platform.getContext
   pure
     manager
       { -- To be able to correlate events and logs belonging to a single
@@ -211,7 +211,7 @@ prepareManagerForRequest manager = do
         HTTP.Internal.mWrapException = wrapException log
       }
   where
-    modifyRequest :: Platform.Contexts -> HTTP.Request -> IO HTTP.Request
+    modifyRequest :: Platform.Context -> HTTP.Request -> IO HTTP.Request
     modifyRequest contexts req =
       case Platform.requestId contexts of
         Nothing -> pure req
@@ -227,7 +227,7 @@ prepareManagerForRequest manager = do
       doAnything <- Platform.doAnythingHandler
       Log.withContext
         "outoing http request"
-        [ Platform.HttpRequest Platform.HttpRequestInfo
+        [ Platform.httpRequestContext Platform.HttpRequestInfo
             { Platform.requestUri =
                 HTTP.getUri req
                   |> Network.URI.uriToString (\_ -> "*****")
