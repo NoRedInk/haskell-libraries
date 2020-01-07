@@ -37,7 +37,7 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import MySQL.Internal (inToAny)
 import qualified Postgres.Settings
-import Prelude (IO, fromIntegral, pure)
+import Prelude (IO, fromIntegral)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of

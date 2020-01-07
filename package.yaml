@@ -7,6 +7,7 @@ dependencies:
 - attoparsec
 - base
 - bytestring
+- cherry-core
 - directory
 - env-parser
 - exceptions
@@ -15,13 +16,12 @@ dependencies:
 - lens
 - lens-regex-pcre
 - monad-logger
-- mysql-haskell
 - mtl
+- mysql-haskell
 - network
-- cherry-core
 - oops
-- persistent-mysql-haskell
 - pcre-light
+- persistent-mysql-haskell
 - postgresql-simple
 - postgresql-typed
 - process
