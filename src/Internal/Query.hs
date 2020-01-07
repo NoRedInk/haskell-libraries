@@ -82,14 +82,7 @@ qqSQL :: String -> ExpQ
 qqSQL query = do
   let db =
         Environment.decode Postgres.Settings.decoder
-          |> andThen
-            ( \result ->
-                case result of
-                  Err err ->
-                    fail (Data.Text.unpack err)
-                  Ok settings ->
-                    pure (Postgres.Settings.toPGDatabase settings)
-            )
+          |> map Postgres.Settings.toPGDatabase
   db' <- runIO db
   void (useTPGDatabase db')
   let meta = Parser.parse (Data.Text.pack query)
