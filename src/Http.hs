@@ -7,6 +7,11 @@ module Http
     post,
     request,
     Settings (..),
+    Body,
+    emptyBody,
+    stringBody,
+    jsonBody,
+    bytesBody,
     Expect,
     expectJson,
     expectText,
@@ -20,6 +25,7 @@ import qualified Conduit
 import qualified Control.Exception as Exception
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Text.Encoding
@@ -32,6 +38,7 @@ import qualified Network.HTTP.Client.Internal as HTTP.Internal
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
+import qualified Network.Mime as Mime
 import qualified Network.URI
 import qualified Platform
 import qualified Task
@@ -77,19 +84,19 @@ get handler' url expect =
     { _method = "GET",
       _headers = [],
       _url = url,
-      _body = (),
+      _body = emptyBody,
       _timeout = Nothing,
       _expect = expect
     }
 
 -- |
-post :: Handler -> Text -> Expect a -> Task Error a
-post handler' url expect =
+post :: Handler -> Text -> Body -> Expect a -> Task Error a
+post handler' url body expect =
   request handler' Settings
     { _method = "POST",
       _headers = [],
       _url = url,
-      _body = (),
+      _body = body,
       _timeout = Nothing,
       _expect = expect
     }
@@ -97,18 +104,67 @@ post handler' url expect =
 -- REQUEST
 
 -- |
-data Settings body a
+data Settings a
   = Settings
       { _method :: Text,
         _headers :: [Header.Header],
         _url :: Text,
-        _body :: body,
+        _body :: Body,
         _timeout :: Maybe Int,
         _expect :: Expect a
       }
 
+-- |  Represents the body of a Request.
+data Body
+  = Body
+      { bodyContents :: Data.ByteString.Lazy.ByteString,
+        bodyContentType :: Maybe Mime.MimeType
+      }
+
+-- | Create an empty body for your Request. This is useful for GET requests and
+-- POST requests where you are not sending any data.
+emptyBody :: Body
+emptyBody =
+  Body
+    { bodyContents = "",
+      bodyContentType = Nothing
+    }
+
+-- | Put some string in the body of your Request.
+--
+-- The first argument is a MIME type of the body. Some servers are strict about
+-- this!
+stringBody :: Text -> Text -> Body
+stringBody mimeType text =
+  Body
+    { bodyContents = Data.Text.Encoding.encodeUtf8 text |> Data.ByteString.Lazy.fromStrict,
+      bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
+    }
+
+-- | Put some JSON value in the body of your Request. This will automatically
+-- add the Content-Type: application/json header.
+jsonBody :: Aeson.ToJSON body => body -> Body
+jsonBody json =
+  Body
+    { bodyContents = Aeson.encode json,
+      bodyContentType = Just "application/json"
+    }
+
+-- | Put some Bytes in the body of your Request. This allows you to use
+-- ByteString to have full control over the binary representation of the data
+-- you are sending.
+--
+-- The first argument is a MIME type of the body. In other scenarios you may
+-- want to use MIME types like image/png or image/jpeg instead.
+bytesBody :: Text -> ByteString -> Body
+bytesBody mimeType bytes =
+  Body
+    { bodyContents = Data.ByteString.Lazy.fromStrict bytes,
+      bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
+    }
+
 -- |
-request :: (Aeson.ToJSON body) => Handler -> Settings body expect -> Task Error expect
+request :: Handler -> Settings expect -> Task Error expect
 request (Handler doAnythingHandler manager) settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
@@ -117,8 +173,12 @@ request (Handler doAnythingHandler manager) settings = do
     let finalRequest =
           basicRequest
             { HTTP.method = Data.Text.Encoding.encodeUtf8 (_method settings),
-              HTTP.requestHeaders = _headers settings,
-              HTTP.requestBody = HTTP.RequestBodyLBS <| Aeson.encode (_body settings),
+              HTTP.requestHeaders = case bodyContentType (_body settings) of
+                Nothing ->
+                  _headers settings
+                Just mimeType ->
+                  ("content-type", mimeType) : _headers settings,
+              HTTP.requestBody = HTTP.RequestBodyLBS <| bodyContents (_body settings),
               HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
             }
     response <- Exception.try (HTTP.httpLbs finalRequest requestManager)

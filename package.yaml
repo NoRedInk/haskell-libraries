@@ -13,6 +13,7 @@ library:
   - http-client
   - http-client-tls
   - http-types
+  - mime-types
   - network-uri
   - text
   exposed-modules:
