@@ -236,6 +236,9 @@ data Error
   | BadResponse
   | Timeout
   | NetworkError
+  deriving (Show)
+
+instance Exception.Exception Error
 
 -- Our Task type carries around some context values which should influence in
 -- minor ways the logic of sending a request. In this function we modify a
