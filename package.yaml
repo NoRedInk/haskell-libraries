@@ -19,3 +19,13 @@ library:
   exposed-modules:
   - Http
   source-dirs: src
+tests:
+  spec:
+    dependencies:
+    - base
+    - cherry-core
+    - http
+    main: Main.hs
+    source-dirs:
+    - test/
+    ghc-options: *test-ghc-options
