@@ -261,14 +261,18 @@ prepareManagerForRequest manager = do
         -- original user request we pass around a request ID on HTTP requests
         -- between services. Below we add this request ID to all outgoing HTTP
         -- requests.
-        HTTP.Internal.mModifyRequest = modifyRequest contexts,
+        HTTP.Internal.mModifyRequest = \req ->
+          HTTP.Internal.mModifyRequest manager req
+            |> andThen (modifyRequest contexts),
         -- We trace outgoing HTTP requests. This comes down to measuring how
         -- long they take and passing that information to some dashboard. This
         -- dashboard can then draw nice graphs showing how the time responding
         -- to a request it divided between different activities, such as sending
         -- HTTP requests. We can use the `mWrapException` for this purpose,
         -- although in our case we're not wrapping because of exceptions.
-        HTTP.Internal.mWrapException = wrapException log
+        HTTP.Internal.mWrapException = \req io ->
+          HTTP.Internal.mWrapException manager req io
+            |> wrapException log req
       }
   where
     modifyRequest :: Platform.Context -> HTTP.Request -> IO HTTP.Request
