@@ -309,3 +309,14 @@ prepareManagerForRequest manager = do
                 Ok x -> x
           )
         |> Platform.runCmd log
+        -- The call to `withContext` will wrap `HttpException`s thrown by the
+        -- `http-client` code in a `TriagableException` wrapper. This will
+        -- prevent code that handles the original `HttpException` from working
+        -- correctly. Because this modified manager is potentially passed into
+        -- third party libraries we might break those libraries.
+        --
+        -- To avoid this we rethrow the original exceptions. This means the
+        -- additional context available on the `TriagableException` wrapper is
+        -- gone, but that sounds preferable to potentially introducing bugs in
+        -- dependencies.
+        |> Platform.rethrowOriginalExceptions
