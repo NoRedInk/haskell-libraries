@@ -23,8 +23,15 @@ tests:
   spec:
     dependencies:
     - base
+    - bytestring
     - cherry-core
+    - conduit
     - http
+    - http-types
+    - safe-exceptions
+    - text
+    - wai
+    - warp
     main: Main.hs
     source-dirs:
     - test/

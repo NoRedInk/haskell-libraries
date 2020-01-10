@@ -3,7 +3,7 @@ module Http
     handler,
     withThirdParty,
     withThirdPartyIO,
-    Http.get,
+    get,
     post,
     request,
     Settings (..),
@@ -168,20 +168,21 @@ request :: Handler -> Settings expect -> Task Error expect
 request (Handler doAnythingHandler manager) settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
-    basicRequest <-
-      HTTP.parseUrlThrow <| Data.Text.unpack (_url settings)
-    let finalRequest =
-          basicRequest
-            { HTTP.method = Data.Text.Encoding.encodeUtf8 (_method settings),
-              HTTP.requestHeaders = case bodyContentType (_body settings) of
-                Nothing ->
-                  _headers settings
-                Just mimeType ->
-                  ("content-type", mimeType) : _headers settings,
-              HTTP.requestBody = HTTP.RequestBodyLBS <| bodyContents (_body settings),
-              HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
-            }
-    response <- Exception.try (HTTP.httpLbs finalRequest requestManager)
+    response <- Exception.try <| do
+      basicRequest <-
+        HTTP.parseUrlThrow <| Data.Text.unpack (_url settings)
+      let finalRequest =
+            basicRequest
+              { HTTP.method = Data.Text.Encoding.encodeUtf8 (_method settings),
+                HTTP.requestHeaders = case bodyContentType (_body settings) of
+                  Nothing ->
+                    _headers settings
+                  Just mimeType ->
+                    ("content-type", mimeType) : _headers settings,
+                HTTP.requestBody = HTTP.RequestBodyLBS <| bodyContents (_body settings),
+                HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
+              }
+      HTTP.httpLbs finalRequest requestManager
     pure <| case response of
       Right okResponse ->
         case decode (_expect settings) (HTTP.responseBody okResponse) of
@@ -236,7 +237,7 @@ data Error
   | BadResponse
   | Timeout
   | NetworkError
-  deriving (Show)
+  deriving (Eq, Show)
 
 instance Exception.Exception Error
 
