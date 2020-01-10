@@ -13,9 +13,20 @@ library:
   - http-client
   - http-client-tls
   - http-types
+  - mime-types
   - network-uri
   - safe-exceptions
   - text
   exposed-modules:
   - Http
   source-dirs: src
+tests:
+  spec:
+    dependencies:
+    - base
+    - cherry-core
+    - http
+    main: Main.hs
+    source-dirs:
+    - test/
+    ghc-options: *test-ghc-options
