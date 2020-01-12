@@ -22,7 +22,7 @@ where
 
 import Cherry.Prelude
 import qualified Conduit
-import qualified Control.Exception as Exception
+import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)

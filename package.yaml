@@ -15,6 +15,7 @@ library:
   - http-types
   - mime-types
   - network-uri
+  - safe-exceptions
   - text
   exposed-modules:
   - Http
