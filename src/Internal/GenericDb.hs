@@ -157,7 +157,7 @@ handleError connectionString err = do
                 |You might see this error when you try to start the content creation app or during compilation.
                 |
                 |Are you sure your database is running?
-                |Bring it up by running `aide build setup-postgres`.
+                |Bring it up by running `aide setup-postgres`.
                 |We're trying to connect with the credentials stored in `.env`, perhaps you can try to connect manually.
                 |
                 |If credentials recently changed, regenerating configuration files might also work.
