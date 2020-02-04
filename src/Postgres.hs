@@ -132,7 +132,7 @@ inTestTransaction =
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
-readiness log conn = Health.Check "postgres" Health.Fatal (GenericDb.readiness go log conn)
+readiness log conn = Health.mkCheck "postgres" (GenericDb.readiness go log conn)
   where
     go :: PGConnection -> ByteString -> IO ()
     go c = pgQuery c >> void

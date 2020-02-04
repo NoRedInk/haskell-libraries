@@ -84,7 +84,7 @@ connection settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  Health.Check "mysql" Health.Fatal (GenericDb.readiness go log conn)
+  Health.mkCheck "mysql" (GenericDb.readiness go log conn)
   where
     go :: MySQL.SqlBackend -> Text -> IO ()
     go backend q = void <| go' backend q
