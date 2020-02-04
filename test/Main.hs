@@ -14,7 +14,7 @@ import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Platform
 import qualified Task
-import Test (Test, describe, skip, test)
+import Test (Test, describe, test)
 import qualified Test.Runner.Tasty
 import qualified Prelude
 
@@ -63,7 +63,7 @@ tests =
                   Err err -> Prelude.pure (Err err)
             )
           |> Expect.withIO (Expect.equal (Ok "[1,2,3]")),
-      skip <| test "When a request is made using `get` with a string body the `Content-Type` header is set to provided mime type" <| \() ->
+      test "When a request is made using `get` with a string body the `Content-Type` header is set to provided mime type" <| \() ->
         expectRequest (\http url -> Http.post http url (Http.stringBody "element/fire" "WOOSH") Http.expectWhatever)
           |> map (map (Data.List.lookup "content-type" << Wai.requestHeaders))
           |> Expect.withIO (Expect.equal (Ok (Just "element/fire")))
