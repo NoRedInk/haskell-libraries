@@ -132,8 +132,8 @@ readiness runQuery log' conn =
           |> map (Result.mapError toQueryError << eitherToResult)
    in runTaskWithConnection conn query
         |> Task.mapError (Data.Text.pack << Exception.displayException)
-        |> Task.attempt Health.fromResult
-        |> Platform.runCmd log'
+        |> Task.attempt log'
+        |> map Health.fromResult
 
 toQueryError :: Exception.Exception e => e -> Query.Error
 toQueryError err =
