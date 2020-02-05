@@ -85,8 +85,7 @@ withServer app run = do
   Conduit.withAcquire Http.handler <| \http ->
     Warp.testWithApplication (Prelude.pure app) <| \port ->
       run http ("http://localhost:" ++ Debug.toString port)
-        |> Task.attempt identity
-        |> Platform.runCmd log
+        |> Task.attempt log
 
 -- | Run a temporary web application that handles a single request, and then
 -- immediately returns that request so you can run expectations against it.

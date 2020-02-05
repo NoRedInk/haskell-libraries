@@ -66,13 +66,7 @@ withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> 
 withThirdPartyIO log (Handler _ manager) library = do
   requestManager <-
     prepareManagerForRequest manager
-      |> Task.attempt
-        ( \result ->
-            case result of
-              Err err -> never err
-              Ok x -> x
-        )
-      |> Platform.runCmd log
+      |> Task.perform log
   library requestManager
 
 -- QUICKS
@@ -306,13 +300,7 @@ prepareManagerForRequest manager = do
             }
         ]
         (Platform.doAnything doAnything (map Ok io))
-        |> Task.attempt
-          ( \result ->
-              case result of
-                Err err -> never err
-                Ok x -> x
-          )
-        |> Platform.runCmd log
+        |> Task.perform log
         -- The call to `withContext` will wrap `HttpException`s thrown by the
         -- `http-client` code in a `TriagableException` wrapper. This will
         -- prevent code that handles the original `HttpException` from working
