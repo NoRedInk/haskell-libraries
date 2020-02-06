@@ -61,12 +61,14 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
+import qualified List
 import qualified Log
 import Network.Socket (SockAddr (..))
 import qualified Platform
 import qualified Postgres.Settings as Settings
 import qualified Result
 import qualified Task
+import qualified Text
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
 type Connection = GenericDb.Connection PGConnection
@@ -144,7 +146,7 @@ doQuery ::
   (Result Query.Error [row] -> Task e a) ->
   Task e a
 doQuery conn query handleResponse = do
-  withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
+  withFrozenCallStack Log.debug (Query.asMessage query) []
   let runQuery c =
         Query.runQuery query c
           |> Exception.try

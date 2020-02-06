@@ -100,7 +100,7 @@ doQuery ::
   (Result Query.Error [row] -> Task e a) ->
   Task e a
 doQuery conn query handleResponse = do
-  withFrozenCallStack Log.debug (Query.quasiQuotedString query) []
+  withFrozenCallStack Log.debug (Query.asMessage query) []
   GenericDb.runTaskWithConnection conn (runQuery query)
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit

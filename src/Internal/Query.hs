@@ -13,6 +13,8 @@ module Internal.Query
     Query (..),
     Error (..),
     TimeoutOrigin (..),
+    asMessage,
+    format,
   )
 where
 
@@ -35,8 +37,10 @@ import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
   )
 import Language.Haskell.TH.Syntax (runIO)
+import qualified List
 import MySQL.Internal (inToAny)
 import qualified Postgres.Settings
+import qualified Text
 import Prelude (IO, fromIntegral)
 
 -- |
@@ -134,3 +138,25 @@ instance PGTypes.PGColumn t a => PGTypes.PGColumn t (MySQL.Single a) where
   pgDecode tid tv =
     PGTypes.pgDecode tid tv
       |> MySQL.Single
+
+-- |
+-- | Formatter for logging
+-- |
+asMessage :: Query row -> Text.Text
+asMessage query =
+  "I ran the following query:\n\n" ++ format query
+
+format :: Query row -> Text.Text
+format query =
+  let fixBang query_ =
+        case Text.uncons query_ of
+          Just ('!', rest) -> "! " ++ Text.trim rest
+          Nothing -> query_
+      indent string =
+        "    " ++ string
+   in quasiQuotedString query
+        |> Text.split "\n"
+        |> List.map Text.trim
+        |> Text.join "\n        "
+        |> fixBang
+        |> indent
