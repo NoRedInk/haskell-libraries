@@ -14,7 +14,7 @@ import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Platform
 import qualified Task
-import Test (Test, describe, test)
+import Test (Test, describe, only, test)
 import qualified Test.Runner.Tasty
 import qualified Prelude
 
@@ -25,7 +25,7 @@ tests :: Test
 tests =
   describe
     "Http"
-    [ test "Given a request made using `get` when the response has a 200 status code the task return succeeds" <| \() ->
+    [ only <| test "Given a request made using `get` when the response has a 200 status code the task return succeeds" <| \() ->
         withServer
           (constant "" Status.ok200)
           (\http url -> Http.get http url Http.expectWhatever)
