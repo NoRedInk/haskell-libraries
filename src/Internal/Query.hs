@@ -151,6 +151,7 @@ format query =
   let fixBang query_ =
         case Text.uncons query_ of
           Just ('!', rest) -> "! " ++ Text.trim rest
+          Just _ -> query_
           Nothing -> query_
       indent string =
         "    " ++ string
