@@ -144,7 +144,7 @@ doQuery ::
   (Result Query.Error [row] -> Task e a) ->
   Task e a
 doQuery conn query handleResponse = do
-  withFrozenCallStack Log.debug (Query.asMessage query) []
+  withFrozenCallStack Log.info (Query.asMessage query) []
   let runQuery c =
         Query.runQuery query c
           |> Exception.try
