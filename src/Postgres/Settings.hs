@@ -263,12 +263,15 @@ toPGDatabase
         pgDBUser = Data.Text.Encoding.encodeUtf8 (unPgUser pgUser),
         pgDBPass = Data.Text.Encoding.encodeUtf8 <| Log.unSecret (unPgPassword pgPassword),
         pgDBParams =
-          [ -- We configure Postgres to automatically kill queries when they run
-            -- too long. That should offer some protection against queries
-            -- locking up the database.
-            -- https://www.postgresql.org/docs/9.4/runtime-config-client.html
-            ("statement_timeout", milli * pgQueryTimeoutSeconds |> floor |> show |> Data.ByteString.Char8.pack)
-          ],
+          if pgQueryTimeoutSeconds > 0
+            then
+              [ -- We configure Postgres to automatically kill queries when they run
+                -- too long. That should offer some protection against queries
+                -- locking up the database.
+                -- https://www.postgresql.org/docs/9.4/runtime-config-client.html
+                ("statement_timeout", milli * pgQueryTimeoutSeconds |> floor |> show |> Data.ByteString.Char8.pack)
+              ]
+            else [],
         pgDBAddr =
           -- The rule that PostgreSQL/libpq applies to `host`:
           --

@@ -59,9 +59,9 @@ runTaskWithConnection ::
   Task Query.Error a
 runTaskWithConnection conn f =
   let timeoutInMicroSeconds = timeoutMicroSeconds conn
-   in withConnection
-        conn
-        ( \c ->
+      withOptionalTimeout c =
+        if timeoutInMicroSeconds > 0
+          then
             f c
               |> System.Timeout.timeout (fromIntegral timeoutInMicroSeconds)
               |> map
@@ -73,6 +73,11 @@ runTaskWithConnection conn f =
                           |> Err
                       Just x -> x
                 )
+          else f c
+   in withConnection
+        conn
+        ( \c ->
+            withOptionalTimeout c
               |> Platform.doAnything (doAnything conn)
         )
 
