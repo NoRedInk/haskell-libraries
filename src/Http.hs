@@ -42,7 +42,7 @@ import qualified Network.Mime as Mime
 import qualified Network.URI
 import qualified Platform
 import qualified Task
-import Prelude (Either (Left, Right), IO, fromIntegral, pure)
+import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 
 -- |
 data Handler
@@ -192,11 +192,11 @@ request (Handler doAnythingHandler manager) settings = do
           HTTP.ResponseTimeout ->
             Err Timeout
           HTTP.ConnectionTimeout ->
-            Err NetworkError
-          HTTP.ConnectionFailure _ ->
-            Err NetworkError
-          _ ->
-            Err BadResponse
+            Err (NetworkError "ConnectionTimeout")
+          HTTP.ConnectionFailure err ->
+            Err (NetworkError (Data.Text.pack (Exception.displayException err)))
+          err ->
+            Err (BadResponse (Data.Text.pack (show err)))
       Left (HTTP.InvalidUrlException _ message) ->
         Err (BadUrl (Data.Text.pack message))
 
@@ -228,9 +228,9 @@ data Error
   = BadUrl Text
   | BadStatus Int
   | BadBody Text
-  | BadResponse
+  | BadResponse Text
   | Timeout
-  | NetworkError
+  | NetworkError Text
   deriving (Eq, Show)
 
 instance Exception.Exception Error
