@@ -1,3 +1,7 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -- |
 -- Description : Helpers for running queries.
 --
@@ -222,3 +226,10 @@ toConnectionLogContext db =
         )
   where
     databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8
+
+-- useful typeclass instances
+instance PGTypes.PGType "jsonb" => PGTypes.PGType "jsonb[]" where
+  type PGVal "jsonb[]" = PGArray.PGArray (PGTypes.PGVal "jsonb")
+
+instance PGTypes.PGType "jsonb" => PGArray.PGArrayType "jsonb[]" where
+  type PGElemType "jsonb[]" = "jsonb"
