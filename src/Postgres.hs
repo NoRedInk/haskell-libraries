@@ -177,6 +177,10 @@ fromPGError c pgError =
   -- them. If a Postgres error starts showing up in our log, please feel free
   -- to add a special case for it to this list!
   case pgErrorCode pgError of
+    "23505" ->
+      Exception.displayException pgError
+        |> Data.Text.pack
+        |> Query.UniqueViolation
     "57014" ->
       Query.TimeoutAfterSeconds Query.ServerTimeout (fromIntegral (GenericDb.timeoutMicroSeconds c) / 10e6)
     _ ->

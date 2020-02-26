@@ -74,6 +74,7 @@ data Query row
 
 data Error
   = TimeoutAfterSeconds TimeoutOrigin Float
+  | UniqueViolation Text
   | Other Text
   deriving (Show)
 
