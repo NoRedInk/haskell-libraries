@@ -1,6 +1,12 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
 module Http
   ( Handler,
     handler,
+    handlerWithCustomManager,
+    testHandler,
+    simpleTestHandler,
     withThirdParty,
     withThirdPartyIO,
     get,
@@ -27,10 +33,12 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
+import Data.IORef
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
+import Data.Typeable
 import qualified Log
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
@@ -46,26 +54,89 @@ import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 
 -- |
 data Handler
-  = Handler Platform.DoAnythingHandler HTTP.Manager
+  = Handler
+      { handlerRequest :: forall expect. Settings expect -> Task Error expect,
+        manager :: Maybe HTTP.Manager,
+        doAnything :: Platform.DoAnythingHandler
+      }
 
 -- |
 handler :: Conduit.Acquire Handler
-handler =
-  map2 Handler (liftIO Platform.doAnythingHandler) TLS.newTlsManager
+handler = do
+  doAnything <- liftIO Platform.doAnythingHandler
+  manager <- TLS.newTlsManager
+  pure <| Handler (_request doAnything manager) (Just manager) doAnything
+
+handlerWithCustomManager :: HTTP.Manager -> Conduit.Acquire Handler
+handlerWithCustomManager m = do
+  doAnything <- liftIO Platform.doAnythingHandler
+  pure <| Handler (_request doAnything m) (Just m) doAnything
+
+testHandler :: (forall expect. Settings expect -> Task Error expect) -> IO Handler
+testHandler mockServer = do
+  doAnything <- Platform.doAnythingHandler
+  pure <| Handler mockServer Nothing doAnything
+
+simpleMockServer :: Typeable mock => Platform.DoAnythingHandler -> IORef (Maybe (Settings mock)) -> mock -> Settings expect -> Task Error expect
+simpleMockServer doAnything ioRef v s =
+  case _expect s of
+    ExpectWhatever ->
+      case (cast v, cast s) of
+        (Just response, Just settings) -> do
+          Platform.doAnything
+            doAnything
+            (map Ok (writeIORef ioRef (Just settings)))
+          Task.succeed
+            response
+        _ -> Task.fail (NetworkError "You expected a response of the wrong type in your mock HTTP request.")
+    ExpectText ->
+      case (cast v, cast s) of
+        (Just response, Just settings) -> do
+          Platform.doAnything
+            doAnything
+            (map Ok (writeIORef ioRef (Just settings)))
+          Task.succeed
+            response
+        _ -> Task.fail (NetworkError "You expected a response of the wrong type in your mock HTTP request.")
+    ExpectJson ->
+      case (cast v, cast s) of
+        (Just response, Just settings) -> do
+          Platform.doAnything
+            doAnything
+            (map Ok (writeIORef ioRef (Just settings)))
+          Task.succeed
+            response
+        _ -> Task.fail (NetworkError "You expected a response of the wrong type in your mock HTTP request.")
+
+simpleTestHandler :: Typeable result => result -> IO (Handler, IORef (Maybe (Settings result)))
+simpleTestHandler responseValue = do
+  doAnything <- Platform.doAnythingHandler
+  ioRef <- newIORef Nothing
+  h <- testHandler (simpleMockServer doAnything ioRef responseValue)
+  pure (h, ioRef)
 
 -- | This is for external libraries only!
 withThirdParty :: Handler -> (HTTP.Manager -> Task e a) -> Task e a
-withThirdParty (Handler _ manager) library = do
-  requestManager <- prepareManagerForRequest manager
+withThirdParty Handler {manager, doAnything} library = do
+  manager' <-
+    case manager of
+      Just m -> pure m
+      Nothing ->
+        Platform.doAnything doAnything (map Ok TLS.newTlsManager)
+  requestManager <- prepareManagerForRequest manager'
   library requestManager
 
 -- | Like `withThirdParty`, but runs in `IO`. We'd rather this function didn't
 -- exist, and as we move more of our code to run in `Task` rather than `IO`
 -- there will should come a point we will be able to delete it.
 withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> IO a
-withThirdPartyIO log (Handler _ manager) library = do
+withThirdPartyIO log Handler {manager} library = do
+  manager' <-
+    case manager of
+      Just m -> pure m
+      Nothing -> TLS.newTlsManager
   requestManager <-
-    prepareManagerForRequest manager
+    prepareManagerForRequest manager'
       |> Task.perform log
   library requestManager
 
@@ -159,7 +230,11 @@ bytesBody mimeType bytes =
 
 -- |
 request :: Handler -> Settings expect -> Task Error expect
-request (Handler doAnythingHandler manager) settings = do
+request Handler {handlerRequest} settings = handlerRequest settings
+
+-- |
+_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Settings expect -> Task Error expect
+_request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
     response <- Exception.try <| do
@@ -202,26 +277,33 @@ request (Handler doAnythingHandler manager) settings = do
 
 -- |
 -- Logic for interpreting a response body.
-newtype Expect a = Expect {decode :: Data.ByteString.Lazy.ByteString -> Result Text a}
+data Expect a where
+  ExpectJson :: (Typeable a, Aeson.FromJSON a) => Expect a
+  ExpectText :: Expect Text
+  ExpectWhatever :: Expect ()
+
+decode :: Expect a -> Data.ByteString.Lazy.ByteString -> Result Text a
+decode ExpectJson bytes =
+  case Aeson.eitherDecode bytes of
+    Left err -> Err (Data.Text.pack err)
+    Right x -> Ok x
+decode ExpectText bytes = (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8) bytes
+decode ExpectWhatever _ = Ok ()
 
 -- |
 -- Expect the response body to be JSON.
-expectJson :: Aeson.FromJSON a => Expect a
-expectJson =
-  Expect <| \bytestring ->
-    case Aeson.eitherDecode bytestring of
-      Left err -> Err (Data.Text.pack err)
-      Right x -> Ok x
+expectJson :: (Typeable a, Aeson.FromJSON a) => Expect a
+expectJson = ExpectJson
 
 -- |
 -- Expect the response body to be a `Text`.
 expectText :: Expect Text
-expectText = Expect (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8)
+expectText = ExpectText
 
 -- |
 -- Expect the response body to be whatever. It does not matter. Ignore it!
 expectWhatever :: Expect ()
-expectWhatever = Expect (\_ -> Ok ())
+expectWhatever = ExpectWhatever
 
 -- |
 data Error
