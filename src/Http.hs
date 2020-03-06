@@ -10,7 +10,6 @@ module Http
     get,
     post,
     request,
-    Body,
     emptyBody,
     stringBody,
     jsonBody,
@@ -21,6 +20,7 @@ module Http
     expectWhatever,
     Internal.Http.Error (..),
     Internal.Http.Settings (..),
+    Internal.Http.Body (..),
   )
 where
 
