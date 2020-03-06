@@ -19,6 +19,7 @@ library:
   - text
   exposed-modules:
   - Http
+  - Http.Mock
   source-dirs: src
 tests:
   spec:
