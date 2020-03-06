@@ -5,14 +5,18 @@ module Http
   ( Handler,
     handler,
     handlerWithCustomManager,
-    testHandler,
-    simpleTestHandler,
     withThirdParty,
     withThirdPartyIO,
     get,
     post,
     request,
-    Settings (..),
+    Settings,
+    Internal.Http._method,
+    Internal.Http._headers,
+    Internal.Http._url,
+    Internal.Http._body,
+    Internal.Http._timeout,
+    Internal.Http._expect,
     Body,
     emptyBody,
     stringBody,
@@ -22,7 +26,7 @@ module Http
     expectJson,
     expectText,
     expectWhatever,
-    Error (..),
+    Internal.Http.Error (..),
   )
 where
 
@@ -33,111 +37,62 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
-import Data.IORef
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import Data.Typeable
+import qualified Internal.Http
 import qualified Log
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.Internal as HTTP.Internal
 import qualified Network.HTTP.Client.TLS as TLS
-import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
-import qualified Network.Mime as Mime
 import qualified Network.URI
 import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 
 -- |
-data Handler
-  = Handler
-      { handlerRequest :: forall expect. Settings expect -> Task Error expect,
-        manager :: Maybe HTTP.Manager,
-        doAnything :: Platform.DoAnythingHandler
-      }
+type Handler = Internal.Http.Handler
 
 -- |
 handler :: Conduit.Acquire Handler
 handler = do
   doAnything <- liftIO Platform.doAnythingHandler
   manager <- TLS.newTlsManager
-  pure <| Handler (_request doAnything manager) (Just manager) doAnything
+  pure
+    <| Internal.Http.Handler
+      (_request doAnything manager)
+      (_withThirdParty manager)
+      (_withThirdPartyIO manager)
 
 handlerWithCustomManager :: HTTP.Manager -> Conduit.Acquire Handler
 handlerWithCustomManager m = do
   doAnything <- liftIO Platform.doAnythingHandler
-  pure <| Handler (_request doAnything m) (Just m) doAnything
-
-testHandler :: (forall expect. Settings expect -> Task Error expect) -> IO Handler
-testHandler mockServer = do
-  doAnything <- Platform.doAnythingHandler
-  pure <| Handler mockServer Nothing doAnything
-
-simpleMockServer :: Typeable mock => Platform.DoAnythingHandler -> IORef (Maybe (Settings mock)) -> mock -> Settings expect -> Task Error expect
-simpleMockServer doAnything ioRef v s =
-  case _expect s of
-    ExpectWhatever ->
-      case (cast v, cast s) of
-        (Just response, Just settings) -> do
-          Platform.doAnything
-            doAnything
-            (map Ok (writeIORef ioRef (Just settings)))
-          Task.succeed
-            response
-        _ -> Task.fail (NetworkError "You expected a response of the wrong type in your mock HTTP request.")
-    ExpectText ->
-      case (cast v, cast s) of
-        (Just response, Just settings) -> do
-          Platform.doAnything
-            doAnything
-            (map Ok (writeIORef ioRef (Just settings)))
-          Task.succeed
-            response
-        _ -> Task.fail (NetworkError "You expected a response of the wrong type in your mock HTTP request.")
-    ExpectJson ->
-      case (cast v, cast s) of
-        (Just response, Just settings) -> do
-          Platform.doAnything
-            doAnything
-            (map Ok (writeIORef ioRef (Just settings)))
-          Task.succeed
-            response
-        _ -> Task.fail (NetworkError "You expected a response of the wrong type in your mock HTTP request.")
-
-simpleTestHandler :: Typeable result => result -> IO (Handler, IORef (Maybe (Settings result)))
-simpleTestHandler responseValue = do
-  doAnything <- Platform.doAnythingHandler
-  ioRef <- newIORef Nothing
-  h <- testHandler (simpleMockServer doAnything ioRef responseValue)
-  pure (h, ioRef)
+  pure <| Internal.Http.Handler (_request doAnything m) (_withThirdParty m) (_withThirdPartyIO m)
 
 -- | This is for external libraries only!
 withThirdParty :: Handler -> (HTTP.Manager -> Task e a) -> Task e a
-withThirdParty Handler {manager, doAnything} library = do
-  manager' <-
-    case manager of
-      Just m -> pure m
-      Nothing ->
-        Platform.doAnything doAnything (map Ok TLS.newTlsManager)
-  requestManager <- prepareManagerForRequest manager'
+withThirdParty Internal.Http.Handler {Internal.Http.handlerWithThirdParty = wtp} library = do
+  wtp library
+
+_withThirdParty :: HTTP.Manager -> (HTTP.Manager -> Task e a) -> Task e a
+_withThirdParty manager library = do
+  requestManager <- prepareManagerForRequest manager
   library requestManager
 
 -- | Like `withThirdParty`, but runs in `IO`. We'd rather this function didn't
 -- exist, and as we move more of our code to run in `Task` rather than `IO`
 -- there will should come a point we will be able to delete it.
 withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> IO a
-withThirdPartyIO log Handler {manager} library = do
-  manager' <-
-    case manager of
-      Just m -> pure m
-      Nothing -> TLS.newTlsManager
-  requestManager <-
-    prepareManagerForRequest manager'
-      |> Task.perform log
+withThirdPartyIO log Internal.Http.Handler {Internal.Http.handlerWithThirdPartyIO = wtp} library = do
+  wtp log library
+
+_withThirdPartyIO :: HTTP.Manager -> Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
+_withThirdPartyIO manager log library = do
+  requestManager <- prepareManagerForRequest manager |> Task.perform log
   library requestManager
 
 -- QUICKS
@@ -145,54 +100,42 @@ withThirdPartyIO log Handler {manager} library = do
 -- |
 get :: Handler -> Text -> Expect a -> Task Error a
 get handler' url expect =
-  request handler' Settings
-    { _method = "GET",
-      _headers = [],
-      _url = url,
-      _body = emptyBody,
-      _timeout = Nothing,
-      _expect = expect
+  request handler' Internal.Http.Settings
+    { Internal.Http._method = "GET",
+      Internal.Http._headers = [],
+      Internal.Http._url = url,
+      Internal.Http._body = emptyBody,
+      Internal.Http._timeout = Nothing,
+      Internal.Http._expect = expect
     }
 
 -- |
 post :: Handler -> Text -> Body -> Expect a -> Task Error a
 post handler' url body expect =
-  request handler' Settings
-    { _method = "POST",
-      _headers = [],
-      _url = url,
-      _body = body,
-      _timeout = Nothing,
-      _expect = expect
+  request handler' Internal.Http.Settings
+    { Internal.Http._method = "POST",
+      Internal.Http._headers = [],
+      Internal.Http._url = url,
+      Internal.Http._body = body,
+      Internal.Http._timeout = Nothing,
+      Internal.Http._expect = expect
     }
 
 -- REQUEST
 
 -- |
-data Settings a
-  = Settings
-      { _method :: Text,
-        _headers :: [Header.Header],
-        _url :: Text,
-        _body :: Body,
-        _timeout :: Maybe Int,
-        _expect :: Expect a
-      }
+type Settings a = Internal.Http.Settings a
 
 -- |  Represents the body of a Request.
-data Body
-  = Body
-      { bodyContents :: Data.ByteString.Lazy.ByteString,
-        bodyContentType :: Maybe Mime.MimeType
-      }
+type Body = Internal.Http.Body
 
 -- | Create an empty body for your Request. This is useful for GET requests and
 -- POST requests where you are not sending any data.
 emptyBody :: Body
 emptyBody =
-  Body
-    { bodyContents = "",
-      bodyContentType = Nothing
+  Internal.Http.Body
+    { Internal.Http.bodyContents = "",
+      Internal.Http.bodyContentType = Nothing
     }
 
 -- | Put some string in the body of your Request.
@@ -201,18 +144,18 @@ emptyBody =
 -- this!
 stringBody :: Text -> Text -> Body
 stringBody mimeType text =
-  Body
-    { bodyContents = Data.Text.Encoding.encodeUtf8 text |> Data.ByteString.Lazy.fromStrict,
-      bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
+  Internal.Http.Body
+    { Internal.Http.bodyContents = Data.Text.Encoding.encodeUtf8 text |> Data.ByteString.Lazy.fromStrict,
+      Internal.Http.bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
     }
 
 -- | Put some JSON value in the body of your Request. This will automatically
 -- add the Content-Type: application/json header.
 jsonBody :: Aeson.ToJSON body => body -> Body
 jsonBody json =
-  Body
-    { bodyContents = Aeson.encode json,
-      bodyContentType = Just "application/json"
+  Internal.Http.Body
+    { Internal.Http.bodyContents = Aeson.encode json,
+      Internal.Http.bodyContentType = Just "application/json"
     }
 
 -- | Put some Bytes in the body of your Request. This allows you to use
@@ -223,14 +166,14 @@ jsonBody json =
 -- want to use MIME types like image/png or image/jpeg instead.
 bytesBody :: Text -> ByteString -> Body
 bytesBody mimeType bytes =
-  Body
-    { bodyContents = Data.ByteString.Lazy.fromStrict bytes,
-      bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
+  Internal.Http.Body
+    { Internal.Http.bodyContents = Data.ByteString.Lazy.fromStrict bytes,
+      Internal.Http.bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
     }
 
 -- |
 request :: Handler -> Settings expect -> Task Error expect
-request Handler {handlerRequest} settings = handlerRequest settings
+request Internal.Http.Handler {Internal.Http.handlerRequest} settings = handlerRequest settings
 
 -- |
 _request :: Platform.DoAnythingHandler -> HTTP.Manager -> Settings expect -> Task Error expect
@@ -239,83 +182,71 @@ _request doAnythingHandler manager settings = do
   Platform.doAnything doAnythingHandler <| do
     response <- Exception.try <| do
       basicRequest <-
-        HTTP.parseUrlThrow <| Data.Text.unpack (_url settings)
+        HTTP.parseUrlThrow <| Data.Text.unpack (Internal.Http._url settings)
       let finalRequest =
             basicRequest
-              { HTTP.method = Data.Text.Encoding.encodeUtf8 (_method settings),
-                HTTP.requestHeaders = case bodyContentType (_body settings) of
+              { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.Http._method settings),
+                HTTP.requestHeaders = case Internal.Http.bodyContentType (Internal.Http._body settings) of
                   Nothing ->
-                    _headers settings
+                    Internal.Http._headers settings
                   Just mimeType ->
-                    ("content-type", mimeType) : _headers settings,
-                HTTP.requestBody = HTTP.RequestBodyLBS <| bodyContents (_body settings),
-                HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (_timeout settings)
+                    ("content-type", mimeType) : Internal.Http._headers settings,
+                HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http._body settings),
+                HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (Internal.Http._timeout settings)
               }
       HTTP.httpLbs finalRequest requestManager
     pure <| case response of
       Right okResponse ->
-        case decode (_expect settings) (HTTP.responseBody okResponse) of
+        case decode (Internal.Http._expect settings) (HTTP.responseBody okResponse) of
           Ok decodedBody ->
             Ok decodedBody
           Err message ->
-            Err (BadBody message)
+            Err (Internal.Http.BadBody message)
       Left (HTTP.HttpExceptionRequest _ content) ->
         case content of
           HTTP.StatusCodeException res _ ->
             let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
-             in Err (BadStatus (statusCode res))
+             in Err (Internal.Http.BadStatus (statusCode res))
           HTTP.ResponseTimeout ->
-            Err Timeout
+            Err Internal.Http.Timeout
           HTTP.ConnectionTimeout ->
-            Err (NetworkError "ConnectionTimeout")
+            Err (Internal.Http.NetworkError "ConnectionTimeout")
           HTTP.ConnectionFailure err ->
-            Err (NetworkError (Data.Text.pack (Exception.displayException err)))
+            Err (Internal.Http.NetworkError (Data.Text.pack (Exception.displayException err)))
           err ->
-            Err (BadResponse (Data.Text.pack (show err)))
+            Err (Internal.Http.BadResponse (Data.Text.pack (show err)))
       Left (HTTP.InvalidUrlException _ message) ->
-        Err (BadUrl (Data.Text.pack message))
+        Err (Internal.Http.BadUrl (Data.Text.pack message))
 
 -- |
 -- Logic for interpreting a response body.
-data Expect a where
-  ExpectJson :: (Typeable a, Aeson.FromJSON a) => Expect a
-  ExpectText :: Expect Text
-  ExpectWhatever :: Expect ()
+type Expect a = Internal.Http.Expect a
 
 decode :: Expect a -> Data.ByteString.Lazy.ByteString -> Result Text a
-decode ExpectJson bytes =
+decode Internal.Http.ExpectJson bytes =
   case Aeson.eitherDecode bytes of
     Left err -> Err (Data.Text.pack err)
     Right x -> Ok x
-decode ExpectText bytes = (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8) bytes
-decode ExpectWhatever _ = Ok ()
+decode Internal.Http.ExpectText bytes = (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8) bytes
+decode Internal.Http.ExpectWhatever _ = Ok ()
 
 -- |
 -- Expect the response body to be JSON.
 expectJson :: (Typeable a, Aeson.FromJSON a) => Expect a
-expectJson = ExpectJson
+expectJson = Internal.Http.ExpectJson
 
 -- |
 -- Expect the response body to be a `Text`.
 expectText :: Expect Text
-expectText = ExpectText
+expectText = Internal.Http.ExpectText
 
 -- |
 -- Expect the response body to be whatever. It does not matter. Ignore it!
 expectWhatever :: Expect ()
-expectWhatever = ExpectWhatever
+expectWhatever = Internal.Http.ExpectWhatever
 
 -- |
-data Error
-  = BadUrl Text
-  | BadStatus Int
-  | BadBody Text
-  | BadResponse Text
-  | Timeout
-  | NetworkError Text
-  deriving (Eq, Show)
-
-instance Exception.Exception Error
+type Error = Internal.Http.Error
 
 -- Our Task type carries around some context values which should influence in
 -- minor ways the logic of sending a request. In this function we modify a
