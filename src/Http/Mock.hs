@@ -1,16 +1,21 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Http.Mock where
+module Http.Mock
+  ( simpleJsonTestHandler,
+    simpleWhateverTestHandler,
+    testHandler,
+  )
+where
 
 import Cherry.Prelude
+import qualified Data.Aeson as Aeson
 import Data.IORef
-import Data.Typeable
 import qualified Debug
 import Internal.Http
 import qualified Platform
 import qualified Task
-import Prelude (IO, pure)
+import Prelude (Either (Left, Right), IO, pure)
 
 testHandler :: (forall expect. Settings expect -> Task Error expect) -> IO Handler
 testHandler mockServer =
@@ -20,39 +25,47 @@ testHandler mockServer =
       (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
       (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
 
-simpleMockServer :: Typeable mock => Platform.DoAnythingHandler -> IORef (Maybe (Settings mock)) -> mock -> Settings expect -> Task Error expect
-simpleMockServer doAnything ioRef v s =
+simpleJsonMockServer :: Aeson.ToJSON mock => Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> mock -> Settings expect -> Task Error expect
+simpleJsonMockServer doAnything ioRef v s =
   case Internal.Http._expect s of
     Internal.Http.ExpectWhatever ->
-      case cast s of
-        Just settings -> do
-          Platform.doAnything
-            doAnything
-            (map Ok (writeIORef ioRef (Just settings)))
-          Task.succeed ()
-        _ -> Task.fail (Internal.Http.NetworkError "You expected a response of the wrong type in your mock HTTP request.")
+      Task.fail (Internal.Http.NetworkError "You said you expected a JSON request, but 'ExpectWhatever' was sent")
     Internal.Http.ExpectText ->
-      case (cast v, cast s) of
-        (Just response, Just settings) -> do
-          Platform.doAnything
-            doAnything
-            (map Ok (writeIORef ioRef (Just settings)))
-          Task.succeed
-            response
-        _ -> Task.fail (Internal.Http.NetworkError "You expected a response of the wrong type in your mock HTTP request.")
+      Task.fail (Internal.Http.NetworkError "You said you expected a JSON request, but 'ExpectText' was sent")
     Internal.Http.ExpectJson ->
-      case (cast v, cast s) of
-        (Just response, Just settings) -> do
+      case v |> Aeson.encode |> Aeson.eitherDecode of
+        Left _ ->
+          Task.fail (Internal.Http.NetworkError "We couldn't transform the mock JSON you provided into a valid response.")
+        Right response -> do
           Platform.doAnything
             doAnything
-            (map Ok (writeIORef ioRef (Just settings)))
+            (map Ok (writeIORef ioRef (Just s {_expect = Internal.Http.ExpectWhatever})))
           Task.succeed
             response
-        _ -> Task.fail (Internal.Http.NetworkError "You expected a response of the wrong type in your mock HTTP request.")
 
-simpleTestHandler :: Typeable result => result -> IO (Handler, IORef (Maybe (Settings result)))
-simpleTestHandler responseValue = do
+simpleJsonTestHandler :: Aeson.ToJSON result => result -> IO (Handler, IORef (Maybe (Settings ())))
+simpleJsonTestHandler responseValue = do
   doAnything <- Platform.doAnythingHandler
   ioRef <- newIORef Nothing
-  h <- testHandler (simpleMockServer doAnything ioRef responseValue)
+  h <- testHandler (simpleJsonMockServer doAnything ioRef responseValue)
+  pure (h, ioRef)
+
+simpleWhateverMockServer :: Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> Settings expect -> Task Error expect
+simpleWhateverMockServer doAnything ioRef s =
+  case Internal.Http._expect s of
+    Internal.Http.ExpectWhatever -> do
+      Platform.doAnything
+        doAnything
+        (map Ok (writeIORef ioRef (Just s)))
+      Task.succeed ()
+    Internal.Http.ExpectText ->
+      Task.fail (Internal.Http.NetworkError "You said you didn't care about the response, but 'ExpectText' was sent")
+    Internal.Http.ExpectJson ->
+      Task.fail (Internal.Http.NetworkError "You said you didn't care about the response, but 'ExpectJson' was sent")
+
+simpleWhateverTestHandler :: IO (Handler, IORef (Maybe (Settings ())))
+simpleWhateverTestHandler = do
+  doAnything <- Platform.doAnythingHandler
+  ioRef <- newIORef Nothing
+  h <- testHandler (simpleWhateverMockServer doAnything ioRef)
   pure (h, ioRef)

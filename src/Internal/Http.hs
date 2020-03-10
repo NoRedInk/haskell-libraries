@@ -7,7 +7,6 @@ import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
-import Data.Typeable
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.Mime as Mime
@@ -43,7 +42,7 @@ data Body
 -- |
 -- Logic for interpreting a response body.
 data Expect a where
-  ExpectJson :: (Typeable a, Aeson.FromJSON a) => Expect a
+  ExpectJson :: Aeson.FromJSON a => Expect a
   ExpectText :: Expect Text
   ExpectWhatever :: Expect ()
 
