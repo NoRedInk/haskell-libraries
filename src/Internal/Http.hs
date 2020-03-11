@@ -55,6 +55,9 @@ data Error
   | BadResponse Text
   | Timeout
   | NetworkError Text
-  deriving (Eq, Show)
+  deriving (Generic, Eq, Show)
 
 instance Exception.Exception Error
+
+instance Aeson.ToJSON Error
+
