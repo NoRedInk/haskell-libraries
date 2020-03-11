@@ -141,6 +141,20 @@ instance PGTypes.PGColumn t a => PGTypes.PGColumn t (MySQL.Single a) where
       |> MySQL.Single
 
 -- |
+-- Several monolith tables use smaller int sizes to represent
+-- enumerables; this type class allows us to extract them safely
+-- and without too much ceremony
+instance PGTypes.PGColumn "smallint" Int where
+  pgDecode tid tv =
+    let (i :: Data.Int.Int16) = PGTypes.pgDecode tid tv
+     in fromIntegral i
+
+instance PGTypes.PGParameter "smallint" Int where
+  pgEncode tid tv =
+    let (i :: Data.Int.Int16) = fromIntegral tv
+     in PGTypes.pgEncode tid i
+
+-- |
 -- | Formatter for logging
 -- |
 asMessage :: Query row -> Text.Text
