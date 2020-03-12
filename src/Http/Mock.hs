@@ -2,8 +2,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Http.Mock
-  ( simpleJsonTestHandler,
-    simpleWhateverTestHandler,
+  ( singleJsonTestHandler,
+    singleWhateverTestHandler,
     testHandler,
   )
 where
@@ -25,8 +25,8 @@ testHandler mockServer =
       (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
       (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
 
-simpleJsonMockServer :: Aeson.ToJSON mock => Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> mock -> Settings expect -> Task Error expect
-simpleJsonMockServer doAnything ioRef responseValue capturedRequestSettings =
+singleJsonMockServer :: Aeson.ToJSON mock => Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> mock -> Settings expect -> Task Error expect
+singleJsonMockServer doAnything ioRef responseValue capturedRequestSettings =
   case Internal.Http._expect capturedRequestSettings of
     Internal.Http.ExpectWhatever ->
       Task.fail (Internal.Http.NetworkError "You said you expected a JSON request, but 'ExpectWhatever' was sent")
@@ -43,15 +43,15 @@ simpleJsonMockServer doAnything ioRef responseValue capturedRequestSettings =
           Task.succeed
             response
 
-simpleJsonTestHandler :: Aeson.ToJSON result => result -> IO (Handler, IORef (Maybe (Settings ())))
-simpleJsonTestHandler responseValue = do
+singleJsonTestHandler :: Aeson.ToJSON result => result -> IO (Handler, IORef (Maybe (Settings ())))
+singleJsonTestHandler responseValue = do
   doAnything <- Platform.doAnythingHandler
   ioRef <- newIORef Nothing
-  h <- testHandler (simpleJsonMockServer doAnything ioRef responseValue)
+  h <- testHandler (singleJsonMockServer doAnything ioRef responseValue)
   pure (h, ioRef)
 
-simpleWhateverMockServer :: Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> Settings expect -> Task Error expect
-simpleWhateverMockServer doAnything ioRef capturedRequestSettings =
+singleWhateverMockServer :: Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> Settings expect -> Task Error expect
+singleWhateverMockServer doAnything ioRef capturedRequestSettings =
   case Internal.Http._expect capturedRequestSettings of
     Internal.Http.ExpectWhatever -> do
       Platform.doAnything
@@ -63,9 +63,9 @@ simpleWhateverMockServer doAnything ioRef capturedRequestSettings =
     Internal.Http.ExpectJson ->
       Task.fail (Internal.Http.NetworkError "You said you didn't care about the response, but 'ExpectJson' was sent")
 
-simpleWhateverTestHandler :: IO (Handler, IORef (Maybe (Settings ())))
-simpleWhateverTestHandler = do
+singleWhateverTestHandler :: IO (Handler, IORef (Maybe (Settings ())))
+singleWhateverTestHandler = do
   doAnything <- Platform.doAnythingHandler
   ioRef <- newIORef Nothing
-  h <- testHandler (simpleWhateverMockServer doAnything ioRef)
+  h <- testHandler (singleWhateverMockServer doAnything ioRef)
   pure (h, ioRef)
