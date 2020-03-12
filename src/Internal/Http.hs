@@ -59,4 +59,3 @@ data Error
 instance Exception.Exception Error
 
 instance Aeson.ToJSON Error
-
