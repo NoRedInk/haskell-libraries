@@ -35,7 +35,6 @@ import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
-import Data.Typeable
 import qualified Internal.Http
 import qualified Log
 import qualified Maybe
@@ -226,7 +225,7 @@ decode Internal.Http.ExpectWhatever _ = Ok ()
 
 -- |
 -- Expect the response body to be JSON.
-expectJson :: (Typeable a, Aeson.FromJSON a) => Expect a
+expectJson :: Aeson.FromJSON a => Expect a
 expectJson = Internal.Http.ExpectJson
 
 -- |
