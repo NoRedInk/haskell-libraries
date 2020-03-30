@@ -20,6 +20,9 @@ module MySQL
     Query.Error (..),
     Query.sql,
     doQuery,
+    -- Handling transactions
+    transaction,
+    inTestTransaction,
     -- Reexposing useful Database.Persist.MySQL types
     QueryResults,
     MySQL.PersistField (..),
@@ -28,6 +31,7 @@ module MySQL
 where
 
 import Cherry.Prelude
+import Control.Monad.IO.Class (MonadIO)
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
 import qualified Control.Monad.Logger
@@ -79,6 +83,39 @@ connection settings =
     size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
     database = toConnectInfo settings
     micro = 1000 * 1000
+
+-- |
+-- Perform a database transaction.
+transaction :: Connection -> (Connection -> Task e a) -> Task e a
+transaction =
+  GenericDb.transaction GenericDb.Transaction
+    { GenericDb.begin = execute "BEGIN" >> void,
+      GenericDb.commit = execute "COMMIT" >> void,
+      GenericDb.rollback = execute "ROLLBACK" >> void,
+      GenericDb.rollbackAll = execute "ROLLBACK" >> void
+    }
+
+
+-- | Run code in a transaction, then roll that transaction back.
+--   Useful in tests that shouldn't leave anything behind in the DB.
+inTestTransaction ::
+  forall m a.
+  (MonadIO m, Exception.MonadCatch m) =>
+  Connection ->
+  (Connection -> m a) ->
+  m a
+inTestTransaction =
+  GenericDb.inTestTransaction GenericDb.Transaction
+    { GenericDb.begin = execute "BEGIN" >> void,
+      GenericDb.commit = execute "COMMIT" >> void,
+      GenericDb.rollback = execute "ROLLBACK" >> void,
+      GenericDb.rollbackAll = execute "ROLLBACK" >> void
+    }
+
+execute :: Text -> MySQL.SqlBackend -> IO [MySQL.Single Int]
+execute query conn =
+  MySQL.rawSql query []
+    |> (\reader -> runReaderT reader conn :: IO [MySQL.Single Int])
 
 -- |
 -- Check that we are ready to be take traffic.
