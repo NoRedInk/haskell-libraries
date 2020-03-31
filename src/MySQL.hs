@@ -39,13 +39,15 @@ import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
 import qualified Data.Coerce
-import Data.Either (Either (Right))
+import Data.IORef
 import qualified Data.Pool
 import Data.String (fromString)
 import qualified Data.Text
 import qualified Data.Text.Encoding
+import Data.Word (Word)
 import qualified Database.MySQL.Connection
 import qualified Database.Persist.MySQL as MySQL
+import qualified Debug
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
@@ -57,7 +59,7 @@ import qualified Platform
 import qualified Result
 import qualified Task
 import qualified Text
-import Prelude (IO, fromIntegral, pure, show)
+import Prelude (IO, error, fromIntegral, pure, show)
 
 type Connection = GenericDb.Connection MySQL.SqlBackend
 
@@ -67,6 +69,7 @@ connection settings =
   where
     acquire = do
       doAnything <- Platform.doAnythingHandler
+      transactionCount <- newIORef 0
       pool <-
         MySQL.createMySQLPool database size
           |> Control.Monad.Logger.runNoLoggingT
@@ -75,6 +78,7 @@ connection settings =
         ( GenericDb.Connection
             doAnything
             pool
+            (GenericDb.TransactionCount transactionCount)
             (toConnectionLogContext settings)
             (floor (micro * Settings.mysqlQueryTimeoutSeconds settings))
         )
@@ -90,11 +94,11 @@ connection settings =
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction =
-  GenericDb.transaction GenericDb.Transaction -- TODO add SAVEPOINT stuff
-    { GenericDb.begin = execute "BEGIN" >> void,
-      GenericDb.commit = execute "COMMIT" >> void,
-      GenericDb.rollback = execute "ROLLBACK" >> void,
-      GenericDb.rollbackAll = execute "ROLLBACK" >> void
+  GenericDb.transaction GenericDb.Transaction
+    { GenericDb.begin = begin,
+      GenericDb.commit = commit,
+      GenericDb.rollback = rollback,
+      GenericDb.rollbackAll = rollbackAll
     }
 
 -- | Run code in a transaction, then roll that transaction back.
@@ -107,16 +111,11 @@ inTestTransaction ::
   m a
 inTestTransaction =
   GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = execute "BEGIN" >> void,
-      GenericDb.commit = execute "COMMIT" >> void,
-      GenericDb.rollback = execute "ROLLBACK" >> void,
-      GenericDb.rollbackAll = execute "ROLLBACK" >> void
+    { GenericDb.begin = begin,
+      GenericDb.commit = commit,
+      GenericDb.rollback = rollback,
+      GenericDb.rollbackAll = rollbackAll
     }
-
-execute :: Text -> MySQL.SqlBackend -> IO [MySQL.Single Int]
-execute query conn =
-  MySQL.rawSql query []
-    |> (\reader -> runReaderT reader conn :: IO [MySQL.Single Int])
 
 -- |
 -- Check that we are ready to be take traffic.
@@ -218,23 +217,6 @@ toConnectInfo settings =
             database
             |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
             |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
-
--- |
--- The MySQL library expects inserts and updates to be run via the execute
--- function and so doesn't provide a QueryResults instance for `()`. Unfortunately
--- that doesn't play nice with the Postgres wrapper and its type checking, where
--- we run inserts via `doQuery` returning `()`. Hence the instance here
-instance MySQL.PersistField () where
-
-  toPersistValue () = MySQL.PersistNull
-
-  fromPersistValue _ = Right ()
-
-instance QueryResults () where
-
-  type FromRawSql () = MySQL.Single ()
-
-  toQueryResult _ = ()
 
 -- |
 -- The persistent library gives us back types matching the constaint `RawSql`.
@@ -411,3 +393,44 @@ instance
       )
 
   toQueryResult = Data.Coerce.coerce
+
+-- TRANSACTION HELPERS
+
+execute :: MySQL.SqlBackend -> Text -> IO ()
+execute conn query =
+  MySQL.rawExecute query []
+    |> (\reader -> runReaderT reader conn)
+
+addTransaction :: Word -> (Word, Word)
+addTransaction count =
+  (count + 1, count + 1)
+
+subTransaction :: Word -> (Word, Word)
+subTransaction count =
+  case count of
+    0 -> (0, error "mysqlTransaction: no transactions")
+    nonZero -> (nonZero - 1, nonZero - 1)
+
+-- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
+begin :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+begin (GenericDb.TransactionCount transactionCount) conn = do
+  current <- atomicModifyIORef' transactionCount addTransaction
+  void <| execute conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
+
+-- | Rollback to the most recent 'begin'.
+rollback :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+rollback (GenericDb.TransactionCount transactionCount) conn = do
+  current <- atomicModifyIORef' transactionCount subTransaction
+  void <| execute conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
+
+-- | Commit the most recent 'begin'.
+commit :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+commit (GenericDb.TransactionCount transactionCount) conn = do
+  current <- atomicModifyIORef' transactionCount subTransaction
+  void <| execute conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
+
+-- | Rollback all active 'begin's.
+rollbackAll :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+rollbackAll (GenericDb.TransactionCount transactionCount) conn = do
+  writeIORef transactionCount 0
+  void <| execute conn "ROLLBACK"

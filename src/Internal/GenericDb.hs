@@ -5,6 +5,7 @@ module Internal.GenericDb
     SingleOrPool (..),
     runTaskWithConnection,
     Transaction (Transaction, begin, commit, rollback, rollbackAll),
+    TransactionCount (..),
     transaction,
     inTestTransaction,
     readiness,
@@ -19,9 +20,11 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.Catch
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.IORef
 import qualified Data.Pool
 import Data.String (IsString)
 import qualified Data.Text
+import Data.Word (Word)
 import qualified Health
 import qualified Internal.Query as Query
 import qualified Oops
@@ -37,9 +40,13 @@ data Connection c
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool c,
+        transactionCount :: TransactionCount,
         logContext :: Platform.QueryConnectionInfo,
         timeoutMicroSeconds :: Int
       }
+
+data TransactionCount
+  = TransactionCount (IORef Word)
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -190,20 +197,20 @@ inTestTransaction ::
   m a
 inTestTransaction t@Transaction {begin} conn f =
   withConnectionUnsafe conn <| \c -> do
-    rollbackAllSafe t c
-    liftIO <| begin c
+    rollbackAllSafe t conn c
+    liftIO <| begin (transactionCount conn) c
     x <-
       f (conn {singleOrPool = Single c})
-        `Control.Monad.Catch.onException` rollbackAllSafe t c
-    rollbackAllSafe t c
+        `Control.Monad.Catch.onException` rollbackAllSafe t conn c
+    rollbackAllSafe t conn c
     pure x
 
 data Transaction conn
   = Transaction
-      { commit :: conn -> IO (),
-        begin :: conn -> IO (),
-        rollback :: conn -> IO (),
-        rollbackAll :: conn -> IO ()
+      { commit :: TransactionCount -> conn -> IO (),
+        begin :: TransactionCount -> conn -> IO (),
+        rollback :: TransactionCount -> conn -> IO (),
+        rollbackAll :: TransactionCount -> conn -> IO ()
       }
 
 -- |
@@ -220,29 +227,24 @@ transaction Transaction {commit, begin, rollback} conn f =
     start :: conn -> Task e conn
     start c =
       Platform.doAnything (doAnything conn) <| map Ok <| do
-        begin c
+        begin (transactionCount conn) c
         pure c
     end :: conn -> ExitCase a -> Task e ()
     end c =
       Platform.doAnything (doAnything conn) << map Ok
         << ( \exitCase ->
                case exitCase of
-                 ExitCaseSuccess _ -> commit c
-                 ExitCaseException _ -> rollback c
-                 ExitCaseAbort -> rollback c
+                 ExitCaseSuccess _ -> commit (transactionCount conn) c
+                 ExitCaseException _ -> rollback (transactionCount conn) c
+                 ExitCaseAbort -> rollback (transactionCount conn) c
            )
 
-rollbackAllSafe ::
-  forall conn m.
-  (MonadIO m) =>
-  Transaction conn ->
-  conn ->
-  m ()
-rollbackAllSafe Transaction {begin, rollbackAll} c =
+rollbackAllSafe :: forall conn m. (MonadIO m) => Transaction conn -> Connection conn -> conn -> m ()
+rollbackAllSafe Transaction {begin, rollbackAll} conn c =
   liftIO <| do
     -- Because calling `rollbackAllTransactions` when no transactions are
     -- running will result in a warning message in the log (even if tests
     -- pass), let's start by beginning a transaction, so that we alwas have
     -- at least one to kill.
-    begin c
-    rollbackAll c
+    begin (transactionCount conn) c
+    rollbackAll (transactionCount conn) c

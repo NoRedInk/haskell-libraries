@@ -38,6 +38,7 @@ import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Data.Acquire
 import Data.ByteString (ByteString)
+import Data.IORef
 import qualified Data.Pool
 import qualified Data.Text
 import qualified Data.Text.Encoding
@@ -81,6 +82,7 @@ connection settings =
   where
     acquire = do
       doAnything <- Platform.doAnythingHandler
+      transactionCount <- newIORef 0
       pool <-
         map GenericDb.Pool
           <| Data.Pool.createPool
@@ -93,6 +95,7 @@ connection settings =
         ( GenericDb.Connection
             doAnything
             pool
+            (GenericDb.TransactionCount transactionCount) -- Not actually used, the pg connection has it's own
             (toConnectionLogContext database)
             (floor (micro * Settings.pgQueryTimeoutSeconds settings))
         )
@@ -111,10 +114,10 @@ connection settings =
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction =
   GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = pgBegin,
-      GenericDb.commit = pgCommit,
-      GenericDb.rollback = pgRollback,
-      GenericDb.rollbackAll = pgRollbackAll
+    { GenericDb.begin = \_ -> pgBegin,
+      GenericDb.commit = \_ -> pgCommit,
+      GenericDb.rollback = \_ -> pgRollback,
+      GenericDb.rollbackAll = \_ -> pgRollbackAll
     }
 
 -- | Run code in a transaction, then roll that transaction back.
@@ -127,10 +130,10 @@ inTestTransaction ::
   m a
 inTestTransaction =
   GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = pgBegin,
-      GenericDb.commit = pgCommit,
-      GenericDb.rollback = pgRollback,
-      GenericDb.rollbackAll = pgRollbackAll
+    { GenericDb.begin = \_ -> pgBegin,
+      GenericDb.commit = \_ -> pgCommit,
+      GenericDb.rollback = \_ -> pgRollback,
+      GenericDb.rollbackAll = \_ -> pgRollbackAll
     }
 
 -- |
