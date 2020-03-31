@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
 -- Description : Helpers for running queries.
@@ -31,13 +32,14 @@ module MySQL
 where
 
 import Cherry.Prelude
-import Control.Monad.IO.Class (MonadIO)
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
+import Control.Monad.IO.Class (MonadIO)
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
 import qualified Data.Coerce
+import Data.Either (Either (Right))
 import qualified Data.Pool
 import Data.String (fromString)
 import qualified Data.Text
@@ -94,7 +96,6 @@ transaction =
       GenericDb.rollback = execute "ROLLBACK" >> void,
       GenericDb.rollbackAll = execute "ROLLBACK" >> void
     }
-
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
@@ -217,6 +218,23 @@ toConnectInfo settings =
             database
             |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
             |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+
+-- |
+-- The MySQL library expects inserts and updates to be run via the execute
+-- function and so doesn't provide a QueryResults instance for `()`. Unfortunately
+-- that doesn't play nice with the Postgres wrapper and its type checking, where
+-- we run inserts via `doQuery` returning `()`. Hence the instance here
+instance MySQL.PersistField () where
+
+  toPersistValue () = MySQL.PersistNull
+
+  fromPersistValue _ = Right ()
+
+instance QueryResults () where
+
+  type FromRawSql () = MySQL.Single ()
+
+  toQueryResult _ = ()
 
 -- |
 -- The persistent library gives us back types matching the constaint `RawSql`.
