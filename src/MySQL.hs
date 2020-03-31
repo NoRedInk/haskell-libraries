@@ -90,7 +90,7 @@ connection settings =
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction =
-  GenericDb.transaction GenericDb.Transaction
+  GenericDb.transaction GenericDb.Transaction -- TODO add SAVEPOINT stuff
     { GenericDb.begin = execute "BEGIN" >> void,
       GenericDb.commit = execute "COMMIT" >> void,
       GenericDb.rollback = execute "ROLLBACK" >> void,
