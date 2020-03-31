@@ -21,6 +21,7 @@ module MySQL
     Query.Error (..),
     Query.sql,
     doQuery,
+    doExecute,
     -- Handling transactions
     transaction,
     inTestTransaction,
@@ -39,7 +40,6 @@ import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
 import qualified Data.Coerce
-import Data.Either (Either (Right))
 import qualified Data.Pool
 import Data.String (fromString)
 import qualified Data.Text
@@ -179,6 +179,46 @@ runQuery query conn =
     |> Exception.tryAny
     |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
 
+doExecute ::
+  Connection ->
+  Query.Query () ->
+  (Result Query.Error () -> Task e a) ->
+  Task e a
+doExecute conn query handleResponse = do
+  withFrozenCallStack Log.info (Query.asMessage query) []
+  GenericDb.runTaskWithConnection conn (executeQuery query)
+    -- Handle the response before wrapping the operation in a context. This way,
+    -- if the response handling logic creates errors, those errors can inherit
+    -- context values like the query string.
+    |> intoResult
+    |> andThen handleResponse
+    |> Log.withContext "mysql-query" [Platform.queryContext queryInfo]
+  where
+    queryInfo = Platform.QueryInfo
+      { Platform.queryText = Log.mkSecret (Query.sqlString query),
+        Platform.queryTemplate = Query.quasiQuotedString query,
+        Platform.queryConn = GenericDb.logContext conn,
+        Platform.queryOperation = Query.sqlOperation query,
+        Platform.queryCollection = Query.queriedRelation query
+      }
+
+executeQuery ::
+  Query.Query () ->
+  MySQL.SqlBackend ->
+  IO (Result Query.Error ())
+executeQuery query conn =
+  query
+    |> Query.sqlString
+    -- We need this prefix on tables to allow compile-time checks of the query.
+    |> Text.replace "monolith." ""
+    |> Internal.anyToIn
+    |> Data.Text.unpack
+    |> fromString
+    |> (\query' -> MySQL.rawExecute query' [])
+    |> (\reader -> runReaderT reader conn)
+    |> Exception.tryAny
+    |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
+
 toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
 toConnectionLogContext settings =
   let connectionSettings = Settings.mysqlConnection settings
@@ -218,23 +258,6 @@ toConnectInfo settings =
             database
             |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
             |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
-
--- |
--- The MySQL library expects inserts and updates to be run via the execute
--- function and so doesn't provide a QueryResults instance for `()`. Unfortunately
--- that doesn't play nice with the Postgres wrapper and its type checking, where
--- we run inserts via `doQuery` returning `()`. Hence the instance here
-instance MySQL.PersistField () where
-
-  toPersistValue () = MySQL.PersistNull
-
-  fromPersistValue _ = Right ()
-
-instance QueryResults () where
-
-  type FromRawSql () = MySQL.Single ()
-
-  toQueryResult _ = ()
 
 -- |
 -- The persistent library gives us back types matching the constaint `RawSql`.
