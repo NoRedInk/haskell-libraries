@@ -20,7 +20,7 @@ module MySQL
     Query.Error (..),
     Query.sql,
     doQuery,
-    doExecute,
+    doCommand,
     -- Handling transactions
     transaction,
     inTestTransaction,
@@ -181,36 +181,35 @@ inTestTransaction =
 --
 
 -- |
--- For queries which return something.
+-- For SQL which returns something.
 doQuery :: (HasCallStack, QueryResults row) => Connection -> Query.Query row -> (Result Query.Error [row] -> Task e a) -> Task e a
-doQuery conn query handleResponse =
-  actuallyExecute conn query handleResponse runRawSql
+doQuery =
+  execute executeQuery
 
 -- |
--- For queries which do not return anything.
-doExecute :: HasCallStack => Connection -> Query.Query () -> (Result Query.Error () -> Task e a) -> Task e a
-doExecute conn query handleResponse =
-  actuallyExecute conn query handleResponse runRawExecute
+-- For SQL which does not return anything.
+doCommand :: HasCallStack => Connection -> Query.Query () -> (Result Query.Error () -> Task e a) -> Task e a
+doCommand =
+  execute executeCommand
 
-actuallyExecute :: HasCallStack => Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> (MySQL.SqlBackend -> Text -> IO result) -> Task e a
-actuallyExecute conn query handleResponse run =
+execute :: HasCallStack => (MySQL.SqlBackend -> Text -> IO result) -> Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> Task e a
+execute executeSql conn query handleResponse =
   let --
       queryAsText :: Text
       queryAsText =
-        query
-          |> Query.sqlString
+        Query.sqlString query
           -- We need this prefix on tables to allow compile-time checks of the query.
           |> Text.replace "monolith." ""
           |> Internal.anyToIn
       --
       runQuery backend = do
-        result <- attemptQuery run backend queryAsText
+        result <- attempt executeSql backend queryAsText
         let (GenericDb.TransactionCount transactionCount) = GenericDb.transactionCount conn
         currentCount <- readIORef transactionCount
         case (currentCount, result) of
           (0, Ok value) -> do
             -- If not currently inside a transaction and original query succeeded, then commit
-            result2 <- attemptQuery runRawExecute backend "COMMIT"
+            result2 <- attempt executeCommand backend "COMMIT"
             pure <| Result.map (always value) result2
           _ ->
             pure result
@@ -234,19 +233,19 @@ actuallyExecute conn query handleResponse run =
           |> andThen handleResponse
           |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
-attemptQuery :: (MySQL.SqlBackend -> Text -> IO result) -> MySQL.SqlBackend -> Text -> IO (Result Query.Error result)
-attemptQuery execute_ backend query = do
-  either <- Exception.tryAny (execute_ backend query)
+attempt :: (MySQL.SqlBackend -> Text -> IO result) -> MySQL.SqlBackend -> Text -> IO (Result Query.Error result)
+attempt executeSql backend query = do
+  either <- Exception.tryAny (executeSql backend query)
   pure <| Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
 
-runRawSql :: QueryResults row => MySQL.SqlBackend -> Text -> IO [row]
-runRawSql backend query =
+executeQuery :: QueryResults row => MySQL.SqlBackend -> Text -> IO [row]
+executeQuery backend query =
   MySQL.rawSql query []
     |> (\reader -> runReaderT reader backend)
     |> map (map toQueryResult)
 
-runRawExecute :: MySQL.SqlBackend -> Text -> IO ()
-runRawExecute backend query =
+executeCommand :: MySQL.SqlBackend -> Text -> IO ()
+executeCommand backend query =
   MySQL.rawExecute query []
     |> (\reader -> runReaderT reader backend)
 
@@ -268,25 +267,25 @@ subTransaction count =
 begin :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 begin (GenericDb.TransactionCount transactionCount) conn = do
   current <- atomicModifyIORef' transactionCount addTransaction
-  void <| runRawExecute conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
+  void <| executeCommand conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Rollback to the most recent 'begin'.
 rollback :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 rollback (GenericDb.TransactionCount transactionCount) conn = do
   current <- atomicModifyIORef' transactionCount subTransaction
-  void <| runRawExecute conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
+  void <| executeCommand conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Commit the most recent 'begin'.
 commit :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 commit (GenericDb.TransactionCount transactionCount) conn = do
   current <- atomicModifyIORef' transactionCount subTransaction
-  void <| runRawExecute conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
+  void <| executeCommand conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Rollback all active 'begin's.
 rollbackAll :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 rollbackAll (GenericDb.TransactionCount transactionCount) conn = do
   writeIORef transactionCount 0
-  void <| runRawExecute conn "ROLLBACK"
+  void <| executeCommand conn "ROLLBACK"
 
 --
 -- TYPE CLASSES
