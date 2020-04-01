@@ -132,19 +132,25 @@ readiness log conn =
 
 doQuery :: (HasCallStack, QueryResults row) => Connection -> Query.Query row -> (Result Query.Error [row] -> Task e a) -> Task e a
 doQuery conn query handleResponse =
-  actuallyExecute conn query handleResponse <| \backend query_ ->
-    MySQL.rawSql query_ []
-      |> (\reader -> runReaderT reader backend)
-      |> map (map toQueryResult)
+  actuallyExecute conn query handleResponse runRawSql
 
 doExecute :: HasCallStack => Connection -> Query.Query () -> (Result Query.Error () -> Task e a) -> Task e a
 doExecute conn query handleResponse =
-  actuallyExecute conn query handleResponse <| \backend query_ ->
-    MySQL.rawExecute query_ []
-      |> (\reader -> runReaderT reader backend)
+  actuallyExecute conn query handleResponse runRawExecute
+
+runRawSql :: QueryResults row => MySQL.SqlBackend -> Text -> IO [row]
+runRawSql backend query =
+  MySQL.rawSql query []
+    |> (\reader -> runReaderT reader backend)
+    |> map (map toQueryResult)
+
+runRawExecute :: MySQL.SqlBackend -> Text -> IO ()
+runRawExecute backend query =
+  MySQL.rawExecute query []
+    |> (\reader -> runReaderT reader backend)
 
 actuallyExecute :: HasCallStack => Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> (MySQL.SqlBackend -> Text -> IO result) -> Task e a
-actuallyExecute conn query handleResponse readQuery =
+actuallyExecute conn query handleResponse run =
   let --
       queryAsText :: Text
       queryAsText =
@@ -154,9 +160,17 @@ actuallyExecute conn query handleResponse readQuery =
           |> Text.replace "monolith." ""
           |> Internal.anyToIn
       --
-      tryQuery backend = do
-        either <- Exception.tryAny (readQuery backend queryAsText)
-        pure <| Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
+      runQuery backend = do
+        result <- attemptQuery run backend queryAsText
+        let (GenericDb.TransactionCount transactionCount) = GenericDb.transactionCount conn
+        currentCount <- readIORef transactionCount
+        case (currentCount, result) of
+          (0, Ok value) -> do
+            -- If not currently inside a transaction and original query succeeded, then commit
+            result2 <- attemptQuery runRawExecute backend "COMMIT"
+            pure <| Result.map (always value) result2
+          _ ->
+            pure result
       --
       infoForContext :: Platform.QueryInfo
       infoForContext = Platform.QueryInfo
@@ -168,7 +182,7 @@ actuallyExecute conn query handleResponse readQuery =
         }
    in do
         withFrozenCallStack Log.info (Query.asMessage query) []
-        GenericDb.runTaskWithConnection conn tryQuery
+        GenericDb.runTaskWithConnection conn runQuery
           -- Handle the response before wrapping the operation in a context. This way,
           -- if the response handling logic creates errors, those errors can inherit
           -- context values like the query string.
@@ -177,6 +191,10 @@ actuallyExecute conn query handleResponse readQuery =
           |> andThen handleResponse
           |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
+attemptQuery :: (MySQL.SqlBackend -> Text -> IO result) -> MySQL.SqlBackend -> Text -> IO (Result Query.Error result)
+attemptQuery execute_ backend query = do
+  either <- Exception.tryAny (execute_ backend query)
+  Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
 
 toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
 toConnectionLogContext settings =
