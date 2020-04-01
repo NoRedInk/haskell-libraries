@@ -260,7 +260,7 @@ addTransaction count =
 subTransaction :: Word -> (Word, Word)
 subTransaction count =
   case count of
-    0 -> (0, error "mysqlTransaction: no transactions")
+    0 -> (0, error "MySQL transaction: Trying to close transaction, but there is no transaction running.")
     nonZero -> (nonZero - 1, nonZero - 1)
 
 -- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
