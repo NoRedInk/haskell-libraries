@@ -90,32 +90,53 @@ connection settings =
     database = toConnectInfo settings
     micro = 1000 * 1000
 
--- |
--- Perform a database transaction.
-transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction =
-  GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = begin,
-      GenericDb.commit = commit,
-      GenericDb.rollback = rollback,
-      GenericDb.rollbackAll = rollbackAll
-    }
+--
+-- CONNECTION HELPERS
+--
 
--- | Run code in a transaction, then roll that transaction back.
---   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction ::
-  forall m a.
-  (MonadIO m, Exception.MonadCatch m) =>
-  Connection ->
-  (Connection -> m a) ->
-  m a
-inTestTransaction =
-  GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = begin,
-      GenericDb.commit = commit,
-      GenericDb.rollback = rollback,
-      GenericDb.rollbackAll = rollbackAll
-    }
+toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
+toConnectionLogContext settings =
+  let connectionSettings = Settings.mysqlConnection settings
+      database = Settings.unDatabase (Settings.database connectionSettings)
+   in case Settings.connection connectionSettings of
+        Settings.ConnectSocket socket ->
+          Platform.UnixSocket
+            Platform.MySQL
+            (Data.Text.pack (Settings.unSocket socket))
+            database
+        Settings.ConnectTcp host port ->
+          Platform.TcpSocket
+            Platform.MySQL
+            (Settings.unHost host)
+            (Data.Text.pack (show (Settings.unPort port)))
+            database
+
+toConnectInfo :: Settings.Settings -> MySQL.MySQLConnectInfo
+toConnectInfo settings =
+  let connectionSettings = Settings.mysqlConnection settings
+      database = Data.Text.Encoding.encodeUtf8 (Settings.unDatabase (Settings.database connectionSettings))
+      user = Data.Text.Encoding.encodeUtf8 (Settings.unUser (Settings.user connectionSettings))
+      password = Data.Text.Encoding.encodeUtf8 (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
+   in case Settings.connection connectionSettings of
+        Settings.ConnectSocket socket ->
+          MySQL.mkMySQLConnectInfo
+            (Settings.unSocket socket)
+            user
+            password
+            database
+            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+        Settings.ConnectTcp host port ->
+          MySQL.mkMySQLConnectInfo
+            (Data.Text.unpack (Settings.unHost host))
+            user
+            password
+            database
+            |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
+            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+
+--
+-- READINESS
+--
 
 -- |
 -- Check that we are ready to be take traffic.
@@ -130,24 +151,47 @@ readiness log conn =
       MySQL.rawSql q []
         |> (\reader -> runReaderT reader c)
 
+--
+-- TRANSACTIONS
+--
+
+-- |
+-- Perform a database transaction.
+transaction :: Connection -> (Connection -> Task e a) -> Task e a
+transaction =
+  GenericDb.transaction GenericDb.Transaction
+    { GenericDb.begin = begin,
+      GenericDb.commit = commit,
+      GenericDb.rollback = rollback,
+      GenericDb.rollbackAll = rollbackAll
+    }
+
+-- | Run code in a transaction, then roll that transaction back.
+--   Useful in tests that shouldn't leave anything behind in the DB.
+inTestTransaction :: forall m a. (MonadIO m, Exception.MonadCatch m) => Connection -> (Connection -> m a) -> m a
+inTestTransaction =
+  GenericDb.inTestTransaction GenericDb.Transaction
+    { GenericDb.begin = begin,
+      GenericDb.commit = commit,
+      GenericDb.rollback = rollback,
+      GenericDb.rollbackAll = rollbackAll
+    }
+
+--
+-- EXECUTE QUERIES
+--
+
+-- |
+-- For queries which return something.
 doQuery :: (HasCallStack, QueryResults row) => Connection -> Query.Query row -> (Result Query.Error [row] -> Task e a) -> Task e a
 doQuery conn query handleResponse =
   actuallyExecute conn query handleResponse runRawSql
 
+-- |
+-- For queries which do not return anything.
 doExecute :: HasCallStack => Connection -> Query.Query () -> (Result Query.Error () -> Task e a) -> Task e a
 doExecute conn query handleResponse =
   actuallyExecute conn query handleResponse runRawExecute
-
-runRawSql :: QueryResults row => MySQL.SqlBackend -> Text -> IO [row]
-runRawSql backend query =
-  MySQL.rawSql query []
-    |> (\reader -> runReaderT reader backend)
-    |> map (map toQueryResult)
-
-runRawExecute :: MySQL.SqlBackend -> Text -> IO ()
-runRawExecute backend query =
-  MySQL.rawExecute query []
-    |> (\reader -> runReaderT reader backend)
 
 actuallyExecute :: HasCallStack => Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> (MySQL.SqlBackend -> Text -> IO result) -> Task e a
 actuallyExecute conn query handleResponse run =
@@ -196,45 +240,58 @@ attemptQuery execute_ backend query = do
   either <- Exception.tryAny (execute_ backend query)
   Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
 
-toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
-toConnectionLogContext settings =
-  let connectionSettings = Settings.mysqlConnection settings
-      database = Settings.unDatabase (Settings.database connectionSettings)
-   in case Settings.connection connectionSettings of
-        Settings.ConnectSocket socket ->
-          Platform.UnixSocket
-            Platform.MySQL
-            (Data.Text.pack (Settings.unSocket socket))
-            database
-        Settings.ConnectTcp host port ->
-          Platform.TcpSocket
-            Platform.MySQL
-            (Settings.unHost host)
-            (Data.Text.pack (show (Settings.unPort port)))
-            database
+runRawSql :: QueryResults row => MySQL.SqlBackend -> Text -> IO [row]
+runRawSql backend query =
+  MySQL.rawSql query []
+    |> (\reader -> runReaderT reader backend)
+    |> map (map toQueryResult)
 
-toConnectInfo :: Settings.Settings -> MySQL.MySQLConnectInfo
-toConnectInfo settings =
-  let connectionSettings = Settings.mysqlConnection settings
-      database = Data.Text.Encoding.encodeUtf8 (Settings.unDatabase (Settings.database connectionSettings))
-      user = Data.Text.Encoding.encodeUtf8 (Settings.unUser (Settings.user connectionSettings))
-      password = Data.Text.Encoding.encodeUtf8 (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
-   in case Settings.connection connectionSettings of
-        Settings.ConnectSocket socket ->
-          MySQL.mkMySQLConnectInfo
-            (Settings.unSocket socket)
-            user
-            password
-            database
-            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
-        Settings.ConnectTcp host port ->
-          MySQL.mkMySQLConnectInfo
-            (Data.Text.unpack (Settings.unHost host))
-            user
-            password
-            database
-            |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
-            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+runRawExecute :: MySQL.SqlBackend -> Text -> IO ()
+runRawExecute backend query =
+  MySQL.rawExecute query []
+    |> (\reader -> runReaderT reader backend)
+
+--
+-- TRANSACTION HELPERS
+--
+
+addTransaction :: Word -> (Word, Word)
+addTransaction count =
+  (count + 1, count)
+
+subTransaction :: Word -> (Word, Word)
+subTransaction count =
+  case count of
+    0 -> (0, error "mysqlTransaction: no transactions")
+    nonZero -> (nonZero - 1, nonZero - 1)
+
+-- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
+begin :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+begin (GenericDb.TransactionCount transactionCount) conn = do
+  current <- atomicModifyIORef' transactionCount addTransaction
+  void <| rawExecute conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
+
+-- | Rollback to the most recent 'begin'.
+rollback :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+rollback (GenericDb.TransactionCount transactionCount) conn = do
+  current <- atomicModifyIORef' transactionCount subTransaction
+  void <| rawExecute conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
+
+-- | Commit the most recent 'begin'.
+commit :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+commit (GenericDb.TransactionCount transactionCount) conn = do
+  current <- atomicModifyIORef' transactionCount subTransaction
+  void <| rawExecute conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
+
+-- | Rollback all active 'begin's.
+rollbackAll :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
+rollbackAll (GenericDb.TransactionCount transactionCount) conn = do
+  writeIORef transactionCount 0
+  void <| rawExecute conn "ROLLBACK"
+
+--
+-- TYPE CLASSES
+--
 
 -- |
 -- The persistent library gives us back types matching the constaint `RawSql`.
@@ -411,44 +468,3 @@ instance
       )
 
   toQueryResult = Data.Coerce.coerce
-
--- TRANSACTION HELPERS
-
-execute :: MySQL.SqlBackend -> Text -> IO ()
-execute conn query =
-  MySQL.rawExecute query []
-    |> (\reader -> runReaderT reader conn)
-
-addTransaction :: Word -> (Word, Word)
-addTransaction count =
-  (count + 1, count)
-
-subTransaction :: Word -> (Word, Word)
-subTransaction count =
-  case count of
-    0 -> (0, error "mysqlTransaction: no transactions")
-    nonZero -> (nonZero - 1, nonZero - 1)
-
--- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
-begin :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
-begin (GenericDb.TransactionCount transactionCount) conn = do
-  current <- atomicModifyIORef' transactionCount addTransaction
-  void <| execute conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
-
--- | Rollback to the most recent 'begin'.
-rollback :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
-rollback (GenericDb.TransactionCount transactionCount) conn = do
-  current <- atomicModifyIORef' transactionCount subTransaction
-  void <| execute conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
-
--- | Commit the most recent 'begin'.
-commit :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
-commit (GenericDb.TransactionCount transactionCount) conn = do
-  current <- atomicModifyIORef' transactionCount subTransaction
-  void <| execute conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
-
--- | Rollback all active 'begin's.
-rollbackAll :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
-rollbackAll (GenericDb.TransactionCount transactionCount) conn = do
-  writeIORef transactionCount 0
-  void <| execute conn "ROLLBACK"
