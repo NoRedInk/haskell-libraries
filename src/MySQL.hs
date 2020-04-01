@@ -131,15 +131,35 @@ readiness log conn =
       MySQL.rawSql q []
         |> (\reader -> runReaderT reader c)
 
-doQuery ::
-  (HasCallStack, QueryResults row) =>
-  Connection ->
-  Query.Query row ->
-  (Result Query.Error [row] -> Task e a) ->
-  Task e a
-doQuery conn query handleResponse = do
+doQuery :: (HasCallStack, QueryResults row) => Connection -> Query.Query row -> (Result Query.Error [row] -> Task e a) -> Task e a
+doQuery conn query handleResponse =
+  executeQuery conn query handleResponse <| \backend query_ ->
+    MySQL.rawSql query_ []
+      |> (\reader -> runReaderT reader backend)
+      |> map (map toQueryResult)
+
+doExecute :: HasCallStack => Connection -> Query.Query () -> (Result Query.Error () -> Task e a) -> Task e a
+doExecute conn query handleResponse =
+  executeQuery conn query (handleResponse) <| \backend query_ ->
+    MySQL.rawExecute query_ []
+      |> (\reader -> runReaderT reader backend)
+
+executeQuery :: HasCallStack => Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> (MySQL.SqlBackend -> Text -> IO result) -> Task e a
+executeQuery conn query handleResponse readQuery =
+  let runQuery backend =
+        query
+          |> Query.sqlString
+          -- We need this prefix on tables to allow compile-time checks of the query.
+          |> Text.replace "monolith." ""
+          |> Internal.anyToIn
+          |> Data.Text.unpack
+          |> fromString
+          |> readQuery backend
+          |> Exception.tryAny
+          |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
+  in do
   withFrozenCallStack Log.info (Query.asMessage query) []
-  GenericDb.runTaskWithConnection conn (runQuery query)
+  GenericDb.runTaskWithConnection conn runQuery
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
     -- context values like the query string.
@@ -154,65 +174,6 @@ doQuery conn query handleResponse = do
         Platform.queryOperation = Query.sqlOperation query,
         Platform.queryCollection = Query.queriedRelation query
       }
-
-runQuery ::
-  (QueryResults row) =>
-  Query.Query row ->
-  MySQL.SqlBackend ->
-  IO (Result Query.Error [row])
-runQuery query conn =
-  query
-    |> Query.sqlString
-    -- We need this prefix on tables to allow compile-time checks of the query.
-    |> Text.replace "monolith." ""
-    |> Internal.anyToIn
-    |> Data.Text.unpack
-    |> fromString
-    |> (\query' -> MySQL.rawSql query' [])
-    |> (\reader -> runReaderT reader conn)
-    |> map (map toQueryResult)
-    |> Exception.tryAny
-    |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
-
-doExecute ::
-  Connection ->
-  Query.Query () ->
-  (Result Query.Error () -> Task e a) ->
-  Task e a
-doExecute conn query handleResponse = do
-  withFrozenCallStack Log.info (Query.asMessage query) []
-  GenericDb.runTaskWithConnection conn (executeQuery query)
-    -- Handle the response before wrapping the operation in a context. This way,
-    -- if the response handling logic creates errors, those errors can inherit
-    -- context values like the query string.
-    |> intoResult
-    |> andThen handleResponse
-    |> Log.withContext "mysql-query" [Platform.queryContext queryInfo]
-  where
-    queryInfo = Platform.QueryInfo
-      { Platform.queryText = Log.mkSecret (Query.sqlString query),
-        Platform.queryTemplate = Query.quasiQuotedString query,
-        Platform.queryConn = GenericDb.logContext conn,
-        Platform.queryOperation = Query.sqlOperation query,
-        Platform.queryCollection = Query.queriedRelation query
-      }
-
-executeQuery ::
-  Query.Query () ->
-  MySQL.SqlBackend ->
-  IO (Result Query.Error ())
-executeQuery query conn =
-  query
-    |> Query.sqlString
-    -- We need this prefix on tables to allow compile-time checks of the query.
-    |> Text.replace "monolith." ""
-    |> Internal.anyToIn
-    |> Data.Text.unpack
-    |> fromString
-    |> (\query' -> MySQL.rawExecute query' [])
-    |> (\reader -> runReaderT reader conn)
-    |> Exception.tryAny
-    |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
 
 intoResult :: Task e a -> Task e2 (Result e a)
 intoResult task =
