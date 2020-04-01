@@ -42,7 +42,6 @@ import qualified Data.Acquire
 import qualified Data.Coerce
 import Data.IORef
 import qualified Data.Pool
-import Data.String (fromString)
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import Data.Word (Word)
@@ -133,52 +132,51 @@ readiness log conn =
 
 doQuery :: (HasCallStack, QueryResults row) => Connection -> Query.Query row -> (Result Query.Error [row] -> Task e a) -> Task e a
 doQuery conn query handleResponse =
-  executeQuery conn query handleResponse <| \backend query_ ->
+  actuallyExecute conn query handleResponse <| \backend query_ ->
     MySQL.rawSql query_ []
       |> (\reader -> runReaderT reader backend)
       |> map (map toQueryResult)
 
 doExecute :: HasCallStack => Connection -> Query.Query () -> (Result Query.Error () -> Task e a) -> Task e a
 doExecute conn query handleResponse =
-  executeQuery conn query (handleResponse) <| \backend query_ ->
+  actuallyExecute conn query handleResponse <| \backend query_ ->
     MySQL.rawExecute query_ []
       |> (\reader -> runReaderT reader backend)
 
-executeQuery :: HasCallStack => Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> (MySQL.SqlBackend -> Text -> IO result) -> Task e a
-executeQuery conn query handleResponse readQuery =
-  let runQuery _ backend =
+actuallyExecute :: HasCallStack => Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> (MySQL.SqlBackend -> Text -> IO result) -> Task e a
+actuallyExecute conn query handleResponse readQuery =
+  let --
+      queryAsText :: Text
+      queryAsText =
         query
           |> Query.sqlString
           -- We need this prefix on tables to allow compile-time checks of the query.
           |> Text.replace "monolith." ""
           |> Internal.anyToIn
-          |> Data.Text.unpack
-          |> fromString
-          |> readQuery backend
-          |> Exception.tryAny
-          |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
-  in do
-  withFrozenCallStack Log.info (Query.asMessage query) []
-  GenericDb.runTaskWithConnection conn runQuery
-    -- Handle the response before wrapping the operation in a context. This way,
-    -- if the response handling logic creates errors, those errors can inherit
-    -- context values like the query string.
-    |> intoResult
-    |> andThen handleResponse
-    |> Log.withContext "mysql-query" [Platform.queryContext queryInfo]
-  where
-    queryInfo = Platform.QueryInfo
-      { Platform.queryText = Log.mkSecret (Query.sqlString query),
-        Platform.queryTemplate = Query.quasiQuotedString query,
-        Platform.queryConn = GenericDb.logContext conn,
-        Platform.queryOperation = Query.sqlOperation query,
-        Platform.queryCollection = Query.queriedRelation query
-      }
+      --
+      tryQuery _ backend = do
+        either <- Exception.tryAny (readQuery backend queryAsText)
+        pure <| Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
+      --
+      infoForContext :: Platform.QueryInfo
+      infoForContext = Platform.QueryInfo
+        { Platform.queryText = Log.mkSecret (Query.sqlString query),
+          Platform.queryTemplate = Query.quasiQuotedString query,
+          Platform.queryConn = GenericDb.logContext conn,
+          Platform.queryOperation = Query.sqlOperation query,
+          Platform.queryCollection = Query.queriedRelation query
+        }
+   in do
+        withFrozenCallStack Log.info (Query.asMessage query) []
+        GenericDb.runTaskWithConnection conn tryQuery
+          -- Handle the response before wrapping the operation in a context. This way,
+          -- if the response handling logic creates errors, those errors can inherit
+          -- context values like the query string.
+          |> Task.map Ok
+          |> Task.onError (Task.succeed << Err)
+          |> andThen handleResponse
+          |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
-intoResult :: Task e a -> Task e2 (Result e a)
-intoResult task =
-  map Ok task
-    |> Task.onError (Task.succeed << Err)
 
 toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
 toConnectionLogContext settings =
