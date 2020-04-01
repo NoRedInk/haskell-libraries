@@ -238,7 +238,7 @@ actuallyExecute conn query handleResponse run =
 attemptQuery :: (MySQL.SqlBackend -> Text -> IO result) -> MySQL.SqlBackend -> Text -> IO (Result Query.Error result)
 attemptQuery execute_ backend query = do
   either <- Exception.tryAny (execute_ backend query)
-  Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
+  pure <| Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
 
 runRawSql :: QueryResults row => MySQL.SqlBackend -> Text -> IO [row]
 runRawSql backend query =
@@ -269,25 +269,25 @@ subTransaction count =
 begin :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 begin (GenericDb.TransactionCount transactionCount) conn = do
   current <- atomicModifyIORef' transactionCount addTransaction
-  void <| rawExecute conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
+  void <| runRawExecute conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Rollback to the most recent 'begin'.
 rollback :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 rollback (GenericDb.TransactionCount transactionCount) conn = do
   current <- atomicModifyIORef' transactionCount subTransaction
-  void <| rawExecute conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
+  void <| runRawExecute conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Commit the most recent 'begin'.
 commit :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 commit (GenericDb.TransactionCount transactionCount) conn = do
   current <- atomicModifyIORef' transactionCount subTransaction
-  void <| rawExecute conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
+  void <| runRawExecute conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Rollback all active 'begin's.
 rollbackAll :: GenericDb.TransactionCount -> MySQL.SqlBackend -> IO ()
 rollbackAll (GenericDb.TransactionCount transactionCount) conn = do
   writeIORef transactionCount 0
-  void <| rawExecute conn "ROLLBACK"
+  void <| runRawExecute conn "ROLLBACK"
 
 --
 -- TYPE CLASSES
