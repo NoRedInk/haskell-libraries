@@ -60,7 +60,7 @@ data SingleOrPool c
     --   we need to insure several SQL statements happen on the same connection.
     Single c
 
-runTaskWithConnection :: Connection conn -> (TransactionCount -> conn -> IO (Result Query.Error a)) -> Task Query.Error a
+runTaskWithConnection :: Connection conn -> (conn -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
   let microseconds = timeoutMicroSeconds conn
       --
@@ -76,7 +76,7 @@ runTaskWithConnection conn action =
         Query.TimeoutAfterSeconds Query.ClientTimeout (fromIntegral microseconds / 10e6)
    in --
       withConnection conn <| \dbConnection ->
-        action (transactionCount conn) dbConnection
+        action dbConnection
           |> (if microseconds > 0 then withTimeout else identity)
           |> Platform.doAnything (doAnything conn)
 
@@ -130,7 +130,7 @@ withConnectionUnsafe Connection {singleOrPool} f =
 -- Check that we are ready to be take traffic.
 readiness :: IsString s => (conn -> s -> IO ()) -> Platform.LogHandler -> Connection conn -> IO Health.Status
 readiness runQuery log' conn =
-  let query _ c =
+  let query c =
         runQuery c "SELECT 1"
           |> Exception.tryAny
           |> map (Result.mapError toQueryError << eitherToResult)

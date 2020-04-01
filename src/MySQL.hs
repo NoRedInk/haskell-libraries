@@ -154,7 +154,7 @@ actuallyExecute conn query handleResponse readQuery =
           |> Text.replace "monolith." ""
           |> Internal.anyToIn
       --
-      tryQuery _ backend = do
+      tryQuery backend = do
         either <- Exception.tryAny (readQuery backend queryAsText)
         pure <| Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
       --
