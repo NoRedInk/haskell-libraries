@@ -146,7 +146,7 @@ doExecute conn query handleResponse =
 
 executeQuery :: HasCallStack => Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> (MySQL.SqlBackend -> Text -> IO result) -> Task e a
 executeQuery conn query handleResponse readQuery =
-  let runQuery backend =
+  let runQuery _ backend =
         query
           |> Query.sqlString
           -- We need this prefix on tables to allow compile-time checks of the query.

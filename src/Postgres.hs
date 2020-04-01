@@ -152,7 +152,7 @@ doQuery ::
   Task e a
 doQuery conn query handleResponse = do
   withFrozenCallStack Log.info (Query.asMessage query) []
-  let runQuery c =
+  let runQuery _ c =
         Query.runQuery query c
           |> Exception.try
           |> map (Result.mapError (fromPGError conn) << GenericDb.eitherToResult)
