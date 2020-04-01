@@ -155,11 +155,6 @@ doQuery conn query handleResponse = do
         Platform.queryCollection = Query.queriedRelation query
       }
 
-intoResult :: Task e a -> Task e2 (Result e a)
-intoResult task =
-  map Ok task
-    |> Task.onError (Task.succeed << Err)
-
 runQuery ::
   (QueryResults row) =>
   Query.Query row ->
@@ -218,6 +213,11 @@ executeQuery query conn =
     |> (\reader -> runReaderT reader conn)
     |> Exception.tryAny
     |> map (Result.mapError GenericDb.toQueryError << GenericDb.eitherToResult)
+
+intoResult :: Task e a -> Task e2 (Result e a)
+intoResult task =
+  map Ok task
+    |> Task.onError (Task.succeed << Err)
 
 toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
 toConnectionLogContext settings =
