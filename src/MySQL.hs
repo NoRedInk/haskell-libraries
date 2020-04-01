@@ -405,7 +405,7 @@ execute conn query =
 
 addTransaction :: Word -> (Word, Word)
 addTransaction count =
-  (count + 1, count + 1)
+  (count + 1, count)
 
 subTransaction :: Word -> (Word, Word)
 subTransaction count =
