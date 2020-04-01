@@ -151,32 +151,6 @@ readiness log conn =
         |> (\reader -> runReaderT reader c)
 
 --
--- TRANSACTIONS
---
-
--- |
--- Perform a database transaction.
-transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction =
-  GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = begin,
-      GenericDb.commit = commit,
-      GenericDb.rollback = rollback,
-      GenericDb.rollbackAll = rollbackAll
-    }
-
--- | Run code in a transaction, then roll that transaction back.
---   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: forall m a. (MonadIO m, Exception.MonadCatch m) => Connection -> (Connection -> m a) -> m a
-inTestTransaction =
-  GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = begin,
-      GenericDb.commit = commit,
-      GenericDb.rollback = rollback,
-      GenericDb.rollbackAll = rollbackAll
-    }
-
---
 -- EXECUTE QUERIES
 --
 
@@ -250,8 +224,30 @@ executeCommand backend query =
     |> (\reader -> runReaderT reader backend)
 
 --
--- TRANSACTION HELPERS
+-- TRANSACTIONS
 --
+
+-- |
+-- Perform a database transaction.
+transaction :: Connection -> (Connection -> Task e a) -> Task e a
+transaction =
+  GenericDb.transaction GenericDb.Transaction
+    { GenericDb.begin = begin,
+      GenericDb.commit = commit,
+      GenericDb.rollback = rollback,
+      GenericDb.rollbackAll = rollbackAll
+    }
+
+-- | Run code in a transaction, then roll that transaction back.
+--   Useful in tests that shouldn't leave anything behind in the DB.
+inTestTransaction :: forall m a. (MonadIO m, Exception.MonadCatch m) => Connection -> (Connection -> m a) -> m a
+inTestTransaction =
+  GenericDb.inTestTransaction GenericDb.Transaction
+    { GenericDb.begin = begin,
+      GenericDb.commit = commit,
+      GenericDb.rollback = rollback,
+      GenericDb.rollbackAll = rollbackAll
+    }
 
 addTransaction :: Word -> (Word, Word)
 addTransaction count =
