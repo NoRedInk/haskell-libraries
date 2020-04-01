@@ -62,19 +62,23 @@ data SingleOrPool c
 
 runTaskWithConnection :: Connection conn -> (conn -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
-  let withOptionalTimeout c =
-        let microseconds = timeoutMicroSeconds conn
-        in if microseconds > 0 then do
-          maybeResult <- System.Timeout.timeout (fromIntegral microseconds) (action c)
-          case maybeResult of
-            Nothing ->
-              let error_ = Query.TimeoutAfterSeconds Query.ClientTimeout (fromIntegral microseconds / 10e6)
-              in pure (Err error_)
-            Just result ->
-              pure result
-        else
-          action c
-   in withConnection conn (withOptionalTimeout >> Platform.doAnything (doAnything conn))
+  let microseconds = timeoutMicroSeconds conn
+      --
+      withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
+      withTimeout io = do
+        maybeResult <- System.Timeout.timeout (fromIntegral microseconds) io
+        case maybeResult of
+          Just result -> pure result
+          Nothing -> pure (Err timeoutError)
+      --
+      timeoutError :: Query.Error
+      timeoutError =
+        Query.TimeoutAfterSeconds Query.ClientTimeout (fromIntegral microseconds / 10e6)
+   in --
+      withConnection conn <| \dbConnection ->
+        action dbConnection
+          |> (if microseconds > 0 then withTimeout else identity)
+          |> Platform.doAnything (doAnything conn)
 
 --
 
@@ -126,7 +130,7 @@ withConnectionUnsafe Connection {singleOrPool} f =
 -- Check that we are ready to be take traffic.
 readiness :: IsString s => (conn -> s -> IO ()) -> Platform.LogHandler -> Connection conn -> IO Health.Status
 readiness runQuery log' conn =
-  let query c =
+  let query _ c =
         runQuery c "SELECT 1"
           |> Exception.tryAny
           |> map (Result.mapError toQueryError << eitherToResult)
