@@ -54,6 +54,10 @@ data SingleOrPool c
     --   we need to insure several SQL statements happen on the same connection.
     Single c
 
+--
+-- CONNECTION HELPERS
+--
+
 runTaskWithConnection :: Connection t conn -> (conn -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
   let microseconds = timeoutMicroSeconds conn
@@ -73,8 +77,6 @@ runTaskWithConnection conn action =
         action dbConnection
           |> (if microseconds > 0 then withTimeout else identity)
           |> Platform.doAnything (doAnything conn)
-
---
 
 -- | by default, queries pull a connection from the connection pool.
 --   For SQL transactions, we want all queries within the transaction to run
@@ -123,6 +125,10 @@ withConnectionUnsafe Connection {singleOrPool} func =
       liftIO (Data.Pool.putResource localPool c)
       pure x
     (Single c) -> func c
+
+--
+-- READINESS
+--
 
 -- |
 -- Check that we are ready to be take traffic.
@@ -176,18 +182,9 @@ handleError connectionString err = do
   Exception.displayException err
     |> System.Exit.die
 
--- | Run code in a transaction, then roll that transaction back.
---   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: forall t conn m a. (MonadIO m, Exception.MonadCatch m) => Transaction t conn -> Connection t conn -> (Connection t conn -> m a) -> m a
-inTestTransaction transaction_@Transaction {begin} conn func =
-  withConnectionUnsafe conn <| \c -> do
-    rollbackAllSafe transaction_ conn c
-    liftIO <| begin (transactionCount conn) c
-    let singleConn = conn {singleOrPool = Single c}
-    -- All queries in a transactions must run on the same thread.
-    x <- func singleConn `Control.Monad.Catch.onException` rollbackAllSafe transaction_ conn c
-    rollbackAllSafe transaction_ conn c
-    pure x
+--
+-- TRANSACTIONS
+--
 
 data Transaction t conn
   = Transaction
@@ -226,6 +223,19 @@ transaction Transaction {commit, begin, rollback} conn func =
    in withConnection conn <| \c ->
         Platform.generalBracket (start c) end (setSingle >> func)
           |> map Tuple.first
+
+-- | Run code in a transaction, then roll that transaction back.
+--   Useful in tests that shouldn't leave anything behind in the DB.
+inTestTransaction :: forall t conn m a. (MonadIO m, Exception.MonadCatch m) => Transaction t conn -> Connection t conn -> (Connection t conn -> m a) -> m a
+inTestTransaction transaction_@Transaction {begin} conn func =
+  withConnectionUnsafe conn <| \c -> do
+    rollbackAllSafe transaction_ conn c
+    liftIO <| begin (transactionCount conn) c
+    let singleConn = conn {singleOrPool = Single c}
+    -- All queries in a transactions must run on the same thread.
+    x <- func singleConn `Control.Monad.Catch.onException` rollbackAllSafe transaction_ conn c
+    rollbackAllSafe transaction_ conn c
+    pure x
 
 rollbackAllSafe :: forall t conn m. (MonadIO m) => Transaction t conn -> Connection t conn -> conn -> m ()
 rollbackAllSafe Transaction {begin, rollbackAll} conn c =
