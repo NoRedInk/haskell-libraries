@@ -38,7 +38,6 @@ import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Data.Acquire
 import Data.ByteString (ByteString)
-import Data.IORef
 import qualified Data.Pool
 import qualified Data.Text
 import qualified Data.Text.Encoding
@@ -74,7 +73,7 @@ import qualified Result
 import qualified Task
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
-type Connection = GenericDb.Connection PGConnection
+type Connection = GenericDb.Connection () PGConnection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
@@ -82,7 +81,6 @@ connection settings =
   where
     acquire = do
       doAnything <- Platform.doAnythingHandler
-      transactionCount <- newIORef 0
       pool <-
         map GenericDb.Pool
           <| Data.Pool.createPool
@@ -95,7 +93,7 @@ connection settings =
         ( GenericDb.Connection
             doAnything
             pool
-            (GenericDb.TransactionCount transactionCount) -- Not actually used, the pg connection has it's own
+            ()
             (toConnectionLogContext database)
             (floor (micro * Settings.pgQueryTimeoutSeconds settings))
         )

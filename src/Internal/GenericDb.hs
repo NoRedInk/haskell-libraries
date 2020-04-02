@@ -5,7 +5,6 @@ module Internal.GenericDb
     SingleOrPool (..),
     runTaskWithConnection,
     Transaction (Transaction, begin, commit, rollback, rollbackAll),
-    TransactionCount (..),
     transaction,
     inTestTransaction,
     readiness,
@@ -20,11 +19,9 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.Catch
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.IORef
 import qualified Data.Pool
 import Data.String (IsString)
 import qualified Data.Text
-import Data.Word (Word)
 import qualified Health
 import qualified Internal.Query as Query
 import qualified Oops
@@ -36,17 +33,14 @@ import qualified Task
 import qualified Tuple
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
-data Connection c
+data Connection t c
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool c,
-        transactionCount :: TransactionCount,
+        transactionCount :: t,
         logContext :: Platform.QueryConnectionInfo,
         timeoutMicroSeconds :: Int
       }
-
-data TransactionCount
-  = TransactionCount (IORef Word)
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -60,7 +54,7 @@ data SingleOrPool c
     --   we need to insure several SQL statements happen on the same connection.
     Single c
 
-runTaskWithConnection :: Connection conn -> (conn -> IO (Result Query.Error a)) -> Task Query.Error a
+runTaskWithConnection :: Connection t conn -> (conn -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
   let microseconds = timeoutMicroSeconds conn
       --
@@ -86,7 +80,7 @@ runTaskWithConnection conn action =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Connection conn -> (conn -> Task e a) -> Task e a
+withConnection :: Connection t conn -> (conn -> Task e a) -> Task e a
 withConnection Connection {doAnything, singleOrPool} func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
@@ -120,7 +114,7 @@ withConnection Connection {doAnything, singleOrPool} func =
 --   useful (reason: `PropertyT` does not implement a `MonadBaseControl IO a`
 --   instance). The trade-off is that this function isn't quite as safe, and has
 --   a small chance to leek database connections. For tests that seems okay.
-withConnectionUnsafe :: (MonadIO m, Exception.MonadCatch m) => Connection conn -> (conn -> m a) -> m a
+withConnectionUnsafe :: (MonadIO m, Exception.MonadCatch m) => Connection t conn -> (conn -> m a) -> m a
 withConnectionUnsafe Connection {singleOrPool} func =
   case singleOrPool of
     (Pool pool) -> do
@@ -132,7 +126,7 @@ withConnectionUnsafe Connection {singleOrPool} func =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: IsString s => (conn -> s -> IO ()) -> Platform.LogHandler -> Connection conn -> IO Health.Status
+readiness :: IsString s => (conn -> s -> IO ()) -> Platform.LogHandler -> Connection t conn -> IO Health.Status
 readiness runQuery log' conn =
   let query c =
         runQuery c "SELECT 1"
@@ -184,7 +178,7 @@ handleError connectionString err = do
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: forall conn m a. (MonadIO m, Exception.MonadCatch m) => Transaction conn -> Connection conn -> (Connection conn -> m a) -> m a
+inTestTransaction :: forall t conn m a. (MonadIO m, Exception.MonadCatch m) => Transaction t conn -> Connection t conn -> (Connection t conn -> m a) -> m a
 inTestTransaction transaction_@Transaction {begin} conn func =
   withConnectionUnsafe conn <| \c -> do
     rollbackAllSafe transaction_ conn c
@@ -195,17 +189,17 @@ inTestTransaction transaction_@Transaction {begin} conn func =
     rollbackAllSafe transaction_ conn c
     pure x
 
-data Transaction conn
+data Transaction t conn
   = Transaction
-      { commit :: TransactionCount -> conn -> IO (),
-        begin :: TransactionCount -> conn -> IO (),
-        rollback :: TransactionCount -> conn -> IO (),
-        rollbackAll :: TransactionCount -> conn -> IO ()
+      { commit :: t -> conn -> IO (),
+        begin :: t -> conn -> IO (),
+        rollback :: t -> conn -> IO (),
+        rollbackAll :: t -> conn -> IO ()
       }
 
 -- |
 -- Perform a database transaction.
-transaction :: forall conn e a. Transaction conn -> Connection conn -> (Connection conn -> Task e a) -> Task e a
+transaction :: forall t conn e a. Transaction t conn -> Connection t conn -> (Connection t conn -> Task e a) -> Task e a
 transaction Transaction {commit, begin, rollback} conn func =
   let start :: conn -> Task x conn
       start c =
@@ -225,7 +219,7 @@ transaction Transaction {commit, begin, rollback} conn func =
       perform =
         map Ok >> Platform.doAnything (doAnything conn)
       --
-      setSingle :: conn -> Connection conn
+      setSingle :: conn -> Connection t conn
       setSingle c =
         -- All queries in a transactions must run on the same thread.
         conn {singleOrPool = Single c}
@@ -233,7 +227,7 @@ transaction Transaction {commit, begin, rollback} conn func =
         Platform.generalBracket (start c) end (setSingle >> func)
           |> map Tuple.first
 
-rollbackAllSafe :: forall conn m. (MonadIO m) => Transaction conn -> Connection conn -> conn -> m ()
+rollbackAllSafe :: forall t conn m. (MonadIO m) => Transaction t conn -> Connection t conn -> conn -> m ()
 rollbackAllSafe Transaction {begin, rollbackAll} conn c =
   liftIO <| do
     -- Because calling `rollbackAllTransactions` when no transactions are
