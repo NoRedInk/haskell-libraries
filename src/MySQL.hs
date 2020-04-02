@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -149,13 +150,13 @@ readiness log conn =
 --
 -- EXECUTE QUERIES
 --
-class MySqlQueryable query where
-  doQuery :: Connection -> Query.Query query -> (Result Query.Error [query] -> Task e a) -> Task e a
+class MySqlQueryable query result | result -> query where
+  doQuery :: Connection -> Query.Query query -> (Result Query.Error result -> Task e a) -> Task e a
 
-instance QueryResults row => MySqlQueryable row where
+instance QueryResults row => MySqlQueryable row [row] where
   doQuery = execute executeQuery
 
-instance MySqlQueryable () where
+instance MySqlQueryable () () where
   doQuery = execute executeCommand
 
 execute :: HasCallStack => (MySQL.SqlBackend -> Text -> IO result) -> Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> Task e a
@@ -210,11 +211,10 @@ executeQuery backend query =
     |> (\reader -> runReaderT reader backend)
     |> map (map toQueryResult)
 
-executeCommand :: MySQL.SqlBackend -> Text -> IO [()]
+executeCommand :: MySQL.SqlBackend -> Text -> IO ()
 executeCommand backend query =
   MySQL.rawExecute query []
     |> (\reader -> runReaderT reader backend)
-    |> map (\() -> [()])
 
 --
 -- TRANSACTIONS
