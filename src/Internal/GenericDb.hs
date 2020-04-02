@@ -190,7 +190,7 @@ inTestTransaction transaction@Transaction {begin} conn func =
     rollbackAllSafe transaction conn c
     liftIO <| begin (transactionCount conn) c
     let singleConn = conn {singleOrPool = Single c}
-        -- ^ All queries in a transactions must run on the same thread.
+    -- All queries in a transactions must run on the same thread.
     x <- func singleConn `Control.Monad.Catch.onException` rollbackAllSafe transaction conn c
     rollbackAllSafe transaction conn c
     pure x
@@ -215,8 +215,8 @@ transaction Transaction {commit, begin, rollback} conn func =
       --
       end :: conn -> ExitCase b -> Task x ()
       end c exitCase =
-        perform <|
-          case exitCase of
+        perform
+          <| case exitCase of
             ExitCaseSuccess _ -> commit (transactionCount conn) c
             ExitCaseException _ -> rollback (transactionCount conn) c
             ExitCaseAbort -> rollback (transactionCount conn) c
@@ -229,10 +229,9 @@ transaction Transaction {commit, begin, rollback} conn func =
       setSingle c =
         -- All queries in a transactions must run on the same thread.
         conn {singleOrPool = Single c}
-  in
-  withConnection conn <| \c ->
-    Platform.generalBracket (start c) end (setSingle >> func)
-      |> map Tuple.first
+   in withConnection conn <| \c ->
+        Platform.generalBracket (start c) end (setSingle >> func)
+          |> map Tuple.first
 
 rollbackAllSafe :: forall conn m. (MonadIO m) => Transaction conn -> Connection conn -> conn -> m ()
 rollbackAllSafe Transaction {begin, rollbackAll} conn c =
