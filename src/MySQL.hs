@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- |
 -- Description : Helpers for running queries.
@@ -20,7 +21,6 @@ module MySQL
     Query.Error (..),
     Query.sql,
     doQuery,
-    doCommand,
     -- Handling transactions
     transaction,
     inTestTransaction,
@@ -144,24 +144,19 @@ readiness log conn =
   let executeSql :: MySQL.SqlBackend -> Text -> IO ()
       executeSql backend query =
         void (executeQuery backend query :: IO [MySQL.Single Int])
-  in
-  Health.mkCheck "mysql" (GenericDb.readiness executeSql log conn)
+   in Health.mkCheck "mysql" (GenericDb.readiness executeSql log conn)
 
 --
 -- EXECUTE QUERIES
 --
+class MySqlQueryable query where
+  doQuery :: Connection -> Query.Query query -> (Result Query.Error [query] -> Task e a) -> Task e a
 
--- |
--- For SQL which returns something.
-doQuery :: (HasCallStack, QueryResults row) => Connection -> Query.Query row -> (Result Query.Error [row] -> Task e a) -> Task e a
-doQuery =
-  execute executeQuery
+instance QueryResults row => MySqlQueryable row where
+  doQuery = execute executeQuery
 
--- |
--- For SQL which does not return anything.
-doCommand :: HasCallStack => Connection -> Query.Query () -> (Result Query.Error () -> Task e a) -> Task e a
-doCommand =
-  execute executeCommand
+instance MySqlQueryable () where
+  doQuery = execute executeCommand
 
 execute :: HasCallStack => (MySQL.SqlBackend -> Text -> IO result) -> Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> Task e a
 execute executeSql conn query handleResponse =
@@ -215,10 +210,11 @@ executeQuery backend query =
     |> (\reader -> runReaderT reader backend)
     |> map (map toQueryResult)
 
-executeCommand :: MySQL.SqlBackend -> Text -> IO ()
+executeCommand :: MySQL.SqlBackend -> Text -> IO [()]
 executeCommand backend query =
   MySQL.rawExecute query []
     |> (\reader -> runReaderT reader backend)
+    |> map (\() -> [()])
 
 --
 -- TRANSACTIONS
