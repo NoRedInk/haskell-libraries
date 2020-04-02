@@ -120,19 +120,17 @@ withConnection Connection {doAnything, singleOrPool} func =
 --   useful (reason: `PropertyT` does not implement a `MonadBaseControl IO a`
 --   instance). The trade-off is that this function isn't quite as safe, and has
 --   a small chance to leek database connections. For tests that seems okay.
-withConnectionUnsafe ::
-  (MonadIO m, Exception.MonadCatch m) => Connection conn -> (conn -> m a) -> m a
-withConnectionUnsafe Connection {singleOrPool} f =
+withConnectionUnsafe :: (MonadIO m, Exception.MonadCatch m) => Connection conn -> (conn -> m a) -> m a
+withConnectionUnsafe Connection {singleOrPool} func =
   case singleOrPool of
     (Pool pool) -> do
-      (c, localPool) <- liftIO <| Data.Pool.takeResource pool
+      (c, localPool) <- liftIO (Data.Pool.takeResource pool)
       x <-
-        Data.Pool.destroyResource pool localPool c
-          |> liftIO
+        liftIO (Data.Pool.destroyResource pool localPool c)
           |> Control.Monad.Catch.onException (f c)
       liftIO (Data.Pool.putResource localPool c)
       pure x
-    (Single c) -> f c
+    (Single c) -> func c
 
 -- |
 -- Check that we are ready to be take traffic.
