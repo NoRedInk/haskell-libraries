@@ -185,14 +185,14 @@ handleError connectionString err = do
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: forall conn m a. (MonadIO m, Exception.MonadCatch m) => Transaction conn -> Connection conn -> (Connection conn -> m a) -> m a
-inTestTransaction transaction@Transaction {begin} conn func =
+inTestTransaction transaction_@Transaction {begin} conn func =
   withConnectionUnsafe conn <| \c -> do
-    rollbackAllSafe transaction conn c
+    rollbackAllSafe transaction_ conn c
     liftIO <| begin (transactionCount conn) c
     let singleConn = conn {singleOrPool = Single c}
     -- All queries in a transactions must run on the same thread.
-    x <- func singleConn `Control.Monad.Catch.onException` rollbackAllSafe transaction conn c
-    rollbackAllSafe transaction conn c
+    x <- func singleConn `Control.Monad.Catch.onException` rollbackAllSafe transaction_ conn c
+    rollbackAllSafe transaction_ conn c
     pure x
 
 data Transaction conn
