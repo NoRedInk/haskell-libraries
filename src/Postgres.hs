@@ -73,7 +73,7 @@ import qualified Result
 import qualified Task
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
-type Connection = GenericDb.Connection () PGConnection
+type Connection = GenericDb.Connection PGConnection PGConnection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
@@ -93,7 +93,7 @@ connection settings =
         ( GenericDb.Connection
             doAnything
             pool
-            ()
+            identity
             (toConnectionLogContext database)
             (floor (micro * Settings.pgQueryTimeoutSeconds settings))
         )
@@ -112,10 +112,10 @@ connection settings =
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction =
   GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = \_ -> pgBegin,
-      GenericDb.commit = \_ -> pgCommit,
-      GenericDb.rollback = \_ -> pgRollback,
-      GenericDb.rollbackAll = \_ -> pgRollbackAll
+    { GenericDb.begin = pgBegin,
+      GenericDb.commit = pgCommit,
+      GenericDb.rollback = pgRollback,
+      GenericDb.rollbackAll = pgRollbackAll
     }
 
 -- | Run code in a transaction, then roll that transaction back.
@@ -128,10 +128,10 @@ inTestTransaction ::
   m a
 inTestTransaction =
   GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = \_ -> pgBegin,
-      GenericDb.commit = \_ -> pgCommit,
-      GenericDb.rollback = \_ -> pgRollback,
-      GenericDb.rollbackAll = \_ -> pgRollbackAll
+    { GenericDb.begin = pgBegin,
+      GenericDb.commit = pgCommit,
+      GenericDb.rollback = pgRollback,
+      GenericDb.rollbackAll = pgRollbackAll
     }
 
 -- |

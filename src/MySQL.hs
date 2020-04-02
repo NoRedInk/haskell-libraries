@@ -61,7 +61,7 @@ import qualified Task
 import qualified Text
 import Prelude (IO, error, fromIntegral, pure, show)
 
-type Connection = GenericDb.Connection TransactionCount MySQL.SqlBackend
+type Connection = GenericDb.Connection (TransactionCount, MySQL.SqlBackend) MySQL.SqlBackend
 
 data TransactionCount
   = TransactionCount (IORef Word)
@@ -81,7 +81,7 @@ connection settings =
         ( GenericDb.Connection
             doAnything
             pool
-            (TransactionCount transactionCount)
+            (\c -> (TransactionCount transactionCount, c))
             (toConnectionLogContext settings)
             (floor (micro * Settings.mysqlQueryTimeoutSeconds settings))
         )
@@ -145,8 +145,8 @@ toConnectInfo settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  let executeSql :: MySQL.SqlBackend -> Text -> IO ()
-      executeSql backend query =
+  let executeSql :: ( TransactionCount, MySQL.SqlBackend) -> Text -> IO ()
+      executeSql (_, backend) query =
         void (executeQuery backend query :: IO [MySQL.Single Int])
    in Health.mkCheck "mysql" (GenericDb.readiness executeSql log conn)
 
@@ -172,9 +172,8 @@ execute executeSql conn query handleResponse =
           |> Text.replace "monolith." ""
           |> Internal.anyToIn
       --
-      runQuery backend = do
+      runQuery (TransactionCount transactionCount, backend) = do
         result <- attempt executeSql backend queryAsText
-        let (TransactionCount transactionCount) = GenericDb.transactionCount conn
         currentCount <- readIORef transactionCount
         case (currentCount, result) of
           (0, Ok value) -> do
@@ -256,26 +255,26 @@ subTransaction count =
     nonZero -> (nonZero - 1, nonZero - 1)
 
 -- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
-begin :: TransactionCount -> MySQL.SqlBackend -> IO ()
-begin (TransactionCount transactionCount) conn = do
+begin :: (TransactionCount, MySQL.SqlBackend) -> IO ()
+begin (TransactionCount transactionCount, conn) = do
   current <- atomicModifyIORef' transactionCount addTransaction
   void <| executeCommand conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Rollback to the most recent 'begin'.
-rollback :: TransactionCount -> MySQL.SqlBackend -> IO ()
-rollback (TransactionCount transactionCount) conn = do
+rollback :: (TransactionCount, MySQL.SqlBackend) -> IO ()
+rollback (TransactionCount transactionCount, conn) = do
   current <- atomicModifyIORef' transactionCount subTransaction
   void <| executeCommand conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Commit the most recent 'begin'.
-commit :: TransactionCount -> MySQL.SqlBackend -> IO ()
-commit (TransactionCount transactionCount) conn = do
+commit :: (TransactionCount, MySQL.SqlBackend) -> IO ()
+commit (TransactionCount transactionCount, conn) = do
   current <- atomicModifyIORef' transactionCount subTransaction
   void <| executeCommand conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
 
 -- | Rollback all active 'begin's.
-rollbackAll :: TransactionCount -> MySQL.SqlBackend -> IO ()
-rollbackAll (TransactionCount transactionCount) conn = do
+rollbackAll :: (TransactionCount, MySQL.SqlBackend) -> IO ()
+rollbackAll (TransactionCount transactionCount, conn) = do
   writeIORef transactionCount 0
   void <| executeCommand conn "ROLLBACK"
 
