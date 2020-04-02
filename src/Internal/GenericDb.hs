@@ -87,24 +87,32 @@ runTaskWithConnection conn action =
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
 withConnection :: Connection conn -> (conn -> Task e a) -> Task e a
-withConnection Connection {doAnything, singleOrPool} f =
-  case singleOrPool of
-    (Single c) -> f c
-    (Pool pool) -> map Tuple.first <| Platform.generalBracket acquire release (f << Tuple.first)
-      where
-        acquire =
-          Data.Pool.takeResource pool
-            |> map Ok
-            |> Platform.doAnything doAnything
-        release (c, localPool) =
-          Platform.doAnything doAnything << map Ok
-            << ( \exitCase ->
-                   case exitCase of
-                     ExitCaseSuccess _ -> Data.Pool.putResource localPool c
-                     ExitCaseException _ ->
-                       Data.Pool.destroyResource pool localPool c
-                     ExitCaseAbort -> Data.Pool.destroyResource pool localPool c
-               )
+withConnection Connection {doAnything, singleOrPool} func =
+  let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
+      acquire pool =
+        perform
+          <| Data.Pool.takeResource pool
+      --
+      release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> ExitCase x -> Task y ()
+      release pool (c, localPool) exitCase =
+        perform
+          <| case exitCase of
+            ExitCaseSuccess _ ->
+              Data.Pool.putResource localPool c
+            ExitCaseException _ ->
+              Data.Pool.destroyResource pool localPool c
+            ExitCaseAbort ->
+              Data.Pool.destroyResource pool localPool c
+      --
+      perform :: IO a -> Task x a
+      perform =
+        map Ok >> Platform.doAnything doAnything
+   in case singleOrPool of
+        (Single c) ->
+          func c
+        (Pool pool) ->
+          Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
+            |> map Tuple.first
 
 -- | A version of `withConnection` that doesn't use `Data.Pool.withResource`.
 --   This has the advantage it doesn't put a `MonadBaseControl IO m` constraint
