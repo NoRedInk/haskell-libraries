@@ -7,7 +7,9 @@ library:
   - bytestring
   - base
   - cherry-core
+  - env-parser
   - hedis
+  - resourcet
   - text
   exposed-modules:
   - Redis
