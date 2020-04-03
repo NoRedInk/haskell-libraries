@@ -63,7 +63,7 @@ import Prelude (IO, error, fromIntegral, pure, show)
 
 type Connection = GenericDb.Connection (TransactionCount, MySQL.SqlBackend) MySQL.SqlBackend
 
-data TransactionCount
+newtype TransactionCount
   = TransactionCount (IORef Word)
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
