@@ -15,6 +15,7 @@ module MySQL.Settings
     MysqlPoolSize (MysqlPoolSize, unMysqlPoolSize),
     decoder,
     defaultSettings,
+    defaultConnectionSettings,
   )
 where
 
