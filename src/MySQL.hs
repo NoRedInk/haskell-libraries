@@ -145,7 +145,7 @@ toConnectInfo settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  let executeSql :: ( TransactionCount, MySQL.SqlBackend) -> Text -> IO ()
+  let executeSql :: (TransactionCount, MySQL.SqlBackend) -> Text -> IO ()
       executeSql (_, backend) query =
         void (executeQuery backend query :: IO [MySQL.Single Int])
    in Health.mkCheck "mysql" (GenericDb.readiness executeSql log conn)
