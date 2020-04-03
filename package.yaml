@@ -36,6 +36,7 @@ dependencies:
 library:
   exposed-modules:
   - MySQL
+  - MySQL.Settings
   - Postgres
   - DatabaseSpec
   source-dirs: src
