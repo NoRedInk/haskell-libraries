@@ -1,0 +1,15 @@
+<<: !include ../package-yaml-support/base-package.yaml
+name: redis
+synopsis: Redis helper for NRI code
+library:
+  dependencies: &dependencies
+  - aeson
+  - bytestring
+  - base
+  - cherry-core
+  - hedis
+  - text
+  exposed-modules:
+  - Redis
+  source-dirs:
+  - src
