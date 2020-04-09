@@ -275,8 +275,13 @@ commit (TransactionCount transactionCount, conn) = do
 -- | Rollback all active 'begin's.
 rollbackAll :: (TransactionCount, MySQL.SqlBackend) -> IO ()
 rollbackAll (TransactionCount transactionCount, conn) = do
-  writeIORef transactionCount 0
-  void <| executeCommand conn "ROLLBACK"
+  current <- readIORef transactionCount
+  if current == 0
+    then pure ()
+    else do
+      rollback (TransactionCount transactionCount, conn)
+      rollbackAll (TransactionCount transactionCount, conn)
+
 
 --
 -- TYPE CLASSES
