@@ -282,7 +282,6 @@ rollbackAll (TransactionCount transactionCount, conn) = do
       rollback (TransactionCount transactionCount, conn)
       rollbackAll (TransactionCount transactionCount, conn)
 
-
 --
 -- TYPE CLASSES
 --
