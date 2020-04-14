@@ -2,7 +2,6 @@ module Redis.Real where
 
 import Cherry.Prelude
 import qualified Control.Monad.Catch
-import Control.Monad.IO.Class (liftIO)
 import qualified Data.Acquire
 import qualified Data.ByteString
 import qualified Data.Text.Encoding
@@ -10,7 +9,6 @@ import qualified Database.Redis
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
-import qualified Task
 import Prelude (Either (Left, Right), fromIntegral, fst, pure)
 
 handler :: Settings.Settings -> Data.Acquire.Acquire Internal.Handler

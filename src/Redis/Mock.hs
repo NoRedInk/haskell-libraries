@@ -8,7 +8,7 @@ import Data.IORef
 import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
-import Prelude (pure, snd)
+import Prelude (pure)
 
 handler :: Data.Acquire.Acquire Internal.Handler
 handler = do

@@ -7,7 +7,9 @@ library:
   - bytestring
   - base
   - cherry-core
+  - conduit
   - env-parser
+  - exceptions
   - hedis
   - resourcet
   - text
@@ -17,3 +19,10 @@ library:
   - Redis.Mock
   source-dirs:
   - src
+tests:
+  spec:
+    dependencies: *dependencies
+    main: Main.hs
+    source-dirs:
+      - test/spec
+      - src

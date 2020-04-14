@@ -26,7 +26,7 @@ decoderConnectInfo =
         Environment.text
         ( \str ->
             case str |> Data.Text.unpack |> parseConnectInfo of
-              Right info -> Ok info
+              Right info' -> Ok info'
               Left parseError -> Err ("Invalid Redis connection string: " ++ Data.Text.pack parseError)
         )
     )
