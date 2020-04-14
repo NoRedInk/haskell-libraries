@@ -11,7 +11,9 @@ library:
   - hedis
   - resourcet
   - text
+  - unordered-containers
   exposed-modules:
   - Redis
+  - Redis.Mock
   source-dirs:
   - src

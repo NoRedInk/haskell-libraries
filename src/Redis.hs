@@ -1,35 +1,31 @@
 module Redis
-  ( Handler,
-    handler,
-    Namespace (..),
+  ( get,
+    getJSON,
+    set,
+    setJSON,
+    getSet,
+    getSetJSON,
+    delete,
     -- Settings
     Settings.Settings,
     Settings.decoder,
+    -- Internal
+    Internal.Handler,
+    Internal.NamespacedHandler,
+    Internal.namespacedHandler,
+    -- Real
+    Real.handler,
   )
 where
 
 import Cherry.Prelude
-import Control.Monad.IO.Class (liftIO)
-import qualified Data.Acquire
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
+import qualified Data.ByteString.Lazy as Lazy
 import qualified Data.Text.Encoding
-import qualified Database.Redis
-import qualified Platform
+import qualified Redis.Internal as Internal
+import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
-import qualified Task
-import Prelude (Either (Left, Right), pure)
-
-data Handler
-  = Handler
-      { anything :: Platform.DoAnythingHandler,
-        connection :: Database.Redis.Connection
-      }
-
-data Error = Error
-  deriving (Show, Eq)
-
-newtype Namespace = Namespace Text
-  deriving (Show, Eq)
 
 toT :: Data.ByteString.ByteString -> Text
 toT = Data.Text.Encoding.decodeUtf8
@@ -37,37 +33,34 @@ toT = Data.Text.Encoding.decodeUtf8
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
 
-handler :: Settings.Settings -> Data.Acquire.Acquire Handler
-handler settings =
-  Data.Acquire.mkAcquire acquire release
-  where
-    acquire = do
-      anything <- Platform.doAnythingHandler
-      connection <- Database.Redis.checkedConnect (Settings.connectionInfo settings)
-      pure <| Handler anything connection
-    release Handler {connection} = Database.Redis.disconnect connection
-
-namespaceKey :: Namespace -> Text -> Data.ByteString.ByteString
-namespaceKey (Namespace ns) key =
-  ns ++ ":" ++ key |> toB
-
-platformRedis :: Handler -> Database.Redis.Redis (Either Database.Redis.Reply a) -> Task Error a
-platformRedis Handler {connection, anything} action =
-  Platform.doAnything
-    anything
-    ( Database.Redis.runRedis connection action
-        |> map
-          ( \rep -> case rep of
-              Left _ -> Err Error
-              Right r -> Ok r
-          )
-    )
-
-set :: Handler -> Namespace -> Text -> Text -> Task Error Database.Redis.Status
-set handler ns key value =
-  platformRedis handler (Database.Redis.set (namespaceKey ns key) (toB value))
-
-get :: Handler -> Namespace -> Text -> Task Error (Maybe Text)
-get handler ns key =
-  platformRedis handler (Database.Redis.get (namespaceKey ns key))
+get :: Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe Text)
+get handler key =
+  Internal.get handler (toB key)
     |> map (map toT)
+
+getJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe a)
+getJSON handler key =
+  Internal.get handler (toB key)
+    |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
+
+set :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error ()
+set handler key value =
+  Internal.set handler (toB key) (toB value)
+
+setJSON :: Aeson.ToJSON a => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error ()
+setJSON handler key value =
+  Internal.set handler (toB key) (Aeson.encode value |> Lazy.toStrict)
+
+getSet :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)
+getSet handler key value =
+  Internal.getSet handler (toB key) (toB value)
+    |> map (map toT)
+
+getSetJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error (Maybe a)
+getSetJSON handler key value =
+  Internal.getSet handler (toB key) (Aeson.encode value |> Lazy.toStrict)
+    |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
+
+delete :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
+delete handler keys =
+  Internal.delete handler (map toB keys)
