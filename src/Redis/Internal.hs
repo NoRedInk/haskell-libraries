@@ -7,6 +7,7 @@ import qualified Data.Text.Encoding
 data Error
   = RedisError Text
   | ConnectionLost
+  deriving (Show)
 
 data Handler
   = Handler
