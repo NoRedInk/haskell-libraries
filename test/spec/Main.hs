@@ -94,9 +94,9 @@ getRedisHandler settings =
     release (_, Just conn) = Database.Redis.disconnect conn
     release (_, Nothing) = pure ()
     acquire =
-      Control.Monad.Catch.catch
+      Control.Monad.Catch.catchAll
         (Real.acquireHandler settings |> map (Tuple.mapSecond Just))
-        ( \(_ :: Database.Redis.ConnectError) -> do
+        ( \_ -> do
             h <- Mock.handler
             pure (h, Nothing)
         )
