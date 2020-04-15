@@ -15,12 +15,12 @@ import qualified Task
 import Test
 import qualified Test.Runner.Tasty
 import qualified Tuple
-import Prelude (IO, fst, pure)
+import Prelude (IO, fst, pure, uncurry)
 
 buildSpecs :: TestHandlers -> Test
 buildSpecs TestHandlers {logHandler, redisHandlers} =
   redisHandlers
-    |> map (\(whichHandler, redisHandler) -> specs logHandler whichHandler redisHandler)
+    |> map (uncurry (specs logHandler))
     |> describe "Redis Library"
 
 specs :: Platform.LogHandler -> Text -> Handler -> Test
