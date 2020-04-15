@@ -17,10 +17,16 @@ import qualified Test.Runner.Tasty
 import qualified Tuple
 import Prelude (IO, fst, pure)
 
-specs :: TestHandlers -> Test
-specs TestHandlers {logHandler, redisHandler} =
+buildSpecs :: TestHandlers -> Test
+buildSpecs TestHandlers {logHandler, redisHandlers} =
+  redisHandlers
+    |> map (\(whichHandler, redisHandler) -> specs logHandler whichHandler redisHandler)
+    |> describe "Redis Library"
+
+specs :: Platform.LogHandler -> Text -> Handler -> Test
+specs logHandler whichHandler redisHandler =
   describe
-    "Redis"
+    (whichHandler ++ " Redis")
     [ redisTest "get and set" <| do
         set testNS "bob" "hello!"
         result <- get testNS "bob"
@@ -74,20 +80,20 @@ specs TestHandlers {logHandler, redisHandler} =
 main :: IO ()
 main =
   Conduit.withAcquire getHandlers <| \testHandlers ->
-    Test.Runner.Tasty.main <| specs testHandlers
+    Test.Runner.Tasty.main <| buildSpecs testHandlers
 
 data TestHandlers
   = TestHandlers
       { logHandler :: Platform.LogHandler,
-        redisHandler :: Handler
+        redisHandlers :: [(Text, Handler)]
       }
 
 getLogHandler :: Conduit.Acquire Platform.LogHandler
 getLogHandler =
   Platform.mkLogHandler "redis" (Platform.Environment "test") [] Platform.nullTracer
 
-getRedisHandler :: Settings.Settings -> Conduit.Acquire Handler
-getRedisHandler settings =
+getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, Handler)]
+getRedisHandlers settings =
   Conduit.mkAcquire acquire release
     |> map fst
   where
@@ -95,15 +101,22 @@ getRedisHandler settings =
     release (_, Nothing) = pure ()
     acquire =
       Control.Monad.Catch.catchAll
-        (Real.acquireHandler settings |> map (Tuple.mapSecond Just))
+        ( Real.acquireHandler settings
+            |> map (Tuple.mapSecond Just)
+            |> andThen
+              ( \(h, c) -> do
+                  h' <- Mock.handler
+                  pure ([("Real", h), ("Mock", h')], c)
+              )
+        )
         ( \_ -> do
             h <- Mock.handler
-            pure (h, Nothing)
+            pure ([("Mock", h)], Nothing)
         )
 
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
   lh <- getLogHandler
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
-  rh <- getRedisHandler settings
+  rh <- getRedisHandlers settings
   pure (TestHandlers lh rh)
