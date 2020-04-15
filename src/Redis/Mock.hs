@@ -1,19 +1,17 @@
 module Redis.Mock where
 
 import Cherry.Prelude
-import Control.Monad.IO.Class (liftIO)
-import qualified Data.Acquire
 import qualified Data.HashMap.Strict as HM
 import Data.IORef
 import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
-import Prelude (pure)
+import Prelude (IO, pure)
 
-handler :: Data.Acquire.Acquire Internal.Handler
+handler :: IO Internal.Handler
 handler = do
-  hm <- liftIO <| newIORef HM.empty
-  anything <- liftIO Platform.doAnythingHandler
+  hm <- newIORef HM.empty
+  anything <- Platform.doAnythingHandler
   let rawGet key =
         Platform.doAnything
           anything

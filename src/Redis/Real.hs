@@ -9,26 +9,29 @@ import qualified Database.Redis
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
-import Prelude (Either (Left, Right), fromIntegral, fst, pure)
+import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure)
 
 handler :: Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler settings =
-  Data.Acquire.mkAcquire acquire release
+  Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
     |> map fst
-  where
-    acquire = do
-      connection <- Database.Redis.checkedConnect (Settings.connectionInfo settings)
-      anything <- Platform.doAnythingHandler
-      pure
-        <| ( Internal.Handler
-               { Internal.rawGet = rawGet connection anything,
-                 Internal.rawSet = rawSet connection anything,
-                 Internal.rawGetSet = rawGetSet connection anything,
-                 Internal.rawDelete = rawDelete connection anything
-               },
-             connection
-           )
-    release (_, connection) = Database.Redis.disconnect connection
+
+acquireHandler :: Settings.Settings -> IO (Internal.Handler, Database.Redis.Connection)
+acquireHandler settings = do
+  connection <- Database.Redis.checkedConnect (Settings.connectionInfo settings)
+  anything <- Platform.doAnythingHandler
+  pure
+    <| ( Internal.Handler
+           { Internal.rawGet = rawGet connection anything,
+             Internal.rawSet = rawSet connection anything,
+             Internal.rawGetSet = rawGetSet connection anything,
+             Internal.rawDelete = rawDelete connection anything
+           },
+         connection
+       )
+
+releaseHandler :: (Internal.Handler, Database.Redis.Connection) -> IO ()
+releaseHandler (_, connection) = Database.Redis.disconnect connection
 
 platformRedis ::
   Database.Redis.Connection ->

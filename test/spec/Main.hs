@@ -2,15 +2,20 @@ module Main (main) where
 
 import Cherry.Prelude
 import qualified Conduit
+import qualified Control.Monad.Catch
+import qualified Database.Redis
 import qualified Environment
 import qualified Expect
 import qualified Platform
 import Redis
+import qualified Redis.Mock as Mock
+import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Task
 import Test
 import qualified Test.Runner.Tasty
-import Prelude (IO, pure)
+import qualified Tuple
+import Prelude (IO, fst, pure)
 
 specs :: TestHandlers -> Test
 specs TestHandlers {logHandler, redisHandler} =
@@ -67,8 +72,8 @@ specs TestHandlers {logHandler, redisHandler} =
           |> Expect.withIO (Expect.ok identity)
 
 main :: IO ()
-main = do
-  Conduit.withAcquire getHandlers <| \testHandlers -> do
+main =
+  Conduit.withAcquire getHandlers <| \testHandlers ->
     Test.Runner.Tasty.main <| specs testHandlers
 
 data TestHandlers
@@ -81,9 +86,24 @@ getLogHandler :: Conduit.Acquire Platform.LogHandler
 getLogHandler =
   Platform.mkLogHandler "redis" (Platform.Environment "test") [] Platform.nullTracer
 
+getRedisHandler :: Settings.Settings -> Conduit.Acquire Handler
+getRedisHandler settings =
+  Conduit.mkAcquire acquire release
+    |> map fst
+  where
+    release (_, Just conn) = Database.Redis.disconnect conn
+    release (_, Nothing) = pure ()
+    acquire =
+      Control.Monad.Catch.catch
+        (Real.acquireHandler settings |> map (Tuple.mapSecond Just))
+        ( \(_ :: Database.Redis.ConnectError) -> do
+            h <- Mock.handler
+            pure (h, Nothing)
+        )
+
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
   lh <- getLogHandler
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
-  rh <- handler settings
+  rh <- getRedisHandler settings
   pure (TestHandlers lh rh)
