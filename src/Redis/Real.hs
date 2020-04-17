@@ -4,11 +4,13 @@ import Cherry.Prelude
 import qualified Control.Monad.Catch
 import qualified Data.Acquire
 import qualified Data.ByteString
+import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
+import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure)
 
 handler :: Settings.Settings -> Data.Acquire.Acquire Internal.Handler
@@ -25,7 +27,8 @@ acquireHandler settings = do
            { Internal.rawGet = rawGet connection anything,
              Internal.rawSet = rawSet connection anything,
              Internal.rawGetSet = rawGetSet connection anything,
-             Internal.rawDelete = rawDelete connection anything
+             Internal.rawDelete = rawDelete connection anything,
+             Internal.rawAtomicModify = rawAtomicModify connection anything
            },
          connection
        )
@@ -42,14 +45,16 @@ platformRedis connection anything action =
   Platform.doAnything
     anything
     ( Database.Redis.runRedis connection action
-        |> map
-          ( \rep -> case rep of
-              Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
-              Left _ -> Err (Internal.RedisError "The Redis library said this was an error but returned no error message.")
-              Right r -> Ok r
-          )
+        |> map toResult
         |> (\r -> Control.Monad.Catch.catch r (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost))
     )
+
+toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
+toResult reply =
+  case reply of
+    Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
+    Left _ -> Err (Internal.RedisError "The Redis library said this was an error but returned no error message.")
+    Right r -> Ok r
 
 rawGet ::
   Database.Redis.Connection ->
@@ -86,3 +91,32 @@ rawDelete ::
 rawDelete connection anything keys =
   platformRedis connection anything (Database.Redis.del keys)
     |> map fromIntegral
+
+rawAtomicModify ::
+  Database.Redis.Connection ->
+  Platform.DoAnythingHandler ->
+  Data.ByteString.ByteString ->
+  (Maybe Data.ByteString.ByteString -> Data.ByteString.ByteString) ->
+  Task Internal.Error Data.ByteString.ByteString
+rawAtomicModify connection anything key f =
+  platformRedis
+    connection
+    anything
+    action
+    |> andThen processTxResult
+  where
+    processTxResult (txResult, newValue) =
+      case txResult of
+        Database.Redis.TxSuccess _ -> pure newValue
+        Database.Redis.TxAborted -> rawAtomicModify connection anything key f
+        Database.Redis.TxError err -> Task.fail <| Internal.RedisError (Data.Text.pack err)
+    action = do
+      _ <- Database.Redis.watch [key]
+      resp <- Database.Redis.get key
+      case resp of
+        Right r -> do
+          let newValue = f r
+          txResult <- Database.Redis.multiExec (Database.Redis.set key newValue)
+          pure <| Right (txResult, newValue)
+        Left e' -> pure <| Left e'
+

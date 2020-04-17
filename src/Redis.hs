@@ -6,6 +6,8 @@ module Redis
     getSet,
     getSetJSON,
     delete,
+    atomicModify,
+    atomicModifyJSON,
     -- Settings
     Settings.Settings,
     Settings.decoder,
@@ -26,6 +28,7 @@ import qualified Data.Text.Encoding
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
+import qualified Task
 
 toT :: Data.ByteString.ByteString -> Text
 toT = Data.Text.Encoding.decodeUtf8
@@ -64,3 +67,19 @@ getSetJSON handler key value =
 delete :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
 delete handler keys =
   Internal.delete handler (map toB keys)
+
+atomicModify :: Internal.NamespacedHandler -> Text -> (Maybe Text -> Text) -> Task Internal.Error Text
+atomicModify handler key f =
+  Internal.atomicModify handler (toB key) (map toT >> f >> toB)
+    |> map toT
+
+atomicModifyJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> (Maybe a -> a) -> Task Internal.Error a
+atomicModifyJSON handler key f =
+  Internal.atomicModify handler (toB key) (andThen (Lazy.fromStrict >> Aeson.decode') >> f >> (Aeson.encode >> Lazy.toStrict))
+    |> andThen
+      ( \bs -> case bs |> Lazy.fromStrict |> Aeson.decode' of
+          Just v -> Task.succeed v
+          Nothing ->
+            Task.fail
+              <| Internal.LibraryError "We failed to decode the ByteStream we successfully wrote; this should never happen and indicates a bug in our Redis library."
+      )

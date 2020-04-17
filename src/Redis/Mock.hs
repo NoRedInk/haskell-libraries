@@ -47,9 +47,21 @@ handler = do
               )
               |> map Ok
           )
+  let atomicModify key f =
+        Platform.doAnything
+          anything
+          ( atomicModifyIORef
+              hm
+              ( \hm' ->
+                  let newValue = HM.lookup key hm' |> f
+                   in (HM.insert key newValue hm', newValue)
+              )
+              |> map Ok
+          )
   pure Internal.Handler
     { Internal.rawGet = rawGet,
       Internal.rawSet = rawSet,
       Internal.rawGetSet = rawGetSet,
-      Internal.rawDelete = delete
+      Internal.rawDelete = delete,
+      Internal.rawAtomicModify = atomicModify
     }

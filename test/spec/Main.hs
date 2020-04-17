@@ -68,7 +68,34 @@ specs logHandler whichHandler redisHandler =
         let testData :: [Text] = ["one", "two", "three"]
         setJSON testNS "JSON list" testData
         result <- getJSON testNS "JSON list"
-        pure <| Expect.just (Expect.equal testData) result
+        pure <| Expect.just (Expect.equal testData) result,
+      redisTest "atomic modify with no value" <| do
+        _ <- delete testNS ["Empty Atom"]
+        result <-
+          atomicModify
+            testNS
+            "Empty Atom"
+            ( \v -> case v of
+                Just v' -> "Prefix:" ++ v'
+                Nothing -> "Nothing"
+            )
+        pure <| Expect.equal "Nothing" result,
+      redisTest "atomic modify with value" <| do
+        _ <- delete testNS ["Full Atom"]
+        set testNS "Full Atom" "Something"
+        result <-
+          atomicModify
+            testNS
+            "Full Atom"
+            ( \v -> case v of
+                Just v' -> "Prefix:" ++ v'
+                Nothing -> "Nothing"
+            )
+        pure <| Expect.equal "Prefix:Something" result
+      -- Ideally we want an other test here to do parallel
+      -- atomic operations and check our use of Redis
+      -- transactions is correct. Unfortunately, we don't
+      -- have a nice way of executing parallel tasks yet.
     ]
   where
     testNS = namespacedHandler redisHandler "TestNamespace"
