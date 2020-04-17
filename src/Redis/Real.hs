@@ -119,4 +119,3 @@ rawAtomicModify connection anything key f =
           txResult <- Database.Redis.multiExec (Database.Redis.set key newValue)
           pure <| Right (txResult, newValue)
         Left e' -> pure <| Left e'
-
