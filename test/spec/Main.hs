@@ -2,10 +2,12 @@ module Main (main) where
 
 import Cherry.Prelude
 import qualified Conduit
+import qualified Control.Concurrent.Async
 import qualified Control.Monad.Catch
 import qualified Database.Redis
 import qualified Environment
 import qualified Expect
+import qualified List
 import qualified Platform
 import Redis
 import qualified Redis.Mock as Mock
@@ -91,11 +93,24 @@ specs logHandler whichHandler redisHandler =
                 Just v' -> "Prefix:" ++ v'
                 Nothing -> "Nothing"
             )
-        pure <| Expect.equal "Prefix:Something" result
-      -- Ideally we want an other test here to do parallel
-      -- atomic operations and check our use of Redis
-      -- transactions is correct. Unfortunately, we don't
-      -- have a nice way of executing parallel tasks yet.
+        pure <| Expect.equal "Prefix:Something" result,
+      test "Concurrent atomicModify works" <| \() ->
+        let ioTest = do
+              _ <- delete testNS ["Concurrent Atom"] |> Task.attempt logHandler
+              let ops =
+                    List.repeat
+                      1000
+                      ( atomicModifyJSON
+                          testNS
+                          "Concurrent Atom"
+                          ( \i -> case i of
+                              Just i' -> i' + 1
+                              Nothing -> 1 :: Int
+                          )
+                      )
+              _ <- Control.Concurrent.Async.mapConcurrently (Task.attempt logHandler) ops
+              getJSON testNS "Concurrent Atom" |> Task.attempt logHandler
+         in Expect.withIO (Expect.ok <| Expect.just <| Expect.equal (1000 :: Int)) ioTest
     ]
   where
     testNS = namespacedHandler redisHandler "TestNamespace"

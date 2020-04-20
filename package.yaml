@@ -4,6 +4,7 @@ synopsis: Redis helper for NRI code
 library:
   dependencies: &dependencies
   - aeson
+  - async
   - bytestring
   - base
   - cherry-core
