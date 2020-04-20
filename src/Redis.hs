@@ -1,3 +1,14 @@
+-- | A simple Redis library providing high level access to Redis features we
+-- use here at NoRedInk
+--
+-- We make some assumptions in this module that are worth bearing in mind:
+-- - As with our Ruby Redis access, we enforce working within a "namespace",
+--   so most functions take a "NamespacedHandler".
+-- - Data stored in Redis should be, by definition, transient and disposable.
+--   Because of that, we are very lenient in how we handle decoding of data:
+--   if we find invalid or out of date data stored in a key, we treat that the
+--   same as if the key is empty. This avoids issues with things like changes
+--   of JSON representations of data - we just throw the old data away!
 module Redis
   ( get,
     getJSON,
@@ -36,43 +47,61 @@ toT = Data.Text.Encoding.decodeUtf8
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
 
+-- | Get a value from a namespaced Redis key, assuming it is valid UTF8 data.
+-- Returns `Nothing` if no value is set.
 get :: Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe Text)
 get handler key =
   Internal.get handler (toB key)
     |> map (map toT)
 
+-- | Get a value from a namespaced Redis key, assuming it is valid JSON data of
+-- the expected type.
+-- Returns `Nothing` if no value is set, or if the JSON decoding fails.
 getJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe a)
 getJSON handler key =
   Internal.get handler (toB key)
     |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
 
+-- | Set the value at a namespaced Redis key.
 set :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error ()
 set handler key value =
   Internal.set handler (toB key) (toB value)
 
+-- | Set the value at a namespaced Redis key with a JSON representation of the value provided.
 setJSON :: Aeson.ToJSON a => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error ()
 setJSON handler key value =
   Internal.set handler (toB key) (Aeson.encode value |> Lazy.toStrict)
 
+-- | Set the value at a namespaced Redis key, returning the previous value (if any)
 getSet :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)
 getSet handler key value =
   Internal.getSet handler (toB key) (toB value)
     |> map (map toT)
 
+-- | Set the namespaced Redis key with JSON representing the provided value,
+-- returning the previous value (if any and if it can be decoded to the same type).
 getSetJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error (Maybe a)
 getSetJSON handler key value =
   Internal.getSet handler (toB key) (Aeson.encode value |> Lazy.toStrict)
     |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
 
+-- | Delete the values at all of the provided keys. Return how many of those keys existed
+-- (and hence were deleted)
 delete :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
 delete handler keys =
   Internal.delete handler (map toB keys)
 
+-- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
+-- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
+-- The returned value is the value that was set.
 atomicModify :: Internal.NamespacedHandler -> Text -> (Maybe Text -> Text) -> Task Internal.Error Text
 atomicModify handler key f =
   Internal.atomicModify handler (toB key) (map toT >> f >> toB)
     |> map toT
 
+-- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
+-- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
+-- The returned value is the value that was set.
 atomicModifyJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> (Maybe a -> a) -> Task Internal.Error a
 atomicModifyJSON handler key f =
   Internal.atomicModify handler (toB key) (andThen (Lazy.fromStrict >> Aeson.decode') >> f >> (Aeson.encode >> Lazy.toStrict))
