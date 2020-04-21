@@ -96,26 +96,31 @@ rawAtomicModify ::
   Database.Redis.Connection ->
   Platform.DoAnythingHandler ->
   Data.ByteString.ByteString ->
-  (Maybe Data.ByteString.ByteString -> Data.ByteString.ByteString) ->
-  Task Internal.Error Data.ByteString.ByteString
+  (Maybe Data.ByteString.ByteString -> (Data.ByteString.ByteString, a)) ->
+  Task Internal.Error (Data.ByteString.ByteString, a)
 rawAtomicModify connection anything key f =
-  platformRedis
-    connection
-    anything
-    action
-    |> andThen processTxResult
+  inner (100 :: Int)
   where
-    processTxResult (txResult, newValue) =
+    inner count =
+      platformRedis
+        connection
+        anything
+        action
+        |> andThen (processTxResult count)
+    processTxResult count (txResult, newValue) =
       case txResult of
         Database.Redis.TxSuccess _ -> pure newValue
-        Database.Redis.TxAborted -> rawAtomicModify connection anything key f
+        Database.Redis.TxAborted ->
+          if count > 0
+            then inner (count - 1)
+            else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
         Database.Redis.TxError err -> Task.fail <| Internal.RedisError (Data.Text.pack err)
     action = do
       _ <- Database.Redis.watch [key]
       resp <- Database.Redis.get key
       case resp of
         Right r -> do
-          let newValue = f r
+          let (newValue, context) = f r
           txResult <- Database.Redis.multiExec (Database.Redis.set key newValue)
-          pure <| Right (txResult, newValue)
+          pure <| Right (txResult, (newValue, context))
         Left e' -> pure <| Left e'

@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 -- | A simple Redis library providing high level access to Redis features we
 -- use here at NoRedInk
 --
@@ -19,10 +21,13 @@ module Redis
     delete,
     atomicModify,
     atomicModifyJSON,
+    atomicModifyWithContext,
+    atomicModifyWithContextJSON,
     -- Settings
     Settings.Settings,
     Settings.decoder,
     -- Internal
+    Internal.Error (..),
     Internal.Handler,
     Internal.NamespacedHandler,
     Internal.namespacedHandler,
@@ -40,9 +45,20 @@ import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Task
+import qualified Tuple
+import Prelude (Either (Left, Right))
 
-toT :: Data.ByteString.ByteString -> Text
-toT = Data.Text.Encoding.decodeUtf8
+toT :: Data.ByteString.ByteString -> Maybe Text
+toT bs =
+  Data.Text.Encoding.decodeUtf8' bs
+    |> \r -> case r of
+      Right t -> Just t
+      Left _ -> Nothing
+
+-- We should only use this function when we created
+-- the ByteString ourselves and know it to be UTF8
+knowT :: Data.ByteString.ByteString -> Text
+knowT = Data.Text.Encoding.decodeUtf8
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
@@ -52,7 +68,7 @@ toB = Data.Text.Encoding.encodeUtf8
 get :: Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe Text)
 get handler key =
   Internal.get handler (toB key)
-    |> map (map toT)
+    |> map (andThen toT)
 
 -- | Get a value from a namespaced Redis key, assuming it is valid JSON data of
 -- the expected type.
@@ -76,7 +92,7 @@ setJSON handler key value =
 getSet :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)
 getSet handler key value =
   Internal.getSet handler (toB key) (toB value)
-    |> map (map toT)
+    |> map (andThen toT)
 
 -- | Set the namespaced Redis key with JSON representing the provided value,
 -- returning the previous value (if any and if it can be decoded to the same type).
@@ -96,19 +112,66 @@ delete handler keys =
 -- The returned value is the value that was set.
 atomicModify :: Internal.NamespacedHandler -> Text -> (Maybe Text -> Text) -> Task Internal.Error Text
 atomicModify handler key f =
-  Internal.atomicModify handler (toB key) (map toT >> f >> toB)
-    |> map toT
+  Internal.atomicModify handler (toB key) wrapAndUnwrap
+    |> map (Tuple.first >> knowT)
+  where
+    wrapAndUnwrap bs =
+      bs
+        |> andThen toT
+        |> f
+        |> toB
+        |> (,())
 
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
 atomicModifyJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> (Maybe a -> a) -> Task Internal.Error a
 atomicModifyJSON handler key f =
-  Internal.atomicModify handler (toB key) (andThen (Lazy.fromStrict >> Aeson.decode') >> f >> (Aeson.encode >> Lazy.toStrict))
+  Internal.atomicModify
+    handler
+    (toB key)
+    ( andThen
+        (Lazy.fromStrict >> Aeson.decode')
+        >> f
+        >> (Aeson.encode >> Lazy.toStrict >> (,()))
+    )
     |> andThen
-      ( \bs -> case bs |> Lazy.fromStrict |> Aeson.decode' of
+      ( \(bs, _) -> case bs |> Lazy.fromStrict |> Aeson.decode' of
           Just v -> Task.succeed v
           Nothing ->
             Task.fail
-              <| Internal.LibraryError "We failed to decode the ByteStream we successfully wrote; this should never happen and indicates a bug in our Redis library."
+              <| Internal.LibraryError "We failed to decode the ByteStream we successfully wrote; this should never happen and indicates a bug in our Redis library or our JSON encoding/decoding."
+      )
+
+-- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
+-- that was set.
+atomicModifyWithContext :: Internal.NamespacedHandler -> Text -> (Maybe Text -> (Text, a)) -> Task Internal.Error (Text, a)
+atomicModifyWithContext handler key f =
+  Internal.atomicModify handler (toB key) wrapAndUnwrap
+    |> map (Tuple.mapFirst knowT)
+  where
+    wrapAndUnwrap bs =
+      bs
+        |> andThen toT
+        |> f
+        |> Tuple.mapFirst toB
+
+-- | As `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
+-- that was set.
+atomicModifyWithContextJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
+atomicModifyWithContextJSON handler key f =
+  Internal.atomicModify
+    handler
+    (toB key)
+    ( andThen
+        (Lazy.fromStrict >> Aeson.decode')
+        >> f
+        >> Tuple.mapFirst (Aeson.encode >> Lazy.toStrict)
+    )
+    |> andThen
+      ( \(bs, context) -> case bs |> Lazy.fromStrict |> Aeson.decode' of
+          Just v -> Task.succeed (v, context)
+          Nothing ->
+            Task.fail
+              <| Internal.LibraryError "We failed to decode the ByteStream we successfully wrote; this should never happen and indicates a bug in our Redis library or our JSON encoding/decoding."
       )

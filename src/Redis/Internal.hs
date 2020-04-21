@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Redis.Internal where
 
 import Cherry.Prelude
@@ -17,9 +19,10 @@ data Handler
         rawGetSet :: Data.ByteString.ByteString -> Data.ByteString.ByteString -> Task Error (Maybe Data.ByteString.ByteString),
         rawDelete :: [Data.ByteString.ByteString] -> Task Error Int,
         rawAtomicModify ::
+          forall a.
           Data.ByteString.ByteString ->
-          (Maybe Data.ByteString.ByteString -> Data.ByteString.ByteString) ->
-          Task Error Data.ByteString.ByteString
+          (Maybe Data.ByteString.ByteString -> (Data.ByteString.ByteString, a)) ->
+          Task Error (Data.ByteString.ByteString, a)
       }
 
 data NamespacedHandler
@@ -29,9 +32,10 @@ data NamespacedHandler
         getSet :: Data.ByteString.ByteString -> Data.ByteString.ByteString -> Task Error (Maybe Data.ByteString.ByteString),
         delete :: [Data.ByteString.ByteString] -> Task Error Int,
         atomicModify ::
+          forall a.
           Data.ByteString.ByteString ->
-          (Maybe Data.ByteString.ByteString -> Data.ByteString.ByteString) ->
-          Task Error Data.ByteString.ByteString
+          (Maybe Data.ByteString.ByteString -> (Data.ByteString.ByteString, a)) ->
+          Task Error (Data.ByteString.ByteString, a)
       }
 
 namespacedHandler :: Handler -> Text -> NamespacedHandler

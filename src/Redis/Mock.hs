@@ -53,8 +53,8 @@ handler = do
           ( atomicModifyIORef
               hm
               ( \hm' ->
-                  let newValue = HM.lookup key hm' |> f
-                   in (HM.insert key newValue hm', newValue)
+                  let (newValue, context) = HM.lookup key hm' |> f
+                   in (HM.insert key newValue hm', (newValue, context))
               )
               |> map Ok
           )
