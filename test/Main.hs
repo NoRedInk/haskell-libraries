@@ -44,7 +44,7 @@ tests =
         withServer
           (constant "12" Status.ok200)
           (\http url -> Http.get http url (Http.expectJson :: Http.Expect Text))
-          |> Expect.withIO (Expect.equal (Err (Http.BadBody "Error in $: expected Text, encountered Number"))),
+          |> Expect.withIO (Expect.equal (Err (Http.BadBody "Error in $: parsing Text failed, expected String, but encountered Number"))),
       test "When a request is made using `get` to an invalid URL we fail with a BadUrl error" <| \() ->
         withServer
           (constant "" Status.ok200)
