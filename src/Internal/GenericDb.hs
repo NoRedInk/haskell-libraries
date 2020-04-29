@@ -16,9 +16,7 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
-import qualified Control.Monad.Catch
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
-import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Pool
 import Data.String (IsString)
 import qualified Data.Text
@@ -116,15 +114,23 @@ withConnection Connection {doAnything, singleOrPool} func =
 --   useful (reason: `PropertyT` does not implement a `MonadBaseControl IO a`
 --   instance). The trade-off is that this function isn't quite as safe, and has
 --   a small chance to leek database connections. For tests that seems okay.
-withConnectionUnsafe :: (MonadIO m, Exception.MonadCatch m) => Connection internal conn -> (conn -> m a) -> m a
-withConnectionUnsafe Connection {singleOrPool} func =
+withConnectionUnsafe :: forall internal conn x a. Connection internal conn -> (conn -> Task x a) -> Task x a
+withConnectionUnsafe conn@Connection {singleOrPool} func =
   case singleOrPool of
     (Pool pool) -> do
-      (c, localPool) <- liftIO (Data.Pool.takeResource pool)
-      x <- func c `Control.Monad.Catch.onException` liftIO (Data.Pool.destroyResource pool localPool c)
-      liftIO (Data.Pool.putResource localPool c)
-      pure x
-    (Single c) -> func c
+      (c, localPool) <- doIO conn (Data.Pool.takeResource pool)
+      func c
+        |> Task.andThen (\a -> do
+            doIO conn (Data.Pool.putResource localPool c)
+            Task.succeed a
+           )
+        |> Task.onError (\x -> do
+            doIO conn (Data.Pool.destroyResource pool localPool c)
+            Task.fail x
+          )
+    --
+    (Single c) ->
+      func c
 
 --
 -- READINESS
@@ -226,23 +232,30 @@ transaction Transaction {commit, begin, rollback} conn func =
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: forall internal conn m a. (MonadIO m, Exception.MonadCatch m) => Transaction internal -> Connection internal conn -> (Connection internal conn -> m a) -> m a
+inTestTransaction :: forall internal conn x a. Transaction internal -> Connection internal conn -> (Connection internal conn -> Task x a) -> Task x a
 inTestTransaction transaction_@Transaction {begin} conn func =
   withConnectionUnsafe conn <| \c -> do
     rollbackAllSafe transaction_ conn c
-    liftIO <| begin (toInternalConnection conn c)
+    doIO conn <| begin (toInternalConnection conn c)
     let singleConn = conn {singleOrPool = Single c}
     -- All queries in a transactions must run on the same thread.
-    x <- func singleConn `Control.Monad.Catch.onException` rollbackAllSafe transaction_ conn c
+    x <- func singleConn
     rollbackAllSafe transaction_ conn c
     pure x
 
-rollbackAllSafe :: forall internal conn m. (MonadIO m) => Transaction internal -> Connection internal conn -> conn -> m ()
+rollbackAllSafe :: Transaction internal -> Connection internal conn -> conn -> Task x ()
 rollbackAllSafe Transaction {begin, rollbackAll} conn c =
-  liftIO <| do
+  doIO conn <| do
     -- Because calling `rollbackAllTransactions` when no transactions are
     -- running will result in a warning message in the log (even if tests
     -- pass), let's start by beginning a transaction, so that we alwas have
     -- at least one to kill.
     begin (toInternalConnection conn c)
     rollbackAll (toInternalConnection conn c)
+
+
+-- HELPER
+
+doIO :: Connection internal conn -> IO a -> Task x a
+doIO conn io =
+  Platform.doAnything (doAnything conn) (io |> map Ok)
