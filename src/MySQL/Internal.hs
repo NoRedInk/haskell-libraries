@@ -27,22 +27,25 @@ inToAny =
 anyToIn :: Text -> Text
 anyToIn =
   Lens.over
-    ( [R.caselessRegex|(=\s*any)\s*\(\s*('{.*}')\s*\)|] << R.groups
+    ( [R.caselessRegex|(\s+\w+\s+)(=\s*any)\s*\(\s*('{.*}')\s*\)|] << R.groups
       --             ^^^^^^^^^    ^^^^^^^^^^^^
       -- "...where id  = ANY      ('{1,2,3,4}')  ..."
-      -- Matches       ["= ANY",    "'{1,2,3,4}'"]
+      -- Matches ["id", "= ANY",  "'{1,2,3,4}'"]
     )
     replaceAny
   where
     -- Replace matched groups with SQL that MySQL understands.
     -- Example groupes from regex:
-    --   Groups:    ["= ANY", "'{1,2,3,4}'"]
-    --   Converted: ["IN", "1,2,3,4"]
+    --   Groups:    ["id", "= ANY", "'{1,2,3,4}'"]
+    --   Converted: ["id", "IN", "1,2,3,4"]
     replaceAny :: [Text] -> [Text]
     replaceAny groups =
       case groups of
-        [_, elems] ->
-          [ "IN",
+        [field, _, "'{}'"] ->
+          [field, "!=", field]
+        [field, _, elems] ->
+          [ field,
+            "IN",
             elems
               |> Text.dropLeft 2 -- '{
               |> Text.dropRight 2 -- }'

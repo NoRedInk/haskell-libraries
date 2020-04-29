@@ -11,7 +11,8 @@ tests =
   describe
     "MySQL.Internal"
     [ anyToInTests,
-      inToAnyTests
+      inToAnyTests,
+      emptyAnyTests
     ]
 
 queryInFixValues :: Text
@@ -88,4 +89,23 @@ inToAnyTests =
          in subQuery
               |> MySQL.Internal.inToAny
               |> Expect.equal subQuery
+    ]
+
+emptyAnyTests :: Test
+emptyAnyTests =
+  describe
+    "emptyAnyTests"
+    [ test "Replaces ANY with no elements with a predicate that is always false" <| \_ ->
+        [ "SELECT hat FROM royalty",
+          "WHERE hat = ANY ('{}');"
+        ]
+          |> Text.join "\n"
+          |> MySQL.Internal.anyToIn
+          |> Expect.equal
+            ( Text.join
+                "\n"
+                [ "SELECT hat FROM royalty",
+                  "WHERE hat != ( hat );"
+                ]
+            )
     ]
