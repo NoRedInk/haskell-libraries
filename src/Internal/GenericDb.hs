@@ -239,9 +239,15 @@ inTestTransaction transaction_@Transaction {begin} conn func =
     doIO conn <| begin (toInternalConnection conn c)
     let singleConn = conn {singleOrPool = Single c}
     -- All queries in a transactions must run on the same thread.
-    x <- func singleConn
-    rollbackAllSafe transaction_ conn c
-    pure x
+    func singleConn
+        |> Task.andThen (\a -> do
+            rollbackAllSafe transaction_ conn c
+            Task.succeed a
+           )
+        |> Task.onError (\x -> do
+            rollbackAllSafe transaction_ conn c
+            Task.fail x
+          )
 
 rollbackAllSafe :: Transaction internal -> Connection internal conn -> conn -> Task x ()
 rollbackAllSafe Transaction {begin, rollbackAll} conn c =
