@@ -210,20 +210,24 @@ transaction Transaction {commit, begin, rollback} conn func =
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: forall internal conn x a. Transaction internal -> Connection internal conn -> (Connection internal conn -> Task x a) -> Task x a
 inTestTransaction transaction_@Transaction {begin} conn func =
-  withConnection conn <| \c -> do
-    rollbackAllSafe transaction_ conn c
-    doIO conn <| begin (toInternalConnection conn c)
-    let singleConn = conn {singleOrPool = Single c}
-    -- All queries in a transactions must run on the same thread.
-    func singleConn
-        |> Task.andThen (\a -> do
-            rollbackAllSafe transaction_ conn c
-            Task.succeed a
-           )
-        |> Task.onError (\x -> do
-            rollbackAllSafe transaction_ conn c
-            Task.fail x
-          )
+  let start :: conn -> Task x conn
+      start c = do
+        rollbackAllSafe transaction_ conn c
+        doIO conn <| begin (toInternalConnection conn c)
+        pure c
+      --
+      end :: conn -> ExitCase b -> Task x ()
+      end c _ =
+        rollbackAllSafe transaction_ conn c
+      --
+      setSingle :: conn -> Connection internal conn
+      setSingle c =
+        -- All queries in a transactions must run on the same thread.
+        conn {singleOrPool = Single c}
+      --
+   in withConnection conn <| \c ->
+        Platform.generalBracket (start c) end (setSingle >> func)
+          |> map Tuple.first
 
 rollbackAllSafe :: Transaction internal -> Connection internal conn -> conn -> Task x ()
 rollbackAllSafe Transaction {begin, rollbackAll} conn c =
