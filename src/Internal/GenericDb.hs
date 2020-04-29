@@ -81,15 +81,15 @@ runTaskWithConnection conn action =
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
 withConnection :: Connection internal conn -> (conn -> Task e a) -> Task e a
-withConnection Connection {doAnything, singleOrPool} func =
+withConnection conn@Connection {singleOrPool} func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
-        perform
+        doIO conn
           <| Data.Pool.takeResource pool
       --
       release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> ExitCase x -> Task y ()
       release pool (c, localPool) exitCase =
-        perform
+        doIO conn
           <| case exitCase of
             ExitCaseSuccess _ ->
               Data.Pool.putResource localPool c
@@ -98,12 +98,10 @@ withConnection Connection {doAnything, singleOrPool} func =
             ExitCaseAbort ->
               Data.Pool.destroyResource pool localPool c
       --
-      perform :: IO a -> Task x a
-      perform =
-        map Ok >> Platform.doAnything doAnything
    in case singleOrPool of
         (Single c) ->
           func c
+        --
         (Pool pool) ->
           Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
             |> map Tuple.first
@@ -182,21 +180,17 @@ transaction :: forall internal conn e a. Transaction internal -> Connection inte
 transaction Transaction {commit, begin, rollback} conn func =
   let start :: conn -> Task x conn
       start c =
-        perform <| do
+        doIO conn <| do
           begin (toInternalConnection conn c)
           pure c
       --
       end :: conn -> ExitCase b -> Task x ()
       end c exitCase =
-        perform
+        doIO conn
           <| case exitCase of
             ExitCaseSuccess _ -> commit (toInternalConnection conn c)
             ExitCaseException _ -> rollback (toInternalConnection conn c)
             ExitCaseAbort -> rollback (toInternalConnection conn c)
-      --
-      perform :: IO c -> Task x c
-      perform =
-        map Ok >> Platform.doAnything (doAnything conn)
       --
       setSingle :: conn -> Connection internal conn
       setSingle c =
