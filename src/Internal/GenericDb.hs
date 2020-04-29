@@ -108,30 +108,6 @@ withConnection Connection {doAnything, singleOrPool} func =
           Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
             |> map Tuple.first
 
--- | A version of `withConnection` that doesn't use `Data.Pool.withResource`.
---   This has the advantage it doesn't put a `MonadBaseControl IO m` constraint
---   on the return type, which we require for the `inTestTransaction` to be
---   useful (reason: `PropertyT` does not implement a `MonadBaseControl IO a`
---   instance). The trade-off is that this function isn't quite as safe, and has
---   a small chance to leek database connections. For tests that seems okay.
-withConnectionUnsafe :: forall internal conn x a. Connection internal conn -> (conn -> Task x a) -> Task x a
-withConnectionUnsafe conn@Connection {singleOrPool} func =
-  case singleOrPool of
-    (Pool pool) -> do
-      (c, localPool) <- doIO conn (Data.Pool.takeResource pool)
-      func c
-        |> Task.andThen (\a -> do
-            doIO conn (Data.Pool.putResource localPool c)
-            Task.succeed a
-           )
-        |> Task.onError (\x -> do
-            doIO conn (Data.Pool.destroyResource pool localPool c)
-            Task.fail x
-          )
-    --
-    (Single c) ->
-      func c
-
 --
 -- READINESS
 --
@@ -234,7 +210,7 @@ transaction Transaction {commit, begin, rollback} conn func =
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: forall internal conn x a. Transaction internal -> Connection internal conn -> (Connection internal conn -> Task x a) -> Task x a
 inTestTransaction transaction_@Transaction {begin} conn func =
-  withConnectionUnsafe conn <| \c -> do
+  withConnection conn <| \c -> do
     rollbackAllSafe transaction_ conn c
     doIO conn <| begin (toInternalConnection conn c)
     let singleConn = conn {singleOrPool = Single c}
