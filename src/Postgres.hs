@@ -141,7 +141,6 @@ inTestTransactionIo postgres io = do
     Ok a -> pure a
     Err _ -> error "This should never happen."
 
-
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
