@@ -24,6 +24,7 @@ module Postgres
     -- Handling transactions
     transaction,
     inTestTransaction,
+    inTestTransactionIo,
     -- Reexposing useful postgresql-typed types
     PGArray.PGArray,
     PGArray.PGArrayType,
@@ -127,6 +128,19 @@ inTestTransaction =
       GenericDb.rollback = pgRollback,
       GenericDb.rollbackAll = pgRollbackAll
     }
+
+-- | DON'T USE. Prefer to arrange your tests around Task, not IO.
+--   Same as `inTestTransaction` but for IO. Should be removed when no
+--   tests depend on it anymore.
+inTestTransactionIo :: Postgres.Connection -> (Postgres.Connection -> IO a) -> IO a
+inTestTransactionIo postgres io = do
+  doAnything <- Platform.doAnythingHandler
+  logHandler <- Platform.silentContext
+  result <- Task.attempt logHandler <| Postgres.inTestTransaction postgres <| \c -> Platform.doAnything doAnything (io c |> map Ok)
+  case result of
+    Ok a -> pure a
+    Err _ -> error "This should never happen."
+
 
 -- |
 -- Check that we are ready to be take traffic.
