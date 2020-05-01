@@ -97,8 +97,8 @@ withConnection conn@Connection {singleOrPool} func =
               Data.Pool.destroyResource pool localPool c
             ExitCaseAbort ->
               Data.Pool.destroyResource pool localPool c
-      --
-   in case singleOrPool of
+   in --
+      case singleOrPool of
         (Single c) ->
           func c
         --
@@ -218,8 +218,8 @@ inTestTransaction transaction_@Transaction {begin} conn func =
       setSingle c =
         -- All queries in a transactions must run on the same thread.
         conn {singleOrPool = Single c}
-      --
-   in withConnection conn <| \c ->
+   in --
+      withConnection conn <| \c ->
         Platform.generalBracket (start c) end (setSingle >> func)
           |> map Tuple.first
 
@@ -232,7 +232,6 @@ rollbackAllSafe Transaction {begin, rollbackAll} conn c =
     -- at least one to kill.
     begin (toInternalConnection conn c)
     rollbackAll (toInternalConnection conn c)
-
 
 -- HELPER
 
