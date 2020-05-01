@@ -27,7 +27,7 @@ inToAny =
 anyToIn :: Text -> Text
 anyToIn =
   Lens.over
-    ( [R.caselessRegex|(\s+\w+\s+)(=\s*any)\s*\(\s*('{.*}')\s*\)|] << R.groups
+    ( [R.caselessRegex|(\s+[^\s-]+\s+)(=\s*any)\s*\(\s*('{.*}')\s*\)|] << R.groups
       --             ^^^^^^^^^    ^^^^^^^^^^^^
       -- "...where id  = ANY      ('{1,2,3,4}')  ..."
       -- Matches ["id", "= ANY",  "'{1,2,3,4}'"]
