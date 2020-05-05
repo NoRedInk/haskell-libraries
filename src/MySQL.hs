@@ -35,7 +35,6 @@ where
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
-import Control.Monad.IO.Class (MonadIO)
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
@@ -235,7 +234,7 @@ transaction =
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: forall m a. (MonadIO m, Exception.MonadCatch m) => Connection -> (Connection -> m a) -> m a
+inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
 inTestTransaction =
   GenericDb.inTestTransaction GenericDb.Transaction
     { GenericDb.begin = begin,
