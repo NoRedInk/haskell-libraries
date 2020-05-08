@@ -11,6 +11,7 @@ where
 
 import qualified Internal.Query.ParserSpec
 import qualified MySQL.InternalSpec
+import qualified MySQLSpec
 import qualified Postgres.SettingsSpec
 import Test (Test, describe)
 
@@ -20,5 +21,6 @@ tests =
     "lib/database"
     [ Postgres.SettingsSpec.tests,
       MySQL.InternalSpec.tests,
-      Internal.Query.ParserSpec.tests
+      Internal.Query.ParserSpec.tests,
+      MySQLSpec.tests
     ]

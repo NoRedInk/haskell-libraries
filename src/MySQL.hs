@@ -18,7 +18,7 @@ module MySQL
     Settings.Settings,
     Settings.decoder,
     -- Querying
-    Query.Query,
+    Query,
     Query.Error (..),
     Query.sql,
     doQuery,
@@ -29,6 +29,8 @@ module MySQL
     QueryResults,
     MySQL.PersistField (..),
     MySQL.Single (..),
+    -- Bulk inserts
+    unsafeBulkifyInserts,
   )
 where
 
@@ -40,6 +42,7 @@ import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
 import qualified Data.Coerce
 import Data.IORef
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.Pool
 import qualified Data.Text
 import qualified Data.Text.Encoding
@@ -51,6 +54,7 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
+import Internal.Query (Query (..))
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
@@ -58,7 +62,9 @@ import qualified Platform
 import qualified Result
 import qualified Task
 import qualified Text
+import qualified Tuple
 import Prelude (IO, error, fromIntegral, pure, show)
+import qualified Prelude
 
 type Connection = GenericDb.Connection (TransactionCount, MySQL.SqlBackend) MySQL.SqlBackend
 
@@ -460,3 +466,37 @@ instance
       )
 
   toQueryResult = Data.Coerce.coerce
+
+-- | Combine a number of insert queries that all insert a single row into the
+-- same table into a single query.
+--
+-- This helper is not type-safe. It projects you from accidentally combining
+-- queries that are selects, because it only work for queries that return `()`.
+-- But if you try to combine queries that insert into different tables, or
+-- insert different columns, then you're going to see some weird runtime errors.
+--
+-- For queries against Postgres there's a better ways to do this, see this
+-- how-to:
+-- https://github.com/NoRedInk/NoRedInk/blob/master/docs/how-tos/insert-multiple-rows-postgresql-typed.md
+--
+-- For MySQL there might be other approaches we could take, which might offer
+-- more compile-time guarantees.
+unsafeBulkifyInserts :: NonEmpty (Query ()) -> Result Text (Query ())
+unsafeBulkifyInserts queries@(first :| _) =
+  case maybeBrokenQueries of
+    Nothing -> Err "Not all queries are inserts with a VALUES keyword."
+    Just (_ :| otherQueries) ->
+      first {sqlString = Data.Text.intercalate "," (sqlString first : otherQueries)}
+        |> Ok
+  where
+    maybeBrokenQueries = Prelude.traverse (dropUntilCaseInsensitive "VALUES" << sqlString) queries
+
+dropUntilCaseInsensitive :: Text -> Text -> Maybe Text
+dropUntilCaseInsensitive breaker original =
+  let (start, end) = Data.Text.breakOn (Data.Text.toLower breaker) (Data.Text.toLower original)
+   in if Data.Text.null end
+        then Nothing
+        else
+          Data.Text.splitAt (Data.Text.length (start ++ "values")) original
+            |> Tuple.second
+            |> Just
