@@ -66,7 +66,7 @@ data Query row
         sqlString :: Text,
         -- | The query string as extracted from an `sql` quasi quote.
         quasiQuotedString :: Text,
-        -- | SELECT / INSERT / UPDATE / ...
+        -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
         sqlOperation :: Text,
         -- | The main table/view/.. queried.
         queriedRelation :: Text

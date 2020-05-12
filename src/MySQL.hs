@@ -31,6 +31,7 @@ module MySQL
     MySQL.Single (..),
     -- Bulk inserts
     unsafeBulkifyInserts,
+    onConflictUpdate,
   )
 where
 
@@ -55,6 +56,7 @@ import qualified Health
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import Internal.Query (Query (..))
+import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
@@ -490,6 +492,24 @@ unsafeBulkifyInserts queries@(first :| _) =
         |> Ok
   where
     maybeBrokenQueries = Prelude.traverse (dropUntilCaseInsensitive "VALUES" << sqlString) queries
+
+-- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
+-- the key isn't unique.
+onConflictUpdate :: [Text] -> Query () -> Query ()
+onConflictUpdate columns q@Query {sqlString, sqlOperation} =
+  let onDuplicateKeyUPDATE = "ON DUPLICATE KEY UPDATE"
+   in q
+        { sqlString =
+            Text.join
+              " "
+              [ sqlString,
+                onDuplicateKeyUPDATE,
+                columns
+                  |> List.map (\column -> column ++ " = VALUES(" ++ column ++ ")")
+                  |> Text.join ","
+              ],
+          sqlOperation = sqlOperation ++ " " ++ onDuplicateKeyUPDATE
+        }
 
 dropUntilCaseInsensitive :: Text -> Text -> Maybe Text
 dropUntilCaseInsensitive breaker original =
