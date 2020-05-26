@@ -3,6 +3,7 @@
 module Redis.Internal where
 
 import Cherry.Prelude
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.Text.Encoding
 
@@ -10,7 +11,9 @@ data Error
   = RedisError Text
   | ConnectionLost
   | LibraryError Text
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance Aeson.ToJSON Error
 
 data Handler
   = Handler
