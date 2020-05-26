@@ -19,6 +19,7 @@ module Redis
     getSet,
     getSetJSON,
     mGet,
+    mGetJSON,
     delete,
     atomicModify,
     atomicModifyJSON,
@@ -103,6 +104,24 @@ mGet handler keys =
                 |> Dict.fromList
                 |> Task.succeed
             else Task.fail (Internal.LibraryError "We got a mismatch in the size of keys and values when post-processing the results of an mget command. Redis guarantees this shouldn't happen, so a mismatch here means that we did something wrong and continuing could mean building an incorrect mapping.")
+      )
+
+mGetJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text a)
+mGetJSON handler keys =
+  mGet handler keys
+    |> Task.map
+      ( \dict ->
+          dict
+            |> Dict.toList
+            |> List.filterMap
+              ( \(key, value) ->
+                  value
+                    |> toB -- TODO: we are going to/from Text unnecessarily by reusing mGet
+                    |> Lazy.fromStrict
+                    |> Aeson.decode'
+                    |> map (key,)
+              )
+            |> Dict.fromList
       )
 
 -- | Set the value at a namespaced Redis key.
