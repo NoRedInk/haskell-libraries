@@ -85,19 +85,23 @@ specs logHandler whichHandler redisHandler =
             )
         pure <| Expect.equal "Nothing" result,
       redisTest "mGet retrieves a mapping of the requested keys and their corresponding values" <| do
-        set testNS "key1" "value1"
-        set testNS "key3" "value3"
-        result <- mGet testNS ["key1", "key2", "key3"]
-        pure <| Expect.equal (Dict.toList result) [("key1", "value1"), ("key3", "value3")],
-      redisTest "mGet json roundtrip" <| do
-        setJSON testNS "key1" ([1, 2] :: [Int])
-        setJSON testNS "key2" ([3, 4] :: [Int])
-        result <- mGetJSON testNS ["key1", "key2"] :: Task Error (Dict Text [Int])
+        set testNS "key 1" "value 1"
+        set testNS "key 3" "value 3"
+        result <- mGet testNS ["key 1", "key 2", "key 3"]
         pure
           ( Expect.equal
               (Dict.toList result)
-              [ ("key1", [1, 2]),
-                ("key2", [3, 4])
+              [("key 1", "value 1"), ("key 3", "value 3")]
+          ),
+      redisTest "mGet json roundtrip" <| do
+        setJSON testNS "JSON key 1" ([1, 2] :: [Int])
+        setJSON testNS "JSON key 2" ([3, 4] :: [Int])
+        result <- mGetJSON testNS ["JSON key 1", "JSON key 2"] :: Task Error (Dict Text [Int])
+        pure
+          ( Expect.equal
+              (Dict.toList result)
+              [ ("JSON key 1", [1, 2]),
+                ("JSON key 2", [3, 4])
               ]
           ),
       redisTest "atomic modify with value" <| do

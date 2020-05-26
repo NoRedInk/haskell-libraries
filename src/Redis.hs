@@ -88,6 +88,20 @@ getJSON handler key =
 mGet :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
 mGet handler keys =
   keys
+    |> mGetInternal handler
+    |> Task.map
+      ( Dict.foldl
+          ( \k v r ->
+              case toT v of
+                Nothing -> r
+                Just v' -> Dict.insert k v' r
+          )
+          Dict.empty
+      )
+
+mGetInternal :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Data.ByteString.ByteString)
+mGetInternal handler keys =
+  keys
     |> List.map toB
     |> Internal.mGet handler
     |> andThen
@@ -97,7 +111,7 @@ mGet handler keys =
               zip keys values
                 |> List.filterMap
                   ( \(key, value) ->
-                      case value >>= toT of
+                      case value of
                         Nothing -> Nothing
                         Just v -> Just (key, v)
                   )
@@ -108,7 +122,7 @@ mGet handler keys =
 
 mGetJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text a)
 mGetJSON handler keys =
-  mGet handler keys
+  mGetInternal handler keys
     |> Task.map
       ( \dict ->
           dict
@@ -116,7 +130,6 @@ mGetJSON handler keys =
             |> List.filterMap
               ( \(key, value) ->
                   value
-                    |> toB -- TODO: we are going to/from Text unnecessarily by reusing mGet
                     |> Lazy.fromStrict
                     |> Aeson.decode'
                     |> map (key,)
