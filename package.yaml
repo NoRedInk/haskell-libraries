@@ -18,6 +18,7 @@ library:
   exposed-modules:
   - Redis
   - Redis.Mock
+  - Redis.Settings
   source-dirs:
   - src
 tests:
