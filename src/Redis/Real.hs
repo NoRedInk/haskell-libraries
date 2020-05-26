@@ -27,6 +27,7 @@ acquireHandler settings = do
            { Internal.rawGet = rawGet connection anything,
              Internal.rawSet = rawSet connection anything,
              Internal.rawGetSet = rawGetSet connection anything,
+             Internal.rawMGet = rawMGet connection anything,
              Internal.rawDelete = rawDelete connection anything,
              Internal.rawAtomicModify = rawAtomicModify connection anything
            },
@@ -82,6 +83,14 @@ rawGetSet ::
   Task Internal.Error (Maybe Data.ByteString.ByteString)
 rawGetSet connection anything key value =
   platformRedis connection anything (Database.Redis.getset key value)
+
+rawMGet ::
+  Database.Redis.Connection ->
+  Platform.DoAnythingHandler ->
+  [Data.ByteString.ByteString] ->
+  Task Internal.Error [Maybe Data.ByteString.ByteString]
+rawMGet connection anything key =
+  platformRedis connection anything (Database.Redis.mget key)
 
 rawDelete ::
   Database.Redis.Connection ->

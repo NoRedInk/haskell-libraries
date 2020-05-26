@@ -30,6 +30,18 @@ handler = do
               )
               |> andThen (Ok >> pure)
           )
+  let rawMGet keys =
+        Platform.doAnything
+          anything
+          ( readIORef hm
+              |> andThen
+                ( \hm' ->
+                    keys
+                      |> List.map (\key -> HM.lookup key hm')
+                      |> Ok
+                      |> pure
+                )
+          )
   let delete keys =
         Platform.doAnything
           anything
@@ -62,6 +74,7 @@ handler = do
     { Internal.rawGet = rawGet,
       Internal.rawSet = rawSet,
       Internal.rawGetSet = rawGetSet,
+      Internal.rawMGet = rawMGet,
       Internal.rawDelete = delete,
       Internal.rawAtomicModify = atomicModify
     }

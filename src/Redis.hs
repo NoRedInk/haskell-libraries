@@ -18,6 +18,7 @@ module Redis
     setJSON,
     getSet,
     getSetJSON,
+    mGet,
     delete,
     atomicModify,
     atomicModifyJSON,
@@ -40,7 +41,12 @@ import Cherry.Prelude
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.ByteString.Lazy as Lazy
+import Data.List (zip)
 import qualified Data.Text.Encoding
+import qualified Dict
+import Dict (Dict)
+import qualified List
+import List (List)
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -77,6 +83,27 @@ getJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> Text -> Task Intern
 getJSON handler key =
   Internal.get handler (toB key)
     |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
+
+mGet :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
+mGet handler keys =
+  keys
+    |> List.map toB
+    |> Internal.mGet handler
+    |> andThen
+      ( \values ->
+          if List.length keys == List.length values
+            then
+              zip keys values
+                |> List.filterMap
+                  ( \(key, value) ->
+                      case value >>= toT of
+                        Nothing -> Nothing
+                        Just v -> Just (key, v)
+                  )
+                |> Dict.fromList
+                |> Task.succeed
+            else Task.fail (Internal.LibraryError "We got a mismatch in the size of keys and values when post-processing the results of an mget command. Redis guarantees this shouldn't happen, so a mismatch here means that we did something wrong and continuing could mean building an incorrect mapping.")
+      )
 
 -- | Set the value at a namespaced Redis key.
 set :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error ()

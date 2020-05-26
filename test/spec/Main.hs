@@ -5,6 +5,7 @@ import qualified Conduit
 import qualified Control.Concurrent.Async
 import qualified Control.Monad.Catch
 import qualified Database.Redis
+import qualified Dict
 import qualified Environment
 import qualified Expect
 import qualified List
@@ -82,6 +83,11 @@ specs logHandler whichHandler redisHandler =
                 Nothing -> "Nothing"
             )
         pure <| Expect.equal "Nothing" result,
+      redisTest "mget retrieves a mapping of the requested keys and their corresponding values" <| do
+        set testNS "key1" "value1"
+        set testNS "key3" "value3"
+        result <- mGet testNS ["key1", "key2", "key3"]
+        pure <| Expect.equal (Dict.toList result) [("key1", "value1"), ("key3", "value3")],
       redisTest "atomic modify with value" <| do
         _ <- delete testNS ["Full Atom"]
         set testNS "Full Atom" "Something"
