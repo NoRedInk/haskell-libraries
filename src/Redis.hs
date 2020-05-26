@@ -85,6 +85,7 @@ getJSON handler key =
   Internal.get handler (toB key)
     |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
 
+-- | Get multipel values from  a namespaced Redis key, assuming it is valid UTF8 data.
 mGet :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
 mGet handler keys =
   keys
@@ -97,6 +98,25 @@ mGet handler keys =
                 Just v' -> Dict.insert k v' r
           )
           Dict.empty
+      )
+
+-- | Get multiple values from a namespaced Redis key, assuming it is valid JSON
+-- data of the expected type.
+mGetJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text a)
+mGetJSON handler keys =
+  mGetInternal handler keys
+    |> Task.map
+      ( \dict ->
+          dict
+            |> Dict.toList
+            |> List.filterMap
+              ( \(key, value) ->
+                  value
+                    |> Lazy.fromStrict
+                    |> Aeson.decode'
+                    |> map (key,)
+              )
+            |> Dict.fromList
       )
 
 mGetInternal :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Data.ByteString.ByteString)
@@ -118,23 +138,6 @@ mGetInternal handler keys =
                 |> Dict.fromList
                 |> Task.succeed
             else Task.fail (Internal.LibraryError "We got a mismatch in the size of keys and values when post-processing the results of an mget command. Redis guarantees this shouldn't happen, so a mismatch here means that we did something wrong and continuing could mean building an incorrect mapping.")
-      )
-
-mGetJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text a)
-mGetJSON handler keys =
-  mGetInternal handler keys
-    |> Task.map
-      ( \dict ->
-          dict
-            |> Dict.toList
-            |> List.filterMap
-              ( \(key, value) ->
-                  value
-                    |> Lazy.fromStrict
-                    |> Aeson.decode'
-                    |> map (key,)
-              )
-            |> Dict.fromList
       )
 
 -- | Set the value at a namespaced Redis key.
