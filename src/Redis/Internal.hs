@@ -22,7 +22,7 @@ errorForHumans topError =
 
 data Handler
   = Handler
-      { rawPing :: () -> Task Error Database.Redis.Status,
+      { rawPing :: Task Error Database.Redis.Status,
         rawGet :: Data.ByteString.ByteString -> Task Error (Maybe Data.ByteString.ByteString),
         rawSet :: Data.ByteString.ByteString -> Data.ByteString.ByteString -> Task Error (),
         rawGetSet :: Data.ByteString.ByteString -> Data.ByteString.ByteString -> Task Error (Maybe Data.ByteString.ByteString),
@@ -37,7 +37,7 @@ data Handler
 
 data NamespacedHandler
   = NamespacedHandler
-      { ping :: () -> Task Error Database.Redis.Status,
+      { ping :: Task Error Database.Redis.Status,
         get :: Data.ByteString.ByteString -> Task Error (Maybe Data.ByteString.ByteString),
         set :: Data.ByteString.ByteString -> Data.ByteString.ByteString -> Task Error (),
         getSet :: Data.ByteString.ByteString -> Data.ByteString.ByteString -> Task Error (Maybe Data.ByteString.ByteString),
@@ -54,7 +54,7 @@ namespacedHandler :: Handler -> Text -> NamespacedHandler
 namespacedHandler h namespace =
   let byteNamespace = namespace ++ ":" |> toB
    in NamespacedHandler
-        { ping = \_ -> rawPing h (),
+        { ping = rawPing h,
           get = \key -> rawGet h (byteNamespace ++ key),
           set = \key value -> rawSet h (byteNamespace ++ key) value,
           getSet = \key value -> rawGetSet h (byteNamespace ++ key) value,

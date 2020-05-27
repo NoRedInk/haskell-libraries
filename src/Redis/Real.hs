@@ -61,9 +61,8 @@ toResult reply =
 rawPing ::
   Database.Redis.Connection ->
   Platform.DoAnythingHandler ->
-  () ->
   Task Internal.Error Database.Redis.Status
-rawPing connection anything _ =
+rawPing connection anything =
   platformRedis connection anything Database.Redis.ping
 
 rawGet ::

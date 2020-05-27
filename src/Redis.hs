@@ -244,7 +244,7 @@ atomicModifyWithContextJSON handler key f =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Internal.Handler -> Health.Check
 readiness log handler =
-  Internal.rawPing handler ()
+  Internal.rawPing handler
     |> Task.map (\_ -> Health.Good)
     |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
     |> Task.perform log

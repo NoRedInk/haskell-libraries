@@ -13,7 +13,7 @@ handler :: IO Internal.Handler
 handler = do
   hm <- newIORef HM.empty
   anything <- Platform.doAnythingHandler
-  let rawPing () =
+  let rawPing =
         pure Database.Redis.Pong
   let rawGet key =
         Platform.doAnything
