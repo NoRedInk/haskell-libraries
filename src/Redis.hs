@@ -85,7 +85,7 @@ getJSON handler key =
   Internal.get handler (toB key)
     |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
 
--- | Get multipel values from  a namespaced Redis key, assuming it is valid UTF8 data.
+-- | Get multiple values from  a namespaced Redis key, assuming it is valid UTF8 data.
 mGet :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
 mGet handler keys =
   keys
