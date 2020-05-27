@@ -3,6 +3,7 @@ module Redis.Mock where
 import Cherry.Prelude
 import qualified Data.HashMap.Strict as HM
 import Data.IORef
+import qualified Database.Redis
 import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
@@ -13,6 +14,8 @@ handler :: IO Internal.Handler
 handler = do
   hm <- newIORef HM.empty
   anything <- Platform.doAnythingHandler
+  let rawPing =
+        pure Database.Redis.Pong
   let rawGet key =
         Platform.doAnything
           anything
@@ -77,7 +80,8 @@ handler = do
               |> map Ok
           )
   pure Internal.Handler
-    { Internal.rawGet = rawGet,
+    { Internal.rawPing = rawPing,
+      Internal.rawGet = rawGet,
       Internal.rawSet = rawSet,
       Internal.rawGetSet = rawGetSet,
       Internal.rawGetMany = rawGetMany,
