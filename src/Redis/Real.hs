@@ -89,8 +89,8 @@ rawMGet ::
   Platform.DoAnythingHandler ->
   [Data.ByteString.ByteString] ->
   Task Internal.Error [Maybe Data.ByteString.ByteString]
-rawMGet connection anything key =
-  platformRedis connection anything (Database.Redis.mget key)
+rawMGet connection anything keys =
+  platformRedis connection anything (Database.Redis.mget keys)
 
 rawDelete ::
   Database.Redis.Connection ->
