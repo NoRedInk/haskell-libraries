@@ -105,10 +105,23 @@ specs logHandler whichHandler redisHandler =
               ]
           ),
       redisTest "setMany allows setting multiple values at once" <| do
-        let assocs = [("setManyTest::key1", "value 1"), ("setManyTest::key2", "value 2")]
-        setMany testNS (Dict.fromList assocs)
-        result <- getMany testNS ["setManyTest::key1", "setManyTest::key2"]
-        pure (Expect.equal (Dict.toList result) assocs),
+        let dict =
+              Dict.fromList
+                [ ("setManyTest::key1", "value 1"),
+                  ("setManyTest::key2", "value 2")
+                ]
+        setMany testNS dict
+        result <- getMany testNS (Dict.keys dict)
+        pure (Expect.equal result dict),
+      redisTest "setManyJSON allows setting multiple JSON values at once" <| do
+        let dict =
+              Dict.fromList
+                [ ("setManyTestJSON::key1", [1, 2] :: [Int]),
+                  ("setManyTestJSON::key2", [3, 4] :: [Int])
+                ]
+        setManyJSON testNS dict
+        result <- getManyJSON testNS (Dict.keys dict)
+        pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do
         _ <- delete testNS ["Full Atom"]
         set testNS "Full Atom" "Something"
