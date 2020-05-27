@@ -88,16 +88,15 @@ getJSON handler key =
 -- | Get multiple values from  a namespaced Redis key, assuming it is valid UTF8 data.
 getMany :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
 getMany handler keys =
-  keys
-    |> getManyInternal handler
+  getManyInternal handler keys
     |> Task.map
-      ( Dict.foldl
-          ( \k v r ->
-              case toT v of
-                Nothing -> r
-                Just v' -> Dict.insert k v' r
+      ( List.filterMap
+          ( \(key, value) ->
+              value
+                |> toT
+                |> map (key,)
           )
-          Dict.empty
+          >> Dict.fromList
       )
 
 -- | Get multiple values from a namespaced Redis key, assuming it is valid JSON
@@ -106,20 +105,17 @@ getManyJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Ta
 getManyJSON handler keys =
   getManyInternal handler keys
     |> Task.map
-      ( \dict ->
-          dict
-            |> Dict.toList
-            |> List.filterMap
-              ( \(key, value) ->
-                  value
-                    |> Lazy.fromStrict
-                    |> Aeson.decode'
-                    |> map (key,)
-              )
-            |> Dict.fromList
+      ( List.filterMap
+          ( \(key, value) ->
+              value
+                |> Lazy.fromStrict
+                |> Aeson.decode'
+                |> map (key,)
+          )
+          >> Dict.fromList
       )
 
-getManyInternal :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Data.ByteString.ByteString)
+getManyInternal :: Internal.NamespacedHandler -> List Text -> Task Internal.Error [(Text, Data.ByteString.ByteString)]
 getManyInternal handler keys =
   keys
     |> List.map toB
@@ -135,7 +131,6 @@ getManyInternal handler keys =
                         Nothing -> Nothing
                         Just v -> Just (key, v)
                   )
-                |> Dict.fromList
                 |> Task.succeed
             else
               Task.fail
