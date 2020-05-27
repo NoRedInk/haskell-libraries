@@ -18,8 +18,8 @@ module Redis
     setJSON,
     getSet,
     getSetJSON,
-    mGet,
-    mGetJSON,
+    getMany,
+    getManyJSON,
     delete,
     atomicModify,
     atomicModifyJSON,
@@ -86,10 +86,10 @@ getJSON handler key =
     |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
 
 -- | Get multiple values from  a namespaced Redis key, assuming it is valid UTF8 data.
-mGet :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
-mGet handler keys =
+getMany :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
+getMany handler keys =
   keys
-    |> mGetInternal handler
+    |> getManyInternal handler
     |> Task.map
       ( Dict.foldl
           ( \k v r ->
@@ -102,9 +102,9 @@ mGet handler keys =
 
 -- | Get multiple values from a namespaced Redis key, assuming it is valid JSON
 -- data of the expected type.
-mGetJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text a)
-mGetJSON handler keys =
-  mGetInternal handler keys
+getManyJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text a)
+getManyJSON handler keys =
+  getManyInternal handler keys
     |> Task.map
       ( \dict ->
           dict
@@ -119,11 +119,11 @@ mGetJSON handler keys =
             |> Dict.fromList
       )
 
-mGetInternal :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Data.ByteString.ByteString)
-mGetInternal handler keys =
+getManyInternal :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Data.ByteString.ByteString)
+getManyInternal handler keys =
   keys
     |> List.map toB
-    |> Internal.mGet handler
+    |> Internal.getMany handler
     |> andThen
       ( \values ->
           if List.length keys == List.length values

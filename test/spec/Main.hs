@@ -84,19 +84,19 @@ specs logHandler whichHandler redisHandler =
                 Nothing -> "Nothing"
             )
         pure <| Expect.equal "Nothing" result,
-      redisTest "mGet retrieves a mapping of the requested keys and their corresponding values" <| do
+      redisTest "getMany retrieves a mapping of the requested keys and their corresponding values" <| do
         set testNS "key 1" "value 1"
         set testNS "key 3" "value 3"
-        result <- mGet testNS ["key 1", "key 2", "key 3"]
+        result <- getMany testNS ["key 1", "key 2", "key 3"]
         pure
           ( Expect.equal
               (Dict.toList result)
               [("key 1", "value 1"), ("key 3", "value 3")]
           ),
-      redisTest "mGet json roundtrip" <| do
+      redisTest "getMany json roundtrip" <| do
         setJSON testNS "JSON key 1" ([1, 2] :: [Int])
         setJSON testNS "JSON key 2" ([3, 4] :: [Int])
-        result <- mGetJSON testNS ["JSON key 1", "JSON key 2"] :: Task Error (Dict Text [Int])
+        result <- getManyJSON testNS ["JSON key 1", "JSON key 2"] :: Task Error (Dict Text [Int])
         pure
           ( Expect.equal
               (Dict.toList result)

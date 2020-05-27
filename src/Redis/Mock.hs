@@ -30,7 +30,7 @@ handler = do
               )
               |> andThen (Ok >> pure)
           )
-  let rawMGet keys =
+  let rawGetMany keys =
         Platform.doAnything
           anything
           ( readIORef hm
@@ -74,7 +74,7 @@ handler = do
     { Internal.rawGet = rawGet,
       Internal.rawSet = rawSet,
       Internal.rawGetSet = rawGetSet,
-      Internal.rawMGet = rawMGet,
+      Internal.rawGetMany = rawGetMany,
       Internal.rawDelete = delete,
       Internal.rawAtomicModify = atomicModify
     }
