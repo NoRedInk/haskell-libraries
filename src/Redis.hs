@@ -35,6 +35,7 @@ module Redis
     Internal.namespacedHandler,
     -- Real
     Real.handler,
+    readiness,
   )
 where
 
@@ -46,8 +47,10 @@ import Data.List (zip)
 import qualified Data.Text.Encoding
 import qualified Dict
 import Dict (Dict)
+import qualified Health
 import qualified List
 import List (List)
+import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -236,3 +239,13 @@ atomicModifyWithContextJSON handler key f =
             Task.fail
               <| Internal.LibraryError "We failed to decode the ByteStream we successfully wrote; this should never happen and indicates a bug in our Redis library or our JSON encoding/decoding."
       )
+
+-- |
+-- Check that we are ready to be take traffic.
+readiness :: Platform.LogHandler -> Internal.Handler -> Health.Check
+readiness log handler =
+  Internal.rawPing handler ()
+    |> Task.map (\_ -> Health.Good)
+    |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
+    |> Task.perform log
+    |> Health.mkCheck "redis"
