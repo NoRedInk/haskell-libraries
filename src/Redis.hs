@@ -137,7 +137,14 @@ getManyInternal handler keys =
                   )
                 |> Dict.fromList
                 |> Task.succeed
-            else Task.fail (Internal.LibraryError "We got a mismatch in the size of keys and values when post-processing the results of an mget command. Redis guarantees this shouldn't happen, so a mismatch here means that we did something wrong and continuing could mean building an incorrect mapping.")
+            else
+              Task.fail
+                ( Internal.LibraryError
+                    "We got a mismatch in the size of keys and values when post-processing the \
+                    \results of an mget command. Redis guarantees this shouldn't happen, so a \
+                    \mismatch here means that we did something wrong and continuing could mean \
+                    \building an incorrect mapping."
+                )
       )
 
 -- | Set the value at a namespaced Redis key.
