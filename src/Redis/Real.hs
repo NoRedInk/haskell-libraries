@@ -24,7 +24,8 @@ acquireHandler settings = do
   anything <- Platform.doAnythingHandler
   pure
     <| ( Internal.Handler
-           { Internal.rawGet = rawGet connection anything,
+           { Internal.rawPing = rawPing connection anything,
+             Internal.rawGet = rawGet connection anything,
              Internal.rawSet = rawSet connection anything,
              Internal.rawGetSet = rawGetSet connection anything,
              Internal.rawGetMany = rawGetMany connection anything,
@@ -56,6 +57,14 @@ toResult reply =
     Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
     Left _ -> Err (Internal.RedisError "The Redis library said this was an error but returned no error message.")
     Right r -> Ok r
+
+rawPing ::
+  Database.Redis.Connection ->
+  Platform.DoAnythingHandler ->
+  () ->
+  Task Internal.Error Database.Redis.Status
+rawPing connection anything _ =
+  platformRedis connection anything Database.Redis.ping
 
 rawGet ::
   Database.Redis.Connection ->
