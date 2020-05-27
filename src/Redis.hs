@@ -83,7 +83,7 @@ get handler key =
 getJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe a)
 getJSON handler key =
   Internal.get handler (toB key)
-    |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
+    |> map (andThen Aeson.decodeStrict')
 
 -- | Get multiple values from  a namespaced Redis key, assuming it is valid UTF8 data.
 getMany :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
@@ -108,8 +108,7 @@ getManyJSON handler keys =
       ( List.filterMap
           ( \(key, value) ->
               value
-                |> Lazy.fromStrict
-                |> Aeson.decode'
+                |> Aeson.decodeStrict'
                 |> map (key,)
           )
           >> Dict.fromList
@@ -163,7 +162,7 @@ getSet handler key value =
 getSetJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error (Maybe a)
 getSetJSON handler key value =
   Internal.getSet handler (toB key) (Aeson.encode value |> Lazy.toStrict)
-    |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
+    |> map (andThen Aeson.decodeStrict')
 
 -- | Delete the values at all of the provided keys. Return how many of those keys existed
 -- (and hence were deleted)
@@ -194,13 +193,12 @@ atomicModifyJSON handler key f =
   Internal.atomicModify
     handler
     (toB key)
-    ( andThen
-        (Lazy.fromStrict >> Aeson.decode')
+    ( andThen Aeson.decodeStrict'
         >> f
         >> (Aeson.encode >> Lazy.toStrict >> (,()))
     )
     |> andThen
-      ( \(bs, _) -> case bs |> Lazy.fromStrict |> Aeson.decode' of
+      ( \(bs, _) -> case bs |> Aeson.decodeStrict' of
           Just v -> Task.succeed v
           Nothing ->
             Task.fail
@@ -227,13 +225,12 @@ atomicModifyWithContextJSON handler key f =
   Internal.atomicModify
     handler
     (toB key)
-    ( andThen
-        (Lazy.fromStrict >> Aeson.decode')
+    ( andThen Aeson.decodeStrict'
         >> f
         >> Tuple.mapFirst (Aeson.encode >> Lazy.toStrict)
     )
     |> andThen
-      ( \(bs, context) -> case bs |> Lazy.fromStrict |> Aeson.decode' of
+      ( \(bs, context) -> case bs |> Aeson.decodeStrict' of
           Just v -> Task.succeed (v, context)
           Nothing ->
             Task.fail
