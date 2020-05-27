@@ -20,6 +20,7 @@ module Redis
     getSetJSON,
     getMany,
     getManyJSON,
+    setMany,
     delete,
     atomicModify,
     atomicModifyJSON,
@@ -149,6 +150,16 @@ set handler key value =
 setJSON :: Aeson.ToJSON a => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error ()
 setJSON handler key value =
   Internal.set handler (toB key) (Aeson.encode value |> Lazy.toStrict)
+
+-- | Set the multiple values with namespaced keys.
+setMany :: Internal.NamespacedHandler -> Dict Text Text -> Task Internal.Error ()
+setMany handler values =
+  Internal.setMany
+    handler
+    ( values
+        |> Dict.toList
+        |> List.map (\(k, v) -> (toB k, toB v))
+    )
 
 -- | Set the value at a namespaced Redis key, returning the previous value (if any)
 getSet :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)

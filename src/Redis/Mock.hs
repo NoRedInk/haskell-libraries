@@ -6,7 +6,8 @@ import Data.IORef
 import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
-import Prelude (IO, pure)
+import qualified Task
+import Prelude (IO, pure, uncurry)
 
 handler :: IO Internal.Handler
 handler = do
@@ -42,6 +43,11 @@ handler = do
                       |> pure
                 )
           )
+  let rawSetMany assocs =
+        assocs
+          |> List.map (uncurry rawSet)
+          |> Task.sequence
+          |> map (\_ -> ())
   let delete keys =
         Platform.doAnything
           anything
@@ -75,6 +81,7 @@ handler = do
       Internal.rawSet = rawSet,
       Internal.rawGetSet = rawGetSet,
       Internal.rawGetMany = rawGetMany,
+      Internal.rawSetMany = rawSetMany,
       Internal.rawDelete = delete,
       Internal.rawAtomicModify = atomicModify
     }

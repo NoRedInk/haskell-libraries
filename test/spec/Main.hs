@@ -85,25 +85,30 @@ specs logHandler whichHandler redisHandler =
             )
         pure <| Expect.equal "Nothing" result,
       redisTest "getMany retrieves a mapping of the requested keys and their corresponding values" <| do
-        set testNS "key 1" "value 1"
-        set testNS "key 3" "value 3"
-        result <- getMany testNS ["key 1", "key 2", "key 3"]
+        set testNS "getManyTest::key1" "value 1"
+        set testNS "getManyTest::key3" "value 3"
+        result <- getMany testNS ["getManyTest::key1", "getManyTest::key2", "getManyTest::key3"]
         pure
           ( Expect.equal
               (Dict.toList result)
-              [("key 1", "value 1"), ("key 3", "value 3")]
+              [("getManyTest::key1", "value 1"), ("getManyTest::key3", "value 3")]
           ),
       redisTest "getMany json roundtrip" <| do
-        setJSON testNS "JSON key 1" ([1, 2] :: [Int])
-        setJSON testNS "JSON key 2" ([3, 4] :: [Int])
-        result <- getManyJSON testNS ["JSON key 1", "JSON key 2"] :: Task Error (Dict Text [Int])
+        setJSON testNS "getManyJSONTest::key1" ([1, 2] :: [Int])
+        setJSON testNS "getManyJSONTest::key2" ([3, 4] :: [Int])
+        result <- getManyJSON testNS ["getManyJSONTest::key1", "getManyJSONTest::key2"] :: Task Error (Dict Text [Int])
         pure
           ( Expect.equal
               (Dict.toList result)
-              [ ("JSON key 1", [1, 2]),
-                ("JSON key 2", [3, 4])
+              [ ("getManyJSONTest::key1", [1, 2]),
+                ("getManyJSONTest::key2", [3, 4])
               ]
           ),
+      redisTest "setMany allows setting multiple values at once" <| do
+        let assocs = [("setManyTest::key1", "value 1"), ("setManyTest::key2", "value 2")]
+        setMany testNS (Dict.fromList assocs)
+        result <- getMany testNS ["setManyTest::key1", "setManyTest::key2"]
+        pure (Expect.equal (Dict.toList result) assocs),
       redisTest "atomic modify with value" <| do
         _ <- delete testNS ["Full Atom"]
         set testNS "Full Atom" "Something"
