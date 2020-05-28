@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -31,6 +32,7 @@ module MySQL
     MySQL.Single (..),
     -- Bulk inserts
     unsafeBulkifyInserts,
+    BulkifiedInsert (..),
     onConflictUpdate,
   )
 where
@@ -483,15 +485,22 @@ instance
 --
 -- For MySQL there might be other approaches we could take, which might offer
 -- more compile-time guarantees.
-unsafeBulkifyInserts :: NonEmpty (Query ()) -> Result Text (Query ())
-unsafeBulkifyInserts queries@(first :| _) =
+data BulkifiedInsert a
+  = BulkifiedInsert a
+  | UnableToBulkify Text
+  | EmptyInsert
+  deriving (Prelude.Functor, Show, Eq)
+
+unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
+unsafeBulkifyInserts [] = EmptyInsert
+unsafeBulkifyInserts (first : rest) =
   case maybeBrokenQueries of
-    Nothing -> Err "Not all queries are inserts with a VALUES keyword."
+    Nothing -> UnableToBulkify "Not all queries are inserts with a VALUES keyword."
     Just (_ :| otherQueries) ->
       first {sqlString = Data.Text.intercalate "," (sqlString first : otherQueries)}
-        |> Ok
+        |> BulkifiedInsert
   where
-    maybeBrokenQueries = Prelude.traverse (dropUntilCaseInsensitive "VALUES" << sqlString) queries
+    maybeBrokenQueries = Prelude.traverse (dropUntilCaseInsensitive "VALUES" << sqlString) (first :| rest)
 
 -- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
 -- the key isn't unique.
