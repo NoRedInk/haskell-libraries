@@ -585,7 +585,7 @@ qqSQLYearly query =
   let queryFor :: Int -> Prelude.String
       queryFor year =
         Data.Text.pack query
-          |> Data.Text.replace "[[YEAR]]" (Debug.toString year)
+          |> Data.Text.replace "[[YEAR]]" (Text.fromInt year)
           |> Data.Text.unpack
    in [e|
         ( \(year :: Int) ->
