@@ -22,7 +22,7 @@ module MySQL
     -- Querying
     Query,
     Query.Error (..),
-    Query.sql,
+    sql,
     doQuery,
     -- Handling transactions
     transaction,
@@ -37,6 +37,7 @@ module MySQL
     onDuplicateDoNothing,
     sqlYearly,
     lastInsertedPrimaryKey,
+    escape,
   )
 where
 
@@ -48,17 +49,24 @@ import Control.Monad (void)
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Coerce
 import Data.IORef
+import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.Pool
+import Data.Proxy (Proxy (Proxy))
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import Data.Word (Word)
 import qualified Database.MySQL.Connection
+import qualified Database.MySQL.Protocol.Escape as Escape
 import qualified Database.Persist.MySQL as MySQL
+import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Debug
 import GHC.Stack (HasCallStack, withFrozenCallStack)
+import GHC.TypeLits (Symbol)
 import qualified Health
 import Internal.CaselessRegex (caselessRegex)
 import qualified Internal.GenericDb as GenericDb
@@ -582,21 +590,21 @@ qqSQLYearly query =
    in [e|
         ( \(year :: Int) ->
             case year of
-              2015 -> $(quoteExp Query.sql (queryFor 2015))
-              2016 -> $(quoteExp Query.sql (queryFor 2016))
-              2017 -> $(quoteExp Query.sql (queryFor 2017))
-              2018 -> $(quoteExp Query.sql (queryFor 2018))
-              2019 -> $(quoteExp Query.sql (queryFor 2019))
-              2020 -> $(quoteExp Query.sql (queryFor 2020))
-              2021 -> $(quoteExp Query.sql (queryFor 2021))
-              2022 -> $(quoteExp Query.sql (queryFor 2022))
-              2023 -> $(quoteExp Query.sql (queryFor 2023))
-              2024 -> $(quoteExp Query.sql (queryFor 2024))
-              2025 -> $(quoteExp Query.sql (queryFor 2025))
-              2026 -> $(quoteExp Query.sql (queryFor 2026))
-              2027 -> $(quoteExp Query.sql (queryFor 2027))
-              2028 -> $(quoteExp Query.sql (queryFor 2028))
-              2029 -> $(quoteExp Query.sql (queryFor 2029))
+              2015 -> $(quoteExp sql (queryFor 2015))
+              2016 -> $(quoteExp sql (queryFor 2016))
+              2017 -> $(quoteExp sql (queryFor 2017))
+              2018 -> $(quoteExp sql (queryFor 2018))
+              2019 -> $(quoteExp sql (queryFor 2019))
+              2020 -> $(quoteExp sql (queryFor 2020))
+              2021 -> $(quoteExp sql (queryFor 2021))
+              2022 -> $(quoteExp sql (queryFor 2022))
+              2023 -> $(quoteExp sql (queryFor 2023))
+              2024 -> $(quoteExp sql (queryFor 2024))
+              2025 -> $(quoteExp sql (queryFor 2025))
+              2026 -> $(quoteExp sql (queryFor 2026))
+              2027 -> $(quoteExp sql (queryFor 2027))
+              2028 -> $(quoteExp sql (queryFor 2028))
+              2029 -> $(quoteExp sql (queryFor 2029))
               _ -> Prelude.error ("Unsupported school year: " ++ Prelude.show year)
         )
         |]
@@ -645,3 +653,92 @@ lastInsertedPrimaryKey c =
             Ok (MySQL.Single x : _) -> Task.succeed x
             Err err -> Task.fail err
         )
+
+sql :: QuasiQuoter
+sql =
+  QuasiQuoter
+    { quoteExp = qqSQL,
+      quoteType = Prelude.fail "sql not supported in types",
+      quotePat = Prelude.fail "sql not supported in patterns",
+      quoteDec = Prelude.fail "sql not supported in declarations"
+    }
+
+qqSQL :: Prelude.String -> ExpQ
+qqSQL query =
+  [e|
+    $(quoteExp Query.sql (Data.Text.unpack (escapeInterpolations (Data.Text.pack query))))
+    |]
+
+escapeInterpolations :: Text -> Text
+escapeInterpolations =
+  Lens.over
+    ([caselessRegex|\$\{([^\}]+)\}|] << R.group 0)
+    (\match -> "MySQL.escape (" ++ match ++ ")")
+
+-- | Types wrapped in `Escaped` get escaped in a MySQL rather than a
+-- Postgresql fashion when used as column values.
+newtype Escaped a = Escaped a deriving (Show, Eq, PGTypes.PGColumn t)
+
+instance
+  ( PGTypes.PGParameter t a,
+    KnownEscapingStrategy t a (HowToEscape t a)
+  ) =>
+  PGTypes.PGParameter t (MySQL.Escaped a)
+  where
+
+  pgEncode p (Escaped t) = PGTypes.pgEncode p t
+
+  pgLiteral p (Escaped t) =
+    escapeType (Proxy :: Proxy (HowToEscape t a)) p t
+
+-- A type family is a function for types. The type family (function) below
+-- takes two arguments: The postgres type to encode into and the Haskell type
+-- to encode. It returns a type representing the escaping strategy to use.
+-- Example usage:
+--
+--     HowToEscape "text" Text       --> EscapeMySQLText
+--     HowToEscape "text" Maybe Text --> Nullable EscapeMySQLText
+type family HowToEscape (t :: Symbol) (a :: Type) :: EscapingStrategy where
+  HowToEscape t (Maybe a) = 'Nullable (HowToEscape t a)
+  HowToEscape "text" a = 'EscapeMySqlText
+  HowToEscape "character varying" a = 'EscapeMySqlText
+  HowToEscape "json" a = 'EscapeMySqlText
+  HowToEscape t a = 'EscapeSameAsPostgres
+
+-- The different escaping strategies we perform for different types.
+data EscapingStrategy
+  = EscapeSameAsPostgres -- We let `postgresql-typed` escape for us.
+  | EscapeMySqlText -- MySQL-specific escaping for text-columns.
+  | Nullable EscapingStrategy -- We don't want to escape `NULL` values.
+
+-- The type above enumerates the escaping strategies. The class below and it's
+-- instances represent the implementations for the enumerated strategies.
+class KnownEscapingStrategy t a (e :: EscapingStrategy) where
+  escapeType :: PGTypes.PGParameter t a => Proxy e -> PGTypes.PGTypeID t -> a -> BS.ByteString
+
+instance KnownEscapingStrategy t a 'EscapeSameAsPostgres where
+  escapeType _ p t = PGTypes.pgLiteral p t
+
+instance KnownEscapingStrategy t a 'EscapeMySqlText where
+  escapeType _ p t = mysqlEscape (PGTypes.pgEncode p t)
+
+instance
+  (KnownEscapingStrategy t a e, PGTypes.PGParameter t a) =>
+  KnownEscapingStrategy t (Maybe a) ('Nullable e)
+  where
+  escapeType _ p t =
+    case t of
+      Nothing -> BSC.pack "NULL"
+      Just justT -> escapeType (Proxy :: Proxy e) p justT
+
+-- | Wrap a value in a newtype that will ensure correct MySQL escaping logic is
+-- applied. You don't need to do this manually, the `sql` quasiquoter will wrap
+-- for you automatically.
+escape :: a -> Escaped a
+escape = Escaped
+
+mysqlEscape :: BS.ByteString -> BS.ByteString
+mysqlEscape = wrapInSingleQuotes << Escape.escapeBytes
+
+wrapInSingleQuotes :: BS.ByteString -> BS.ByteString
+wrapInSingleQuotes s = BSC.snoc (BSC.cons '\'' s) '\''
