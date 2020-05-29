@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -29,14 +30,17 @@ module MySQL
     QueryResults,
     MySQL.PersistField (..),
     MySQL.Single (..),
-    -- Bulk inserts
+    -- Helpers for uncommon queries
     unsafeBulkifyInserts,
     onConflictUpdate,
+    onDuplicateDoNothing,
   )
 where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
+import qualified Control.Lens as Lens
+import qualified Control.Lens.Regex.Text as R
 import Control.Monad (void)
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
@@ -53,6 +57,7 @@ import qualified Database.Persist.MySQL as MySQL
 import qualified Debug
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
+import Internal.CaselessRegex (caselessRegex)
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import Internal.Query (Query (..))
@@ -520,3 +525,18 @@ dropUntilCaseInsensitive breaker original =
           Data.Text.splitAt (Data.Text.length (start ++ "values")) original
             |> Tuple.second
             |> Just
+
+-- | Use for insert queries that are allowed to fail. In Postgres we would use
+-- an `ON CONFLICT DO NOTHING` clause for this, but MySQL doesn't support it.
+-- `MySQL` recommends using `INSERT IGNORE` syntax, but that Postgres does not
+-- support. This helper hacks the `IGNORE` clause into a query after we run
+-- Postgres compile-time checks.
+onDuplicateDoNothing :: Query () -> Query ()
+onDuplicateDoNothing query =
+  query
+    { sqlString =
+        Lens.over
+          ([caselessRegex|^\s*INSERT INTO|] << R.match)
+          (\_ -> "INSERT IGNORE INTO")
+          (sqlString query)
+    }
