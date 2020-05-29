@@ -36,6 +36,7 @@ module MySQL
     onConflictUpdate,
     onDuplicateDoNothing,
     sqlYearly,
+    lastInsertedPrimaryKey,
   )
 where
 
@@ -599,3 +600,48 @@ qqSQLYearly query =
               _ -> Prelude.error ("Unsupported school year: " ++ Prelude.show year)
         )
         |]
+
+-- |
+-- Get the primary key of the last row inserted by the MySQL connection we're
+-- currently in. This uses MySQL's `LAST_INSERT_ID()` function and has all the
+-- same caveats and limitations. In particular:
+--
+-- - This gets the last inserted by the current connection. This means we can
+--   only use it within a MySQL transaction created using this library. Such a
+--   transaction holds on to a reserved connection, preventing other threads
+--   from using the connection to make requests in between our `INSERT` query
+--   and our use of this function.
+-- - If the last insert inserted multiple rows this function will return the
+--   primary key of the first of this batch of rows that was inserted.
+--
+-- In Postgres use a `RETURNING` statement to get inserted id's for inserted
+-- rows:
+--
+--    insertedIds <-
+--      Postgres.doQuery
+--        [Postgres.sql|!
+--          INSERT INTO peanut_butters (brand, chunkiness)
+--          VALUES ('Original', 'granite')
+--          RETURNING id
+--        |]
+--        expectQuerySuccess
+--
+-- For more information: https://dev.mysql.com/doc/refman/8.0/en/getting-unique-id.html
+lastInsertedPrimaryKey :: Connection -> Task Query.Error Int
+lastInsertedPrimaryKey c =
+  let query =
+        Query.Query
+          { runQuery = \_ -> pure [],
+            sqlString = "SELECT LAST_INSERT_ID()",
+            quasiQuotedString = "SELECT LAST_INSERT_ID()",
+            sqlOperation = "SELECT",
+            queriedRelation = "LAST_INSERTED_ID()"
+          }
+   in doQuery
+        c
+        query
+        ( \res -> case res of
+            Ok [] -> Task.succeed (-1)
+            Ok (MySQL.Single x : _) -> Task.succeed x
+            Err err -> Task.fail err
+        )
