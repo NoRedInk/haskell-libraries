@@ -635,7 +635,7 @@ qqSQLYearly query =
 --        expectQuerySuccess
 --
 -- For more information: https://dev.mysql.com/doc/refman/8.0/en/getting-unique-id.html
-lastInsertedPrimaryKey :: Connection -> Task Query.Error Int
+lastInsertedPrimaryKey :: Connection -> Task Query.Error (Maybe Int)
 lastInsertedPrimaryKey c =
   let query =
         Query.Query
@@ -649,7 +649,7 @@ lastInsertedPrimaryKey c =
         c
         query
         ( \res -> case res of
-            Ok [] -> Task.succeed (-1)
+            Ok [] -> Task.succeed Nothing
             Ok (MySQL.Single x : _) -> Task.succeed x
             Err err -> Task.fail err
         )
