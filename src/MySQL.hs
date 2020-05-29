@@ -643,7 +643,7 @@ lastInsertedPrimaryKey c =
             sqlString = "SELECT LAST_INSERT_ID()",
             quasiQuotedString = "SELECT LAST_INSERT_ID()",
             sqlOperation = "SELECT",
-            queriedRelation = "LAST_INSERTED_ID()"
+            queriedRelation = "LAST_INSERT_ID()"
           }
    in doQuery
         c
