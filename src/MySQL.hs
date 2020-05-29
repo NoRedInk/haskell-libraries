@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -34,6 +35,7 @@ module MySQL
     unsafeBulkifyInserts,
     onConflictUpdate,
     onDuplicateDoNothing,
+    sqlYearly,
   )
 where
 
@@ -61,6 +63,8 @@ import Internal.CaselessRegex (caselessRegex)
 import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import Internal.Query (Query (..))
+import Language.Haskell.TH (ExpQ)
+import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
@@ -540,3 +544,58 @@ onDuplicateDoNothing query =
           (\_ -> "INSERT IGNORE INTO")
           (sqlString query)
     }
+
+-- | Special quasi quoter for accessing yearly tables like `mastery_2019`. Use
+-- it like this:
+--
+--     MySQL.doQuery
+--       handler
+--       (
+--         [sqlYearly|!
+--           SELECT * FROM mastery_[[YEAR]]
+--           LIMIT 1
+--         |]
+--         2019
+--       )
+--
+-- How this works: whereas the `sql` quasiquoter generates code of a type
+-- `Query row`, `sqlYearly` generates code of a type `Int -> Query row`: That's
+-- a function that takes a year and substitutes it in the place of the
+-- `[[YEAR]]` placeholder.
+sqlYearly :: QuasiQuoter
+sqlYearly =
+  QuasiQuoter
+    { quoteExp = qqSQLYearly,
+      quoteType = Prelude.fail "sql not supported in types",
+      quotePat = Prelude.fail "sql not supported in patterns",
+      quoteDec = Prelude.fail "sql not supported in declarations"
+    }
+
+qqSQLYearly :: Prelude.String -> ExpQ
+qqSQLYearly query =
+  let queryFor :: Int -> Prelude.String
+      queryFor year =
+        Data.Text.pack query
+          |> Data.Text.replace "[[YEAR]]" (Debug.toString year)
+          |> Data.Text.unpack
+   in [e|
+        ( \(year :: Int) ->
+            case year of
+              2015 -> $(quoteExp Query.sql (queryFor 2015))
+              2016 -> $(quoteExp Query.sql (queryFor 2016))
+              2017 -> $(quoteExp Query.sql (queryFor 2017))
+              2018 -> $(quoteExp Query.sql (queryFor 2018))
+              2019 -> $(quoteExp Query.sql (queryFor 2019))
+              2020 -> $(quoteExp Query.sql (queryFor 2020))
+              2021 -> $(quoteExp Query.sql (queryFor 2021))
+              2022 -> $(quoteExp Query.sql (queryFor 2022))
+              2023 -> $(quoteExp Query.sql (queryFor 2023))
+              2024 -> $(quoteExp Query.sql (queryFor 2024))
+              2025 -> $(quoteExp Query.sql (queryFor 2025))
+              2026 -> $(quoteExp Query.sql (queryFor 2026))
+              2027 -> $(quoteExp Query.sql (queryFor 2027))
+              2028 -> $(quoteExp Query.sql (queryFor 2028))
+              2029 -> $(quoteExp Query.sql (queryFor 2029))
+              _ -> Prelude.error ("Unsupported school year: " ++ Prelude.show year)
+        )
+        |]
