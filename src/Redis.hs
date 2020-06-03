@@ -18,6 +18,10 @@ module Redis
     setJSON,
     getSet,
     getSetJSON,
+    getMany,
+    getManyJSON,
+    setMany,
+    setManyJSON,
     delete,
     atomicModify,
     atomicModifyJSON,
@@ -33,6 +37,7 @@ module Redis
     Internal.namespacedHandler,
     -- Real
     Real.handler,
+    readiness,
   )
 where
 
@@ -40,7 +45,14 @@ import Cherry.Prelude
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.ByteString.Lazy as Lazy
+import Data.List (zip)
 import qualified Data.Text.Encoding
+import qualified Dict
+import Dict (Dict)
+import qualified Health
+import qualified List
+import List (List)
+import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -76,7 +88,63 @@ get handler key =
 getJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe a)
 getJSON handler key =
   Internal.get handler (toB key)
-    |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
+    |> map (andThen Aeson.decodeStrict')
+
+-- | Get multiple values from  a namespaced Redis key, assuming it is valid UTF8 data.
+getMany :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text Text)
+getMany handler keys =
+  getManyInternal handler keys
+    |> Task.map
+      ( List.filterMap
+          ( \(key, value) ->
+              value
+                |> toT
+                |> map (key,)
+          )
+          >> Dict.fromList
+      )
+
+-- | Get multiple values from a namespaced Redis key, assuming it is valid JSON
+-- data of the expected type.
+getManyJSON :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict Text a)
+getManyJSON handler keys =
+  getManyInternal handler keys
+    |> Task.map
+      ( List.filterMap
+          ( \(key, value) ->
+              value
+                |> Aeson.decodeStrict'
+                |> map (key,)
+          )
+          >> Dict.fromList
+      )
+
+getManyInternal :: Internal.NamespacedHandler -> List Text -> Task Internal.Error [(Text, Data.ByteString.ByteString)]
+getManyInternal handler keys =
+  keys
+    |> List.map toB
+    |> Internal.getMany handler
+    |> andThen
+      ( \values ->
+          if List.length keys == List.length values
+            then
+              zip keys values
+                |> List.filterMap
+                  ( \(key, value) ->
+                      case value of
+                        Nothing -> Nothing
+                        Just v -> Just (key, v)
+                  )
+                |> Task.succeed
+            else
+              Task.fail
+                ( Internal.LibraryError
+                    "We got a mismatch in the size of keys and values when post-processing the \
+                    \results of an mget command. Redis guarantees this shouldn't happen, so a \
+                    \mismatch here means that we did something wrong and continuing could mean \
+                    \building an incorrect mapping."
+                )
+      )
 
 -- | Set the value at a namespaced Redis key.
 set :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error ()
@@ -87,6 +155,26 @@ set handler key value =
 setJSON :: Aeson.ToJSON a => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error ()
 setJSON handler key value =
   Internal.set handler (toB key) (Aeson.encode value |> Lazy.toStrict)
+
+-- | Set the multiple values with namespaced keys.
+setMany :: Internal.NamespacedHandler -> Dict Text Text -> Task Internal.Error ()
+setMany handler values =
+  Internal.setMany
+    handler
+    ( values
+        |> Dict.toList
+        |> List.map (\(k, v) -> (toB k, toB v))
+    )
+
+-- | Set the multiple JSON values with namespaced keys.
+setManyJSON :: Aeson.ToJSON a => Internal.NamespacedHandler -> Dict Text a -> Task Internal.Error ()
+setManyJSON handler values =
+  Internal.setMany
+    handler
+    ( values
+        |> Dict.toList
+        |> List.map (\(k, v) -> (toB k, Aeson.encode v |> Lazy.toStrict))
+    )
 
 -- | Set the value at a namespaced Redis key, returning the previous value (if any)
 getSet :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)
@@ -99,7 +187,7 @@ getSet handler key value =
 getSetJSON :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error (Maybe a)
 getSetJSON handler key value =
   Internal.getSet handler (toB key) (Aeson.encode value |> Lazy.toStrict)
-    |> map (andThen (Lazy.fromStrict >> Aeson.decode'))
+    |> map (andThen Aeson.decodeStrict')
 
 -- | Delete the values at all of the provided keys. Return how many of those keys existed
 -- (and hence were deleted)
@@ -130,13 +218,12 @@ atomicModifyJSON handler key f =
   Internal.atomicModify
     handler
     (toB key)
-    ( andThen
-        (Lazy.fromStrict >> Aeson.decode')
+    ( andThen Aeson.decodeStrict'
         >> f
         >> (Aeson.encode >> Lazy.toStrict >> (,()))
     )
     |> andThen
-      ( \(bs, _) -> case bs |> Lazy.fromStrict |> Aeson.decode' of
+      ( \(bs, _) -> case bs |> Aeson.decodeStrict' of
           Just v -> Task.succeed v
           Nothing ->
             Task.fail
@@ -163,15 +250,24 @@ atomicModifyWithContextJSON handler key f =
   Internal.atomicModify
     handler
     (toB key)
-    ( andThen
-        (Lazy.fromStrict >> Aeson.decode')
+    ( andThen Aeson.decodeStrict'
         >> f
         >> Tuple.mapFirst (Aeson.encode >> Lazy.toStrict)
     )
     |> andThen
-      ( \(bs, context) -> case bs |> Lazy.fromStrict |> Aeson.decode' of
+      ( \(bs, context) -> case bs |> Aeson.decodeStrict' of
           Just v -> Task.succeed (v, context)
           Nothing ->
             Task.fail
               <| Internal.LibraryError "We failed to decode the ByteStream we successfully wrote; this should never happen and indicates a bug in our Redis library or our JSON encoding/decoding."
       )
+
+-- |
+-- Check that we are ready to be take traffic.
+readiness :: Platform.LogHandler -> Internal.Handler -> Health.Check
+readiness log handler =
+  Internal.rawPing handler
+    |> Task.map (\_ -> Health.Good)
+    |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
+    |> Task.perform log
+    |> Health.mkCheck "redis"

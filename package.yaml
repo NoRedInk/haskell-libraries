@@ -11,6 +11,7 @@ library:
   - conduit
   - env-parser
   - exceptions
+  - health
   - hedis
   - resourcet
   - text

@@ -5,6 +5,8 @@ import qualified Conduit
 import qualified Control.Concurrent.Async
 import qualified Control.Monad.Catch
 import qualified Database.Redis
+import qualified Dict
+import Dict (Dict)
 import qualified Environment
 import qualified Expect
 import qualified List
@@ -82,6 +84,44 @@ specs logHandler whichHandler redisHandler =
                 Nothing -> "Nothing"
             )
         pure <| Expect.equal "Nothing" result,
+      redisTest "getMany retrieves a mapping of the requested keys and their corresponding values" <| do
+        set testNS "getManyTest::key1" "value 1"
+        set testNS "getManyTest::key3" "value 3"
+        result <- getMany testNS ["getManyTest::key1", "getManyTest::key2", "getManyTest::key3"]
+        pure
+          ( Expect.equal
+              (Dict.toList result)
+              [("getManyTest::key1", "value 1"), ("getManyTest::key3", "value 3")]
+          ),
+      redisTest "getMany json roundtrip" <| do
+        setJSON testNS "getManyJSONTest::key1" ([1, 2] :: [Int])
+        setJSON testNS "getManyJSONTest::key2" ([3, 4] :: [Int])
+        result <- getManyJSON testNS ["getManyJSONTest::key1", "getManyJSONTest::key2"] :: Task Error (Dict Text [Int])
+        pure
+          ( Expect.equal
+              (Dict.toList result)
+              [ ("getManyJSONTest::key1", [1, 2]),
+                ("getManyJSONTest::key2", [3, 4])
+              ]
+          ),
+      redisTest "setMany allows setting multiple values at once" <| do
+        let dict =
+              Dict.fromList
+                [ ("setManyTest::key1", "value 1"),
+                  ("setManyTest::key2", "value 2")
+                ]
+        setMany testNS dict
+        result <- getMany testNS (Dict.keys dict)
+        pure (Expect.equal result dict),
+      redisTest "setManyJSON allows setting multiple JSON values at once" <| do
+        let dict =
+              Dict.fromList
+                [ ("setManyTestJSON::key1", [1, 2] :: [Int]),
+                  ("setManyTestJSON::key2", [3, 4] :: [Int])
+                ]
+        setManyJSON testNS dict
+        result <- getManyJSON testNS (Dict.keys dict)
+        pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do
         _ <- delete testNS ["Full Atom"]
         set testNS "Full Atom" "Something"
