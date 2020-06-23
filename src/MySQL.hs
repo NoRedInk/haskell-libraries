@@ -38,6 +38,7 @@ module MySQL
     sqlYearly,
     lastInsertedPrimaryKey,
     escape,
+    replace,
   )
 where
 
@@ -53,6 +54,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Coerce
 import Data.IORef
+import qualified Data.Int
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.Pool
@@ -63,6 +65,7 @@ import Data.Word (Word)
 import qualified Database.MySQL.Connection
 import qualified Database.MySQL.Protocol.Escape as Escape
 import qualified Database.Persist.MySQL as MySQL
+import Database.Persist.MySQL (RawSql (..))
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Debug
 import GHC.Stack (HasCallStack, withFrozenCallStack)
@@ -333,6 +336,15 @@ type family CountColumns (c :: Type) :: ColumnCount where
   CountColumns (a, b, c, d, e, f) = 'MultipleColumns
   CountColumns (a, b, c, d, e, f, g) = 'MultipleColumns
   CountColumns (a, b, c, d, e, f, g, h) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = 'MultipleColumns
   CountColumns x = 'SingleColumn
 
 instance (MySQL.PersistField a) => QueryResults 'SingleColumn a where
@@ -486,6 +498,339 @@ instance
         MySQL.Single f,
         MySQL.Single g,
         MySQL.Single h
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j,
+    MySQL.PersistField k
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j,
+        MySQL.Single k
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j,
+    MySQL.PersistField k,
+    MySQL.PersistField l
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j,
+        MySQL.Single k,
+        MySQL.Single l
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j,
+    MySQL.PersistField k,
+    MySQL.PersistField l,
+    MySQL.PersistField m
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j,
+        MySQL.Single k,
+        MySQL.Single l,
+        MySQL.Single m
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j,
+    MySQL.PersistField k,
+    MySQL.PersistField l,
+    MySQL.PersistField m,
+    MySQL.PersistField n
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j,
+        MySQL.Single k,
+        MySQL.Single l,
+        MySQL.Single m,
+        MySQL.Single n
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j,
+    MySQL.PersistField k,
+    MySQL.PersistField l,
+    MySQL.PersistField m,
+    MySQL.PersistField n,
+    MySQL.PersistField o
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j,
+        MySQL.Single k,
+        MySQL.Single l,
+        MySQL.Single m,
+        MySQL.Single n,
+        MySQL.Single o
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j,
+    MySQL.PersistField k,
+    MySQL.PersistField l,
+    MySQL.PersistField m,
+    MySQL.PersistField n,
+    MySQL.PersistField o,
+    MySQL.PersistField p
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j,
+        MySQL.Single k,
+        MySQL.Single l,
+        MySQL.Single m,
+        MySQL.Single n,
+        MySQL.Single o,
+        MySQL.Single p
+      )
+
+  toQueryResult _ = Data.Coerce.coerce
+
+instance
+  ( MySQL.PersistField a,
+    MySQL.PersistField b,
+    MySQL.PersistField c,
+    MySQL.PersistField d,
+    MySQL.PersistField e,
+    MySQL.PersistField f,
+    MySQL.PersistField g,
+    MySQL.PersistField h,
+    MySQL.PersistField i,
+    MySQL.PersistField j,
+    MySQL.PersistField k,
+    MySQL.PersistField l,
+    MySQL.PersistField m,
+    MySQL.PersistField n,
+    MySQL.PersistField o,
+    MySQL.PersistField p,
+    MySQL.PersistField q
+  ) =>
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
+  where
+
+  type
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) =
+      ( MySQL.Single a,
+        MySQL.Single b,
+        MySQL.Single c,
+        MySQL.Single d,
+        MySQL.Single e,
+        MySQL.Single f,
+        MySQL.Single g,
+        MySQL.Single h,
+        MySQL.Single i,
+        MySQL.Single j,
+        MySQL.Single k,
+        MySQL.Single l,
+        MySQL.Single m,
+        MySQL.Single n,
+        MySQL.Single o,
+        MySQL.Single p,
+        MySQL.Single q
       )
 
   toQueryResult _ = Data.Coerce.coerce
@@ -752,3 +1097,305 @@ mysqlEscape = wrapInSingleQuotes << Escape.escapeBytes
 
 wrapInSingleQuotes :: BS.ByteString -> BS.ByteString
 wrapInSingleQuotes s = BSC.snoc (BSC.cons '\'' s) '\''
+
+instance PGTypes.PGColumn "boolean" Data.Int.Int16 where
+  pgDecode tid tv =
+    PGTypes.pgDecode tid tv |> boolToSmallInt
+
+instance PGTypes.PGParameter "real" Float where
+  pgEncode tid tv =
+    let (i :: Prelude.Float) = Prelude.realToFrac tv
+     in PGTypes.pgEncode tid i
+
+boolToSmallInt :: Bool -> Data.Int.Int16
+boolToSmallInt b =
+  if b
+    then 1
+    else 0
+
+-- |
+-- Hack to allow us to do things like replace "-quoted idenitifier with `-quoted
+-- identifiers.
+--
+-- If we turn on ANSI quotes on the MySQL client MySQL would accept "-quotes and
+-- this hack would no longer be necessary. At the moment the Haskell quiz engine
+-- code is using the Rails MySQL client, so we cannot enable it for queries from
+-- Haskell alone, and are scared to enable it for all queries. This might change
+-- in the future.
+replace :: Text -> Text -> Query row -> Query row
+replace original replacement query =
+  query {sqlString = Text.replace original replacement (sqlString query)}
+
+-- Support results with additional columns then what `persistent` supports out
+-- of the box. From version `2.10.2` of persistent onwards up to 12 columns will
+-- be supported by default. We'll need to remove our custom instances for up to
+-- twelve columns once we reach that point.
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i)
+  where
+
+  rawSqlCols e = rawSqlCols e << from9
+
+  rawSqlColCountReason = rawSqlColCountReason << from9
+
+  rawSqlProcessRow = fmap to9 << rawSqlProcessRow
+
+from9 :: (a, b, c, d, e, f, g, h, i) -> ((a, b), (c, d), (e, f), (g, h), i)
+from9 (a, b, c, d, e, f, g, h, i) = ((a, b), (c, d), (e, f), (g, h), i)
+
+to9 :: ((a, b), (c, d), (e, f), (g, h), i) -> (a, b, c, d, e, f, g, h, i)
+to9 ((a, b), (c, d), (e, f), (g, h), i) = (a, b, c, d, e, f, g, h, i)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j)
+  where
+
+  rawSqlCols e = rawSqlCols e << from10
+
+  rawSqlColCountReason = rawSqlColCountReason << from10
+
+  rawSqlProcessRow = fmap to10 << rawSqlProcessRow
+
+from10 :: (a, b, c, d, e, f, g, h, i, j) -> ((a, b), (c, d), (e, f), (g, h), (i, j))
+from10 (a, b, c, d, e, f, g, h, i, j) = ((a, b), (c, d), (e, f), (g, h), (i, j))
+
+to10 :: ((a, b), (c, d), (e, f), (g, h), (i, j)) -> (a, b, c, d, e, f, g, h, i, j)
+to10 ((a, b), (c, d), (e, f), (g, h), (i, j)) = (a, b, c, d, e, f, g, h, i, j)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j,
+    RawSql k
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j, k)
+  where
+
+  rawSqlCols e = rawSqlCols e << from11
+
+  rawSqlColCountReason = rawSqlColCountReason << from11
+
+  rawSqlProcessRow = fmap to11 << rawSqlProcessRow
+
+from11 :: (a, b, c, d, e, f, g, h, i, j, k) -> ((a, b), (c, d), (e, f), (g, h), (i, j), k)
+from11 (a, b, c, d, e, f, g, h, i, j, k) = ((a, b), (c, d), (e, f), (g, h), (i, j), k)
+
+to11 :: ((a, b), (c, d), (e, f), (g, h), (i, j), k) -> (a, b, c, d, e, f, g, h, i, j, k)
+to11 ((a, b), (c, d), (e, f), (g, h), (i, j), k) = (a, b, c, d, e, f, g, h, i, j, k)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j,
+    RawSql k,
+    RawSql l
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j, k, l)
+  where
+
+  rawSqlCols e = rawSqlCols e << from12
+
+  rawSqlColCountReason = rawSqlColCountReason << from12
+
+  rawSqlProcessRow = fmap to12 << rawSqlProcessRow
+
+from12 :: (a, b, c, d, e, f, g, h, i, j, k, l) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l))
+from12 (a, b, c, d, e, f, g, h, i, j, k, l) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l))
+
+to12 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l)) -> (a, b, c, d, e, f, g, h, i, j, k, l)
+to12 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l)) = (a, b, c, d, e, f, g, h, i, j, k, l)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j,
+    RawSql k,
+    RawSql l,
+    RawSql m
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m)
+  where
+
+  rawSqlCols e = rawSqlCols e << from13
+
+  rawSqlColCountReason = rawSqlColCountReason << from13
+
+  rawSqlProcessRow = fmap to13 << rawSqlProcessRow
+
+from13 :: (a, b, c, d, e, f, g, h, i, j, k, l, m) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m)
+from13 (a, b, c, d, e, f, g, h, i, j, k, l, m) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m)
+
+to13 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m) -> (a, b, c, d, e, f, g, h, i, j, k, l, m)
+to13 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m) = (a, b, c, d, e, f, g, h, i, j, k, l, m)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j,
+    RawSql k,
+    RawSql l,
+    RawSql m,
+    RawSql n
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
+  where
+
+  rawSqlCols e = rawSqlCols e << from14
+
+  rawSqlColCountReason = rawSqlColCountReason << from14
+
+  rawSqlProcessRow = fmap to14 << rawSqlProcessRow
+
+from14 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n))
+from14 (a, b, c, d, e, f, g, h, i, j, k, l, m, n) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n))
+
+to14 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n)) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
+to14 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n)) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j,
+    RawSql k,
+    RawSql l,
+    RawSql m,
+    RawSql n,
+    RawSql o
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
+  where
+
+  rawSqlCols e = rawSqlCols e << from15
+
+  rawSqlColCountReason = rawSqlColCountReason << from15
+
+  rawSqlProcessRow = fmap to15 << rawSqlProcessRow
+
+from15 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o)
+from15 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o)
+
+to15 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
+to15 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j,
+    RawSql k,
+    RawSql l,
+    RawSql m,
+    RawSql n,
+    RawSql o,
+    RawSql p
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
+  where
+
+  rawSqlCols e = rawSqlCols e << from16
+
+  rawSqlColCountReason = rawSqlColCountReason << from16
+
+  rawSqlProcessRow = fmap to16 << rawSqlProcessRow
+
+from16 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p))
+from16 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p))
+
+to16 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p)) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
+to16 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p)) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
+
+instance
+  ( RawSql a,
+    RawSql b,
+    RawSql c,
+    RawSql d,
+    RawSql e,
+    RawSql f,
+    RawSql g,
+    RawSql h,
+    RawSql i,
+    RawSql j,
+    RawSql k,
+    RawSql l,
+    RawSql m,
+    RawSql n,
+    RawSql o,
+    RawSql p,
+    RawSql q
+  ) =>
+  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
+  where
+
+  rawSqlCols e = rawSqlCols e << from17
+
+  rawSqlColCountReason = rawSqlColCountReason << from17
+
+  rawSqlProcessRow = fmap to17 << rawSqlProcessRow
+
+from17 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q)
+from17 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q)
+
+to17 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
+to17 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
