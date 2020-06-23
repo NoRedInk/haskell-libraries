@@ -29,9 +29,7 @@ module MySQL
     transaction,
     inTestTransaction,
     -- Reexposing useful Database.Persist.MySQL types
-    QueryResults,
     MySQL.PersistField (..),
-    MySQL.Single (..),
     -- Helpers for uncommon queries
     unsafeBulkifyInserts,
     BulkifiedInsert (..),
@@ -174,7 +172,7 @@ readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
   let executeSql :: (TransactionCount, MySQL.SqlBackend) -> Text -> IO ()
       executeSql (_, backend) query =
-        void (executeQuery backend query :: IO [MySQL.Single Int])
+        void (executeQuery backend query :: IO [Int])
    in Health.mkCheck "mysql" (GenericDb.readiness executeSql log conn)
 
 --
@@ -183,7 +181,7 @@ readiness log conn =
 class MySqlQueryable query result | result -> query where
   doQuery :: Connection -> Query.Query query -> (Result Query.Error result -> Task e a) -> Task e a
 
-instance QueryResults row => MySqlQueryable row [row] where
+instance QueryResults (CountColumns row) row => MySqlQueryable row [row] where
   doQuery = execute executeQuery
 
 instance MySqlQueryable () () where
@@ -234,11 +232,11 @@ attempt executeSql backend query = do
   either <- Exception.tryAny (executeSql backend query)
   pure <| Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
 
-executeQuery :: QueryResults row => MySQL.SqlBackend -> Text -> IO [row]
+executeQuery :: forall row. QueryResults (CountColumns row) row => MySQL.SqlBackend -> Text -> IO [row]
 executeQuery backend query =
   MySQL.rawSql query []
     |> (\reader -> runReaderT reader backend)
-    |> map (map toQueryResult)
+    |> map (map (toQueryResult (Proxy :: Proxy (CountColumns row))))
 
 executeCommand :: MySQL.SqlBackend -> Text -> IO ()
 executeCommand backend query =
@@ -319,60 +317,63 @@ rollbackAll (TransactionCount transactionCount, conn) = do
 -- unfortunately every field is wrapped in a `Single` constructor. The purpose
 -- of this typeclass is to unwrap these constructors so we can return records
 -- of plain unwrapped values from this module.
-class MySQL.RawSql (FromRawSql a) => QueryResults a where
+class MySQL.RawSql (FromRawSql c a) => QueryResults (c :: ColumnCount) a where
 
-  type FromRawSql a
+  type FromRawSql c a
 
-  toQueryResult :: FromRawSql a -> a
+  toQueryResult :: Proxy c -> FromRawSql c a -> a
 
--- |
--- It would be really sweet if we could get rid of the `Single` wrapper here,
--- and allow single-column values to be QueryResults by themselves without the
--- need for the wrapper. This is how it works on the Postgres side too.
---
--- The straight-forward attempt to remove the `MySQL.Single` wrapper here will
--- result in overlapping instances. Pretty certain there's type-level trickery
--- to work around that, which might be worth exploring at some point to get a
--- cleaner API.
-instance (MySQL.PersistField a) => QueryResults (MySQL.Single a) where
+data ColumnCount = SingleColumn | MultipleColumns
+
+type family CountColumns (c :: Type) :: ColumnCount where
+  CountColumns (a, b) = 'MultipleColumns
+  CountColumns (a, b, c) = 'MultipleColumns
+  CountColumns (a, b, c, d) = 'MultipleColumns
+  CountColumns (a, b, c, d, e) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h) = 'MultipleColumns
+  CountColumns x = 'SingleColumn
+
+instance (MySQL.PersistField a) => QueryResults 'SingleColumn a where
 
   type
-    FromRawSql (MySQL.Single a) =
-      MySQL.Single a
+    FromRawSql 'SingleColumn a =
+      (MySQL.Single a)
 
-  toQueryResult = identity
+  toQueryResult _ = Data.Coerce.coerce
 
 instance
   ( MySQL.PersistField a,
     MySQL.PersistField b
   ) =>
-  QueryResults (a, b)
+  QueryResults 'MultipleColumns (a, b)
   where
 
   type
-    FromRawSql (a, b) =
+    FromRawSql 'MultipleColumns (a, b) =
       ( MySQL.Single a,
         MySQL.Single b
       )
 
-  toQueryResult = Data.Coerce.coerce
+  toQueryResult _ = Data.Coerce.coerce
 
 instance
   ( MySQL.PersistField a,
     MySQL.PersistField b,
     MySQL.PersistField c
   ) =>
-  QueryResults (a, b, c)
+  QueryResults 'MultipleColumns (a, b, c)
   where
 
   type
-    FromRawSql (a, b, c) =
+    FromRawSql 'MultipleColumns (a, b, c) =
       ( MySQL.Single a,
         MySQL.Single b,
         MySQL.Single c
       )
 
-  toQueryResult = Data.Coerce.coerce
+  toQueryResult _ = Data.Coerce.coerce
 
 instance
   ( MySQL.PersistField a,
@@ -380,18 +381,18 @@ instance
     MySQL.PersistField c,
     MySQL.PersistField d
   ) =>
-  QueryResults (a, b, c, d)
+  QueryResults 'MultipleColumns (a, b, c, d)
   where
 
   type
-    FromRawSql (a, b, c, d) =
+    FromRawSql 'MultipleColumns (a, b, c, d) =
       ( MySQL.Single a,
         MySQL.Single b,
         MySQL.Single c,
         MySQL.Single d
       )
 
-  toQueryResult = Data.Coerce.coerce
+  toQueryResult _ = Data.Coerce.coerce
 
 instance
   ( MySQL.PersistField a,
@@ -400,11 +401,11 @@ instance
     MySQL.PersistField d,
     MySQL.PersistField e
   ) =>
-  QueryResults (a, b, c, d, e)
+  QueryResults 'MultipleColumns (a, b, c, d, e)
   where
 
   type
-    FromRawSql (a, b, c, d, e) =
+    FromRawSql 'MultipleColumns (a, b, c, d, e) =
       ( MySQL.Single a,
         MySQL.Single b,
         MySQL.Single c,
@@ -412,7 +413,7 @@ instance
         MySQL.Single e
       )
 
-  toQueryResult = Data.Coerce.coerce
+  toQueryResult _ = Data.Coerce.coerce
 
 instance
   ( MySQL.PersistField a,
@@ -422,11 +423,11 @@ instance
     MySQL.PersistField e,
     MySQL.PersistField f
   ) =>
-  QueryResults (a, b, c, d, e, f)
+  QueryResults 'MultipleColumns (a, b, c, d, e, f)
   where
 
   type
-    FromRawSql (a, b, c, d, e, f) =
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f) =
       ( MySQL.Single a,
         MySQL.Single b,
         MySQL.Single c,
@@ -435,7 +436,7 @@ instance
         MySQL.Single f
       )
 
-  toQueryResult = Data.Coerce.coerce
+  toQueryResult _ = Data.Coerce.coerce
 
 instance
   ( MySQL.PersistField a,
@@ -446,11 +447,11 @@ instance
     MySQL.PersistField f,
     MySQL.PersistField g
   ) =>
-  QueryResults (a, b, c, d, e, f, g)
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g)
   where
 
   type
-    FromRawSql (a, b, c, d, e, f, g) =
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g) =
       ( MySQL.Single a,
         MySQL.Single b,
         MySQL.Single c,
@@ -460,7 +461,7 @@ instance
         MySQL.Single g
       )
 
-  toQueryResult = Data.Coerce.coerce
+  toQueryResult _ = Data.Coerce.coerce
 
 instance
   ( MySQL.PersistField a,
@@ -472,11 +473,11 @@ instance
     MySQL.PersistField g,
     MySQL.PersistField h
   ) =>
-  QueryResults (a, b, c, d, e, f, g, h)
+  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h)
   where
 
   type
-    FromRawSql (a, b, c, d, e, f, g, h) =
+    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h) =
       ( MySQL.Single a,
         MySQL.Single b,
         MySQL.Single c,
@@ -487,7 +488,7 @@ instance
         MySQL.Single h
       )
 
-  toQueryResult = Data.Coerce.coerce
+  toQueryResult _ = Data.Coerce.coerce
 
 -- | Combine a number of insert queries that all insert a single row into the
 -- same table into a single query.
@@ -659,7 +660,7 @@ lastInsertedPrimaryKey c =
         query
         ( \res -> case res of
             Ok [] -> Task.succeed Nothing
-            Ok (MySQL.Single x : _) -> Task.succeed x
+            Ok (x : _) -> Task.succeed x
             Err err -> Task.fail err
         )
 
