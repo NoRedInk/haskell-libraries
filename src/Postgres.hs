@@ -150,7 +150,7 @@ readiness log conn = Health.mkCheck "postgres" (GenericDb.readiness go log conn)
     go c = pgQuery c >> void
 
 doQuery ::
-  (HasCallStack) =>
+  HasCallStack =>
   Connection ->
   Query.Query row ->
   (Result Query.Error [row] -> Task e a) ->
