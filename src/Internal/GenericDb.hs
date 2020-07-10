@@ -69,7 +69,7 @@ runTaskWithConnection conn action =
       --
       timeoutError :: Query.Error
       timeoutError =
-        Query.TimeoutAfterSeconds Query.ClientTimeout (fromIntegral microseconds / 10e6)
+        Query.TimeoutAfterSeconds Query.ClientTimeout (fromIntegral microseconds / 1e6)
    in --
       withConnection conn <| \dbConnection ->
         action (toInternalConnection conn dbConnection)
