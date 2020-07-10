@@ -95,7 +95,7 @@ connection settings =
             pool
             identity
             (toConnectionLogContext database)
-            (floor (micro * Settings.pgQueryTimeoutSeconds settings))
+            (Settings.pgQueryTimeout settings)
         )
     release GenericDb.Connection {GenericDb.singleOrPool} =
       case singleOrPool of
@@ -105,7 +105,6 @@ connection settings =
     maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings))
     size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral
     database = Settings.toPGDatabase settings
-    micro = 1000 * 1000
 
 -- |
 -- Perform a database transaction.
@@ -190,7 +189,7 @@ fromPGError c pgError =
         |> Data.Text.pack
         |> Query.UniqueViolation
     "57014" ->
-      Query.TimeoutAfterSeconds Query.ServerTimeout (fromIntegral (GenericDb.timeoutMicroSeconds c) / 10e6)
+      Query.Timeout Query.ServerTimeout (GenericDb.timeout c)
     _ ->
       Exception.displayException pgError
         |> Data.Text.pack

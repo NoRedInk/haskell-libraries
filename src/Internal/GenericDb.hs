@@ -22,6 +22,7 @@ import Data.String (IsString)
 import qualified Data.Text
 import qualified Health
 import qualified Internal.Query as Query
+import qualified Internal.Time as Time
 import qualified Oops
 import qualified Platform
 import qualified Result
@@ -37,7 +38,7 @@ data Connection internal conn
         singleOrPool :: SingleOrPool conn,
         toInternalConnection :: conn -> internal,
         logContext :: Platform.QueryConnectionInfo,
-        timeoutMicroSeconds :: Int
+        timeout :: Time.Interval
       }
 
 -- | A database connection type.
@@ -58,22 +59,20 @@ data SingleOrPool c
 
 runTaskWithConnection :: Connection internal conn -> (internal -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
-  let microseconds = timeoutMicroSeconds conn
-      --
-      withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
+  let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
       withTimeout io = do
-        maybeResult <- System.Timeout.timeout (fromIntegral microseconds) io
+        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (timeout conn))) io
         case maybeResult of
           Just result -> pure result
           Nothing -> pure (Err timeoutError)
       --
       timeoutError :: Query.Error
       timeoutError =
-        Query.TimeoutAfterSeconds Query.ClientTimeout (fromIntegral microseconds / 1e6)
+        Query.Timeout Query.ClientTimeout (timeout conn)
    in --
       withConnection conn <| \dbConnection ->
         action (toInternalConnection conn dbConnection)
-          |> (if microseconds > 0 then withTimeout else identity)
+          |> (if Time.microseconds (timeout conn) > 0 then withTimeout else identity)
           |> Platform.doAnything (doAnything conn)
 
 -- | by default, queries pull a connection from the connection pool.

@@ -3,7 +3,7 @@ module Postgres.Settings
       ( Settings,
         pgConnection,
         pgPool,
-        pgQueryTimeoutSeconds
+        pgQueryTimeout
       ),
     ConnectionSettings
       ( ConnectionSettings,
@@ -48,6 +48,7 @@ import Database.PostgreSQL.Typed
     pgDBUser,
   )
 import qualified Environment
+import qualified Internal.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
 import System.FilePath ((</>))
@@ -57,7 +58,7 @@ data Settings
   = Settings
       { pgConnection :: ConnectionSettings,
         pgPool :: PoolSettings,
-        pgQueryTimeoutSeconds :: Float
+        pgQueryTimeout :: Time.Interval
       }
   deriving (Eq, Show, Generic)
 
@@ -75,7 +76,7 @@ defaultSettings = Settings
         pgPoolMaxIdleTime = PgPoolMaxIdleTime (toNominalDiffTime 3600),
         pgPoolStripes = PgPoolStripes 1
       },
-    pgQueryTimeoutSeconds = 5
+    pgQueryTimeout = Time.fromSeconds 5
   }
 
 data ConnectionSettings
@@ -101,7 +102,7 @@ decoder =
   pure Settings
     |> andMap connectionDecoder
     |> andMap poolDecoder
-    |> andMap queryTimeoutSecondsDecoder
+    |> andMap queryTimeoutDecoder
 
 connectionDecoder :: Environment.Decoder ConnectionSettings
 connectionDecoder =
@@ -256,20 +257,20 @@ toPGDatabase
             pgPassword,
             pgPort
           },
-      pgQueryTimeoutSeconds
+      pgQueryTimeout
     } =
     defaultPGDatabase
       { pgDBName = Data.Text.Encoding.encodeUtf8 (unPgDatabase pgDatabase),
         pgDBUser = Data.Text.Encoding.encodeUtf8 (unPgUser pgUser),
         pgDBPass = Data.Text.Encoding.encodeUtf8 <| Log.unSecret (unPgPassword pgPassword),
         pgDBParams =
-          if pgQueryTimeoutSeconds > 0
+          if Time.milliseconds pgQueryTimeout > 0
             then
               [ -- We configure Postgres to automatically kill queries when they run
                 -- too long. That should offer some protection against queries
                 -- locking up the database.
                 -- https://www.postgresql.org/docs/9.4/runtime-config-client.html
-                ("statement_timeout", milli * pgQueryTimeoutSeconds |> floor |> show |> Data.ByteString.Char8.pack)
+                ("statement_timeout", pgQueryTimeout |> Time.milliseconds |> floor |> show |> Data.ByteString.Char8.pack)
               ]
             else [],
         pgDBAddr =
@@ -290,14 +291,13 @@ toPGDatabase
     where
       host = unPgHost pgHost
       port = unPgPort pgPort
-      milli = 1000
 
-queryTimeoutSecondsDecoder :: Environment.Decoder Float
-queryTimeoutSecondsDecoder =
+queryTimeoutDecoder :: Environment.Decoder Time.Interval
+queryTimeoutDecoder =
   Environment.variable
     Environment.Variable
       { Environment.name = "PG_QUERY_TIMEOUT_SECONDS",
         Environment.description = "The maximum time a query can run before it is cancelled.",
-        Environment.defaultValue = defaultSettings |> pgQueryTimeoutSeconds |> show |> Data.Text.pack
+        Environment.defaultValue = defaultSettings |> pgQueryTimeout |> Time.seconds |> show |> Data.Text.pack
       }
-    Environment.float
+    (Environment.float |> map Time.fromSeconds)

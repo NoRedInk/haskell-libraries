@@ -32,6 +32,7 @@ import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
 import qualified Internal.Query.Parser as Parser
+import qualified Internal.Time as Time
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
@@ -73,7 +74,7 @@ data Query row
       }
 
 data Error
-  = TimeoutAfterSeconds TimeoutOrigin Float
+  = Timeout TimeoutOrigin Time.Interval
   | UniqueViolation Text
   | Other Text
   deriving (Show)

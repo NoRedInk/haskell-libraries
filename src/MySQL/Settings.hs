@@ -22,6 +22,7 @@ where
 import Cherry.Prelude
 import qualified Data.Text
 import qualified Environment
+import qualified Internal.Time as Time
 import qualified Log
 import Prelude (FilePath, pure, show)
 
@@ -29,7 +30,7 @@ data Settings
   = Settings
       { mysqlConnection :: ConnectionSettings,
         mysqlPool :: PoolSettings,
-        mysqlQueryTimeoutSeconds :: Float
+        mysqlQueryTimeoutSeconds :: Time.Interval
       }
 
 data ConnectionSettings
@@ -57,7 +58,7 @@ defaultSettings =
       mysqlPool = PoolSettings
         { mysqlPoolSize = MysqlPoolSize 2
         },
-      mysqlQueryTimeoutSeconds = 5
+      mysqlQueryTimeoutSeconds = Time.fromSeconds 5
     }
 
 defaultConnectionSettings :: ConnectionSettings
@@ -211,12 +212,12 @@ mysqlPoolSizeDecoder =
       }
     (Environment.int |> map MysqlPoolSize)
 
-queryTimeoutSecondsDecoder :: Environment.Decoder Float
+queryTimeoutSecondsDecoder :: Environment.Decoder Time.Interval
 queryTimeoutSecondsDecoder =
   Environment.variable
     Environment.Variable
       { Environment.name = "MYSQL_QUERY_TIMEOUT_SECONDS",
         Environment.description = "The maximum time a query can run before it is cancelled.",
-        Environment.defaultValue = defaultSettings |> mysqlQueryTimeoutSeconds |> show |> Data.Text.pack
+        Environment.defaultValue = defaultSettings |> mysqlQueryTimeoutSeconds |> Time.seconds |> show |> Data.Text.pack
       }
-    Environment.float
+    (Environment.float |> map Time.fromSeconds)

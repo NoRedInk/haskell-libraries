@@ -10,6 +10,7 @@ module DatabaseSpec
 where
 
 import qualified Internal.Query.ParserSpec
+import qualified Internal.TimeSpec
 import qualified MySQL.InternalSpec
 import qualified MySQLSpec
 import qualified Postgres.SettingsSpec
@@ -22,5 +23,6 @@ tests =
     [ Postgres.SettingsSpec.tests,
       MySQL.InternalSpec.tests,
       Internal.Query.ParserSpec.tests,
+      Internal.TimeSpec.tests,
       MySQLSpec.tests
     ]
