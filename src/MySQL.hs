@@ -55,7 +55,6 @@ import qualified Data.Acquire
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Coerce
-import Data.IORef
 import qualified Data.Int
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty ((:|)))
@@ -63,7 +62,6 @@ import qualified Data.Pool
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Text
 import qualified Data.Text.Encoding
-import Data.Word (Word)
 import qualified Database.MySQL.Connection
 import qualified Database.MySQL.Protocol.Escape as Escape
 import qualified Database.Persist.MySQL as MySQL
@@ -95,7 +93,8 @@ import Prelude (Either (..), IO, error, fromIntegral, pure, show)
 import qualified Prelude
 
 newtype TransactionCount
-  = TransactionCount (IORef Word)
+  = TransactionCount Int
+  deriving (Eq)
 
 data Connection
   = Connection
@@ -236,12 +235,8 @@ execute executeSql conn query handleResponse =
       --
       runQuery backend = do
         result <- attempt executeSql backend queryAsText
-        let inTransaction =
-              case singleOrPool conn of
-                Single _ _ -> True
-                Pool _ -> False
-        case (inTransaction, result) of
-          (True, Ok value) -> do
+        case (transactionCount conn, result) of
+          (TransactionCount 0, Ok value) -> do
             -- If not currently inside a transaction and original query succeeded, then commit
             result2 <- attempt executeCommand backend "COMMIT"
             pure <| Result.map (always value) result2
@@ -282,6 +277,13 @@ executeCommand :: MySQL.SqlBackend -> Text -> IO ()
 executeCommand backend query =
   MySQL.rawExecute query []
     |> (\reader -> runReaderT reader backend)
+
+executeCommand' :: Connection -> Text -> Task e ()
+executeCommand' conn query =
+  withConnection conn <| \backend ->
+    MySQL.rawExecute query []
+      |> (\reader -> runReaderT reader backend)
+      |> doIO conn
 
 toQueryError :: Exception.Exception e => e -> Query.Error
 toQueryError err =
@@ -341,101 +343,82 @@ handleError connectionString err = do
 -- |
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction conn func =
-  let start :: TransactionCount -> MySQL.SqlBackend -> Task x MySQL.SqlBackend
-      start tc c =
-        doIO conn <| do
-          begin (tc, c)
-          pure c
-      --
-      end :: TransactionCount -> MySQL.SqlBackend -> ExitCase b -> Task x ()
-      end tc c exitCase =
-        doIO conn
-          <| case exitCase of
-            ExitCaseSuccess _ -> commit (tc, c)
-            ExitCaseException _ -> rollback (tc, c)
-            ExitCaseAbort -> rollback (tc, c)
-      --
-      setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
-      setSingle tc c =
-        -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single tc c}
-   in withConnection conn <| \c -> do
-        tc <- map TransactionCount (doIO conn (newIORef 0))
-        Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
-          |> map Tuple.first
+transaction conn' func =
+  withTransaction conn' <| \conn ->
+    Platform.generalBracket
+      (begin conn)
+      ( \() exitCase ->
+          case exitCase of
+            ExitCaseSuccess _ -> commit conn
+            ExitCaseException _ -> rollback conn
+            ExitCaseAbort -> rollback conn
+      )
+      (\() -> func conn)
+      |> map Tuple.first
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
-inTestTransaction conn func =
-  let start :: TransactionCount -> MySQL.SqlBackend -> Task x MySQL.SqlBackend
-      start tc c = do
-        rollbackAllSafe tc conn c
-        doIO conn <| begin (tc, c)
-        pure c
-      --
-      end :: TransactionCount -> MySQL.SqlBackend -> ExitCase b -> Task x ()
-      end tc c _ =
-        rollbackAllSafe tc conn c
-      --
-      setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
-      setSingle tc c =
-        -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single tc c}
-   in --
-      withConnection conn <| \c -> do
-        tc <- map TransactionCount (doIO conn (newIORef 0))
-        Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
-          |> map Tuple.first
+inTestTransaction conn' func =
+  withTransaction conn' <| \conn ->
+    Platform.generalBracket
+      (do rollbackAll conn; begin conn)
+      (\() _ -> rollbackAll conn)
+      (\() -> func conn)
+      |> map Tuple.first
 
-rollbackAllSafe :: TransactionCount -> Connection -> MySQL.SqlBackend -> Task x ()
-rollbackAllSafe tc conn c =
-  doIO conn <| do
-    -- Because calling `rollbackAllTransactions` when no transactions are
-    -- running will result in a warning message in the log (even if tests
-    -- pass), let's start by beginning a transaction, so that we alwas have
-    -- at least one to kill.
-    begin (tc, c)
-    rollbackAll (tc, c)
-
-addTransaction :: Word -> (Word, Word)
-addTransaction count =
-  (count + 1, count)
-
-subTransaction :: Word -> (Word, Word)
-subTransaction count =
-  case count of
-    0 -> (0, error "MySQL transaction: Trying to close transaction, but there is no transaction running.")
-    nonZero -> (nonZero - 1, nonZero - 1)
+transactionCount :: Connection -> TransactionCount
+transactionCount conn =
+  case singleOrPool conn of
+    Single tc _ -> tc
+    Pool _ -> TransactionCount 0
 
 -- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
-begin :: (TransactionCount, MySQL.SqlBackend) -> IO ()
-begin (TransactionCount transactionCount, conn) = do
-  current <- atomicModifyIORef' transactionCount addTransaction
-  void <| executeCommand conn <| if current == 0 then "BEGIN" else "SAVEPOINT pgt" ++ Debug.toString current
+begin :: Connection -> Task e ()
+begin conn =
+  let (TransactionCount current) = transactionCount conn
+      query =
+        if current == 0
+          then "BEGIN"
+          else "SAVEPOINT pgt" ++ Debug.toString current
+   in executeCommand' conn query
 
 -- | Rollback to the most recent 'begin'.
-rollback :: (TransactionCount, MySQL.SqlBackend) -> IO ()
-rollback (TransactionCount transactionCount, conn) = do
-  current <- atomicModifyIORef' transactionCount subTransaction
-  void <| executeCommand conn <| if current == 0 then "ROLLBACK" else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
+rollback :: Connection -> Task e ()
+rollback conn =
+  let (TransactionCount current) = transactionCount conn
+      query =
+        if current == 0
+          then "ROLLBACK"
+          else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
+   in executeCommand' conn query
 
 -- | Commit the most recent 'begin'.
-commit :: (TransactionCount, MySQL.SqlBackend) -> IO ()
-commit (TransactionCount transactionCount, conn) = do
-  current <- atomicModifyIORef' transactionCount subTransaction
-  void <| executeCommand conn <| if current == 0 then "COMMIT" else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
+commit :: Connection -> Task e ()
+commit conn =
+  let (TransactionCount current) = transactionCount conn
+      query =
+        if current == 0
+          then "COMMIT"
+          else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
+   in executeCommand' conn query
 
 -- | Rollback all active 'begin's.
-rollbackAll :: (TransactionCount, MySQL.SqlBackend) -> IO ()
-rollbackAll (TransactionCount transactionCount, conn) = do
-  current <- readIORef transactionCount
-  if current == 0
-    then pure ()
-    else do
-      rollback (TransactionCount transactionCount, conn)
-      rollbackAll (TransactionCount transactionCount, conn)
+rollbackAll :: Connection -> Task e ()
+rollbackAll conn =
+  let (TransactionCount current) = transactionCount conn
+   in if current == 0
+        then pure ()
+        else executeCommand' conn "ROLLBACK"
+
+withTransaction :: Connection -> (Connection -> Task e a) -> Task e a
+withTransaction conn func =
+  case singleOrPool conn of
+    Single (TransactionCount tc) c ->
+      func conn {singleOrPool = Single (TransactionCount (tc + 1)) c}
+    Pool _ ->
+      withConnection conn <| \c ->
+        func conn {singleOrPool = Single (TransactionCount 0) c}
 
 -- | by default, queries pull a connection from the connection pool.
 --   For SQL transactions, we want all queries within the transaction to run
