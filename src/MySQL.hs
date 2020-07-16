@@ -67,7 +67,6 @@ import qualified Database.MySQL.Protocol.Escape as Escape
 import qualified Database.Persist.MySQL as MySQL
 import Database.Persist.MySQL (RawSql (..))
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
-import qualified Debug
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits (Symbol)
 import qualified Health
@@ -380,7 +379,7 @@ begin conn =
       query =
         if current == 0
           then "BEGIN"
-          else "SAVEPOINT pgt" ++ Debug.toString current
+          else "SAVEPOINT pgt" ++ Text.fromInt current
    in executeCommand' conn query
 
 -- | Rollback to the most recent 'begin'.
@@ -390,7 +389,7 @@ rollback conn =
       query =
         if current == 0
           then "ROLLBACK"
-          else "ROLLBACK TO SAVEPOINT pgt" ++ Debug.toString current
+          else "ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current
    in executeCommand' conn query
 
 -- | Commit the most recent 'begin'.
@@ -400,7 +399,7 @@ commit conn =
       query =
         if current == 0
           then "COMMIT"
-          else "RELEASE SAVEPOINT pgt" ++ Debug.toString current
+          else "RELEASE SAVEPOINT pgt" ++ Text.fromInt current
    in executeCommand' conn query
 
 -- | Rollback all active 'begin's.
