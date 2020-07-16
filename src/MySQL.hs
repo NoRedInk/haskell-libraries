@@ -73,7 +73,8 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits (Symbol)
 import qualified Health
 import Internal.CaselessRegex (caselessRegex)
-import qualified Internal.GenericDb as GenericDb
+import qualified Internal.MySQLDb as GenericDb
+import Internal.MySQLDb (Connection, TransactionCount (..))
 import qualified Internal.Query as Query
 import Internal.Query (Query (..))
 import Language.Haskell.TH (ExpQ)
@@ -90,18 +91,12 @@ import qualified Tuple
 import Prelude (IO, error, fromIntegral, pure, show)
 import qualified Prelude
 
-type Connection = GenericDb.Connection (TransactionCount, MySQL.SqlBackend) MySQL.SqlBackend
-
-newtype TransactionCount
-  = TransactionCount (IORef Word)
-
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
   Data.Acquire.mkAcquire acquire release
   where
     acquire = do
       doAnything <- Platform.doAnythingHandler
-      transactionCount <- newIORef 0
       pool <-
         MySQL.createMySQLPool database size
           |> Control.Monad.Logger.runNoLoggingT
@@ -110,14 +105,13 @@ connection settings =
         ( GenericDb.Connection
             doAnything
             pool
-            (\c -> (TransactionCount transactionCount, c))
             (toConnectionLogContext settings)
             (Settings.mysqlQueryTimeoutSeconds settings)
         )
     release GenericDb.Connection {GenericDb.singleOrPool} =
       case singleOrPool of
         GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
-        GenericDb.Single _ -> pure ()
+        GenericDb.Single _ _ -> pure ()
     size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
     database = toConnectInfo settings
 
@@ -173,8 +167,8 @@ toConnectInfo settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  let executeSql :: (TransactionCount, MySQL.SqlBackend) -> Text -> IO ()
-      executeSql (_, backend) query =
+  let executeSql :: MySQL.SqlBackend -> Text -> IO ()
+      executeSql backend query =
         void (executeQuery backend query :: IO [Int])
    in Health.mkCheck "mysql" (GenericDb.readiness executeSql log conn)
 
@@ -200,11 +194,14 @@ execute executeSql conn query handleResponse =
           |> Text.replace "monolith." ""
           |> Internal.anyToIn
       --
-      runQuery (TransactionCount transactionCount, backend) = do
+      runQuery backend = do
         result <- attempt executeSql backend queryAsText
-        currentCount <- readIORef transactionCount
-        case (currentCount, result) of
-          (0, Ok value) -> do
+        let inTransaction =
+              case GenericDb.singleOrPool conn of
+                GenericDb.Single _ _ -> True
+                GenericDb.Pool _ -> False
+        case (inTransaction, result) of
+          (True, Ok value) -> do
             -- If not currently inside a transaction and original query succeeded, then commit
             result2 <- attempt executeCommand backend "COMMIT"
             pure <| Result.map (always value) result2
