@@ -48,6 +48,7 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
 import Control.Monad (void)
+import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
@@ -290,24 +291,63 @@ runTaskWithConnection conn action =
 -- |
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction =
-  GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = begin,
-      GenericDb.commit = commit,
-      GenericDb.rollback = rollback,
-      GenericDb.rollbackAll = rollbackAll
-    }
+transaction conn func =
+  let start :: TransactionCount -> MySQL.SqlBackend -> Task x MySQL.SqlBackend
+      start tc c =
+        doIO conn <| do
+          begin (tc, c)
+          pure c
+      --
+      end :: TransactionCount -> MySQL.SqlBackend -> ExitCase b -> Task x ()
+      end tc c exitCase =
+        doIO conn
+          <| case exitCase of
+            ExitCaseSuccess _ -> commit (tc, c)
+            ExitCaseException _ -> rollback (tc, c)
+            ExitCaseAbort -> rollback (tc, c)
+      --
+      setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
+      setSingle tc c =
+        -- All queries in a transactions must run on the same thread.
+        conn {GenericDb.singleOrPool = GenericDb.Single tc c}
+   in GenericDb.withConnection conn <| \c -> do
+        tc <- map TransactionCount (doIO conn (newIORef 0))
+        Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
+          |> map Tuple.first
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
-inTestTransaction =
-  GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = begin,
-      GenericDb.commit = commit,
-      GenericDb.rollback = rollback,
-      GenericDb.rollbackAll = rollbackAll
-    }
+inTestTransaction conn func =
+  let start :: TransactionCount -> MySQL.SqlBackend -> Task x MySQL.SqlBackend
+      start tc c = do
+        rollbackAllSafe tc conn c
+        doIO conn <| begin (tc, c)
+        pure c
+      --
+      end :: TransactionCount -> MySQL.SqlBackend -> ExitCase b -> Task x ()
+      end tc c _ =
+        rollbackAllSafe tc conn c
+      --
+      setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
+      setSingle tc c =
+        -- All queries in a transactions must run on the same thread.
+        conn {GenericDb.singleOrPool = GenericDb.Single tc c}
+   in --
+      GenericDb.withConnection conn <| \c -> do
+        tc <- map TransactionCount (doIO conn (newIORef 0))
+        Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
+          |> map Tuple.first
+
+rollbackAllSafe :: TransactionCount -> Connection -> MySQL.SqlBackend -> Task x ()
+rollbackAllSafe tc conn c =
+  doIO conn <| do
+    -- Because calling `rollbackAllTransactions` when no transactions are
+    -- running will result in a warning message in the log (even if tests
+    -- pass), let's start by beginning a transaction, so that we alwas have
+    -- at least one to kill.
+    begin (tc, c)
+    rollbackAll (tc, c)
 
 addTransaction :: Word -> (Word, Word)
 addTransaction count =
@@ -1149,6 +1189,10 @@ boolToSmallInt b =
   if b
     then 1
     else 0
+
+doIO :: Connection -> IO a -> Task x a
+doIO conn io =
+  Platform.doAnything (GenericDb.doAnything conn) (io |> map Ok)
 
 -- |
 -- Hack to allow us to do things like replace "-quoted idenitifier with `-quoted

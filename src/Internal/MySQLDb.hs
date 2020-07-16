@@ -3,9 +3,6 @@
 module Internal.MySQLDb
   ( Connection (..),
     SingleOrPool (..),
-    Transaction (Transaction, begin, commit, rollback, rollbackAll),
-    transaction,
-    inTestTransaction,
     handleError,
     TransactionCount (..),
     withConnection,
@@ -112,79 +109,6 @@ handleError connectionString err = do
       ]
   Exception.displayException err
     |> System.Exit.die
-
---
--- TRANSACTIONS
---
-
-data Transaction
-  = Transaction
-      { commit :: (TransactionCount, MySQL.SqlBackend) -> IO (),
-        begin :: (TransactionCount, MySQL.SqlBackend) -> IO (),
-        rollback :: (TransactionCount, MySQL.SqlBackend) -> IO (),
-        rollbackAll :: (TransactionCount, MySQL.SqlBackend) -> IO ()
-      }
-
--- |
--- Perform a database transaction.
-transaction :: Transaction -> Connection -> (Connection -> Task e a) -> Task e a
-transaction Transaction {commit, begin, rollback} conn func =
-  let start :: TransactionCount -> MySQL.SqlBackend -> Task x MySQL.SqlBackend
-      start tc c =
-        doIO conn <| do
-          begin (tc, c)
-          pure c
-      --
-      end :: TransactionCount -> MySQL.SqlBackend -> ExitCase b -> Task x ()
-      end tc c exitCase =
-        doIO conn
-          <| case exitCase of
-            ExitCaseSuccess _ -> commit (tc, c)
-            ExitCaseException _ -> rollback (tc, c)
-            ExitCaseAbort -> rollback (tc, c)
-      --
-      setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
-      setSingle tc c =
-        -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single tc c}
-   in withConnection conn <| \c -> do
-        tc <- map TransactionCount (doIO conn (newIORef 0))
-        Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
-          |> map Tuple.first
-
--- | Run code in a transaction, then roll that transaction back.
---   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: Transaction -> Connection -> (Connection -> Task x a) -> Task x a
-inTestTransaction transaction_@Transaction {begin} conn func =
-  let start :: TransactionCount -> MySQL.SqlBackend -> Task x MySQL.SqlBackend
-      start tc c = do
-        rollbackAllSafe tc transaction_ conn c
-        doIO conn <| begin (tc, c)
-        pure c
-      --
-      end :: TransactionCount -> MySQL.SqlBackend -> ExitCase b -> Task x ()
-      end tc c _ =
-        rollbackAllSafe tc transaction_ conn c
-      --
-      setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
-      setSingle tc c =
-        -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single tc c}
-   in --
-      withConnection conn <| \c -> do
-        tc <- map TransactionCount (doIO conn (newIORef 0))
-        Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
-          |> map Tuple.first
-
-rollbackAllSafe :: TransactionCount -> Transaction -> Connection -> MySQL.SqlBackend -> Task x ()
-rollbackAllSafe tc Transaction {begin, rollbackAll} conn c =
-  doIO conn <| do
-    -- Because calling `rollbackAllTransactions` when no transactions are
-    -- running will result in a warning message in the log (even if tests
-    -- pass), let's start by beginning a transaction, so that we alwas have
-    -- at least one to kill.
-    begin (tc, c)
-    rollbackAll (tc, c)
 
 -- HELPER
 
