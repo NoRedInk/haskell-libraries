@@ -82,16 +82,19 @@ transactionTests :: Test
 transactionTests =
   describe
     "transaction"
-    [ fuzz mysqlCommandsFuzzer "transactions don't crash" <| \cmds ->
+    [ fuzz mysqlCommandFuzzer "transactions don't crash" <| \cmd ->
         Expect.withIO identity <| do
           settings <- Environment.decode MySQL.decoder
           noLogger <- Platform.silentContext
           res <- Acquire.withAcquire (MySQL.connection settings) <| \conn ->
-            runCmds conn cmds
+            runCmd conn cmd
               |> Task.attempt noLogger
           Prelude.pure
             <| case res of
               Ok _ -> Expect.pass
+              -- These are exceptions we intentionally throw in the test to
+              -- the effect of exceptions on transactions. They shouldn't fail
+              -- the test.
               Err "oops" -> Expect.pass
               Err err -> Expect.fail err
     ]
@@ -101,19 +104,26 @@ transactionTests =
 data MySQLCommand
   = DoQuery
   | ThrowError
-  | InTransaction [MySQLCommand]
+  | InTransaction MySQLCommand
+  | Sequence [MySQLCommand]
+  | Parallel [MySQLCommand]
   deriving (Show)
 
 mysqlCommandsFuzzer :: Fuzzer [MySQLCommand]
 mysqlCommandsFuzzer =
-  Gen.list (Range.linear 0 5) mysqlCommandFuzzer
+  Gen.list (Range.linear 0 20) mysqlCommandFuzzer
 
 mysqlCommandFuzzer :: Fuzzer MySQLCommand
 mysqlCommandFuzzer =
   Gen.recursive
     Gen.choice
-    [Gen.constant DoQuery, Gen.constant ThrowError]
-    [map InTransaction mysqlCommandsFuzzer]
+    [ Gen.constant DoQuery,
+      Gen.constant ThrowError
+    ]
+    [ map InTransaction mysqlCommandFuzzer,
+      map Sequence mysqlCommandsFuzzer,
+      map Parallel mysqlCommandsFuzzer
+    ]
 
 runCmd :: MySQL.Connection -> MySQLCommand -> Task Text ()
 runCmd conn cmd =
@@ -129,11 +139,13 @@ runCmd conn cmd =
         )
     ThrowError ->
       Task.fail "oops"
-    InTransaction subCmds ->
-      MySQL.transaction conn (\conn' -> runCmds conn' subCmds)
-
-runCmds :: MySQL.Connection -> [MySQLCommand] -> Task Text ()
-runCmds conn cmds =
-  List.map (runCmd conn) cmds
-    |> Task.sequence
-    |> Task.map (\_ -> ())
+    InTransaction subCmd ->
+      MySQL.transaction conn (\conn' -> runCmd conn' subCmd)
+    Sequence subCmds ->
+      List.map (runCmd conn) subCmds
+        |> Task.sequence
+        |> Task.map (\_ -> ())
+    Parallel subCmds ->
+      List.map (runCmd conn) subCmds
+        |> Task.parallel
+        |> Task.map (\_ -> ())
