@@ -3,15 +3,12 @@
 module Internal.MySQLDb
   ( Connection (..),
     SingleOrPool (..),
-    runTaskWithConnection,
     Transaction (Transaction, begin, commit, rollback, rollbackAll),
     transaction,
     inTestTransaction,
-    readiness,
     handleError,
-    toQueryError,
-    eitherToResult,
     TransactionCount (..),
+    withConnection,
   )
 where
 
@@ -59,28 +56,6 @@ data SingleOrPool c
     --   we need to insure several SQL statements happen on the same connection.
     Single TransactionCount c
 
---
--- CONNECTION HELPERS
---
-
-runTaskWithConnection :: Connection -> (MySQL.SqlBackend -> IO (Result Query.Error a)) -> Task Query.Error a
-runTaskWithConnection conn action =
-  let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
-      withTimeout io = do
-        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (timeout conn))) io
-        case maybeResult of
-          Just result -> pure result
-          Nothing -> pure (Err timeoutError)
-      --
-      timeoutError :: Query.Error
-      timeoutError =
-        Query.Timeout Query.ClientTimeout (timeout conn)
-   in --
-      withConnection conn <| \dbConnection ->
-        action dbConnection
-          |> (if Time.microseconds (timeout conn) > 0 then withTimeout else identity)
-          |> Platform.doAnything (doAnything conn)
-
 -- | by default, queries pull a connection from the connection pool.
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
@@ -110,35 +85,6 @@ withConnection conn@Connection {singleOrPool} func =
         (Pool pool) ->
           Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
             |> map Tuple.first
-
---
--- READINESS
---
-
--- |
--- Check that we are ready to be take traffic.
-readiness :: IsString s => (MySQL.SqlBackend -> s -> IO ()) -> Platform.LogHandler -> Connection -> IO Health.Status
-readiness runQuery log' conn =
-  let query c =
-        runQuery c "SELECT 1"
-          |> Exception.tryAny
-          |> map (Result.mapError toQueryError << eitherToResult)
-   in runTaskWithConnection conn query
-        |> Task.mapError (Data.Text.pack << Exception.displayException)
-        |> Task.attempt log'
-        |> map Health.fromResult
-
-toQueryError :: Exception.Exception e => e -> Query.Error
-toQueryError err =
-  Exception.displayException err
-    |> Data.Text.pack
-    |> Query.Other
-
-eitherToResult :: Either e a -> Result e a
-eitherToResult either =
-  case either of
-    Left err -> Err err
-    Right x -> Ok x
 
 handleError :: Text -> Exception.IOException -> IO a
 handleError connectionString err = do

@@ -77,6 +77,7 @@ import qualified Internal.MySQLDb as GenericDb
 import Internal.MySQLDb (Connection, TransactionCount (..))
 import qualified Internal.Query as Query
 import Internal.Query (Query (..))
+import qualified Internal.Time as Time
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import qualified List
@@ -85,10 +86,11 @@ import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
 import qualified Platform
 import qualified Result
+import qualified System.Timeout
 import qualified Task
 import qualified Text
 import qualified Tuple
-import Prelude (IO, error, fromIntegral, pure, show)
+import Prelude (Either (..), IO, error, fromIntegral, pure, show)
 import qualified Prelude
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
@@ -170,7 +172,21 @@ readiness log conn =
   let executeSql :: MySQL.SqlBackend -> Text -> IO ()
       executeSql backend query =
         void (executeQuery backend query :: IO [Int])
-   in Health.mkCheck "mysql" (GenericDb.readiness executeSql log conn)
+      query c =
+        executeSql c "SELECT 1"
+          |> Exception.tryAny
+          |> map (Result.mapError toQueryError << eitherToResult)
+   in runTaskWithConnection conn query
+        |> Task.mapError (Data.Text.pack << Exception.displayException)
+        |> Task.attempt log
+        |> map Health.fromResult
+        |> Health.mkCheck "mysql"
+
+eitherToResult :: Either e a -> Result e a
+eitherToResult either =
+  case either of
+    Left err -> Err err
+    Right x -> Ok x
 
 --
 -- EXECUTE QUERIES
@@ -218,7 +234,7 @@ execute executeSql conn query handleResponse =
         }
    in do
         withFrozenCallStack Log.info (Query.asMessage query) []
-        GenericDb.runTaskWithConnection conn runQuery
+        runTaskWithConnection conn runQuery
           -- Handle the response before wrapping the operation in a context. This way,
           -- if the response handling logic creates errors, those errors can inherit
           -- context values like the query string.
@@ -230,7 +246,7 @@ execute executeSql conn query handleResponse =
 attempt :: (MySQL.SqlBackend -> Text -> IO result) -> MySQL.SqlBackend -> Text -> IO (Result Query.Error result)
 attempt executeSql backend query = do
   either <- Exception.tryAny (executeSql backend query)
-  pure <| Result.mapError GenericDb.toQueryError (GenericDb.eitherToResult either)
+  pure <| Result.mapError toQueryError (eitherToResult either)
 
 executeQuery :: forall row. QueryResults (CountColumns row) row => MySQL.SqlBackend -> Text -> IO [row]
 executeQuery backend query =
@@ -242,6 +258,30 @@ executeCommand :: MySQL.SqlBackend -> Text -> IO ()
 executeCommand backend query =
   MySQL.rawExecute query []
     |> (\reader -> runReaderT reader backend)
+
+toQueryError :: Exception.Exception e => e -> Query.Error
+toQueryError err =
+  Exception.displayException err
+    |> Data.Text.pack
+    |> Query.Other
+
+runTaskWithConnection :: Connection -> (MySQL.SqlBackend -> IO (Result Query.Error a)) -> Task Query.Error a
+runTaskWithConnection conn action =
+  let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
+      withTimeout io = do
+        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (GenericDb.timeout conn))) io
+        case maybeResult of
+          Just result -> pure result
+          Nothing -> pure (Err timeoutError)
+      --
+      timeoutError :: Query.Error
+      timeoutError =
+        Query.Timeout Query.ClientTimeout (GenericDb.timeout conn)
+   in --
+      GenericDb.withConnection conn <| \dbConnection ->
+        action dbConnection
+          |> (if Time.microseconds (GenericDb.timeout conn) > 0 then withTimeout else identity)
+          |> Platform.doAnything (GenericDb.doAnything conn)
 
 --
 -- TRANSACTIONS
