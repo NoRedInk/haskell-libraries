@@ -13,6 +13,7 @@ dependencies:
 - exceptions
 - filepath
 - health
+- hedgehog
 - lens
 - lens-regex-pcre
 - monad-logger
