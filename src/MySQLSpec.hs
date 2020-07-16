@@ -1,17 +1,32 @@
-module MySQLSpec (tests) where
+{-# LANGUAGE QuasiQuotes #-}
+
+module MySQLSpec
+  ( tests,
+  )
+where
 
 import Cherry.Prelude
+import qualified Data.Acquire as Acquire
+import qualified Debug
+import qualified Environment
 import qualified Expect
+import Fuzz (Fuzzer)
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 import Internal.Query (Query (..))
+import qualified List
 import qualified MySQL
-import Test (Test, describe, test)
+import qualified Platform
+import qualified Task
+import Test (Test, describe, fuzz, test)
 import qualified Prelude
 
 tests :: Test
 tests =
   describe
     "MySQL"
-    [ unsafeBulkifyInsertsTests
+    [ unsafeBulkifyInsertsTests,
+      transactionTests
     ]
 
 unsafeBulkifyInsertsTests :: Test
@@ -62,3 +77,63 @@ mockQuery sqlString =
       sqlOperation = "",
       queriedRelation = ""
     }
+
+transactionTests :: Test
+transactionTests =
+  describe
+    "transaction"
+    [ fuzz mysqlCommandsFuzzer "transactions don't crash" <| \cmds ->
+        Expect.withIO identity <| do
+          settings <- Environment.decode MySQL.decoder
+          noLogger <- Platform.silentContext
+          res <- Acquire.withAcquire (MySQL.connection settings) <| \conn ->
+            runCmds conn cmds
+              |> Task.attempt noLogger
+          Prelude.pure
+            <| case res of
+              Ok _ -> Expect.pass
+              Err "oops" -> Expect.pass
+              Err err -> Expect.fail err
+    ]
+
+-- | Representation of a database command. We use this type to fuzz all sorts
+-- of complicated database interacts, to ensure transactions always work.
+data MySQLCommand
+  = DoQuery
+  | ThrowError
+  | InTransaction [MySQLCommand]
+  deriving (Show)
+
+mysqlCommandsFuzzer :: Fuzzer [MySQLCommand]
+mysqlCommandsFuzzer =
+  Gen.list (Range.linear 0 5) mysqlCommandFuzzer
+
+mysqlCommandFuzzer :: Fuzzer MySQLCommand
+mysqlCommandFuzzer =
+  Gen.recursive
+    Gen.choice
+    [Gen.constant DoQuery, Gen.constant ThrowError]
+    [map InTransaction mysqlCommandsFuzzer]
+
+runCmd :: MySQL.Connection -> MySQLCommand -> Task Text ()
+runCmd conn cmd =
+  case cmd of
+    DoQuery ->
+      MySQL.doQuery
+        conn
+        [MySQL.sql|!SELECT 1|]
+        ( \res ->
+            case res of
+              Ok (_ :: [Int]) -> Task.succeed ()
+              Err err -> Task.fail (Debug.toString err)
+        )
+    ThrowError ->
+      Task.fail "oops"
+    InTransaction subCmds ->
+      MySQL.transaction conn (\conn' -> runCmds conn' subCmds)
+
+runCmds :: MySQL.Connection -> [MySQLCommand] -> Task Text ()
+runCmds conn cmds =
+  List.map (runCmd conn) cmds
+    |> Task.sequence
+    |> Task.map (\_ -> ())
