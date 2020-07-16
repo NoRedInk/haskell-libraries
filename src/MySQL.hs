@@ -74,8 +74,6 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits (Symbol)
 import qualified Health
 import Internal.CaselessRegex (caselessRegex)
-import qualified Internal.MySQLDb as GenericDb
-import Internal.MySQLDb (Connection, TransactionCount (..))
 import qualified Internal.Query as Query
 import Internal.Query (Query (..))
 import qualified Internal.Time as Time
@@ -85,14 +83,39 @@ import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
+import qualified Oops
 import qualified Platform
 import qualified Result
+import qualified System.Exit
 import qualified System.Timeout
 import qualified Task
 import qualified Text
 import qualified Tuple
 import Prelude (Either (..), IO, error, fromIntegral, pure, show)
 import qualified Prelude
+
+newtype TransactionCount
+  = TransactionCount (IORef Word)
+
+data Connection
+  = Connection
+      { doAnything :: Platform.DoAnythingHandler,
+        singleOrPool :: SingleOrPool MySQL.SqlBackend,
+        logContext :: Platform.QueryConnectionInfo,
+        timeout :: Time.Interval
+      }
+
+-- | A database connection type.
+--   Defining our own type makes it easier to change it in the future, without
+--   having to fix compilation errors all over the codebase.
+data SingleOrPool c
+  = -- | By default a connection pool is passed around. It will:
+    --   - Create new connections in the pool up to a certain limit.
+    --   - Remove connections from the pool after a query in a connection errored.
+    Pool (Data.Pool.Pool c)
+  | -- | A single connection is only used in the context of a transaction, where
+    --   we need to insure several SQL statements happen on the same connection.
+    Single TransactionCount c
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
@@ -103,18 +126,18 @@ connection settings =
       pool <-
         MySQL.createMySQLPool database size
           |> Control.Monad.Logger.runNoLoggingT
-          |> map GenericDb.Pool
+          |> map Pool
       pure
-        ( GenericDb.Connection
+        ( Connection
             doAnything
             pool
             (toConnectionLogContext settings)
             (Settings.mysqlQueryTimeoutSeconds settings)
         )
-    release GenericDb.Connection {GenericDb.singleOrPool} =
+    release Connection {singleOrPool} =
       case singleOrPool of
-        GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
-        GenericDb.Single _ _ -> pure ()
+        Pool pool -> Data.Pool.destroyAllResources pool
+        Single _ _ -> pure ()
     size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
     database = toConnectInfo settings
 
@@ -214,9 +237,9 @@ execute executeSql conn query handleResponse =
       runQuery backend = do
         result <- attempt executeSql backend queryAsText
         let inTransaction =
-              case GenericDb.singleOrPool conn of
-                GenericDb.Single _ _ -> True
-                GenericDb.Pool _ -> False
+              case singleOrPool conn of
+                Single _ _ -> True
+                Pool _ -> False
         case (inTransaction, result) of
           (True, Ok value) -> do
             -- If not currently inside a transaction and original query succeeded, then commit
@@ -229,7 +252,7 @@ execute executeSql conn query handleResponse =
       infoForContext = Platform.QueryInfo
         { Platform.queryText = Log.mkSecret (Query.sqlString query),
           Platform.queryTemplate = Query.quasiQuotedString query,
-          Platform.queryConn = GenericDb.logContext conn,
+          Platform.queryConn = logContext conn,
           Platform.queryOperation = Query.sqlOperation query,
           Platform.queryCollection = Query.queriedRelation query
         }
@@ -270,19 +293,46 @@ runTaskWithConnection :: Connection -> (MySQL.SqlBackend -> IO (Result Query.Err
 runTaskWithConnection conn action =
   let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
       withTimeout io = do
-        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (GenericDb.timeout conn))) io
+        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (timeout conn))) io
         case maybeResult of
           Just result -> pure result
           Nothing -> pure (Err timeoutError)
       --
       timeoutError :: Query.Error
       timeoutError =
-        Query.Timeout Query.ClientTimeout (GenericDb.timeout conn)
+        Query.Timeout Query.ClientTimeout (timeout conn)
    in --
-      GenericDb.withConnection conn <| \dbConnection ->
+      withConnection conn <| \dbConnection ->
         action dbConnection
-          |> (if Time.microseconds (GenericDb.timeout conn) > 0 then withTimeout else identity)
-          |> Platform.doAnything (GenericDb.doAnything conn)
+          |> (if Time.microseconds (timeout conn) > 0 then withTimeout else identity)
+          |> Platform.doAnything (doAnything conn)
+
+handleError :: Text -> Exception.IOException -> IO a
+handleError connectionString err = do
+  _ <-
+    Oops.putNiceError
+      [Oops.help|# Could not connect to Database
+                |
+                |We couldn't connect to the database.
+                |You might see this error when you try to start the content creation app or during compilation.
+                |
+                |Are you sure your database is running?
+                |Bring it up by running `aide setup-postgres`.
+                |We're trying to connect with the credentials stored in `.env`, perhaps you can try to connect manually.
+                |
+                |If credentials recently changed, regenerating configuration files might also work.
+                |The command for that is:
+                |
+                |```
+                |$ ./Shakefile.hs .env
+                |```
+                |
+                |]
+      [ Oops.extra "Exception" err,
+        Oops.extra "Attempted to connect to" connectionString
+      ]
+  Exception.displayException err
+    |> System.Exit.die
 
 --
 -- TRANSACTIONS
@@ -309,8 +359,8 @@ transaction conn func =
       setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
       setSingle tc c =
         -- All queries in a transactions must run on the same thread.
-        conn {GenericDb.singleOrPool = GenericDb.Single tc c}
-   in GenericDb.withConnection conn <| \c -> do
+        conn {singleOrPool = Single tc c}
+   in withConnection conn <| \c -> do
         tc <- map TransactionCount (doIO conn (newIORef 0))
         Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
           |> map Tuple.first
@@ -332,9 +382,9 @@ inTestTransaction conn func =
       setSingle :: TransactionCount -> MySQL.SqlBackend -> Connection
       setSingle tc c =
         -- All queries in a transactions must run on the same thread.
-        conn {GenericDb.singleOrPool = GenericDb.Single tc c}
+        conn {singleOrPool = Single tc c}
    in --
-      GenericDb.withConnection conn <| \c -> do
+      withConnection conn <| \c -> do
         tc <- map TransactionCount (doIO conn (newIORef 0))
         Platform.generalBracket (start tc c) (end tc) (setSingle tc >> func)
           |> map Tuple.first
@@ -386,6 +436,36 @@ rollbackAll (TransactionCount transactionCount, conn) = do
     else do
       rollback (TransactionCount transactionCount, conn)
       rollbackAll (TransactionCount transactionCount, conn)
+
+-- | by default, queries pull a connection from the connection pool.
+--   For SQL transactions, we want all queries within the transaction to run
+--   on the same connection. withConnection lets transaction bundle
+--   queries on the same connection.
+withConnection :: Connection -> (MySQL.SqlBackend -> Task e a) -> Task e a
+withConnection conn func =
+  let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
+      acquire pool =
+        doIO conn
+          <| Data.Pool.takeResource pool
+      --
+      release :: Data.Pool.Pool MySQL.SqlBackend -> (MySQL.SqlBackend, Data.Pool.LocalPool MySQL.SqlBackend) -> ExitCase x -> Task y ()
+      release pool (c, localPool) exitCase =
+        doIO conn
+          <| case exitCase of
+            ExitCaseSuccess _ ->
+              Data.Pool.putResource localPool c
+            ExitCaseException _ ->
+              Data.Pool.destroyResource pool localPool c
+            ExitCaseAbort ->
+              Data.Pool.destroyResource pool localPool c
+   in --
+      case singleOrPool conn of
+        (Single _ c) ->
+          func c
+        --
+        (Pool pool) ->
+          Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
+            |> map Tuple.first
 
 --
 -- TYPE CLASSES
@@ -1192,7 +1272,7 @@ boolToSmallInt b =
 
 doIO :: Connection -> IO a -> Task x a
 doIO conn io =
-  Platform.doAnything (GenericDb.doAnything conn) (io |> map Ok)
+  Platform.doAnything (doAnything conn) (io |> map Ok)
 
 -- |
 -- Hack to allow us to do things like replace "-quoted idenitifier with `-quoted
