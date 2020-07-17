@@ -37,7 +37,6 @@ data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool PGConnection,
-        toInternalConnection :: PGConnection -> PGConnection,
         logContext :: Platform.QueryConnectionInfo,
         timeout :: Time.Interval
       }
@@ -72,7 +71,7 @@ runTaskWithConnection conn action =
         Query.Timeout Query.ClientTimeout (timeout conn)
    in --
       withConnection conn <| \dbConnection ->
-        action (toInternalConnection conn dbConnection)
+        action dbConnection
           |> (if Time.microseconds (timeout conn) > 0 then withTimeout else identity)
           |> Platform.doAnything (doAnything conn)
 
@@ -181,16 +180,16 @@ transaction Transaction {commit, begin, rollback} conn func =
   let start :: PGConnection -> Task x PGConnection
       start c =
         doIO conn <| do
-          begin (toInternalConnection conn c)
+          begin c
           pure c
       --
       end :: PGConnection -> ExitCase b -> Task x ()
       end c exitCase =
         doIO conn
           <| case exitCase of
-            ExitCaseSuccess _ -> commit (toInternalConnection conn c)
-            ExitCaseException _ -> rollback (toInternalConnection conn c)
-            ExitCaseAbort -> rollback (toInternalConnection conn c)
+            ExitCaseSuccess _ -> commit c
+            ExitCaseException _ -> rollback c
+            ExitCaseAbort -> rollback c
       --
       setSingle :: PGConnection -> Connection
       setSingle c =
@@ -207,7 +206,7 @@ inTestTransaction transaction_@Transaction {begin} conn func =
   let start :: PGConnection -> Task x PGConnection
       start c = do
         rollbackAllSafe transaction_ conn c
-        doIO conn <| begin (toInternalConnection conn c)
+        doIO conn <| begin c
         pure c
       --
       end :: PGConnection -> ExitCase b -> Task x ()
@@ -230,8 +229,8 @@ rollbackAllSafe Transaction {begin, rollbackAll} conn c =
     -- running will result in a warning message in the log (even if tests
     -- pass), let's start by beginning a transaction, so that we alwas have
     -- at least one to kill.
-    begin (toInternalConnection conn c)
-    rollbackAll (toInternalConnection conn c)
+    begin c
+    rollbackAll c
 
 -- HELPER
 

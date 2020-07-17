@@ -93,7 +93,6 @@ connection settings =
         ( GenericDb.Connection
             doAnything
             pool
-            identity
             (toConnectionLogContext database)
             (Settings.pgQueryTimeout settings)
         )
