@@ -202,24 +202,12 @@ inTestTransactionIo postgres io = do
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  runTaskWithConnection
-    conn
-    ( \c ->
-        Query.runQuery [Query.sql|!SELECT 1|] c
-          |> map (\(_ :: [Int]) -> ())
-          |> Exception.try
-          |> map (Result.mapError (fromPGError conn) << eitherToResult)
-    )
+  runQuery conn [Query.sql|!SELECT 1|]
+    |> map (\(_ :: [Int]) -> ())
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
     |> map Health.fromResult
     |> Health.mkCheck "postgres"
-
-eitherToResult :: Either e a -> Result e a
-eitherToResult either =
-  case either of
-    Left err -> Err err
-    Right x -> Ok x
 
 doQuery ::
   HasCallStack =>
@@ -229,15 +217,12 @@ doQuery ::
   Task e a
 doQuery conn query handleResponse = do
   withFrozenCallStack Log.info (Query.asMessage query) []
-  let runQuery c =
-        Query.runQuery query c
-          |> Exception.try
-          |> map (Result.mapError (fromPGError conn) << eitherToResult)
-  runTaskWithConnection conn runQuery
+  runQuery conn query
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
     -- context values like the query string.
-    |> intoResult
+    |> map Ok
+    |> Task.onError (Task.succeed << Err)
     |> andThen handleResponse
     |> Log.withContext "postgresql-query" [Platform.queryContext queryInfo]
   where
@@ -267,11 +252,6 @@ fromPGError c pgError =
       Exception.displayException pgError
         |> Data.Text.pack
         |> Query.Other
-
-intoResult :: Task e a -> Task e2 (Result e a)
-intoResult task =
-  map Ok task
-    |> Task.onError (Task.succeed << Err)
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
@@ -342,10 +322,16 @@ handleError connectionString err = do
 -- CONNECTION HELPERS
 --
 
-runTaskWithConnection :: Connection -> (PGConnection -> IO (Result Query.Error a)) -> Task Query.Error a
-runTaskWithConnection conn action =
-  withConnection conn <| \dbConnection ->
-    action dbConnection
+runQuery :: Connection -> Query.Query row -> Task Query.Error [row]
+runQuery conn query =
+  withConnection conn <| \c ->
+    Query.runQuery query c
+      |> Exception.try
+      |> map
+        ( \res -> case res of
+            Right x -> Ok x
+            Left err -> Err (fromPGError conn err)
+        )
       |> Platform.doAnything (doAnything conn)
       |> withTimeout conn
 
@@ -364,7 +350,7 @@ withTimeout conn task =
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
 withConnection :: Connection -> (PGConnection -> Task e a) -> Task e a
-withConnection conn@Connection {singleOrPool} func =
+withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
         doIO conn
@@ -381,7 +367,7 @@ withConnection conn@Connection {singleOrPool} func =
             ExitCaseAbort ->
               Data.Pool.destroyResource pool localPool c
    in --
-      case singleOrPool of
+      case singleOrPool conn of
         (Single c) ->
           func c
         --
