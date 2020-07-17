@@ -5,7 +5,6 @@ module Internal.GenericDb
     SingleOrPool (..),
     runTaskWithConnection,
     withConnection,
-    handleError,
   )
 where
 
@@ -99,37 +98,6 @@ withConnection conn@Connection {singleOrPool} func =
         (Pool pool) ->
           Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
             |> map Tuple.first
-
---
--- READINESS
---
-
-handleError :: Text -> Exception.IOException -> IO a
-handleError connectionString err = do
-  _ <-
-    Oops.putNiceError
-      [Oops.help|# Could not connect to Database
-                |
-                |We couldn't connect to the database.
-                |You might see this error when you try to start the content creation app or during compilation.
-                |
-                |Are you sure your database is running?
-                |Bring it up by running `aide setup-postgres`.
-                |We're trying to connect with the credentials stored in `.env`, perhaps you can try to connect manually.
-                |
-                |If credentials recently changed, regenerating configuration files might also work.
-                |The command for that is:
-                |
-                |```
-                |$ ./Shakefile.hs .env
-                |```
-                |
-                |]
-      [ Oops.extra "Exception" err,
-        Oops.extra "Attempted to connect to" connectionString
-      ]
-  Exception.displayException err
-    |> System.Exit.die
 
 -- HELPER
 

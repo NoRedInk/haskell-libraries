@@ -1,3 +1,4 @@
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -68,9 +69,11 @@ import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
 import qualified Log
 import Network.Socket (SockAddr (..))
+import qualified Oops
 import qualified Platform
 import qualified Postgres.Settings as Settings
 import qualified Result
+import qualified System.Exit
 import qualified Task
 import qualified Tuple
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
@@ -86,7 +89,7 @@ connection settings =
       pool <-
         map GenericDb.Pool
           <| Data.Pool.createPool
-            (pgConnect database `Exception.catch` GenericDb.handleError (toConnectionString database))
+            (pgConnect database `Exception.catch` handleError (toConnectionString database))
             pgDisconnect
             stripes
             maxIdleTime
@@ -295,6 +298,33 @@ toConnectionLogContext db =
         )
   where
     databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8
+
+handleError :: Text -> Exception.IOException -> IO a
+handleError connectionString err = do
+  _ <-
+    Oops.putNiceError
+      [Oops.help|# Could not connect to Database
+                |
+                |We couldn't connect to the database.
+                |You might see this error when you try to start the content creation app or during compilation.
+                |
+                |Are you sure your database is running?
+                |Bring it up by running `aide setup-postgres`.
+                |We're trying to connect with the credentials stored in `.env`, perhaps you can try to connect manually.
+                |
+                |If credentials recently changed, regenerating configuration files might also work.
+                |The command for that is:
+                |
+                |```
+                |$ ./Shakefile.hs .env
+                |```
+                |
+                |]
+      [ Oops.extra "Exception" err,
+        Oops.extra "Attempted to connect to" connectionString
+      ]
+  Exception.displayException err
+    |> System.Exit.die
 
 doIO :: Connection -> IO a -> Task x a
 doIO conn io =
