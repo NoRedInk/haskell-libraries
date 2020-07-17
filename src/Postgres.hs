@@ -73,7 +73,7 @@ import qualified Result
 import qualified Task
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
-type Connection = GenericDb.Connection PGConnection PGConnection
+type Connection = GenericDb.Connection
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =

@@ -20,6 +20,7 @@ import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCase
 import qualified Data.Pool
 import Data.String (IsString)
 import qualified Data.Text
+import Database.PostgreSQL.Typed (PGConnection)
 import qualified Health
 import qualified Internal.Query as Query
 import qualified Internal.Time as Time
@@ -32,11 +33,11 @@ import qualified Task
 import qualified Tuple
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
-data Connection internal conn
+data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
-        singleOrPool :: SingleOrPool conn,
-        toInternalConnection :: conn -> internal,
+        singleOrPool :: SingleOrPool PGConnection,
+        toInternalConnection :: PGConnection -> PGConnection,
         logContext :: Platform.QueryConnectionInfo,
         timeout :: Time.Interval
       }
@@ -57,7 +58,7 @@ data SingleOrPool c
 -- CONNECTION HELPERS
 --
 
-runTaskWithConnection :: Connection internal conn -> (internal -> IO (Result Query.Error a)) -> Task Query.Error a
+runTaskWithConnection :: Connection -> (PGConnection -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
   let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
       withTimeout io = do
@@ -79,7 +80,7 @@ runTaskWithConnection conn action =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Connection internal conn -> (conn -> Task e a) -> Task e a
+withConnection :: Connection -> (PGConnection -> Task e a) -> Task e a
 withConnection conn@Connection {singleOrPool} func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
@@ -111,7 +112,7 @@ withConnection conn@Connection {singleOrPool} func =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: IsString s => (internal -> s -> IO ()) -> Platform.LogHandler -> Connection internal conn -> IO Health.Status
+readiness :: IsString s => (PGConnection -> s -> IO ()) -> Platform.LogHandler -> Connection -> IO Health.Status
 readiness runQuery log' conn =
   let query c =
         runQuery c "SELECT 1"
@@ -165,25 +166,25 @@ handleError connectionString err = do
 -- TRANSACTIONS
 --
 
-data Transaction internal
+data Transaction
   = Transaction
-      { commit :: internal -> IO (),
-        begin :: internal -> IO (),
-        rollback :: internal -> IO (),
-        rollbackAll :: internal -> IO ()
+      { commit :: PGConnection -> IO (),
+        begin :: PGConnection -> IO (),
+        rollback :: PGConnection -> IO (),
+        rollbackAll :: PGConnection -> IO ()
       }
 
 -- |
 -- Perform a database transaction.
-transaction :: forall internal conn e a. Transaction internal -> Connection internal conn -> (Connection internal conn -> Task e a) -> Task e a
+transaction :: forall e a. Transaction -> Connection -> (Connection -> Task e a) -> Task e a
 transaction Transaction {commit, begin, rollback} conn func =
-  let start :: conn -> Task x conn
+  let start :: PGConnection -> Task x PGConnection
       start c =
         doIO conn <| do
           begin (toInternalConnection conn c)
           pure c
       --
-      end :: conn -> ExitCase b -> Task x ()
+      end :: PGConnection -> ExitCase b -> Task x ()
       end c exitCase =
         doIO conn
           <| case exitCase of
@@ -191,7 +192,7 @@ transaction Transaction {commit, begin, rollback} conn func =
             ExitCaseException _ -> rollback (toInternalConnection conn c)
             ExitCaseAbort -> rollback (toInternalConnection conn c)
       --
-      setSingle :: conn -> Connection internal conn
+      setSingle :: PGConnection -> Connection
       setSingle c =
         -- All queries in a transactions must run on the same thread.
         conn {singleOrPool = Single c}
@@ -201,19 +202,19 @@ transaction Transaction {commit, begin, rollback} conn func =
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: forall internal conn x a. Transaction internal -> Connection internal conn -> (Connection internal conn -> Task x a) -> Task x a
+inTestTransaction :: forall x a. Transaction -> Connection -> (Connection -> Task x a) -> Task x a
 inTestTransaction transaction_@Transaction {begin} conn func =
-  let start :: conn -> Task x conn
+  let start :: PGConnection -> Task x PGConnection
       start c = do
         rollbackAllSafe transaction_ conn c
         doIO conn <| begin (toInternalConnection conn c)
         pure c
       --
-      end :: conn -> ExitCase b -> Task x ()
+      end :: PGConnection -> ExitCase b -> Task x ()
       end c _ =
         rollbackAllSafe transaction_ conn c
       --
-      setSingle :: conn -> Connection internal conn
+      setSingle :: PGConnection -> Connection
       setSingle c =
         -- All queries in a transactions must run on the same thread.
         conn {singleOrPool = Single c}
@@ -222,7 +223,7 @@ inTestTransaction transaction_@Transaction {begin} conn func =
         Platform.generalBracket (start c) end (setSingle >> func)
           |> map Tuple.first
 
-rollbackAllSafe :: Transaction internal -> Connection internal conn -> conn -> Task x ()
+rollbackAllSafe :: Transaction -> Connection -> PGConnection -> Task x ()
 rollbackAllSafe Transaction {begin, rollbackAll} conn c =
   doIO conn <| do
     -- Because calling `rollbackAllTransactions` when no transactions are
@@ -234,6 +235,6 @@ rollbackAllSafe Transaction {begin, rollbackAll} conn c =
 
 -- HELPER
 
-doIO :: Connection internal conn -> IO a -> Task x a
+doIO :: Connection -> IO a -> Task x a
 doIO conn io =
   Platform.doAnything (doAnything conn) (io |> map Ok)
