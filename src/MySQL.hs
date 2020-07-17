@@ -197,6 +197,7 @@ readiness log conn =
           |> Exception.tryAny
           |> map (Result.mapError toQueryError << eitherToResult)
    in runTaskWithConnection conn query
+        |> withTimeout conn
         |> Task.mapError (Data.Text.pack << Exception.displayException)
         |> Task.attempt log
         |> map Health.fromResult
@@ -249,6 +250,7 @@ doQuery conn query handleResponse =
    in do
         withFrozenCallStack Log.info (Query.asMessage query) []
         runTaskWithConnection conn runQuery
+          |> withTimeout conn
           -- Handle the response before wrapping the operation in a context. This way,
           -- if the response handling logic creates errors, those errors can inherit
           -- context values like the query string.
@@ -298,7 +300,6 @@ runTaskWithConnection conn action =
   withConnection conn <| \dbConnection ->
     action dbConnection
       |> Platform.doAnything (doAnything conn)
-      |> withTimeout conn
 
 timeoutError :: Connection -> Query.Error
 timeoutError conn =
