@@ -189,19 +189,11 @@ toConnectInfo settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  let executeSql :: MySQL.SqlBackend -> Text -> IO ()
-      executeSql backend query' =
-        void (executeQuery backend query' :: IO [Int])
-      query c =
-        executeSql c "SELECT 1"
-          |> Exception.tryAny
-          |> map (Result.mapError toQueryError << eitherToResult)
-   in runTaskWithConnection conn query
-        |> withTimeout conn
-        |> Task.mapError (Data.Text.pack << Exception.displayException)
-        |> Task.attempt log
-        |> map Health.fromResult
-        |> Health.mkCheck "mysql"
+  executeCommand conn "SELECT 1"
+    |> Task.mapError (Data.Text.pack << Exception.displayException)
+    |> Task.attempt log
+    |> map Health.fromResult
+    |> Health.mkCheck "mysql"
 
 eitherToResult :: Either e a -> Result e a
 eitherToResult either =
@@ -213,7 +205,7 @@ eitherToResult either =
 -- EXECUTE QUERIES
 --
 class MySqlQueryable query result | result -> query where
-  executeSql :: MySQL.SqlBackend -> Query query -> IO result
+  executeSql :: Connection -> Query query -> Task Query.Error result
 
 instance QueryResults (CountColumns row) row => MySqlQueryable row [row] where
   executeSql c query = executeQuery c (queryAsText query)
@@ -229,16 +221,13 @@ doQuery ::
   Task e a
 doQuery conn query handleResponse =
   let --
-      runQuery backend = do
-        result <- handleMySqlException (executeSql backend query)
-        case (transactionCount conn, result) of
-          (Nothing, Ok value) -> do
-            -- If not currently inside a transaction and original query succeeded, then commit
-            result2 <- handleMySqlException (executeCommand backend "COMMIT")
-            pure <| Result.map (always value) result2
-          _ ->
-            pure result
-      --
+      runQuery = do
+        result <- executeSql conn query
+        -- If not currently inside a transaction and original query succeeded, then commit
+        case transactionCount conn of
+          Nothing -> executeCommand conn "COMMIT"
+          _ -> pure ()
+        pure result
       infoForContext :: Platform.QueryInfo
       infoForContext = Platform.QueryInfo
         { Platform.queryText = Log.mkSecret (Query.sqlString query),
@@ -249,17 +238,14 @@ doQuery conn query handleResponse =
         }
    in do
         withFrozenCallStack Log.info (Query.asMessage query) []
-        withConnection conn <| \dbConnection ->
-          runQuery dbConnection
-            |> Platform.doAnything (doAnything conn)
-            |> withTimeout conn
-            -- Handle the response before wrapping the operation in a context. This way,
-            -- if the response handling logic creates errors, those errors can inherit
-            -- context values like the query string.
-            |> Task.map Ok
-            |> Task.onError (Task.succeed << Err)
-            |> andThen handleResponse
-            |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
+        runQuery
+          -- Handle the response before wrapping the operation in a context. This way,
+          -- if the response handling logic creates errors, those errors can inherit
+          -- context values like the query string.
+          |> Task.map Ok
+          |> Task.onError (Task.succeed << Err)
+          |> Task.andThen handleResponse
+          |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
 queryAsText :: Query q -> Text
 queryAsText query =
@@ -273,14 +259,8 @@ handleMySqlException io = do
   either <- Exception.tryAny io
   pure <| Result.mapError toQueryError (eitherToResult either)
 
-executeQuery :: forall row. QueryResults (CountColumns row) row => MySQL.SqlBackend -> Text -> IO [row]
-executeQuery backend query =
-  MySQL.rawSql query []
-    |> (\reader -> runReaderT reader backend)
-    |> map (map (toQueryResult (Proxy :: Proxy (CountColumns row))))
-
-executeQuery' :: forall row e. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
-executeQuery' conn query =
+executeQuery :: forall row e. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
+executeQuery conn query =
   withConnection conn <| \backend ->
     MySQL.rawSql query []
       |> (\reader -> runReaderT reader backend)
@@ -289,13 +269,8 @@ executeQuery' conn query =
       |> Platform.doAnything (doAnything conn)
       |> withTimeout conn
 
-executeCommand :: MySQL.SqlBackend -> Text -> IO ()
-executeCommand backend query =
-  MySQL.rawExecute query []
-    |> (\reader -> runReaderT reader backend)
-
-executeCommand' :: Connection -> Text -> Task Query.Error ()
-executeCommand' conn query =
+executeCommand :: Connection -> Text -> Task Query.Error ()
+executeCommand conn query =
   withConnection conn <| \backend ->
     MySQL.rawExecute query []
       |> (\reader -> runReaderT reader backend)
@@ -308,12 +283,6 @@ toQueryError err =
   Exception.displayException err
     |> Data.Text.pack
     |> Query.Other
-
-runTaskWithConnection :: Connection -> (MySQL.SqlBackend -> IO (Result Query.Error a)) -> Task Query.Error a
-runTaskWithConnection conn action =
-  withConnection conn <| \dbConnection ->
-    action dbConnection
-      |> Platform.doAnything (doAnything conn)
 
 timeoutError :: Connection -> Query.Error
 timeoutError conn =
@@ -372,8 +341,8 @@ begin conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand' conn "BEGIN"
-      Just (TransactionCount current) -> executeCommand' conn ("SAVEPOINT pgt" ++ Text.fromInt current)
+      Just (TransactionCount 0) -> executeCommand conn "BEGIN"
+      Just (TransactionCount current) -> executeCommand conn ("SAVEPOINT pgt" ++ Text.fromInt current)
 
 -- | Rollback to the most recent 'begin'.
 rollback :: Connection -> Task e ()
@@ -381,9 +350,9 @@ rollback conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand' conn "ROLLBACK"
+      Just (TransactionCount 0) -> executeCommand conn "ROLLBACK"
       Just (TransactionCount current) ->
-        executeCommand' conn ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current)
+        executeCommand conn ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current)
 
 -- | Commit the most recent 'begin'.
 commit :: Connection -> Task e ()
@@ -391,8 +360,8 @@ commit conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand' conn "COMMIT"
-      Just (TransactionCount current) -> executeCommand' conn ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current)
+      Just (TransactionCount 0) -> executeCommand conn "COMMIT"
+      Just (TransactionCount current) -> executeCommand conn ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current)
 
 -- | Rollback all active 'begin's.
 rollbackAll :: Connection -> Task e ()
@@ -400,7 +369,7 @@ rollbackAll conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just _ -> executeCommand' conn "ROLLBACK"
+      Just _ -> executeCommand conn "ROLLBACK"
 
 throwRuntimeError :: Task Query.Error a -> Task e a
 throwRuntimeError task = do
