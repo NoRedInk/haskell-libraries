@@ -301,13 +301,6 @@ handleError connectionString err = do
                 |Bring it up by running `aide setup-postgres`.
                 |We're trying to connect with the credentials stored in `.env`, perhaps you can try to connect manually.
                 |
-                |If credentials recently changed, regenerating configuration files might also work.
-                |The command for that is:
-                |
-                |```
-                |$ ./Shakefile.hs .env
-                |```
-                |
                 |]
       [ Oops.extra "Exception" err,
         Oops.extra "Attempted to connect to" connectionString
