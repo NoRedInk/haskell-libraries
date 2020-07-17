@@ -7,10 +7,7 @@ module Internal.GenericDb
     Transaction (Transaction, begin, commit, rollback, rollbackAll),
     transaction,
     inTestTransaction,
-    readiness,
     handleError,
-    toQueryError,
-    eitherToResult,
   )
 where
 
@@ -108,31 +105,6 @@ withConnection conn@Connection {singleOrPool} func =
 --
 -- READINESS
 --
-
--- |
--- Check that we are ready to be take traffic.
-readiness :: IsString s => (PGConnection -> s -> IO ()) -> Platform.LogHandler -> Connection -> IO Health.Status
-readiness runQuery log' conn =
-  let query c =
-        runQuery c "SELECT 1"
-          |> Exception.tryAny
-          |> map (Result.mapError toQueryError << eitherToResult)
-   in runTaskWithConnection conn query
-        |> Task.mapError (Data.Text.pack << Exception.displayException)
-        |> Task.attempt log'
-        |> map Health.fromResult
-
-toQueryError :: Exception.Exception e => e -> Query.Error
-toQueryError err =
-  Exception.displayException err
-    |> Data.Text.pack
-    |> Query.Other
-
-eitherToResult :: Either e a -> Result e a
-eitherToResult either =
-  case either of
-    Left err -> Err err
-    Right x -> Ok x
 
 handleError :: Text -> Exception.IOException -> IO a
 handleError connectionString err = do

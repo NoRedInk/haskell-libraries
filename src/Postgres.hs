@@ -142,10 +142,30 @@ inTestTransactionIo postgres io = do
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
-readiness log conn = Health.mkCheck "postgres" (GenericDb.readiness go log conn)
-  where
-    go :: PGConnection -> ByteString -> IO ()
-    go c = pgQuery c >> void
+readiness log conn =
+  GenericDb.runTaskWithConnection
+    conn
+    ( \c ->
+        pgQuery c ("SELECT 1" :: ByteString)
+          |> Exception.tryAny
+          |> map (Result.mapError toQueryError << eitherToResult)
+    )
+    |> Task.mapError (Data.Text.pack << Exception.displayException)
+    |> Task.attempt log
+    |> map Health.fromResult
+    |> Health.mkCheck "postgres"
+
+toQueryError :: Exception.Exception e => e -> Query.Error
+toQueryError err =
+  Exception.displayException err
+    |> Data.Text.pack
+    |> Query.Other
+
+eitherToResult :: Either e a -> Result e a
+eitherToResult either =
+  case either of
+    Left err -> Err err
+    Right x -> Ok x
 
 doQuery ::
   HasCallStack =>
@@ -158,7 +178,7 @@ doQuery conn query handleResponse = do
   let runQuery c =
         Query.runQuery query c
           |> Exception.try
-          |> map (Result.mapError (fromPGError conn) << GenericDb.eitherToResult)
+          |> map (Result.mapError (fromPGError conn) << eitherToResult)
   GenericDb.runTaskWithConnection conn runQuery
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
