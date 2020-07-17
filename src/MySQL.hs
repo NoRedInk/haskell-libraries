@@ -295,21 +295,23 @@ toQueryError err =
 
 runTaskWithConnection :: Connection -> (MySQL.SqlBackend -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
-  let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
-      withTimeout io = do
-        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (timeout conn))) io
-        case maybeResult of
-          Just result -> pure result
-          Nothing -> pure (Err timeoutError)
-      --
-      timeoutError :: Query.Error
-      timeoutError =
-        Query.Timeout Query.ClientTimeout (timeout conn)
-   in --
-      withConnection conn <| \dbConnection ->
-        action dbConnection
-          |> (if Time.microseconds (timeout conn) > 0 then withTimeout else identity)
-          |> Platform.doAnything (doAnything conn)
+  withConnection conn <| \dbConnection ->
+    action dbConnection
+      |> (if Time.microseconds (timeout conn) > 0 then withTimeout (timeout conn) (timeoutError conn) else identity)
+      |> Platform.doAnything (doAnything conn)
+
+timeoutError :: Connection -> Query.Error
+timeoutError conn =
+  Query.Timeout Query.ClientTimeout (timeout conn)
+
+-- Run an IO with a timeout. If the IO doesn't finish in the specified timespan
+-- it throws the provided error.
+withTimeout :: Time.Interval -> e -> IO (Result e a) -> IO (Result e a)
+withTimeout timeout' err io = do
+  maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds timeout')) io
+  case maybeResult of
+    Just result -> pure result
+    Nothing -> pure (Err err)
 
 --
 -- TRANSACTIONS
