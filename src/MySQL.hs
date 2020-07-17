@@ -195,12 +195,6 @@ readiness log conn =
     |> map Health.fromResult
     |> Health.mkCheck "mysql"
 
-eitherToResult :: Either e a -> Result e a
-eitherToResult either =
-  case either of
-    Left err -> Err err
-    Right x -> Ok x
-
 --
 -- EXECUTE QUERIES
 --
@@ -254,11 +248,6 @@ queryAsText query =
     |> Text.replace "monolith." ""
     |> Internal.anyToIn
 
-handleMySqlException :: IO result -> IO (Result Query.Error result)
-handleMySqlException io = do
-  either <- Exception.tryAny io
-  pure <| Result.mapError toQueryError (eitherToResult either)
-
 executeQuery :: forall row e. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
 executeQuery conn query =
   withConnection conn <| \backend ->
@@ -278,15 +267,17 @@ executeCommand conn query =
       |> Platform.doAnything (doAnything conn)
       |> withTimeout conn
 
-toQueryError :: Exception.Exception e => e -> Query.Error
-toQueryError err =
-  Exception.displayException err
-    |> Data.Text.pack
-    |> Query.Other
-
-timeoutError :: Connection -> Query.Error
-timeoutError conn =
-  Query.Timeout Query.ClientTimeout (timeout conn)
+handleMySqlException :: IO result -> IO (Result Query.Error result)
+handleMySqlException io = do
+  either <- Exception.tryAny io
+  case either of
+    Left err ->
+      Exception.displayException err
+        |> Data.Text.pack
+        |> Query.Other
+        |> Err
+        |> pure
+    Right x -> pure (Ok x)
 
 withTimeout :: Connection -> Task Query.Error a -> Task Query.Error a
 withTimeout conn task =
@@ -294,7 +285,7 @@ withTimeout conn task =
     then
       Task.timeout
         (Time.milliseconds (timeout conn))
-        (timeoutError conn)
+        (Query.Timeout Query.ClientTimeout (timeout conn))
         task
     else task
 
