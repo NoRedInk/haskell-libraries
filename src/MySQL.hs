@@ -186,7 +186,8 @@ toConnectInfo settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  executeCommand conn "SELECT 1"
+  executeQuery conn "SELECT 1"
+    |> Task.map (\(_ :: [Int]) -> ())
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
     |> map Health.fromResult
