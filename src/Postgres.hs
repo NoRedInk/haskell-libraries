@@ -51,7 +51,6 @@ import Database.PostgreSQL.Typed
     pgDBName,
     pgDBUser,
     pgDisconnect,
-    pgQuery,
   )
 import qualified Database.PostgreSQL.Typed.Array as PGArray
 import Database.PostgreSQL.Typed.Protocol
@@ -206,7 +205,8 @@ readiness log conn =
   runTaskWithConnection
     conn
     ( \c ->
-        pgQuery c ("SELECT 1" :: ByteString)
+        Query.runQuery [Query.sql|!SELECT 1|] c
+          |> map (\(_ :: [Int]) -> ())
           |> Exception.try
           |> map (Result.mapError (fromPGError conn) << eitherToResult)
     )
