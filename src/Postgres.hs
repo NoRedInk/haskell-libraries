@@ -36,6 +36,7 @@ where
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
+import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import qualified Data.Acquire
 import Data.ByteString (ByteString)
 import qualified Data.Pool
@@ -71,6 +72,7 @@ import qualified Platform
 import qualified Postgres.Settings as Settings
 import qualified Result
 import qualified Task
+import qualified Tuple
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
 type Connection = GenericDb.Connection
@@ -108,24 +110,61 @@ connection settings =
 -- |
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction =
-  GenericDb.transaction GenericDb.Transaction
-    { GenericDb.begin = pgBegin,
-      GenericDb.commit = pgCommit,
-      GenericDb.rollback = pgRollback,
-      GenericDb.rollbackAll = pgRollbackAll
-    }
+transaction conn func =
+  let start :: PGConnection -> Task x PGConnection
+      start c =
+        doIO conn <| do
+          pgBegin c
+          pure c
+      --
+      end :: PGConnection -> ExitCase b -> Task x ()
+      end c exitCase =
+        doIO conn
+          <| case exitCase of
+            ExitCaseSuccess _ -> pgCommit c
+            ExitCaseException _ -> pgRollback c
+            ExitCaseAbort -> pgRollback c
+      --
+      setSingle :: PGConnection -> Connection
+      setSingle c =
+        -- All queries in a transactions must run on the same thread.
+        conn {GenericDb.singleOrPool = GenericDb.Single c}
+   in GenericDb.withConnection conn <| \c ->
+        Platform.generalBracket (start c) end (setSingle >> func)
+          |> map Tuple.first
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
-inTestTransaction =
-  GenericDb.inTestTransaction GenericDb.Transaction
-    { GenericDb.begin = pgBegin,
-      GenericDb.commit = pgCommit,
-      GenericDb.rollback = pgRollback,
-      GenericDb.rollbackAll = pgRollbackAll
-    }
+inTestTransaction conn func =
+  let start :: PGConnection -> Task x PGConnection
+      start c = do
+        rollbackAllSafe conn c
+        doIO conn <| pgBegin c
+        pure c
+      --
+      end :: PGConnection -> ExitCase b -> Task x ()
+      end c _ =
+        rollbackAllSafe conn c
+      --
+      setSingle :: PGConnection -> Connection
+      setSingle c =
+        -- All queries in a transactions must run on the same thread.
+        conn {GenericDb.singleOrPool = GenericDb.Single c}
+   in --
+      GenericDb.withConnection conn <| \c ->
+        Platform.generalBracket (start c) end (setSingle >> func)
+          |> map Tuple.first
+
+rollbackAllSafe :: Connection -> PGConnection -> Task x ()
+rollbackAllSafe conn c =
+  doIO conn <| do
+    -- Because calling `rollbackAllTransactions` when no transactions are
+    -- running will result in a warning message in the log (even if tests
+    -- pass), let's start by beginning a transaction, so that we alwas have
+    -- at least one to kill.
+    pgBegin c
+    pgRollbackAll c
 
 -- | DON'T USE. Prefer to arrange your tests around Task, not IO.
 --   Same as `inTestTransaction` but for IO. Should be removed when no
@@ -256,6 +295,10 @@ toConnectionLogContext db =
         )
   where
     databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8
+
+doIO :: Connection -> IO a -> Task x a
+doIO conn io =
+  Platform.doAnything (GenericDb.doAnything conn) (io |> map Ok)
 
 -- useful typeclass instances
 instance PGTypes.PGType "jsonb" => PGTypes.PGType "jsonb[]" where

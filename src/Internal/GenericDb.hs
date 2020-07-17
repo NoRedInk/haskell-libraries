@@ -4,9 +4,7 @@ module Internal.GenericDb
   ( Connection (..),
     SingleOrPool (..),
     runTaskWithConnection,
-    Transaction (Transaction, begin, commit, rollback, rollbackAll),
-    transaction,
-    inTestTransaction,
+    withConnection,
     handleError,
   )
 where
@@ -132,77 +130,6 @@ handleError connectionString err = do
       ]
   Exception.displayException err
     |> System.Exit.die
-
---
--- TRANSACTIONS
---
-
-data Transaction
-  = Transaction
-      { commit :: PGConnection -> IO (),
-        begin :: PGConnection -> IO (),
-        rollback :: PGConnection -> IO (),
-        rollbackAll :: PGConnection -> IO ()
-      }
-
--- |
--- Perform a database transaction.
-transaction :: forall e a. Transaction -> Connection -> (Connection -> Task e a) -> Task e a
-transaction Transaction {commit, begin, rollback} conn func =
-  let start :: PGConnection -> Task x PGConnection
-      start c =
-        doIO conn <| do
-          begin c
-          pure c
-      --
-      end :: PGConnection -> ExitCase b -> Task x ()
-      end c exitCase =
-        doIO conn
-          <| case exitCase of
-            ExitCaseSuccess _ -> commit c
-            ExitCaseException _ -> rollback c
-            ExitCaseAbort -> rollback c
-      --
-      setSingle :: PGConnection -> Connection
-      setSingle c =
-        -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single c}
-   in withConnection conn <| \c ->
-        Platform.generalBracket (start c) end (setSingle >> func)
-          |> map Tuple.first
-
--- | Run code in a transaction, then roll that transaction back.
---   Useful in tests that shouldn't leave anything behind in the DB.
-inTestTransaction :: forall x a. Transaction -> Connection -> (Connection -> Task x a) -> Task x a
-inTestTransaction transaction_@Transaction {begin} conn func =
-  let start :: PGConnection -> Task x PGConnection
-      start c = do
-        rollbackAllSafe transaction_ conn c
-        doIO conn <| begin c
-        pure c
-      --
-      end :: PGConnection -> ExitCase b -> Task x ()
-      end c _ =
-        rollbackAllSafe transaction_ conn c
-      --
-      setSingle :: PGConnection -> Connection
-      setSingle c =
-        -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single c}
-   in --
-      withConnection conn <| \c ->
-        Platform.generalBracket (start c) end (setSingle >> func)
-          |> map Tuple.first
-
-rollbackAllSafe :: Transaction -> Connection -> PGConnection -> Task x ()
-rollbackAllSafe Transaction {begin, rollbackAll} conn c =
-  doIO conn <| do
-    -- Because calling `rollbackAllTransactions` when no transactions are
-    -- running will result in a warning message in the log (even if tests
-    -- pass), let's start by beginning a transaction, so that we alwas have
-    -- at least one to kill.
-    begin c
-    rollbackAll c
 
 -- HELPER
 
