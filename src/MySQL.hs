@@ -212,30 +212,28 @@ eitherToResult either =
 -- EXECUTE QUERIES
 --
 class MySqlQueryable query result | result -> query where
-  doQuery :: Connection -> Query.Query query -> (Result Query.Error result -> Task e a) -> Task e a
+  executeSql :: MySQL.SqlBackend -> Query query -> IO result
 
 instance QueryResults (CountColumns row) row => MySqlQueryable row [row] where
-  doQuery = execute executeQuery
+  executeSql c query = executeQuery c (queryAsText query)
 
 instance MySqlQueryable () () where
-  doQuery = execute executeCommand
+  executeSql c query = executeCommand c (queryAsText query)
 
-execute :: HasCallStack => (MySQL.SqlBackend -> Text -> IO result) -> Connection -> Query.Query row -> (Result Query.Error result -> Task e a) -> Task e a
-execute executeSql conn query handleResponse =
+doQuery ::
+  (HasCallStack, MySqlQueryable row result) =>
+  Connection ->
+  Query.Query row ->
+  (Result Query.Error result -> Task e a) ->
+  Task e a
+doQuery conn query handleResponse =
   let --
-      queryAsText :: Text
-      queryAsText =
-        Query.sqlString query
-          -- We need this prefix on tables to allow compile-time checks of the query.
-          |> Text.replace "monolith." ""
-          |> Internal.anyToIn
-      --
       runQuery backend = do
-        result <- attempt executeSql backend queryAsText
+        result <- handleMySqlException (executeSql backend query)
         case (transactionCount conn, result) of
           (Nothing, Ok value) -> do
             -- If not currently inside a transaction and original query succeeded, then commit
-            result2 <- attempt executeCommand backend "COMMIT"
+            result2 <- handleMySqlException (executeCommand backend "COMMIT")
             pure <| Result.map (always value) result2
           _ ->
             pure result
@@ -259,9 +257,16 @@ execute executeSql conn query handleResponse =
           |> andThen handleResponse
           |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
-attempt :: (MySQL.SqlBackend -> Text -> IO result) -> MySQL.SqlBackend -> Text -> IO (Result Query.Error result)
-attempt executeSql backend query = do
-  either <- Exception.tryAny (executeSql backend query)
+queryAsText :: Query q -> Text
+queryAsText query =
+  Query.sqlString query
+    -- We need this prefix on tables to allow compile-time checks of the query.
+    |> Text.replace "monolith." ""
+    |> Internal.anyToIn
+
+handleMySqlException :: IO result -> IO (Result Query.Error result)
+handleMySqlException io = do
+  either <- Exception.tryAny io
   pure <| Result.mapError toQueryError (eitherToResult either)
 
 executeQuery :: forall row. QueryResults (CountColumns row) row => MySQL.SqlBackend -> Text -> IO [row]
