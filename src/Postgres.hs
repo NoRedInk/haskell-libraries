@@ -74,7 +74,6 @@ import qualified Platform
 import qualified Postgres.Settings as Settings
 import qualified Result
 import qualified System.Exit
-import qualified System.Timeout
 import qualified Task
 import qualified Tuple
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
@@ -351,21 +350,20 @@ handleError connectionString err = do
 
 runTaskWithConnection :: Connection -> (PGConnection -> IO (Result Query.Error a)) -> Task Query.Error a
 runTaskWithConnection conn action =
-  let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
-      withTimeout io = do
-        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (timeout conn))) io
-        case maybeResult of
-          Just result -> pure result
-          Nothing -> pure (Err timeoutError)
-      --
-      timeoutError :: Query.Error
-      timeoutError =
-        Query.Timeout Query.ClientTimeout (timeout conn)
-   in --
-      withConnection conn <| \dbConnection ->
-        action dbConnection
-          |> (if Time.microseconds (timeout conn) > 0 then withTimeout else identity)
-          |> Platform.doAnything (doAnything conn)
+  withConnection conn <| \dbConnection ->
+    action dbConnection
+      |> Platform.doAnything (doAnything conn)
+      |> withTimeout conn
+
+withTimeout :: Connection -> Task Query.Error a -> Task Query.Error a
+withTimeout conn task =
+  if Time.microseconds (timeout conn) > 0
+    then
+      Task.timeout
+        (Time.milliseconds (timeout conn))
+        (Query.Timeout Query.ClientTimeout (timeout conn))
+        task
+    else task
 
 -- | by default, queries pull a connection from the connection pool.
 --   For SQL transactions, we want all queries within the transaction to run
