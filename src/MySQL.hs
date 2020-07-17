@@ -297,21 +297,22 @@ runTaskWithConnection :: Connection -> (MySQL.SqlBackend -> IO (Result Query.Err
 runTaskWithConnection conn action =
   withConnection conn <| \dbConnection ->
     action dbConnection
-      |> (if Time.microseconds (timeout conn) > 0 then withTimeout (timeout conn) (timeoutError conn) else identity)
       |> Platform.doAnything (doAnything conn)
+      |> withTimeout conn
 
 timeoutError :: Connection -> Query.Error
 timeoutError conn =
   Query.Timeout Query.ClientTimeout (timeout conn)
 
--- Run an IO with a timeout. If the IO doesn't finish in the specified timespan
--- it throws the provided error.
-withTimeout :: Time.Interval -> e -> IO (Result e a) -> IO (Result e a)
-withTimeout timeout' err io = do
-  maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds timeout')) io
-  case maybeResult of
-    Just result -> pure result
-    Nothing -> pure (Err err)
+withTimeout :: Connection -> Task Query.Error a -> Task Query.Error a
+withTimeout conn task =
+  if Time.microseconds (timeout conn) > 0
+    then
+      Task.timeout
+        (Time.milliseconds (timeout conn))
+        (timeoutError conn)
+        task
+    else task
 
 --
 -- TRANSACTIONS
