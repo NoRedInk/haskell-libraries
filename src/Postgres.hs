@@ -36,10 +36,8 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
-import Control.Monad (void)
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import qualified Data.Acquire
-import Data.ByteString (ByteString)
 import qualified Data.Pool
 import qualified Data.Text
 import qualified Data.Text.Encoding
@@ -71,7 +69,6 @@ import Network.Socket (SockAddr (..))
 import qualified Oops
 import qualified Platform
 import qualified Postgres.Settings as Settings
-import qualified Result
 import qualified System.Exit
 import qualified Task
 import qualified Tuple

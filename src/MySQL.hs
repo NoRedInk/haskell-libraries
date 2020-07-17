@@ -47,7 +47,6 @@ import Cherry.Prelude hiding (e)
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
-import Control.Monad (void)
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
@@ -81,8 +80,6 @@ import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.Settings as Settings
 import qualified Platform
-import qualified Result
-import qualified System.Timeout
 import qualified Task
 import qualified Text
 import qualified Tuple
@@ -248,7 +245,7 @@ queryAsText query =
     |> Text.replace "monolith." ""
     |> Internal.anyToIn
 
-executeQuery :: forall row e. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
+executeQuery :: forall row. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
 executeQuery conn query =
   withConnection conn <| \backend ->
     MySQL.rawSql query []
