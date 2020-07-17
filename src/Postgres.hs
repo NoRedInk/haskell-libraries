@@ -207,19 +207,13 @@ readiness log conn =
     conn
     ( \c ->
         pgQuery c ("SELECT 1" :: ByteString)
-          |> Exception.tryAny
-          |> map (Result.mapError toQueryError << eitherToResult)
+          |> Exception.try
+          |> map (Result.mapError (fromPGError conn) << eitherToResult)
     )
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
     |> map Health.fromResult
     |> Health.mkCheck "postgres"
-
-toQueryError :: Exception.Exception e => e -> Query.Error
-toQueryError err =
-  Exception.displayException err
-    |> Data.Text.pack
-    |> Query.Other
 
 eitherToResult :: Either e a -> Result e a
 eitherToResult either =
