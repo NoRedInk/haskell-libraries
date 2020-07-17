@@ -65,8 +65,8 @@ import Database.PostgreSQL.Typed.Protocol
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
-import qualified Internal.GenericDb as GenericDb
 import qualified Internal.Query as Query
+import qualified Internal.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (..))
 import qualified Oops
@@ -74,11 +74,30 @@ import qualified Platform
 import qualified Postgres.Settings as Settings
 import qualified Result
 import qualified System.Exit
+import qualified System.Timeout
 import qualified Task
 import qualified Tuple
 import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
 
-type Connection = GenericDb.Connection
+data Connection
+  = Connection
+      { doAnything :: Platform.DoAnythingHandler,
+        singleOrPool :: SingleOrPool PGConnection,
+        logContext :: Platform.QueryConnectionInfo,
+        timeout :: Time.Interval
+      }
+
+-- | A database connection type.
+--   Defining our own type makes it easier to change it in the future, without
+--   having to fix compilation errors all over the codebase.
+data SingleOrPool c
+  = -- | By default a connection pool is passed around. It will:
+    --   - Create new connections in the pool up to a certain limit.
+    --   - Remove connections from the pool after a query in a connection errored.
+    Pool (Data.Pool.Pool c)
+  | -- | A single connection is only used in the context of a transaction, where
+    --   we need to insure several SQL statements happen on the same connection.
+    Single c
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
@@ -87,7 +106,7 @@ connection settings =
     acquire = do
       doAnything <- Platform.doAnythingHandler
       pool <-
-        map GenericDb.Pool
+        map Pool
           <| Data.Pool.createPool
             (pgConnect database `Exception.catch` handleError (toConnectionString database))
             pgDisconnect
@@ -95,16 +114,16 @@ connection settings =
             maxIdleTime
             size
       pure
-        ( GenericDb.Connection
+        ( Connection
             doAnything
             pool
             (toConnectionLogContext database)
             (Settings.pgQueryTimeout settings)
         )
-    release GenericDb.Connection {GenericDb.singleOrPool} =
+    release Connection {singleOrPool} =
       case singleOrPool of
-        GenericDb.Pool pool -> Data.Pool.destroyAllResources pool
-        GenericDb.Single single -> pgDisconnect single
+        Pool pool -> Data.Pool.destroyAllResources pool
+        Single single -> pgDisconnect single
     stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral
     maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings))
     size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral
@@ -131,8 +150,8 @@ transaction conn func =
       setSingle :: PGConnection -> Connection
       setSingle c =
         -- All queries in a transactions must run on the same thread.
-        conn {GenericDb.singleOrPool = GenericDb.Single c}
-   in GenericDb.withConnection conn <| \c ->
+        conn {singleOrPool = Single c}
+   in withConnection conn <| \c ->
         Platform.generalBracket (start c) end (setSingle >> func)
           |> map Tuple.first
 
@@ -153,9 +172,9 @@ inTestTransaction conn func =
       setSingle :: PGConnection -> Connection
       setSingle c =
         -- All queries in a transactions must run on the same thread.
-        conn {GenericDb.singleOrPool = GenericDb.Single c}
+        conn {singleOrPool = Single c}
    in --
-      GenericDb.withConnection conn <| \c ->
+      withConnection conn <| \c ->
         Platform.generalBracket (start c) end (setSingle >> func)
           |> map Tuple.first
 
@@ -185,7 +204,7 @@ inTestTransactionIo postgres io = do
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  GenericDb.runTaskWithConnection
+  runTaskWithConnection
     conn
     ( \c ->
         pgQuery c ("SELECT 1" :: ByteString)
@@ -221,7 +240,7 @@ doQuery conn query handleResponse = do
         Query.runQuery query c
           |> Exception.try
           |> map (Result.mapError (fromPGError conn) << eitherToResult)
-  GenericDb.runTaskWithConnection conn runQuery
+  runTaskWithConnection conn runQuery
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
     -- context values like the query string.
@@ -232,7 +251,7 @@ doQuery conn query handleResponse = do
     queryInfo = Platform.QueryInfo
       { Platform.queryText = Log.mkSecret (Query.sqlString query),
         Platform.queryTemplate = Query.quasiQuotedString query,
-        Platform.queryConn = GenericDb.logContext conn,
+        Platform.queryConn = logContext conn,
         Platform.queryOperation = Query.sqlOperation query,
         Platform.queryCollection = Query.queriedRelation query
       }
@@ -250,7 +269,7 @@ fromPGError c pgError =
         |> Data.Text.pack
         |> Query.UniqueViolation
     "57014" ->
-      Query.Timeout Query.ServerTimeout (GenericDb.timeout c)
+      Query.Timeout Query.ServerTimeout (timeout c)
     _ ->
       Exception.displayException pgError
         |> Data.Text.pack
@@ -326,9 +345,61 @@ handleError connectionString err = do
   Exception.displayException err
     |> System.Exit.die
 
+--
+-- CONNECTION HELPERS
+--
+
+runTaskWithConnection :: Connection -> (PGConnection -> IO (Result Query.Error a)) -> Task Query.Error a
+runTaskWithConnection conn action =
+  let withTimeout :: IO (Result Query.Error a) -> IO (Result Query.Error a)
+      withTimeout io = do
+        maybeResult <- System.Timeout.timeout (fromIntegral (Time.microseconds (timeout conn))) io
+        case maybeResult of
+          Just result -> pure result
+          Nothing -> pure (Err timeoutError)
+      --
+      timeoutError :: Query.Error
+      timeoutError =
+        Query.Timeout Query.ClientTimeout (timeout conn)
+   in --
+      withConnection conn <| \dbConnection ->
+        action dbConnection
+          |> (if Time.microseconds (timeout conn) > 0 then withTimeout else identity)
+          |> Platform.doAnything (doAnything conn)
+
+-- | by default, queries pull a connection from the connection pool.
+--   For SQL transactions, we want all queries within the transaction to run
+--   on the same connection. withConnection lets transaction bundle
+--   queries on the same connection.
+withConnection :: Connection -> (PGConnection -> Task e a) -> Task e a
+withConnection conn@Connection {singleOrPool} func =
+  let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
+      acquire pool =
+        doIO conn
+          <| Data.Pool.takeResource pool
+      --
+      release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> ExitCase x -> Task y ()
+      release pool (c, localPool) exitCase =
+        doIO conn
+          <| case exitCase of
+            ExitCaseSuccess _ ->
+              Data.Pool.putResource localPool c
+            ExitCaseException _ ->
+              Data.Pool.destroyResource pool localPool c
+            ExitCaseAbort ->
+              Data.Pool.destroyResource pool localPool c
+   in --
+      case singleOrPool of
+        (Single c) ->
+          func c
+        --
+        (Pool pool) ->
+          Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
+            |> map Tuple.first
+
 doIO :: Connection -> IO a -> Task x a
 doIO conn io =
-  Platform.doAnything (GenericDb.doAnything conn) (io |> map Ok)
+  Platform.doAnything (doAnything conn) (io |> map Ok)
 
 -- useful typeclass instances
 instance PGTypes.PGType "jsonb" => PGTypes.PGType "jsonb[]" where
