@@ -233,7 +233,7 @@ execute executeSql conn query handleResponse =
       runQuery backend = do
         result <- attempt executeSql backend queryAsText
         case (transactionCount conn, result) of
-          (TransactionCount 0, Ok value) -> do
+          (Nothing, Ok value) -> do
             -- If not currently inside a transaction and original query succeeded, then commit
             result2 <- attempt executeCommand backend "COMMIT"
             pure <| Result.map (always value) result2
@@ -337,49 +337,43 @@ inTestTransaction conn' func =
       (\() -> func conn)
       |> map Tuple.first
 
-transactionCount :: Connection -> TransactionCount
+transactionCount :: Connection -> Maybe TransactionCount
 transactionCount conn =
   case singleOrPool conn of
-    Single tc _ -> tc
-    Pool _ -> TransactionCount 0
+    Single tc _ -> Just tc
+    Pool _ -> Nothing
 
 -- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
 begin :: Connection -> Task e ()
 begin conn =
-  let (TransactionCount current) = transactionCount conn
-      query =
-        if current == 0
-          then "BEGIN"
-          else "SAVEPOINT pgt" ++ Text.fromInt current
-   in executeCommand' conn query
+  case transactionCount conn of
+    Nothing -> pure ()
+    Just (TransactionCount 0) -> executeCommand' conn "BEGIN"
+    Just (TransactionCount current) -> executeCommand' conn ("SAVEPOINT pgt" ++ Text.fromInt current)
 
 -- | Rollback to the most recent 'begin'.
 rollback :: Connection -> Task e ()
 rollback conn =
-  let (TransactionCount current) = transactionCount conn
-      query =
-        if current == 0
-          then "ROLLBACK"
-          else "ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current
-   in executeCommand' conn query
+  case transactionCount conn of
+    Nothing -> pure ()
+    Just (TransactionCount 0) -> executeCommand' conn "ROLLBACK"
+    Just (TransactionCount current) ->
+      executeCommand' conn ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current)
 
 -- | Commit the most recent 'begin'.
 commit :: Connection -> Task e ()
 commit conn =
-  let (TransactionCount current) = transactionCount conn
-      query =
-        if current == 0
-          then "COMMIT"
-          else "RELEASE SAVEPOINT pgt" ++ Text.fromInt current
-   in executeCommand' conn query
+  case transactionCount conn of
+    Nothing -> pure ()
+    Just (TransactionCount 0) -> executeCommand' conn "COMMIT"
+    Just (TransactionCount current) -> executeCommand' conn ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current)
 
 -- | Rollback all active 'begin's.
 rollbackAll :: Connection -> Task e ()
 rollbackAll conn =
-  let (TransactionCount current) = transactionCount conn
-   in if current == 0
-        then pure ()
-        else executeCommand' conn "ROLLBACK"
+  case transactionCount conn of
+    Nothing -> pure ()
+    Just _ -> executeCommand' conn "ROLLBACK"
 
 withTransaction :: Connection -> (Connection -> Task e a) -> Task e a
 withTransaction conn func =
