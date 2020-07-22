@@ -1,12 +1,19 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module MySQLSpec
   ( tests,
   )
 where
 
 import Cherry.Prelude
+import qualified Data.Acquire as Acquire
+import qualified Debug
+import qualified Environment
 import qualified Expect
 import Internal.Query (Query (..))
 import qualified MySQL
+import qualified Platform
+import qualified Task
 import Test (Test, describe, test)
 import qualified Prelude
 
@@ -14,7 +21,8 @@ tests :: Test
 tests =
   describe
     "MySQL"
-    [ unsafeBulkifyInsertsTests
+    [ unsafeBulkifyInsertsTests,
+      queriesWithQuestionMarks
     ]
 
 unsafeBulkifyInsertsTests :: Test
@@ -55,6 +63,56 @@ unsafeBulkifyInsertsTests =
           |> map sqlString
           |> Expect.equal (MySQL.UnableToBulkify "Not all queries are inserts with a VALUES keyword.")
     ]
+
+queriesWithQuestionMarks :: Test
+queriesWithQuestionMarks =
+  describe
+    "queries with question marks don't fail"
+    [ test "inserts" <| \_ ->
+        expectTask <| \conn ->
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!
+              INSERT INTO monolith.topics
+                ( id
+                , name
+                )
+              VALUES
+                ( 12
+                , '?'
+                )
+            |]
+            ( \res ->
+                Task.succeed
+                  <| case res of
+                    Ok () -> Expect.pass
+                    Err err -> Expect.fail (Debug.toString err)
+            ),
+      test "selects" <| \_ ->
+        expectTask <| \conn ->
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!
+              SELECT 1
+              FROM monolith.topics
+              WHERE name = '?'
+            |]
+            ( \res ->
+                Task.succeed
+                  <| case res of
+                    Ok (_ :: [Int]) -> Expect.pass
+                    Err err -> Expect.fail (Debug.toString err)
+            )
+    ]
+
+expectTask :: (MySQL.Connection -> Task Never Expect.Expectation) -> Expect.Expectation
+expectTask run =
+  Expect.withIO identity <| do
+    settings <- Environment.decode MySQL.decoder
+    noLogger <- Platform.silentContext
+    Acquire.withAcquire
+      (MySQL.connection settings)
+      (Task.perform noLogger << run)
 
 mockQuery :: Text -> Query ()
 mockQuery sqlString =
