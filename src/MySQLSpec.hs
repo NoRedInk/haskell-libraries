@@ -7,6 +7,7 @@ where
 
 import Cherry.Prelude
 import qualified Data.Acquire as Acquire
+import Data.Proxy (Proxy (Proxy))
 import qualified Debug
 import qualified Environment
 import qualified Expect
@@ -30,30 +31,30 @@ unsafeBulkifyInsertsTests =
   describe
     "unsafeBulkifyInserts"
     [ test "works when passed a single insert" <| \_ ->
-        [mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)"]
+        [mockQuery (Proxy :: Proxy ()) "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)"]
           |> MySQL.unsafeBulkifyInserts
           |> map sqlString
           |> Expect.equal
             (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)"),
       test "works when passed multiple inserts" <| \_ ->
-        [ mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)",
-          mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (4,5,6)"
+        [ mockQuery (Proxy :: Proxy ()) "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)",
+          mockQuery (Proxy :: Proxy ()) "INSERT INTO foos (id, bars, bazs) VALUES (4,5,6)"
         ]
           |> MySQL.unsafeBulkifyInserts
           |> map sqlString
           |> Expect.equal
             (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3), (4,5,6)"),
       test "works with inconsistent casing of the word VALUES" <| \_ ->
-        [ mockQuery "INSERT INTO foos (id, bars, bazs) valUES (1,2,3)",
-          mockQuery "INSERT INTO foos (id, bars, bazs) vALues (4,5,6)"
+        [ mockQuery (Proxy :: Proxy ()) "INSERT INTO foos (id, bars, bazs) valUES (1,2,3)",
+          mockQuery (Proxy :: Proxy ()) "INSERT INTO foos (id, bars, bazs) vALues (4,5,6)"
         ]
           |> MySQL.unsafeBulkifyInserts
           |> map sqlString
           |> Expect.equal
             (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)"),
       test "fails if no values in the SQL string" <| \_ ->
-        [ mockQuery "SELECT foos",
-          mockQuery "SELECT bars"
+        [ mockQuery (Proxy :: Proxy ()) "SELECT foos",
+          mockQuery (Proxy :: Proxy ()) "SELECT bars"
         ]
           |> MySQL.unsafeBulkifyInserts
           -- Even though we always expect Err values here, the type system does
@@ -72,16 +73,7 @@ queriesWithQuestionMarks =
         expectTask <| \conn ->
           MySQL.doQuery
             conn
-            [MySQL.sql|!
-              INSERT INTO monolith.topics
-                ( id
-                , name
-                )
-              VALUES
-                ( 12
-                , '?'
-                )
-            |]
+            (mockQuery (Proxy :: Proxy ()) "INSERT INTO monolith.topics (name) VALUES ('?')")
             ( \res ->
                 Task.succeed
                   <| case res of
@@ -92,11 +84,7 @@ queriesWithQuestionMarks =
         expectTask <| \conn ->
           MySQL.doQuery
             conn
-            [MySQL.sql|!
-              SELECT 1
-              FROM monolith.topics
-              WHERE name = '?'
-            |]
+            (mockQuery (Proxy :: Proxy Int) "SELECT 1 FROM monolith.topics WHERE name = '?'")
             ( \res ->
                 Task.succeed
                   <| case res of
@@ -112,10 +100,13 @@ expectTask run =
     noLogger <- Platform.silentContext
     Acquire.withAcquire
       (MySQL.connection settings)
-      (Task.perform noLogger << run)
+      ( \conn ->
+          MySQL.inTestTransaction conn run
+            |> Task.perform noLogger
+      )
 
-mockQuery :: Text -> Query ()
-mockQuery sqlString =
+mockQuery :: Proxy a -> Text -> Query a
+mockQuery _ sqlString =
   Query
     { sqlString,
       runQuery = \_ -> Prelude.pure [],
