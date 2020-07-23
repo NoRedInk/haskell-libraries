@@ -266,16 +266,18 @@ executeCommand conn query =
       |> withTimeout conn
 
 handleMySqlException :: IO result -> IO (Result Query.Error result)
-handleMySqlException io = do
-  either <- Exception.tryAny io
-  case either of
-    Left err ->
-      Exception.displayException err
-        |> Data.Text.pack
-        |> Query.Other
-        |> Err
-        |> pure
-    Right x -> pure (Ok x)
+handleMySqlException io =
+  Exception.catches
+    (map Ok io)
+    [ Exception.Handler
+        ( \(err :: Exception.SomeException) ->
+            Exception.displayException err
+              |> Data.Text.pack
+              |> Query.Other
+              |> Err
+              |> pure
+        )
+    ]
 
 withTimeout :: Connection -> Task Query.Error a -> Task Query.Error a
 withTimeout conn task =
