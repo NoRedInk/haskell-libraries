@@ -40,9 +40,10 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import MySQL.Internal (inToAny)
+import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
-import Prelude (IO, fromIntegral)
+import Prelude (IO, Show (show), fromIntegral)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -76,8 +77,12 @@ data Query row
 data Error
   = Timeout TimeoutOrigin Time.Interval
   | UniqueViolation Text
-  | Other Text
-  deriving (Show)
+  | Other Text [Platform.Context]
+
+instance Show Error where
+  show (Timeout _ interval) = "Query timed out after " ++ Data.Text.unpack (Text.fromFloat (Time.seconds interval)) ++ " seconds"
+  show (UniqueViolation err) = "Query violated uniqueness constraint: " ++ Data.Text.unpack err
+  show (Other msg _) = "Query failed with unexpected error: " ++ Data.Text.unpack msg
 
 instance Exception.Exception Error
 

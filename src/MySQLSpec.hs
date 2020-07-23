@@ -24,7 +24,8 @@ tests =
     "MySQL"
     [ unsafeBulkifyInsertsTests,
       onDuplicateDoNothingTests,
-      queriesWithQuestionMarks
+      queriesWithQuestionMarks,
+      exceptionTests
     ]
 
 unsafeBulkifyInsertsTests :: Test
@@ -91,6 +92,27 @@ queriesWithQuestionMarks =
                   <| case res of
                     Ok (_ :: [Int]) -> Expect.pass
                     Err err -> Expect.fail (Debug.toString err)
+            )
+    ]
+
+exceptionTests :: Test
+exceptionTests =
+  describe
+    "exceptions"
+    [ test "dupplicate key errors have groupable error messages" <| \_ ->
+        expectTask <| \conn -> do
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+            (\(_ :: (Result MySQL.Error ())) -> Task.succeed ())
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+            ( \res ->
+                Task.succeed
+                  <| case res of
+                    Err err -> Expect.equal (Debug.toString err) "Query failed with unexpected error: MySQL query failed with unexpected error"
+                    Ok () -> Expect.fail "Expected an error, but none was returned."
             )
     ]
 

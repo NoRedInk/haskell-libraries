@@ -83,7 +83,7 @@ import qualified Platform
 import qualified Task
 import qualified Text
 import qualified Tuple
-import Prelude (Either (..), IO, error, fromIntegral, pure, show)
+import Prelude (IO, error, fromIntegral, pure, show)
 import qualified Prelude
 
 newtype TransactionCount
@@ -273,7 +273,13 @@ handleMySqlException io =
         ( \(err :: Exception.SomeException) ->
             Exception.displayException err
               |> Data.Text.pack
-              |> Query.Other
+              -- We add the full error in the context array rather than the
+              -- message string, to help errors being grouped correctly in a
+              -- bug tracker. Errors might contain unique bits of data like
+              -- generated id's or timestamps which when included in the main
+              -- error message would result in each error being grouped by
+              -- itself.
+              |> (\err' -> Query.Other "MySQL query failed with unexpected error" [Log.context "error" err'])
               |> Err
               |> pure
         )

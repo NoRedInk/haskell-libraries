@@ -248,7 +248,13 @@ fromPGError c pgError =
     _ ->
       Exception.displayException pgError
         |> Data.Text.pack
-        |> Query.Other
+        -- We add the full error in the context array rather than the
+        -- message string, to help errors being grouped correctly in a
+        -- bug tracker. Errors might contain unique bits of data like
+        -- generated id's or timestamps which when included in the main
+        -- error message would result in each error being grouped by
+        -- itself.
+        |> (\err -> Query.Other "Postgres query failed with unexpected error" [Log.context "error" err])
 
 toConnectionString :: PGDatabase -> Text
 toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
