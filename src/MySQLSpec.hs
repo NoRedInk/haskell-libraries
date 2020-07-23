@@ -8,13 +8,15 @@ import qualified Expect
 import Internal.Query (Query (..))
 import qualified MySQL
 import Test (Test, describe, test)
+import qualified Text
 import qualified Prelude
 
 tests :: Test
 tests =
   describe
     "MySQL"
-    [ unsafeBulkifyInsertsTests
+    [ unsafeBulkifyInsertsTests,
+      onDuplicateDoNothingTests
     ]
 
 unsafeBulkifyInsertsTests :: Test
@@ -65,3 +67,19 @@ mockQuery sqlString =
       sqlOperation = "",
       queriedRelation = ""
     }
+
+onDuplicateDoNothingTests :: Test
+onDuplicateDoNothingTests =
+  describe
+    "onDuplicateDoNothingTests"
+    [ test "Replaces `insert into` with `INSERT IGNORE INTO` and doesn't care about whitespaces" <| \_ ->
+        [ "insert   ",
+          " into",
+          "foo"
+        ]
+          |> Text.join "\n"
+          |> mockQuery
+          |> MySQL.onDuplicateDoNothing
+          |> sqlString
+          |> Expect.equal "INSERT IGNORE INTO\nfoo"
+    ]

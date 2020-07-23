@@ -1009,7 +1009,7 @@ onDuplicateDoNothing query =
   query
     { sqlString =
         Lens.over
-          ([caselessRegex|^\s*INSERT INTO|] << R.match)
+          ([caselessRegex|^\s*INSERT\s+INTO|] << R.match)
           (\_ -> "INSERT IGNORE INTO")
           (sqlString query)
     }
