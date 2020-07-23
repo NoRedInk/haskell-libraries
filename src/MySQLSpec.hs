@@ -111,7 +111,7 @@ exceptionTests =
             ( \res ->
                 Task.succeed
                   <| case res of
-                    Err err -> Expect.equal (Debug.toString err) "Query failed with unexpected error: MySQL query failed with unexpected error"
+                    Err err -> Expect.equal (Debug.toString err) "Query failed with unexpected error: MySQL query failed with error code 1062"
                     Ok () -> Expect.fail "Expected an error, but none was returned."
             )
     ]

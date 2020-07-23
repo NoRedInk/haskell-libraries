@@ -61,8 +61,10 @@ import qualified Data.Pool
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Text
 import qualified Data.Text.Encoding
+import qualified Database.MySQL.Base
 import qualified Database.MySQL.Connection
 import qualified Database.MySQL.Protocol.Escape as Escape
+import qualified Database.MySQL.Protocol.Packet
 import qualified Database.Persist.MySQL as MySQL
 import Database.Persist.MySQL (RawSql (..))
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
@@ -270,6 +272,25 @@ handleMySqlException io =
   Exception.catches
     (map Ok io)
     [ Exception.Handler
+        ( \(Database.MySQL.Base.ERRException err) ->
+            let errCode = Database.MySQL.Protocol.Packet.errCode err
+                errState = Database.MySQL.Protocol.Packet.errState err
+                errMsg = Database.MySQL.Protocol.Packet.errMsg err
+             in Query.Other
+                  ("MySQL query failed with error code " ++ Text.fromInt (fromIntegral errCode))
+                  [ Log.context "error state" (Data.Text.Encoding.decodeUtf8 errState),
+                    Log.context "error message" (Data.Text.Encoding.decodeUtf8 errMsg)
+                  ]
+                  |> Err
+                  |> pure
+        ),
+      Exception.Handler
+        ( \Database.MySQL.Base.NetworkException ->
+            Query.Other "MySQL query failed with a network exception" []
+              |> Err
+              |> pure
+        ),
+      Exception.Handler
         ( \(err :: Exception.SomeException) ->
             Exception.displayException err
               |> Data.Text.pack
