@@ -71,26 +71,19 @@ queriesWithQuestionMarks :: Test
 queriesWithQuestionMarks =
   describe
     "queries with question marks don't fail"
-    [ test "inserts" <| \_ ->
-        expectTask <| \conn ->
+    [ test "inserts and selects" <| \_ ->
+        expectTask <| \conn -> do
           MySQL.doQuery
             conn
-            [MySQL.sql|!INSERT INTO monolith.topics (name) VALUES ('?')|]
+            [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES ('?', 5)|]
+            (\(_ :: (Result MySQL.Error ())) -> Task.succeed ())
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = '?'|]
             ( \res ->
                 Task.succeed
                   <| case res of
-                    Ok () -> Expect.pass
-                    Err err -> Expect.fail (Debug.toString err)
-            ),
-      test "selects" <| \_ ->
-        expectTask <| \conn ->
-          MySQL.doQuery
-            conn
-            [MySQL.sql|!SELECT 1 FROM monolith.topics WHERE name = '?'|]
-            ( \res ->
-                Task.succeed
-                  <| case res of
-                    Ok (_ :: [Int]) -> Expect.pass
+                    Ok (results :: List (Text, Int)) -> Expect.equal [("?", 5)] results
                     Err err -> Expect.fail (Debug.toString err)
             )
     ]
