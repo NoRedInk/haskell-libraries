@@ -1,21 +1,15 @@
--- | Top-level specs module.
---
--- This collects and exposes this package's tests/specs, so that internal specs can
--- be written for internal modules without exposing either publicly.
---
--- The specs themselves don't live in here.
-module DatabaseSpec
+module Main
   ( main,
   )
 where
 
-import qualified Internal.Query.ParserSpec
-import qualified Internal.TimeSpec
-import qualified MySQL.InternalSpec
+import qualified MySQLInternalSpec
 import qualified MySQLSpec
-import qualified Postgres.SettingsSpec
+import qualified PostgresSettingsSpec
+import qualified QueryParserSpec
 import Test (Test, describe)
 import qualified Test.Runner.Tasty
+import qualified TimeSpec
 import qualified Prelude
 
 -- `Test.Runner.Tasty.main` exits after finishing, so run other tests first.
@@ -29,15 +23,15 @@ import qualified Prelude
 -- it's not essential as a regression test.
 main :: Prelude.IO ()
 main =
-  Test.Runner.Tasty.main DatabaseSpec.tests
+  Test.Runner.Tasty.main tests
 
 tests :: Test
 tests =
   describe
     "lib/database"
-    [ Postgres.SettingsSpec.tests,
-      MySQL.InternalSpec.tests,
-      Internal.Query.ParserSpec.tests,
-      Internal.TimeSpec.tests,
+    [ PostgresSettingsSpec.tests,
+      MySQLInternalSpec.tests,
+      QueryParserSpec.tests,
+      TimeSpec.tests,
       MySQLSpec.tests
     ]

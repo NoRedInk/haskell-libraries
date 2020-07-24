@@ -1,4 +1,4 @@
-module MySQL.InternalSpec (tests) where
+module MySQLInternalSpec (tests) where
 
 import Cherry.Prelude
 import qualified Expect

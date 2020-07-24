@@ -13,7 +13,6 @@ dependencies:
 - exceptions
 - filepath
 - health
-- hedgehog
 - lens
 - lens-regex-pcre
 - monad-logger
@@ -39,10 +38,15 @@ library:
   - MySQL
   - MySQL.Settings
   - Postgres
-  - DatabaseSpec
+  # Exposed for tests only
+  - MySQL.Internal
+  - Internal.Query.Parser
+  - Internal.Query
+  - Postgres.Settings
+  - Internal.Time
   source-dirs: src
 tests:
-  unit:
+  spec:
     dependencies:
     - hedgehog
     - database
@@ -52,5 +56,5 @@ tests:
     - tasty-hunit
     main: Main.hs
     source-dirs:
-    - test/unit
+    - test
     ghc-options: *test-ghc-options

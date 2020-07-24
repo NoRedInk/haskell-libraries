@@ -1,4 +1,4 @@
-module Internal.Query.ParserSpec (tests) where
+module QueryParserSpec (tests) where
 
 import Cherry.Prelude
 import qualified Expect

@@ -1,4 +1,4 @@
-module Internal.TimeSpec (tests) where
+module TimeSpec (tests) where
 
 import Cherry.Prelude
 import qualified Expect
