@@ -53,18 +53,7 @@ unsafeBulkifyInsertsTests =
           |> MySQL.unsafeBulkifyInserts
           |> map sqlString
           |> Expect.equal
-            (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)"),
-      test "fails if no values in the SQL string" <| \_ ->
-        [ mockQuery "SELECT foos",
-          mockQuery "SELECT bars"
-        ]
-          |> MySQL.unsafeBulkifyInserts
-          -- Even though we always expect Err values here, the type system does
-          -- not see this and things we could see `Ok (Query a)` values as well.
-          -- Without the line below compilation will fail because `Query a` does
-          -- not have Show and Eq instances.
-          |> map sqlString
-          |> Expect.equal (MySQL.UnableToBulkify "Not all queries are inserts with a VALUES keyword.")
+            (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)")
     ]
 
 queriesWithQuestionMarks :: Test

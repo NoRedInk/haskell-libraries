@@ -993,12 +993,17 @@ unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
 unsafeBulkifyInserts [] = EmptyInsert
 unsafeBulkifyInserts (first : rest) =
   case maybeBrokenQueries of
-    Nothing -> UnableToBulkify "Not all queries are inserts with a VALUES keyword."
-    Just (_ :| otherQueries) ->
+    (_ :| otherQueries) ->
       first {sqlString = Data.Text.intercalate "," (sqlString first : otherQueries)}
         |> BulkifiedInsert
   where
-    maybeBrokenQueries = Prelude.traverse (dropUntilCaseInsensitive "VALUES" << sqlString) (first :| rest)
+    splitAt =
+      sqlString first
+        |> Data.Text.toLower
+        |> Data.Text.breakOn (Data.Text.toLower "VALUES")
+        |> Tuple.first
+        |> Text.length
+    maybeBrokenQueries = map (Text.dropLeft (splitAt + 6) << sqlString) (first :| rest)
 
 -- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
 -- the key isn't unique.
@@ -1017,16 +1022,6 @@ onConflictUpdate columns q@Query {sqlString, sqlOperation} =
               ],
           sqlOperation = sqlOperation ++ " " ++ onDuplicateKeyUPDATE
         }
-
-dropUntilCaseInsensitive :: Text -> Text -> Maybe Text
-dropUntilCaseInsensitive breaker original =
-  let (start, end) = Data.Text.breakOn (Data.Text.toLower breaker) (Data.Text.toLower original)
-   in if Data.Text.null end
-        then Nothing
-        else
-          Data.Text.splitAt (Data.Text.length (start ++ "values")) original
-            |> Tuple.second
-            |> Just
 
 -- | Use for insert queries that are allowed to fail. In Postgres we would use
 -- an `ON CONFLICT DO NOTHING` clause for this, but MySQL doesn't support it.
