@@ -56,7 +56,6 @@ import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Coerce
 import qualified Data.Int
 import Data.Kind (Type)
-import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.Pool
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Text
@@ -992,18 +991,21 @@ data BulkifiedInsert a
 unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
 unsafeBulkifyInserts [] = EmptyInsert
 unsafeBulkifyInserts (first : rest) =
-  case maybeBrokenQueries of
-    (_ :| otherQueries) ->
-      first {sqlString = Data.Text.intercalate "," (sqlString first : otherQueries)}
-        |> BulkifiedInsert
+  first
+    { sqlString =
+        Data.Text.intercalate
+          ","
+          (sqlString first : map (Text.dropLeft splitAt << sqlString) rest)
+    }
+    |> BulkifiedInsert
   where
     splitAt =
       sqlString first
         |> Data.Text.toLower
-        |> Data.Text.breakOn (Data.Text.toLower "VALUES")
+        |> Data.Text.breakOn "values"
         |> Tuple.first
         |> Text.length
-    maybeBrokenQueries = map (Text.dropLeft (splitAt + 6) << sqlString) (first :| rest)
+        |> (+) 6
 
 -- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
 -- the key isn't unique.
