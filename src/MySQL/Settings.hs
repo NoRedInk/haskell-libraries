@@ -56,7 +56,7 @@ defaultSettings =
   Settings
     { mysqlConnection = defaultConnectionSettings,
       mysqlPool = PoolSettings
-        { mysqlPoolSize = MysqlPoolSize 2
+        { mysqlPoolSize = MysqlPoolSize 1000
         },
       mysqlQueryTimeoutSeconds = Time.fromSeconds 5
     }

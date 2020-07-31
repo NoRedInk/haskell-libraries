@@ -72,7 +72,7 @@ defaultSettings = Settings
         pgPort = PgPort 8088
       },
     pgPool = PoolSettings
-      { pgPoolSize = PgPoolSize 2,
+      { pgPoolSize = PgPoolSize 500,
         pgPoolMaxIdleTime = PgPoolMaxIdleTime (toNominalDiffTime 3600),
         pgPoolStripes = PgPoolStripes 1
       },
