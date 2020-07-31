@@ -72,7 +72,11 @@ defaultSettings = Settings
         pgPort = PgPort 8088
       },
     pgPool = PoolSettings
-      { pgPoolSize = PgPoolSize 500,
+      { pgPoolSize =
+          -- Connections in the pool are allocated on demand, so we won't
+          -- create all these connections unless the application can make use
+          -- of them.
+          PgPoolSize 500,
         pgPoolMaxIdleTime = PgPoolMaxIdleTime (toNominalDiffTime 3600),
         pgPoolStripes = PgPoolStripes 1
       },

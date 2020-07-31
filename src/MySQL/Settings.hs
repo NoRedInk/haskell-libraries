@@ -56,7 +56,11 @@ defaultSettings =
   Settings
     { mysqlConnection = defaultConnectionSettings,
       mysqlPool = PoolSettings
-        { mysqlPoolSize = MysqlPoolSize 1000
+        { mysqlPoolSize =
+            -- Connections in the pool are allocated on demand, so we won't
+            -- create all these connections unless the application can make use
+            -- of them.
+            MysqlPoolSize 1000
         },
       mysqlQueryTimeoutSeconds = Time.fromSeconds 5
     }
