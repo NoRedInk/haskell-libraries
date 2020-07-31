@@ -421,7 +421,8 @@ withConnection :: Connection -> (MySQL.SqlBackend -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
-        doIO conn
+        Log.withContext "acquiring MySQL connection from pool" []
+          <| doIO conn
           <| Data.Pool.takeResource pool
       --
       release :: Data.Pool.Pool MySQL.SqlBackend -> (MySQL.SqlBackend, Data.Pool.LocalPool MySQL.SqlBackend) -> ExitCase x -> Task y ()

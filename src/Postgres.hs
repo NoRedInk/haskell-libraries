@@ -349,7 +349,8 @@ withConnection :: Connection -> (PGConnection -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
-        doIO conn
+        Log.withContext "acquiring Postgres connection from pool" []
+          <| doIO conn
           <| Data.Pool.takeResource pool
       --
       release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> ExitCase x -> Task y ()
