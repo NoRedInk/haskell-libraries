@@ -36,7 +36,6 @@ import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import qualified Internal.Http
-import qualified Log
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.Internal as HTTP.Internal
@@ -258,7 +257,7 @@ type Error = Internal.Http.Error
 prepareManagerForRequest :: HTTP.Manager -> Task e HTTP.Manager
 prepareManagerForRequest manager = do
   log <- Platform.logHandler
-  contexts <- Platform.getContext
+  requestId <- Platform.requestId
   pure
     manager
       { -- To be able to correlate events and logs belonging to a single
@@ -267,7 +266,7 @@ prepareManagerForRequest manager = do
         -- requests.
         HTTP.Internal.mModifyRequest = \req ->
           HTTP.Internal.mModifyRequest manager req
-            |> andThen (modifyRequest contexts),
+            |> andThen (modifyRequest requestId),
         -- We trace outgoing HTTP requests. This comes down to measuring how
         -- long they take and passing that information to some dashboard. This
         -- dashboard can then draw nice graphs showing how the time responding
@@ -279,11 +278,11 @@ prepareManagerForRequest manager = do
             |> wrapException log req
       }
   where
-    modifyRequest :: Platform.Context -> HTTP.Request -> IO HTTP.Request
-    modifyRequest contexts req =
-      case Platform.requestId contexts of
-        Nothing -> pure req
-        Just requestId ->
+    modifyRequest :: Text -> HTTP.Request -> IO HTTP.Request
+    modifyRequest requestId req =
+      case requestId of
+        "" -> pure req
+        _ ->
           pure
             req
               { HTTP.requestHeaders =
@@ -291,30 +290,31 @@ prepareManagerForRequest manager = do
                     : HTTP.requestHeaders req
               }
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
-    wrapException log req io = do
-      doAnything <- Platform.doAnythingHandler
-      Log.withContext
-        "outoing http request"
-        [ Platform.httpRequestContext Platform.HttpRequestInfo
-            { Platform.requestUri =
+    wrapException log req io =
+      Platform.spanIO
+        log
+        "Outoing HTTP Request"
+        ( HttpRequestInfo
+            { requestUri =
                 HTTP.getUri req
                   |> Network.URI.uriToString (\_ -> "*****")
                   |> (\showS -> Data.Text.pack (showS "")),
-              Platform.requestMethod =
+              requestMethod =
                 HTTP.method req
                   |> Data.Text.Encoding.decodeUtf8
             }
-        ]
-        (Platform.doAnything doAnything (map Ok io))
-        |> Task.perform log
-        -- The call to `withContext` will wrap `HttpException`s thrown by the
-        -- `http-client` code in a `TriagableException` wrapper. This will
-        -- prevent code that handles the original `HttpException` from working
-        -- correctly. Because this modified manager is potentially passed into
-        -- third party libraries we might break those libraries.
-        --
-        -- To avoid this we rethrow the original exceptions. This means the
-        -- additional context available on the `TriagableException` wrapper is
-        -- gone, but that sounds preferable to potentially introducing bugs in
-        -- dependencies.
-        |> Platform.rethrowOriginalExceptions
+            |> Platform.toSpanDetails
+            |> Just
+        )
+        (\_ -> io)
+
+data HttpRequestInfo
+  = HttpRequestInfo
+      { requestUri :: Text,
+        requestMethod :: Text
+      }
+  deriving (Generic)
+
+instance Aeson.ToJSON HttpRequestInfo
+
+instance Platform.SpanDetails HttpRequestInfo
