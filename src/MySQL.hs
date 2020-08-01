@@ -47,7 +47,6 @@ import Cherry.Prelude hiding (e)
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
-import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import qualified Control.Monad.Logger
 import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
@@ -95,7 +94,7 @@ data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool MySQL.SqlBackend,
-        logContext :: Platform.QueryConnectionInfo,
+        logContext :: Query.QueryConnectionInfo,
         timeout :: Time.Interval
       }
 
@@ -139,19 +138,19 @@ connection settings =
 -- CONNECTION HELPERS
 --
 
-toConnectionLogContext :: Settings.Settings -> Platform.QueryConnectionInfo
+toConnectionLogContext :: Settings.Settings -> Query.QueryConnectionInfo
 toConnectionLogContext settings =
   let connectionSettings = Settings.mysqlConnection settings
       database = Settings.unDatabase (Settings.database connectionSettings)
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
-          Platform.UnixSocket
-            Platform.MySQL
+          Query.UnixSocket
+            Query.MySQL
             (Data.Text.pack (Settings.unSocket socket))
             database
         Settings.ConnectTcp host port ->
-          Platform.TcpSocket
-            Platform.MySQL
+          Query.TcpSocket
+            Query.MySQL
             (Settings.unHost host)
             (Data.Text.pack (show (Settings.unPort port)))
             database
@@ -221,13 +220,13 @@ doQuery conn query handleResponse =
           Nothing -> executeCommand conn "COMMIT"
           _ -> pure ()
         pure result
-      infoForContext :: Platform.QueryInfo
-      infoForContext = Platform.QueryInfo
-        { Platform.queryText = Log.mkSecret (Query.sqlString query),
-          Platform.queryTemplate = Query.quasiQuotedString query,
-          Platform.queryConn = logContext conn,
-          Platform.queryOperation = Query.sqlOperation query,
-          Platform.queryCollection = Query.queriedRelation query
+      infoForContext :: Query.QueryInfo
+      infoForContext = Query.QueryInfo
+        { Query.queryText = Log.mkSecret (Query.sqlString query),
+          Query.queryTemplate = Query.quasiQuotedString query,
+          Query.queryConn = logContext conn,
+          Query.queryOperation = Query.sqlOperation query,
+          Query.queryCollection = Query.queriedRelation query
         }
    in do
         withFrozenCallStack Log.info (Query.asMessage query) []
@@ -238,7 +237,7 @@ doQuery conn query handleResponse =
           |> Task.map Ok
           |> Task.onError (Task.succeed << Err)
           |> Task.andThen handleResponse
-          |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
+          |> Platform.span "MySQL Query" (Just (Platform.toSpanDetails infoForContext))
 
 queryAsText :: Query q -> Text
 queryAsText query =
@@ -324,27 +323,25 @@ withTimeout conn task =
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction conn' func =
   withTransaction conn' <| \conn ->
-    Platform.generalBracket
+    Platform.bracket
       (begin conn)
-      ( \() exitCase ->
-          case exitCase of
-            ExitCaseSuccess _ -> commit conn
-            ExitCaseException _ -> rollback conn
-            ExitCaseAbort -> rollback conn
+      ( \succeeded () ->
+          case succeeded of
+            Platform.Succeeded -> commit conn
+            Platform.Failed -> rollback conn
+            Platform.FailedWith _ -> rollback conn
       )
       (\() -> func conn)
-      |> map Tuple.first
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
 inTestTransaction conn' func =
   withTransaction conn' <| \conn ->
-    Platform.generalBracket
+    Platform.bracket
       (do rollbackAll conn; begin conn)
-      (\() _ -> rollbackAll conn)
+      (\_ () -> rollbackAll conn)
       (\() -> func conn)
-      |> map Tuple.first
 
 transactionCount :: Connection -> Maybe TransactionCount
 transactionCount conn =
@@ -389,18 +386,12 @@ rollbackAll conn =
       Just _ -> executeCommand conn "ROLLBACK"
 
 throwRuntimeError :: Task Query.Error a -> Task e a
-throwRuntimeError task = do
-  logHandler <- Platform.logHandler
+throwRuntimeError task =
   Task.onError
     ( \err ->
         Platform.unsafeThrowException
-          logHandler
-          (Data.Text.pack (Exception.displayException err))
-          ( Log.TriageInfo
-              Log.UserBlocked
-              "Low-level MySQL operations are failing. Either we are not able to talk to the database or there is a bug in the `MySQL` module of the `database` package. Verify the database connection is fine by checking the service's health endpoint. If it is please report this as a bug the owner of the `database` library."
-          )
-          []
+          "Internal error in the MySQL module"
+          [Log.context "exception" (Exception.displayException err)]
     )
     task
 
@@ -425,15 +416,19 @@ withConnection conn func =
           <| doIO conn
           <| Data.Pool.takeResource pool
       --
-      release :: Data.Pool.Pool MySQL.SqlBackend -> (MySQL.SqlBackend, Data.Pool.LocalPool MySQL.SqlBackend) -> ExitCase x -> Task y ()
-      release pool (c, localPool) exitCase =
+      release ::
+        Data.Pool.Pool MySQL.SqlBackend ->
+        Platform.Succeeded ->
+        (MySQL.SqlBackend, Data.Pool.LocalPool MySQL.SqlBackend) ->
+        Task y ()
+      release pool succeeded (c, localPool) =
         doIO conn
-          <| case exitCase of
-            ExitCaseSuccess _ ->
+          <| case succeeded of
+            Platform.Succeeded ->
               Data.Pool.putResource localPool c
-            ExitCaseException _ ->
+            Platform.Failed ->
               Data.Pool.destroyResource pool localPool c
-            ExitCaseAbort ->
+            Platform.FailedWith _ ->
               Data.Pool.destroyResource pool localPool c
    in --
       case singleOrPool conn of
@@ -441,8 +436,7 @@ withConnection conn func =
           func c
         --
         (Pool pool) ->
-          Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
-            |> map Tuple.first
+          Platform.bracket (acquire pool) (release pool) (Tuple.first >> func)
 
 --
 -- TYPE CLASSES

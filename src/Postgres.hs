@@ -36,7 +36,6 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
-import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
 import qualified Data.Acquire
 import qualified Data.Pool
 import qualified Data.Text
@@ -78,7 +77,7 @@ data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool PGConnection,
-        logContext :: Platform.QueryConnectionInfo,
+        logContext :: Query.QueryConnectionInfo,
         timeout :: Time.Interval
       }
 
@@ -134,21 +133,20 @@ transaction conn func =
           pgBegin c
           pure c
       --
-      end :: PGConnection -> ExitCase b -> Task x ()
-      end c exitCase =
+      end :: Platform.Succeeded -> PGConnection -> Task x ()
+      end succeeded c =
         doIO conn
-          <| case exitCase of
-            ExitCaseSuccess _ -> pgCommit c
-            ExitCaseException _ -> pgRollback c
-            ExitCaseAbort -> pgRollback c
+          <| case succeeded of
+            Platform.Succeeded -> pgCommit c
+            Platform.Failed -> pgRollback c
+            Platform.FailedWith _ -> pgRollback c
       --
       setSingle :: PGConnection -> Connection
       setSingle c =
         -- All queries in a transactions must run on the same thread.
         conn {singleOrPool = Single c}
    in withConnection conn <| \c ->
-        Platform.generalBracket (start c) end (setSingle >> func)
-          |> map Tuple.first
+        Platform.bracket (start c) end (setSingle >> func)
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
@@ -160,8 +158,8 @@ inTestTransaction conn func =
         doIO conn <| pgBegin c
         pure c
       --
-      end :: PGConnection -> ExitCase b -> Task x ()
-      end c _ =
+      end :: Platform.Succeeded -> PGConnection -> Task x ()
+      end _ c =
         rollbackAllSafe conn c
       --
       setSingle :: PGConnection -> Connection
@@ -170,8 +168,7 @@ inTestTransaction conn func =
         conn {singleOrPool = Single c}
    in --
       withConnection conn <| \c ->
-        Platform.generalBracket (start c) end (setSingle >> func)
-          |> map Tuple.first
+        Platform.bracket (start c) end (setSingle >> func)
 
 rollbackAllSafe :: Connection -> PGConnection -> Task x ()
 rollbackAllSafe conn c =
@@ -189,7 +186,7 @@ rollbackAllSafe conn c =
 inTestTransactionIo :: Postgres.Connection -> (Postgres.Connection -> IO a) -> IO a
 inTestTransactionIo postgres io = do
   doAnything <- Platform.doAnythingHandler
-  logHandler <- Platform.silentContext
+  logHandler <- Platform.newHandler
   result <- Task.attempt logHandler <| Postgres.inTestTransaction postgres <| \c -> Platform.doAnything doAnything (io c |> map Ok)
   case result of
     Ok a -> pure a
@@ -221,14 +218,14 @@ doQuery conn query handleResponse = do
     |> map Ok
     |> Task.onError (Task.succeed << Err)
     |> andThen handleResponse
-    |> Log.withContext "postgresql-query" [Platform.queryContext queryInfo]
+    |> Platform.span "Postgresql Query" (Just (Platform.toSpanDetails queryInfo))
   where
-    queryInfo = Platform.QueryInfo
-      { Platform.queryText = Log.mkSecret (Query.sqlString query),
-        Platform.queryTemplate = Query.quasiQuotedString query,
-        Platform.queryConn = logContext conn,
-        Platform.queryOperation = Query.sqlOperation query,
-        Platform.queryCollection = Query.queriedRelation query
+    queryInfo = Query.QueryInfo
+      { Query.queryText = Log.mkSecret (Query.sqlString query),
+        Query.queryTemplate = Query.quasiQuotedString query,
+        Query.queryConn = logContext conn,
+        Query.queryOperation = Query.sqlOperation query,
+        Query.queryCollection = Query.queriedRelation query
       }
 
 fromPGError :: Connection -> PGError -> Query.Error
@@ -273,17 +270,17 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
     ] ::
     Text
 
-toConnectionLogContext :: PGDatabase -> Platform.QueryConnectionInfo
+toConnectionLogContext :: PGDatabase -> Query.QueryConnectionInfo
 toConnectionLogContext db =
   case pgDBAddr db of
     Left (hostName, serviceName) ->
-      Platform.TcpSocket Platform.Postgres (Data.Text.pack hostName) (Data.Text.pack serviceName) databaseName
+      Query.TcpSocket Query.Postgres (Data.Text.pack hostName) (Data.Text.pack serviceName) databaseName
     Right (SockAddrInet portNum hostAddr) ->
-      Platform.TcpSocket Platform.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
+      Query.TcpSocket Query.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
     Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-      Platform.TcpSocket Platform.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
+      Query.TcpSocket Query.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
     Right (SockAddrUnix sockPath) ->
-      Platform.UnixSocket Platform.Postgres (Data.Text.pack sockPath) databaseName
+      Query.UnixSocket Query.Postgres (Data.Text.pack sockPath) databaseName
     Right somethingElse ->
       -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
       error
@@ -353,15 +350,15 @@ withConnection conn func =
           <| doIO conn
           <| Data.Pool.takeResource pool
       --
-      release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> ExitCase x -> Task y ()
-      release pool (c, localPool) exitCase =
+      release :: Data.Pool.Pool conn -> Platform.Succeeded -> (conn, Data.Pool.LocalPool conn) -> Task y ()
+      release pool succeeded (c, localPool) =
         doIO conn
-          <| case exitCase of
-            ExitCaseSuccess _ ->
+          <| case succeeded of
+            Platform.Succeeded ->
               Data.Pool.putResource localPool c
-            ExitCaseException _ ->
+            Platform.Failed ->
               Data.Pool.destroyResource pool localPool c
-            ExitCaseAbort ->
+            Platform.FailedWith _ ->
               Data.Pool.destroyResource pool localPool c
    in --
       case singleOrPool conn of
@@ -369,8 +366,7 @@ withConnection conn func =
           func c
         --
         (Pool pool) ->
-          Platform.generalBracket (acquire pool) (release pool) (Tuple.first >> func)
-            |> map Tuple.first
+          Platform.bracket (acquire pool) (release pool) (Tuple.first >> func)
 
 doIO :: Connection -> IO a -> Task x a
 doIO conn io =

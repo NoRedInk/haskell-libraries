@@ -15,12 +15,16 @@ module Internal.Query
     TimeoutOrigin (..),
     asMessage,
     format,
+    QueryInfo (..),
+    QueryConnectionInfo (..),
+    QueryEngine (..),
   )
 where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (fail, void)
+import qualified Data.Aeson as Aeson
 import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
@@ -39,6 +43,7 @@ import Language.Haskell.TH.Quote
   )
 import Language.Haskell.TH.Syntax (runIO)
 import qualified List
+import qualified Log
 import MySQL.Internal (inToAny)
 import qualified Platform
 import qualified Postgres.Settings
@@ -77,7 +82,7 @@ data Query row
 data Error
   = Timeout TimeoutOrigin Time.Interval
   | UniqueViolation Text
-  | Other Text [Platform.Context]
+  | Other Text [Log.Context]
 
 instance Show Error where
   show (Timeout _ interval) = "Query timed out after " ++ Data.Text.unpack (Text.fromFloat (Time.seconds interval)) ++ " seconds"
@@ -182,3 +187,52 @@ format query =
         |> Text.join "\n        "
         |> fixBang
         |> indent
+
+--
+-- SpanDetails
+--
+
+data QueryInfo
+  = QueryInfo
+      { -- | The full query we're sending to a database. Wrapped in a Secret
+        -- because some queries might contain sensitive information, and we
+        -- don't know which ones.
+        queryText :: Log.Secret Text,
+        -- | The query template (QuasiQuote) that was used to build the template.
+        -- This we don't need to wrap in a `Secret` and can be safely logged.
+        queryTemplate :: Text,
+        -- | Connection information of the database we're sending the query to.
+        queryConn :: QueryConnectionInfo,
+        -- | Our best guess of the relation we're querying.
+        queryCollection :: Text,
+        -- | Our best guess of the SQL operation we're performing (SELECT /
+        -- DELETE / ...).
+        queryOperation :: Text
+      }
+  deriving (Generic)
+
+instance Aeson.ToJSON QueryInfo
+
+instance Platform.SpanDetails QueryInfo
+
+data QueryConnectionInfo
+  = TcpSocket QueryEngine Host Port DatabaseName
+  | UnixSocket QueryEngine SocketPath DatabaseName
+  deriving (Generic)
+
+type Host = Text
+
+type Port = Text
+
+type SocketPath = Text
+
+type DatabaseName = Text
+
+instance Aeson.ToJSON QueryConnectionInfo
+
+data QueryEngine
+  = Postgres
+  | MySQL
+  deriving (Generic)
+
+instance Aeson.ToJSON QueryEngine
