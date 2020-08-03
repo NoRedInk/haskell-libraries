@@ -146,7 +146,7 @@ transaction conn func =
         -- All queries in a transactions must run on the same thread.
         conn {singleOrPool = Single c}
    in withConnection conn <| \c ->
-        Platform.bracket (start c) end (setSingle >> func)
+        Platform.bracketWithError (start c) end (setSingle >> func)
 
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
@@ -168,7 +168,7 @@ inTestTransaction conn func =
         conn {singleOrPool = Single c}
    in --
       withConnection conn <| \c ->
-        Platform.bracket (start c) end (setSingle >> func)
+        Platform.bracketWithError (start c) end (setSingle >> func)
 
 rollbackAllSafe :: Connection -> PGConnection -> Task x ()
 rollbackAllSafe conn c =
@@ -186,7 +186,7 @@ rollbackAllSafe conn c =
 inTestTransactionIo :: Postgres.Connection -> (Postgres.Connection -> IO a) -> IO a
 inTestTransactionIo postgres io = do
   doAnything <- Platform.doAnythingHandler
-  logHandler <- Platform.newHandler
+  logHandler <- Platform.silentHandler
   result <- Task.attempt logHandler <| Postgres.inTestTransaction postgres <| \c -> Platform.doAnything doAnything (io c |> map Ok)
   case result of
     Ok a -> pure a
@@ -218,7 +218,11 @@ doQuery conn query handleResponse = do
     |> map Ok
     |> Task.onError (Task.succeed << Err)
     |> andThen handleResponse
-    |> Platform.span "Postgresql Query" (Just (Platform.toSpanDetails queryInfo))
+    |> ( \task ->
+           Platform.span
+             "Postgresql Query"
+             (Platform.finally task (Platform.setSpanDetails queryInfo))
+       )
   where
     queryInfo = Query.QueryInfo
       { Query.queryText = Log.mkSecret (Query.sqlString query),
@@ -366,7 +370,7 @@ withConnection conn func =
           func c
         --
         (Pool pool) ->
-          Platform.bracket (acquire pool) (release pool) (Tuple.first >> func)
+          Platform.bracketWithError (acquire pool) (release pool) (Tuple.first >> func)
 
 doIO :: Connection -> IO a -> Task x a
 doIO conn io =

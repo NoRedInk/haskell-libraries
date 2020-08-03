@@ -237,7 +237,11 @@ doQuery conn query handleResponse =
           |> Task.map Ok
           |> Task.onError (Task.succeed << Err)
           |> Task.andThen handleResponse
-          |> Platform.span "MySQL Query" (Just (Platform.toSpanDetails infoForContext))
+          |> ( \task ->
+                 Platform.span
+                   "MySQL Query"
+                   (Platform.finally task (Platform.setSpanDetails infoForContext))
+             )
 
 queryAsText :: Query q -> Text
 queryAsText query =
@@ -323,7 +327,7 @@ withTimeout conn task =
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction conn' func =
   withTransaction conn' <| \conn ->
-    Platform.bracket
+    Platform.bracketWithError
       (begin conn)
       ( \succeeded () ->
           case succeeded of
@@ -338,7 +342,7 @@ transaction conn' func =
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
 inTestTransaction conn' func =
   withTransaction conn' <| \conn ->
-    Platform.bracket
+    Platform.bracketWithError
       (do rollbackAll conn; begin conn)
       (\_ () -> rollbackAll conn)
       (\() -> func conn)
@@ -389,9 +393,9 @@ throwRuntimeError :: Task Query.Error a -> Task e a
 throwRuntimeError task =
   Task.onError
     ( \err ->
-        Platform.unsafeThrowException
-          "Internal error in the MySQL module"
-          [Log.context "exception" (Exception.displayException err)]
+        Exception.displayException err
+          |> Data.Text.pack
+          |> Platform.unsafeThrowException
     )
     task
 
@@ -436,7 +440,7 @@ withConnection conn func =
           func c
         --
         (Pool pool) ->
-          Platform.bracket (acquire pool) (release pool) (Tuple.first >> func)
+          Platform.bracketWithError (acquire pool) (release pool) (Tuple.first >> func)
 
 --
 -- TYPE CLASSES
