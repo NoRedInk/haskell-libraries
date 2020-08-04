@@ -81,6 +81,11 @@ data Query row
 
 qqSQL :: String -> ExpQ
 qqSQL queryWithPgTypedFlags = do
+  let db =
+        Environment.decode Postgres.Settings.decoder
+          |> map Postgres.Settings.toPGDatabase
+  db' <- runIO db
+  void (useTPGDatabase db')
   -- We run the postgresql-typed quasi quoter for it's type-checking logic, but
   -- we're uninterested in the results it produces. At runtime we're taking our
   -- queries straight to MySQL. Consider the line below like a validation
@@ -88,11 +93,6 @@ qqSQL queryWithPgTypedFlags = do
   _ <- quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack queryWithPgTypedFlags)))
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
   let query = Prelude.dropWhile (\char -> char == '!' || char == '$' || char == '?') queryWithPgTypedFlags
-  let db =
-        Environment.decode Postgres.Settings.decoder
-          |> map Postgres.Settings.toPGDatabase
-  db' <- runIO db
-  void (useTPGDatabase db')
   let meta = Parser.parse (Data.Text.pack query)
   let op = Data.Text.unpack (Parser.sqlOperation meta)
   let rel = Data.Text.unpack (Parser.queriedRelation meta)
