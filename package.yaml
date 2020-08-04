@@ -41,8 +41,7 @@ library:
   - Postgres
   # Exposed for tests only
   - MySQL.Internal
-  - Internal.Query.Parser
-  - Internal.Query
+  - Internal.QueryParser
   - Postgres.Settings
   - Internal.Time
   source-dirs: src

@@ -62,12 +62,12 @@ import Database.PostgreSQL.Typed.Protocol
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
-import qualified Internal.Query as Query
 import qualified Internal.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (..))
 import qualified Oops
 import qualified Platform
+import qualified Postgres.Query as Query
 import qualified Postgres.Settings as Settings
 import qualified System.Exit
 import qualified Task

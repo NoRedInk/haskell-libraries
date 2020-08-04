@@ -71,14 +71,14 @@ import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits (Symbol)
 import qualified Health
 import Internal.CaselessRegex (caselessRegex)
-import qualified Internal.Query as Query
-import Internal.Query (Query (..))
 import qualified Internal.Time as Time
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
+import qualified MySQL.Query as Query
+import MySQL.Query (Query (..))
 import qualified MySQL.Settings as Settings
 import qualified Platform
 import qualified Task

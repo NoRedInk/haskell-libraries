@@ -10,8 +10,8 @@ import qualified Data.Acquire as Acquire
 import qualified Debug
 import qualified Environment
 import qualified Expect
-import Internal.Query (Query (..))
 import qualified MySQL
+import MySQL.Query (Query (..))
 import qualified Platform
 import qualified Task
 import Test (Test, describe, test)

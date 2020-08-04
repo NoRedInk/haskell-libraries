@@ -3,7 +3,7 @@
 module Devel where
 
 import Cherry.Prelude
-import Internal.Query
+import MySQL.Query
 import qualified Prelude
 
 main :: Prelude.IO ()
