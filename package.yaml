@@ -15,6 +15,7 @@ dependencies:
 - hashable
 - haskell-src-meta
 - health
+- io-streams
 - lens
 - lens-regex-pcre
 - monad-logger
@@ -23,7 +24,6 @@ dependencies:
 - network
 - oops
 - pcre-light
-- persistent-mysql-haskell
 - postgresql-simple
 - postgresql-typed
 - process
