@@ -22,14 +22,17 @@ import Control.Monad (fail, void)
 import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
+import qualified Data.Time.Clock as Clock
+import qualified Data.Time.LocalTime as LocalTime
+import qualified Data.Word
 import qualified Database.MySQL.Base as Base
 import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
+import Internal.Error (Error (..), TimeoutOrigin (..))
 import qualified Internal.QueryParser as Parser
-import qualified Internal.Time as Time
 import Language.Haskell.Meta.Parse (parseExp)
 import Language.Haskell.TH (ExpQ)
 import qualified Language.Haskell.TH as TH
@@ -40,11 +43,10 @@ import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import qualified Log
 import MySQL.Internal (inToAny)
-import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
 import qualified Tuple
-import Prelude (Show (show), fromIntegral)
+import Prelude (fromIntegral)
 import qualified Prelude
 
 -- |
@@ -75,21 +77,6 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
-  deriving (Show)
-
-data Error
-  = Timeout TimeoutOrigin Time.Interval
-  | UniqueViolation Text
-  | Other Text [Platform.Context]
-
-instance Show Error where
-  show (Timeout _ interval) = "Query timed out after " ++ Data.Text.unpack (Text.fromFloat (Time.seconds interval)) ++ " seconds"
-  show (UniqueViolation err) = "Query violated uniqueness constraint: " ++ Data.Text.unpack err
-  show (Other msg _) = "Query failed with unexpected error: " ++ Data.Text.unpack msg
-
-instance Exception.Exception Error
-
-data TimeoutOrigin = ClientTimeout | ServerTimeout
   deriving (Show)
 
 qqSQL :: String -> ExpQ
@@ -191,11 +178,55 @@ instance Exception.Exception HaskellParseError
 class MySQLColumn a where
   mysqlEncode :: a -> Base.MySQLValue
 
+instance MySQLColumn Data.Int.Int8 where
+  mysqlEncode = Base.MySQLInt8
+
+instance MySQLColumn Data.Word.Word16 where
+  mysqlEncode = Base.MySQLInt16U
+
+instance MySQLColumn Data.Int.Int16 where
+  mysqlEncode = Base.MySQLInt16
+
+instance MySQLColumn Data.Word.Word32 where
+  mysqlEncode = Base.MySQLInt32U
+
+instance MySQLColumn Data.Int.Int32 where
+  mysqlEncode = Base.MySQLInt32
+
+instance MySQLColumn Data.Word.Word64 where
+  mysqlEncode = Base.MySQLInt64U
+
 instance MySQLColumn Int where
   mysqlEncode = Base.MySQLInt64
 
+instance MySQLColumn Prelude.Float where
+  mysqlEncode = Base.MySQLFloat
+
+instance MySQLColumn Float where
+  mysqlEncode = Base.MySQLDouble
+
+instance MySQLColumn Clock.UTCTime where
+  mysqlEncode = Base.MySQLDateTime << LocalTime.utcToLocalTime LocalTime.utc
+
+-- TODO
+-- instance MySQLColumn Local where
+--   mysqlEncode = Base.MySQLDateTime
+
+-- instance MySQLColumn _ where
+--   mysqlEncode = Base.MySQLTimeStamp
+
+-- instance MySQLColumn _ where
+--   mysqlEncode = Base.MySQLDate
+
+-- instance MySQLColumn _ where
+--   mysqlEncode = Base.MySQLTime
+
 instance MySQLColumn Text where
   mysqlEncode = Base.MySQLText
+
+instance MySQLColumn a => MySQLColumn (Maybe a) where
+  mysqlEncode Nothing = Base.MySQLNull
+  mysqlEncode (Just a) = mysqlEncode a
 
 -- A Given quasi quoted query string might look like this:
 --
