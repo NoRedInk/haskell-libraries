@@ -92,7 +92,14 @@ data TimeoutOrigin = ClientTimeout | ServerTimeout
   deriving (Show)
 
 qqSQL :: String -> ExpQ
-qqSQL query = do
+qqSQL queryWithPgTypedFlags = do
+  -- We run the postgresql-typed quasi quoter for it's type-checking logic, but
+  -- we're uninterested in the results it produces. At runtime we're taking our
+  -- queries straight to MySQL. Consider the line below like a validation
+  -- function running against the query string at compile time.
+  _ <- quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack queryWithPgTypedFlags)))
+  -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
+  let query = Prelude.dropWhile (\char -> char == '!' || char == '$' || char == '?') queryWithPgTypedFlags
   let db =
         Environment.decode Postgres.Settings.decoder
           |> map Postgres.Settings.toPGDatabase
@@ -107,10 +114,6 @@ qqSQL query = do
           |> Data.Text.pack
           |> Text.replace "monolith." ""
           |> Data.Text.unpack
-  -- We run the postgresql-typed quasi quoter for it's type-checking logic, but
-  -- we're uninterested in the results it produces. At runtime we're taking our
-  -- queries straight to MySQL.
-  _ <- quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack query)))
   [e|
     Query
       { preparedStatement = preparedStatement',
