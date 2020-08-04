@@ -215,6 +215,7 @@ doQuery ::
 doQuery conn query handleResponse =
   let --
       runQuery = do
+        withFrozenCallStack Log.info "Running MySQL query" []
         result <- executeSql conn query
         -- If not currently inside a transaction and original query succeeded, then commit
         case transactionCount conn of
@@ -229,16 +230,14 @@ doQuery conn query handleResponse =
           Platform.queryOperation = Query.sqlOperation query,
           Platform.queryCollection = Query.queriedRelation query
         }
-   in do
-        withFrozenCallStack Log.info (Query.asMessage query) []
-        runQuery
-          -- Handle the response before wrapping the operation in a context. This way,
-          -- if the response handling logic creates errors, those errors can inherit
-          -- context values like the query string.
-          |> Task.map Ok
-          |> Task.onError (Task.succeed << Err)
-          |> Task.andThen handleResponse
-          |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
+   in runQuery
+        -- Handle the response before wrapping the operation in a context. This way,
+        -- if the response handling logic creates errors, those errors can inherit
+        -- context values like the query string.
+        |> Task.map Ok
+        |> Task.onError (Task.succeed << Err)
+        |> Task.andThen handleResponse
+        |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
 queryAsText :: Query q -> Text
 queryAsText query =

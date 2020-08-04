@@ -14,8 +14,6 @@ module MySQL.Query
     Error (..),
     TimeoutOrigin (..),
     PreparedMySQLQuery (..),
-    asMessage,
-    format,
   )
 where
 
@@ -252,26 +250,3 @@ instance PGTypes.PGParameter "smallint" Int where
   pgEncode tid tv =
     let (i :: Data.Int.Int16) = fromIntegral tv
      in PGTypes.pgEncode tid i
-
--- |
--- | Formatter for logging
--- |
-asMessage :: Query row -> Text.Text
-asMessage query =
-  "I ran the following query:\n\n" ++ format query
-
-format :: Query row -> Text.Text
-format query =
-  let fixBang query_ =
-        case Text.uncons query_ of
-          Just ('!', rest) -> "! " ++ Text.trim rest
-          Just _ -> query_
-          Nothing -> query_
-      indent string =
-        "    " ++ string
-   in quasiQuotedString query
-        |> Text.split "\n"
-        |> List.map Text.trim
-        |> Text.join "\n        "
-        |> fixBang
-        |> indent
