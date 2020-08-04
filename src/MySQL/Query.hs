@@ -30,6 +30,7 @@ import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
 import qualified Internal.QueryParser as Parser
 import qualified Internal.Time as Time
+import Language.Haskell.Meta.Parse (parseExp)
 import Language.Haskell.TH (ExpQ)
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
@@ -164,14 +165,23 @@ toPreparedQuery tokens =
 --     ]
 --
 preparedQueryParamsE :: [SQLToken.SQLToken] -> TH.ExpQ
-preparedQueryParamsE sqlTokens = do
-  names <- Prelude.traverse TH.lookupValueName (placeholderNames sqlTokens)
-  names
-    |> List.filterMap identity
-    |> map (TH.AppE (TH.VarE 'mysqlEncode) << TH.VarE)
+preparedQueryParamsE sqlTokens =
+  placeholderNames sqlTokens
+    |> List.map
+      ( \expr ->
+          case parseExp expr of
+            Prelude.Left err -> Exception.impureThrow (HaskellParseError ("Could not parse: " ++ err))
+            Prelude.Right x -> x
+      )
+    |> map (TH.AppE (TH.VarE 'mysqlEncode))
     |> TH.ListE
     |> TH.AppE (TH.VarE 'Log.mkSecret)
     |> Prelude.pure
+
+newtype HaskellParseError = HaskellParseError String
+  deriving (Show)
+
+instance Exception.Exception HaskellParseError
 
 -- | A type class describing how to encode values for MySQL. The `MySQLValue`
 -- type is defined by our MySQL driver library (`mysql-haskell`).

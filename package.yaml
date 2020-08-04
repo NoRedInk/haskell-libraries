@@ -13,6 +13,7 @@ dependencies:
 - exceptions
 - filepath
 - hashable
+- haskell-src-meta
 - health
 - lens
 - lens-regex-pcre
