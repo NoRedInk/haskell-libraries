@@ -1,5 +1,7 @@
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
@@ -20,8 +22,12 @@ import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (fail, void)
 import qualified Data.Int
+import Data.Proxy (Proxy (Proxy))
 import Data.String (String)
 import qualified Data.Text
+import qualified Data.Text.Lazy
+import qualified Data.Text.Lazy.Builder as Builder
+import qualified Data.Text.Lazy.Builder.Int as Builder.Int
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Data.Word
@@ -92,83 +98,136 @@ qqSQL queryWithPgTypedFlags = do
   -- function running against the query string at compile time.
   _ <- quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack queryWithPgTypedFlags)))
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
-  let query = Prelude.dropWhile (\char -> char == '!' || char == '$' || char == '?') queryWithPgTypedFlags
-  let meta = Parser.parse (Data.Text.pack query)
-  let op = Data.Text.unpack (Parser.sqlOperation meta)
-  let rel = Data.Text.unpack (Parser.queriedRelation meta)
-  let sqlTokens = SQLToken.sqlTokens query
-  let preparedStatement' =
-        toPreparedQuery sqlTokens
+  let query =
+        queryWithPgTypedFlags
+          |> Prelude.dropWhile (\char -> char == '!' || char == '$' || char == '?')
           |> Data.Text.pack
           |> Text.replace "monolith." ""
           |> Data.Text.unpack
+  let meta = Parser.parse (Data.Text.pack query)
+  let op = Data.Text.unpack (Parser.sqlOperation meta)
+  let rel = Data.Text.unpack (Parser.queriedRelation meta)
   [e|
-    Query
-      { preparedStatement = preparedStatement',
-        params = $(preparedQueryParamsE sqlTokens),
-        quasiQuotedString =
-          query
-            |> Data.Text.pack
-            |> inToAny,
-        sqlOperation = op,
-        queriedRelation = rel
-      }
+    let tokens = $(tokenize query)
+     in Query
+          { preparedStatement = generatePreparedStatement tokens,
+            params = collectQueryParams tokens,
+            quasiQuotedString =
+              query
+                |> Data.Text.pack
+                |> inToAny,
+            sqlOperation = op,
+            queriedRelation = rel
+          }
     |]
 
--- Take a quasiquoted query like this:
+-- Our own token type, not to be confused with the `SQLToken` type provided by
+-- the `postgresql-typed` library. When convert queries into a list of these
+-- tokens because it's a format from which we can generate both a template
+-- query string and the list of placeholder values to fill it with.
+data SqlToken
+  = -- | Just a regular bit of SQL string.
+    SqlToken String
+  | -- | A dynamic part of the SQL string, where we want to insert one or more
+    -- values. Typically the list of values will contain only a single element,
+    -- but in a `WHERE x IN (${listTime})` clause we will pass in a list of
+    -- values.
+    SqlParams [Log.Secret Base.MySQLValue]
+
+-- | Take a query string and parse it, turning it into a list of SQL tokens.
+-- We do this at compile time, which is why the return type is not `[SqlToken]`
+-- but rather `TH.ExpQ` (which means 'generated haskell code').
+tokenize :: String -> TH.ExpQ
+tokenize query =
+  SQLToken.sqlTokens query
+    |> Prelude.traverse parseToken
+    |> map TH.ListE
+
+-- | Take a single `SQLToken` provided by `postgresql-typed`'s parsing logic
+-- and construct one of our own `SqlToken`s. We do this at compile time, which
+-- is why the return type is not `SqlToken` but rather `TH.ExpQ` (which means
+-- 'generated haskell code').
+parseToken :: SQLToken.SQLToken -> TH.ExpQ
+parseToken token =
+  case token of
+    SQLToken.SQLExpr expr ->
+      case parseExp expr of
+        Prelude.Left err -> fail ("Could not parse: " ++ err)
+        Prelude.Right x ->
+          [e|
+            flatten $(Prelude.pure x)
+              |> map (Log.mkSecret << mysqlEncode)
+              |> SqlParams
+            |]
+    SQLToken.SQLToken _ -> tokenE (Prelude.show token)
+    SQLToken.SQLParam _ -> tokenE (Prelude.show token)
+    SQLToken.SQLQMark _ -> tokenE (Prelude.show token)
+
+-- | Generate a prepared statement. Params in the query will be replaced with
+-- `$1` placeholders. For example, the following quasiquoted query:
 --
---     SELECT first_name FROM monolith.users WHERE id = ${userId} AND username = ${username}
+--     [MySQL.sql|SELECT names FROM users WHERE id IN (${[1, 2, 3]})|]
 --
--- And turn it into a prepared query like this:
+--  Will result in the following prepared statement:
 --
---     SELECT first_name FROM monolith.users WHERE id = $1 AND username = $2
---
-toPreparedQuery :: [SQLToken.SQLToken] -> String
-toPreparedQuery tokens =
+--     "SELECT names FROM users WHERE id in ($1,$2,$3)"
+generatePreparedStatement :: [SqlToken] -> Text
+generatePreparedStatement tokens =
   tokens
     |> List.foldl
-      ( \token (n, res) ->
+      ( \token (counter, queryAcc) ->
           case token of
-            SQLToken.SQLExpr _ -> (n + 1, SQLToken.SQLParam n : res)
-            SQLToken.SQLParam _ -> (n, token : res)
-            SQLToken.SQLToken _ -> (n, token : res)
-            SQLToken.SQLQMark _ -> (n, token : res)
+            SqlToken str -> (counter, queryAcc ++ Builder.fromString str)
+            SqlParams params ->
+              let paramsCount = List.length params
+               in ( counter + paramsCount,
+                    queryAcc
+                      ++ ( List.range counter (counter + paramsCount - 1)
+                             |> map (\n -> "$" ++ Builder.Int.decimal n)
+                             |> List.intersperse ","
+                             |> Prelude.mconcat
+                         )
+                  )
       )
-      (1, [])
+      (0 :: Int, "")
     |> Tuple.second
-    |> (\tokens' -> Prelude.showList (List.reverse tokens') "")
+    |> Builder.toLazyText
+    |> Data.Text.Lazy.toStrict
 
--- A Given quasi quoted query string might look like this:
---
---     SELECT first_name FROM monolith.users WHERE id = ${userId} AND username = ${username}
---
--- This function will return generated Haskell code containing a list of encoded
--- MySQL column values, one for each placeholder in the query. For example, the
--- generated code for the query above will look like this:
---
---     [
---         mysqlEncode userId,
---         mysqlEncode username
---     ]
---
-preparedQueryParamsE :: [SQLToken.SQLToken] -> TH.ExpQ
-preparedQueryParamsE sqlTokens =
-  placeholderNames sqlTokens
-    |> List.map
-      ( \expr ->
-          case parseExp expr of
-            Prelude.Left err -> Exception.impureThrow (HaskellParseError ("Could not parse: " ++ err))
-            Prelude.Right x -> x
+collectQueryParams :: [SqlToken] -> Log.Secret [Base.MySQLValue]
+collectQueryParams tokens =
+  tokens
+    |> Prelude.traverse
+      ( \token ->
+          case token of
+            SqlToken _ -> Log.mkSecret []
+            SqlParams params -> Prelude.sequenceA params
       )
-    |> map (TH.AppE (TH.VarE 'mysqlEncode))
-    |> TH.ListE
-    |> TH.AppE (TH.VarE 'Log.mkSecret)
-    |> Prelude.pure
+    |> map List.concat
+
+tokenE :: String -> TH.ExpQ
+tokenE str = [e|SqlToken str|]
 
 newtype HaskellParseError = HaskellParseError String
   deriving (Show)
 
 instance Exception.Exception HaskellParseError
+
+flatten :: forall a b. Flatten (IsList a) a b => a -> [b]
+flatten = flatten' (Proxy :: Proxy (IsList a))
+
+type family IsList a :: Bool where
+  IsList [a] = 'True
+  IsList a = 'False
+
+class Flatten (t :: Bool) a b | t b -> a where
+  flatten' :: Proxy t -> a -> [b]
+
+instance Flatten 'True [a] a where
+  flatten' _ xs = xs
+
+instance Flatten 'False a a where
+  flatten' _ x = [x]
 
 -- | A type class describing how to encode values for MySQL. The `MySQLValue`
 -- type is defined by our MySQL driver library (`mysql-haskell`).
@@ -227,27 +286,6 @@ instance MySQLColumn Text where
 instance MySQLColumn a => MySQLColumn (Maybe a) where
   mysqlEncode Nothing = Base.MySQLNull
   mysqlEncode (Just a) = mysqlEncode a
-
--- A Given quasi quoted query string might look like this:
---
---     SELECT first_name FROM monolith.users WHERE id = ${userId} AND username = ${username}
---
--- This function will return a list of the placeholder names. In the example
--- above that would be:
---
---     ["userId", "username"]
---
-placeholderNames :: [SQLToken.SQLToken] -> [String]
-placeholderNames tokens =
-  tokens
-    |> List.filterMap
-      ( \token ->
-          case token of
-            SQLToken.SQLExpr name -> Just name
-            SQLToken.SQLParam _ -> Nothing
-            SQLToken.SQLToken _ -> Nothing
-            SQLToken.SQLQMark _ -> Nothing
-      )
 
 sql :: QuasiQuoter
 sql =
