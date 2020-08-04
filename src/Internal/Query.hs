@@ -29,6 +29,7 @@ import qualified Database.Persist.MySQL as MySQL
 import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
 import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
+import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
 import qualified Internal.Query.Parser as Parser
@@ -43,7 +44,9 @@ import MySQL.Internal (inToAny)
 import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
+import qualified Tuple
 import Prelude (IO, Show (show), fromIntegral)
+import qualified Prelude
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -66,6 +69,8 @@ data Query row
         runQuery :: PGConnection -> IO [row],
         -- | The raw SQL string
         sqlString :: Text,
+        -- | The query as a prepared statement
+        preparedString :: Text,
         -- | The query string as extracted from an `sql` quasi quote.
         quasiQuotedString :: Text,
         -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
@@ -104,6 +109,9 @@ qqSQL query = do
      in Query
           { runQuery = \c -> pgQuery c q,
             sqlString = Data.Text.Encoding.decodeUtf8 (getQueryString PGTypes.unknownPGTypeEnv q),
+            preparedString =
+              toPreparedQuery query
+                |> Data.Text.pack,
             quasiQuotedString =
               query
                 |> Data.Text.pack
@@ -112,6 +120,30 @@ qqSQL query = do
             queriedRelation = rel
           }
     |]
+
+-- Take a quasiquoted query like this:
+--
+--     SELECT first_name FROM monolith.users WHERE id = ${userId} AND username = ${username}
+--
+-- And turn it into a prepared query like this:
+--
+--     SELECT first_name FROM monolith.users WHERE id = $1 AND username = $2
+--
+toPreparedQuery :: String -> String
+toPreparedQuery query =
+  query
+    |> SQLToken.sqlTokens
+    |> List.foldl
+      ( \token (n, res) ->
+          case token of
+            SQLToken.SQLParam _ -> (n + 1, SQLToken.SQLParam n : res)
+            SQLToken.SQLExpr _ -> (n + 1, SQLToken.SQLParam n : res)
+            SQLToken.SQLToken _ -> (n, token : res)
+            SQLToken.SQLQMark _ -> (n, token : res)
+      )
+      (1, [])
+    |> Tuple.second
+    |> (\tokens -> Prelude.showList (List.reverse tokens) "")
 
 sql :: QuasiQuoter
 sql =
