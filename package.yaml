@@ -37,7 +37,6 @@ dependencies:
 - unix
 library:
   exposed-modules:
-  - Devel
   - MySQL
   - MySQL.Settings
   - Postgres
