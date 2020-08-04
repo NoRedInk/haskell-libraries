@@ -48,8 +48,6 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
 import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
-import qualified Control.Monad.Logger
-import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
@@ -60,7 +58,7 @@ import qualified Data.Pool
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Text
 import qualified Data.Text.Encoding
-import qualified Database.MySQL.Base
+import qualified Database.MySQL.Base as Base
 import qualified Database.MySQL.Connection
 import qualified Database.MySQL.Protocol.Escape as Escape
 import qualified Database.MySQL.Protocol.Packet
@@ -93,7 +91,7 @@ newtype TransactionCount
 data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
-        singleOrPool :: SingleOrPool MySQL.SqlBackend,
+        singleOrPool :: SingleOrPool Base.MySQLConn,
         logContext :: Platform.QueryConnectionInfo,
         timeout :: Time.Interval
       }
@@ -117,9 +115,13 @@ connection settings =
     acquire = do
       doAnything <- Platform.doAnythingHandler
       pool <-
-        MySQL.createMySQLPool database size
-          |> Control.Monad.Logger.runNoLoggingT
-          |> map Pool
+        map Pool
+          <| Data.Pool.createPool
+            (Base.connect database)
+            Base.close
+            stripes
+            maxIdleTime
+            size
       pure
         ( Connection
             doAnything
@@ -131,6 +133,8 @@ connection settings =
       case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
         Single _ _ -> pure ()
+    stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral
+    maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings))
     size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
     database = toConnectInfo settings
 
@@ -155,7 +159,7 @@ toConnectionLogContext settings =
             (Data.Text.pack (show (Settings.unPort port)))
             database
 
-toConnectInfo :: Settings.Settings -> MySQL.MySQLConnectInfo
+toConnectInfo :: Settings.Settings -> Base.ConnectInfo
 toConnectInfo settings =
   let connectionSettings = Settings.mysqlConnection settings
       database = Data.Text.Encoding.encodeUtf8 (Settings.unDatabase (Settings.database connectionSettings))
@@ -163,20 +167,22 @@ toConnectInfo settings =
       password = Data.Text.Encoding.encodeUtf8 (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
-          MySQL.mkMySQLConnectInfo
-            (Settings.unSocket socket)
-            user
-            password
-            database
-            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+          Base.defaultConnectInfo
+            { Base.ciHost = Settings.unSocket socket,
+              Base.ciUser = user,
+              Base.ciPassword = password,
+              Base.ciDatabase = database,
+              Base.ciCharset = Database.MySQL.Connection.utf8mb4_unicode_ci
+            }
         Settings.ConnectTcp host port ->
-          MySQL.mkMySQLConnectInfo
-            (Data.Text.unpack (Settings.unHost host))
-            user
-            password
-            database
-            |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
-            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+          Base.defaultConnectInfo
+            { Base.ciHost = Data.Text.unpack (Settings.unHost host),
+              Base.ciUser = user,
+              Base.ciPassword = password,
+              Base.ciDatabase = database,
+              Base.ciPort = fromIntegral (Settings.unPort port),
+              Base.ciCharset = Database.MySQL.Connection.utf8mb4_unicode_ci
+            }
 
 --
 -- READINESS
@@ -186,12 +192,21 @@ toConnectInfo settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  executeQuery conn "SELECT 1"
+  executeQuery conn (queryFromText "SELECT 1")
     |> Task.map (\(_ :: [Int]) -> ())
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
     |> map Health.fromResult
     |> Health.mkCheck "mysql"
+
+queryFromText :: Text -> Query a
+queryFromText text = Query
+  { preparedStatement = text,
+    params = Log.mkSecret [],
+    quasiQuotedString = text,
+    sqlOperation = "",
+    queriedRelation = ""
+  }
 
 --
 -- EXECUTE QUERIES
@@ -199,11 +214,11 @@ readiness log conn =
 class MySqlQueryable query result | result -> query where
   executeSql :: Connection -> Query query -> Task Query.Error result
 
-instance MySqlQueryable row [row] where
-  executeSql _c _query = Prelude.undefined
+instance QueryResults (CountColumns row) row => MySqlQueryable row [row] where
+  executeSql c query = executeQuery c query
 
 instance MySqlQueryable () () where
-  executeSql _c _query = Prelude.undefined
+  executeSql c query = executeCommand c query
 
 doQuery ::
   (HasCallStack, MySqlQueryable row result) =>
@@ -218,7 +233,7 @@ doQuery conn query handleResponse =
         result <- executeSql conn query
         -- If not currently inside a transaction and original query succeeded, then commit
         case transactionCount conn of
-          Nothing -> executeCommand conn "COMMIT"
+          Nothing -> executeCommand conn (queryFromText "COMMIT")
           _ -> pure ()
         pure result
       infoForContext :: Platform.QueryInfo
@@ -238,21 +253,19 @@ doQuery conn query handleResponse =
         |> Task.andThen handleResponse
         |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
-executeQuery :: forall row. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
-executeQuery conn query =
-  withConnection conn <| \backend ->
-    MySQL.rawSql query []
-      |> (\reader -> runReaderT reader backend)
+executeQuery :: forall row. QueryResults (CountColumns row) row => Connection -> Query row -> Task Query.Error [row]
+executeQuery conn _query =
+  withConnection conn <| \_backend ->
+    Prelude.undefined
       |> map (map (toQueryResult (Proxy :: Proxy (CountColumns row))))
       |> handleMySqlException
       |> Platform.doAnything (doAnything conn)
       |> withTimeout conn
 
-executeCommand :: Connection -> Text -> Task Query.Error ()
-executeCommand conn query =
-  withConnection conn <| \backend ->
-    MySQL.rawExecute query []
-      |> (\reader -> runReaderT reader backend)
+executeCommand :: Connection -> Query () -> Task Query.Error ()
+executeCommand conn _query =
+  withConnection conn <| \_backend ->
+    Prelude.undefined
       |> handleMySqlException
       |> Platform.doAnything (doAnything conn)
       |> withTimeout conn
@@ -262,7 +275,7 @@ handleMySqlException io =
   Exception.catches
     (map Ok io)
     [ Exception.Handler
-        ( \(Database.MySQL.Base.ERRException err) ->
+        ( \(Base.ERRException err) ->
             let errCode = Database.MySQL.Protocol.Packet.errCode err
                 errState = Database.MySQL.Protocol.Packet.errState err
                 errMsg = Database.MySQL.Protocol.Packet.errMsg err
@@ -275,7 +288,7 @@ handleMySqlException io =
                   |> pure
         ),
       Exception.Handler
-        ( \Database.MySQL.Base.NetworkException ->
+        ( \Base.NetworkException ->
             Query.Other "MySQL query failed with a network exception" []
               |> Err
               |> pure
@@ -349,8 +362,8 @@ begin conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn "BEGIN"
-      Just (TransactionCount current) -> executeCommand conn ("SAVEPOINT pgt" ++ Text.fromInt current)
+      Just (TransactionCount 0) -> executeCommand conn (queryFromText "BEGIN")
+      Just (TransactionCount current) -> executeCommand conn (queryFromText ("SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Rollback to the most recent 'begin'.
 rollback :: Connection -> Task e ()
@@ -358,9 +371,9 @@ rollback conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn "ROLLBACK"
+      Just (TransactionCount 0) -> executeCommand conn (queryFromText "ROLLBACK")
       Just (TransactionCount current) ->
-        executeCommand conn ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current)
+        executeCommand conn (queryFromText ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Commit the most recent 'begin'.
 commit :: Connection -> Task e ()
@@ -368,8 +381,8 @@ commit conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn "COMMIT"
-      Just (TransactionCount current) -> executeCommand conn ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current)
+      Just (TransactionCount 0) -> executeCommand conn (queryFromText "COMMIT")
+      Just (TransactionCount current) -> executeCommand conn (queryFromText ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Rollback all active 'begin's.
 rollbackAll :: Connection -> Task e ()
@@ -377,7 +390,7 @@ rollbackAll conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just _ -> executeCommand conn "ROLLBACK"
+      Just _ -> executeCommand conn (queryFromText "ROLLBACK")
 
 throwRuntimeError :: Task Query.Error a -> Task e a
 throwRuntimeError task = do
@@ -408,7 +421,7 @@ withTransaction conn func =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Connection -> (MySQL.SqlBackend -> Task e a) -> Task e a
+withConnection :: Connection -> (Base.MySQLConn -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
@@ -416,7 +429,7 @@ withConnection conn func =
           <| doIO conn
           <| Data.Pool.takeResource pool
       --
-      release :: Data.Pool.Pool MySQL.SqlBackend -> (MySQL.SqlBackend, Data.Pool.LocalPool MySQL.SqlBackend) -> ExitCase x -> Task y ()
+      release :: Data.Pool.Pool Base.MySQLConn -> (Base.MySQLConn, Data.Pool.LocalPool Base.MySQLConn) -> ExitCase x -> Task y ()
       release pool (c, localPool) exitCase =
         doIO conn
           <| case exitCase of
@@ -1118,14 +1131,7 @@ qqSQLYearly query =
 -- For more information: https://dev.mysql.com/doc/refman/8.0/en/getting-unique-id.html
 lastInsertedPrimaryKey :: Connection -> Task Query.Error (Maybe Int)
 lastInsertedPrimaryKey c =
-  let query =
-        Query.Query
-          { preparedStatement = "SELECT LAST_INSERT_ID()",
-            params = Log.mkSecret [],
-            quasiQuotedString = "SELECT LAST_INSERT_ID()",
-            sqlOperation = "SELECT",
-            queriedRelation = "LAST_INSERT_ID()"
-          }
+  let query = queryFromText "SELECT LAST_INSERT_ID()"
    in doQuery
         c
         query
