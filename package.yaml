@@ -12,6 +12,7 @@ dependencies:
 - env-parser
 - exceptions
 - filepath
+- hashable
 - health
 - lens
 - lens-regex-pcre

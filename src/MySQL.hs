@@ -51,7 +51,10 @@ import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCase
 import qualified Data.Acquire
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
+import qualified Data.ByteString.Lazy
 import qualified Data.Coerce
+import qualified Data.Hashable as Hashable
+import qualified Data.IORef as IORef
 import qualified Data.Int
 import Data.Kind (Type)
 import qualified Data.Pool
@@ -65,6 +68,7 @@ import qualified Database.MySQL.Protocol.Packet
 import qualified Database.Persist.MySQL as MySQL
 import Database.Persist.MySQL (RawSql (..))
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
+import qualified Dict
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits (Symbol)
 import qualified Health
@@ -93,7 +97,23 @@ data Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool Base.MySQLConn,
         logContext :: Platform.QueryConnectionInfo,
-        timeout :: Time.Interval
+        timeout :: Time.Interval,
+        -- | In this IORef we keep a list of statements we've prepared with
+        -- MySQL. These are SQL commands with some placeholders that MySQL has
+        -- parsed and is ready to run, if we only provide the placeholders. This
+        -- is a faster way of running similar queries multiple times than
+        -- sending MySQL full query strings every time, which it then has to
+        -- parse first.
+        --
+        -- If we prepare a query MySQL makes it available for the current
+        -- connection only, which is why we're not sharing this hash between
+        -- database connections.
+        --
+        -- Database connections can live for a long time. We have to be careful
+        -- with the memory they use because they won't get cleaned up after
+        -- every request. That's why we're using a hash of the query as the key
+        -- in the dictionary below instead of the query itself.
+        preparedQueries :: IORef.IORef (Dict.Dict PreparedQueryHash Base.StmtID)
       }
 
 -- | A database connection type.
@@ -107,6 +127,9 @@ data SingleOrPool c
   | -- | A single connection is only used in the context of a transaction, where
     --   we need to insure several SQL statements happen on the same connection.
     Single TransactionCount c
+
+newtype PreparedQueryHash = PreparedQueryHash Prelude.Int
+  deriving (Eq, Ord)
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
@@ -122,12 +145,14 @@ connection settings =
             stripes
             maxIdleTime
             size
+      preparedQueries <- IORef.newIORef Dict.empty
       pure
         ( Connection
             doAnything
             pool
             (toConnectionLogContext settings)
             (Settings.mysqlQueryTimeoutSeconds settings)
+            preparedQueries
         )
     release Connection {singleOrPool} =
       case singleOrPool of
@@ -263,12 +288,41 @@ executeQuery conn _query =
       |> withTimeout conn
 
 executeCommand :: Connection -> Query () -> Task Query.Error ()
-executeCommand conn _query =
-  withConnection conn <| \_backend ->
-    Prelude.undefined
-      |> handleMySqlException
-      |> Platform.doAnything (doAnything conn)
-      |> withTimeout conn
+executeCommand conn query =
+  withConnection conn <| \backend ->
+    withTimeout conn
+      <| Platform.doAnything (doAnything conn)
+      <| handleMySqlException
+      <| do
+        stmtId <- getPreparedQueryStmtID conn backend query
+        _ <-
+          Query.params query
+            |> Log.unSecret
+            |> Base.executeStmt backend stmtId
+        Prelude.pure ()
+
+-- | Get the prepared statement id for a particular query. If such an ID exists
+-- MySQL already knows this query and has it parsed in memory. We just have to
+-- provide it with the values for the placeholder fields in the query, and
+-- MySQL can run it.
+getPreparedQueryStmtID :: Connection -> Base.MySQLConn -> Query a -> IO Base.StmtID
+getPreparedQueryStmtID conn backend query = do
+  let queryString =
+        Query.preparedStatement query
+          |> Data.Text.Encoding.encodeUtf8
+          |> Data.ByteString.Lazy.fromStrict
+  let queryHash = PreparedQueryHash (Hashable.hash queryString)
+  alreadyPrepped <- IORef.readIORef (preparedQueries conn)
+  case Dict.get queryHash alreadyPrepped of
+    -- We've already prepared this statement before and stored the id.
+    Just stmtId -> pure stmtId
+    -- We've not prepared this statement before, so we do so now.
+    Nothing -> do
+      stmtId <- Base.prepareStmt backend (Base.Query queryString)
+      IORef.atomicModifyIORef'
+        (preparedQueries conn)
+        (\dict -> (Dict.insert queryHash stmtId dict, ()))
+      pure stmtId
 
 handleMySqlException :: IO result -> IO (Result Query.Error result)
 handleMySqlException io =
