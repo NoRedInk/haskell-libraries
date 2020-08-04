@@ -1128,7 +1128,7 @@ lastInsertedPrimaryKey c =
         Query.Query
           { runQuery = \_ -> pure [],
             sqlString = "SELECT LAST_INSERT_ID()",
-            preparedString = "SELECT LAST_INSERT_ID()",
+            preparedMySQLQuery = Query.PreparedMySQLQuery "" [],
             quasiQuotedString = "SELECT LAST_INSERT_ID()",
             sqlOperation = "SELECT",
             queriedRelation = "LAST_INSERT_ID()"

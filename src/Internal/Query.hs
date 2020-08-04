@@ -13,6 +13,7 @@ module Internal.Query
     Query (..),
     Error (..),
     TimeoutOrigin (..),
+    PreparedMySQLQuery (..),
     asMessage,
     format,
   )
@@ -25,6 +26,7 @@ import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
 import qualified Data.Text.Encoding
+import qualified Database.MySQL.Base as MySQL
 import qualified Database.Persist.MySQL as MySQL
 import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
@@ -35,6 +37,7 @@ import qualified Environment
 import qualified Internal.Query.Parser as Parser
 import qualified Internal.Time as Time
 import Language.Haskell.TH (ExpQ)
+import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
   )
@@ -70,7 +73,7 @@ data Query row
         -- | The raw SQL string
         sqlString :: Text,
         -- | The query as a prepared statement
-        preparedString :: Text,
+        preparedMySQLQuery :: PreparedMySQLQuery,
         -- | The query string as extracted from an `sql` quasi quote.
         quasiQuotedString :: Text,
         -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
@@ -109,9 +112,7 @@ qqSQL query = do
      in Query
           { runQuery = \c -> pgQuery c q,
             sqlString = Data.Text.Encoding.decodeUtf8 (getQueryString PGTypes.unknownPGTypeEnv q),
-            preparedString =
-              toPreparedQuery query
-                |> Data.Text.pack,
+            preparedMySQLQuery = $(preparedQueryE query),
             quasiQuotedString =
               query
                 |> Data.Text.pack
@@ -129,21 +130,81 @@ qqSQL query = do
 --
 --     SELECT first_name FROM monolith.users WHERE id = $1 AND username = $2
 --
-toPreparedQuery :: String -> String
-toPreparedQuery query =
-  query
-    |> SQLToken.sqlTokens
+toPreparedQuery :: [SQLToken.SQLToken] -> String
+toPreparedQuery tokens =
+  tokens
     |> List.foldl
       ( \token (n, res) ->
           case token of
-            SQLToken.SQLParam _ -> (n + 1, SQLToken.SQLParam n : res)
             SQLToken.SQLExpr _ -> (n + 1, SQLToken.SQLParam n : res)
+            SQLToken.SQLParam _ -> (n, token : res)
             SQLToken.SQLToken _ -> (n, token : res)
             SQLToken.SQLQMark _ -> (n, token : res)
       )
       (1, [])
     |> Tuple.second
-    |> (\tokens -> Prelude.showList (List.reverse tokens) "")
+    |> (\tokens' -> Prelude.showList (List.reverse tokens') "")
+
+data PreparedMySQLQuery
+  = PreparedMySQLQuery
+      { preparedStatement :: String,
+        params :: [MySQL.MySQLValue]
+      }
+  deriving (Show)
+
+preparedQueryE :: String -> TH.ExpQ
+preparedQueryE query = do
+  let sqlTokens = SQLToken.sqlTokens query
+  let preparedStatement' = toPreparedQuery sqlTokens
+  -- The query string passed in will contain a number of placeholder variables,
+  -- for example: `${id}` or `${name}`. Below is some template haskell for
+  -- generating code for a list of encoded MySQL values. That code will look
+  -- something like this:
+  --
+  --     [
+  --         toMySQLValue id,
+  --         toMySQLValue name
+  --     ]
+  names <- Prelude.traverse TH.lookupValueName (placeholderNames sqlTokens)
+  let params' =
+        names
+          |> List.filterMap identity
+          |> map (TH.AppE (TH.VarE 'toMySQLValue) << TH.VarE)
+          |> TH.ListE
+          |> Prelude.pure
+  [e|PreparedMySQLQuery preparedStatement' $(params')|]
+
+-- | A type class describing how to encode values for MySQL. The `MySQLValue`
+-- type is defined by our MySQL driver library (`mysql-haskell`).
+class ToMySQLValue a where
+  toMySQLValue :: a -> MySQL.MySQLValue
+
+instance ToMySQLValue Int where
+  toMySQLValue = MySQL.MySQLInt64
+
+instance ToMySQLValue Text where
+  toMySQLValue = MySQL.MySQLText
+
+-- A Given quasi quoted query string might look like this:
+--
+--     SELECT first_name FROM monolith.users WHERE id = ${userId} AND username = ${username}
+--
+-- This function will return a list of the placeholder names. In the example
+-- above that would be:
+--
+--     ["userId", "username"]
+--
+placeholderNames :: [SQLToken.SQLToken] -> [String]
+placeholderNames tokens =
+  tokens
+    |> List.filterMap
+      ( \token ->
+          case token of
+            SQLToken.SQLExpr name -> Just name
+            SQLToken.SQLParam _ -> Nothing
+            SQLToken.SQLToken _ -> Nothing
+            SQLToken.SQLQMark _ -> Nothing
+      )
 
 sql :: QuasiQuoter
 sql =
