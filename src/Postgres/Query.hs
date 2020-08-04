@@ -19,7 +19,6 @@ module Postgres.Query
 where
 
 import Cherry.Prelude
-import qualified Control.Exception.Safe as Exception
 import Control.Monad (fail, void)
 import qualified Data.Int
 import Data.String (String)
@@ -30,8 +29,8 @@ import Database.PostgreSQL.Typed.Array ()
 import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
+import Internal.Error (Error (..), TimeoutOrigin (..))
 import qualified Internal.QueryParser as Parser
-import qualified Internal.Time as Time
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
@@ -39,10 +38,9 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import MySQL.Internal (inToAny)
-import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
-import Prelude (IO, Show (show), fromIntegral)
+import Prelude (IO, fromIntegral)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -72,21 +70,6 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
-
-data Error
-  = Timeout TimeoutOrigin Time.Interval
-  | UniqueViolation Text
-  | Other Text [Platform.Context]
-
-instance Show Error where
-  show (Timeout _ interval) = "Query timed out after " ++ Data.Text.unpack (Text.fromFloat (Time.seconds interval)) ++ " seconds"
-  show (UniqueViolation err) = "Query violated uniqueness constraint: " ++ Data.Text.unpack err
-  show (Other msg _) = "Query failed with unexpected error: " ++ Data.Text.unpack msg
-
-instance Exception.Exception Error
-
-data TimeoutOrigin = ClientTimeout | ServerTimeout
-  deriving (Show)
 
 qqSQL :: String -> ExpQ
 qqSQL query = do
