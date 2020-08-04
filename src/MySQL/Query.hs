@@ -13,7 +13,6 @@ module MySQL.Query
     Query (..),
     Error (..),
     TimeoutOrigin (..),
-    PreparedMySQLQuery (..),
   )
 where
 
@@ -23,12 +22,9 @@ import Control.Monad (fail, void)
 import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
-import qualified Data.Text.Encoding
-import qualified Database.MySQL.Base as MySQL
-import qualified Database.Persist.MySQL as MySQL
-import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
+import qualified Database.MySQL.Base as Base
+import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
-import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
@@ -41,12 +37,13 @@ import Language.Haskell.TH.Quote
   )
 import Language.Haskell.TH.Syntax (runIO)
 import qualified List
+import qualified Log
 import MySQL.Internal (inToAny)
 import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
 import qualified Tuple
-import Prelude (IO, Show (show), fromIntegral)
+import Prelude (Show (show), fromIntegral)
 import qualified Prelude
 
 -- |
@@ -66,12 +63,10 @@ import qualified Prelude
 --    type ensures we only need to calculate the metadata once, at compile time.
 data Query row
   = Query
-      { -- | Run a query against Postgres
-        runQuery :: PGConnection -> IO [row],
-        -- | The raw SQL string
-        sqlString :: Text,
-        -- | The query as a prepared statement
-        preparedMySQLQuery :: PreparedMySQLQuery,
+      { -- | The query as a prepared statement
+        preparedStatement :: Text,
+        -- | The parameters that fill the placeholders in this query
+        params :: Log.Secret [Base.MySQLValue],
         -- | The query string as extracted from an `sql` quasi quote.
         quasiQuotedString :: Text,
         -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
@@ -79,6 +74,7 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
+  deriving (Show)
 
 data Error
   = Timeout TimeoutOrigin Time.Interval
@@ -105,19 +101,27 @@ qqSQL query = do
   let meta = Parser.parse (Data.Text.pack query)
   let op = Data.Text.unpack (Parser.sqlOperation meta)
   let rel = Data.Text.unpack (Parser.queriedRelation meta)
+  let sqlTokens = SQLToken.sqlTokens query
+  let preparedStatement' =
+        toPreparedQuery sqlTokens
+          |> Data.Text.pack
+          |> Text.replace "monolith." ""
+          |> Data.Text.unpack
+  -- We run the postgresql-typed quasi quoter for it's type-checking logic, but
+  -- we're uninterested in the results it produces. At runtime we're taking our
+  -- queries straight to MySQL.
+  _ <- quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack query)))
   [e|
-    let q = $(quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack query))))
-     in Query
-          { runQuery = \c -> pgQuery c q,
-            sqlString = Data.Text.Encoding.decodeUtf8 (getQueryString PGTypes.unknownPGTypeEnv q),
-            preparedMySQLQuery = $(preparedQueryE query),
-            quasiQuotedString =
-              query
-                |> Data.Text.pack
-                |> inToAny,
-            sqlOperation = op,
-            queriedRelation = rel
-          }
+    Query
+      { preparedStatement = preparedStatement',
+        params = $(preparedQueryParamsE sqlTokens),
+        quasiQuotedString =
+          query
+            |> Data.Text.pack
+            |> inToAny,
+        sqlOperation = op,
+        queriedRelation = rel
+      }
     |]
 
 -- Take a quasiquoted query like this:
@@ -143,45 +147,42 @@ toPreparedQuery tokens =
     |> Tuple.second
     |> (\tokens' -> Prelude.showList (List.reverse tokens') "")
 
-data PreparedMySQLQuery
-  = PreparedMySQLQuery
-      { preparedStatement :: String,
-        params :: [MySQL.MySQLValue]
-      }
-  deriving (Show)
-
-preparedQueryE :: String -> TH.ExpQ
-preparedQueryE query = do
-  let sqlTokens = SQLToken.sqlTokens query
-  let preparedStatement' = toPreparedQuery sqlTokens
-  -- The query string passed in will contain a number of placeholder variables,
-  -- for example: `${id}` or `${name}`. Below is some template haskell for
-  -- generating code for a list of encoded MySQL values. That code will look
-  -- something like this:
-  --
-  --     [
-  --         toMySQLValue id,
-  --         toMySQLValue name
-  --     ]
+-- A Given quasi quoted query string might look like this:
+--
+--     SELECT first_name FROM monolith.users WHERE id = ${userId} AND username = ${username}
+--
+-- This function will return generated Haskell code containing a list of encoded
+-- MySQL column values, one for each placeholder in the query. For example, the
+-- generated code for the query above will look like this:
+--
+--     [
+--         mysqlEncode userId,
+--         mysqlEncode username
+--     ]
+--
+preparedQueryParamsE :: [SQLToken.SQLToken] -> TH.ExpQ
+preparedQueryParamsE sqlTokens = do
   names <- Prelude.traverse TH.lookupValueName (placeholderNames sqlTokens)
-  let params' =
-        names
-          |> List.filterMap identity
-          |> map (TH.AppE (TH.VarE 'toMySQLValue) << TH.VarE)
-          |> TH.ListE
-          |> Prelude.pure
-  [e|PreparedMySQLQuery preparedStatement' $(params')|]
+  names
+    |> List.filterMap identity
+    |> map (TH.AppE (TH.VarE 'mysqlEncode) << TH.VarE)
+    |> TH.ListE
+    |> TH.AppE (TH.VarE 'Log.mkSecret)
+    |> Prelude.pure
 
 -- | A type class describing how to encode values for MySQL. The `MySQLValue`
 -- type is defined by our MySQL driver library (`mysql-haskell`).
-class ToMySQLValue a where
-  toMySQLValue :: a -> MySQL.MySQLValue
+--
+-- This is the counterpart of the PGColumn typeclass in `postgresql-typed` for
+-- Postgres values.
+class MySQLColumn a where
+  mysqlEncode :: a -> Base.MySQLValue
 
-instance ToMySQLValue Int where
-  toMySQLValue = MySQL.MySQLInt64
+instance MySQLColumn Int where
+  mysqlEncode = Base.MySQLInt64
 
-instance ToMySQLValue Text where
-  toMySQLValue = MySQL.MySQLText
+instance MySQLColumn Text where
+  mysqlEncode = Base.MySQLText
 
 -- A Given quasi quoted query string might look like this:
 --
@@ -231,11 +232,6 @@ instance PGTypes.PGParameter "integer" Int where
   pgEncode tid tv =
     let (i :: Data.Int.Int32) = fromIntegral tv
      in PGTypes.pgEncode tid i
-
-instance PGTypes.PGColumn t a => PGTypes.PGColumn t (MySQL.Single a) where
-  pgDecode tid tv =
-    PGTypes.pgDecode tid tv
-      |> MySQL.Single
 
 -- |
 -- Several monolith tables use smaller int sizes to represent

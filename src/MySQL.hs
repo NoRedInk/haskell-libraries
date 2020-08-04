@@ -76,7 +76,6 @@ import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import qualified List
 import qualified Log
-import qualified MySQL.Internal as Internal
 import qualified MySQL.Query as Query
 import MySQL.Query (Query (..))
 import qualified MySQL.Settings as Settings
@@ -200,11 +199,11 @@ readiness log conn =
 class MySqlQueryable query result | result -> query where
   executeSql :: Connection -> Query query -> Task Query.Error result
 
-instance QueryResults (CountColumns row) row => MySqlQueryable row [row] where
-  executeSql c query = executeQuery c (queryAsText query)
+instance MySqlQueryable row [row] where
+  executeSql _c _query = Prelude.undefined
 
 instance MySqlQueryable () () where
-  executeSql c query = executeCommand c (queryAsText query)
+  executeSql _c _query = Prelude.undefined
 
 doQuery ::
   (HasCallStack, MySqlQueryable row result) =>
@@ -224,7 +223,7 @@ doQuery conn query handleResponse =
         pure result
       infoForContext :: Platform.QueryInfo
       infoForContext = Platform.QueryInfo
-        { Platform.queryText = Log.mkSecret (Query.sqlString query),
+        { Platform.queryText = Log.mkSecret (Query.preparedStatement query),
           Platform.queryTemplate = Query.quasiQuotedString query,
           Platform.queryConn = logContext conn,
           Platform.queryOperation = Query.sqlOperation query,
@@ -238,13 +237,6 @@ doQuery conn query handleResponse =
         |> Task.onError (Task.succeed << Err)
         |> Task.andThen handleResponse
         |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
-
-queryAsText :: Query q -> Text
-queryAsText query =
-  Query.sqlString query
-    -- We need this prefix on tables to allow compile-time checks of the query.
-    |> Text.replace "monolith." ""
-    |> Internal.anyToIn
 
 executeQuery :: forall row. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
 executeQuery conn query =
@@ -992,15 +984,18 @@ unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
 unsafeBulkifyInserts [] = EmptyInsert
 unsafeBulkifyInserts (first : rest) =
   first
-    { sqlString =
+    { preparedStatement =
         Data.Text.intercalate
           ","
-          (sqlString first : map (Text.dropLeft splitAt << sqlString) rest)
+          (preparedStatement first : map (Text.dropLeft splitAt << preparedStatement) rest),
+      params =
+        Prelude.traverse params (first : rest)
+          |> map List.concat
     }
     |> BulkifiedInsert
   where
     splitAt =
-      sqlString first
+      preparedStatement first
         |> Data.Text.toLower
         |> Data.Text.breakOn "values"
         |> Tuple.first
@@ -1010,13 +1005,13 @@ unsafeBulkifyInserts (first : rest) =
 -- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
 -- the key isn't unique.
 onConflictUpdate :: [Text] -> Query () -> Query ()
-onConflictUpdate columns q@Query {sqlString, sqlOperation} =
+onConflictUpdate columns q@Query {preparedStatement, sqlOperation} =
   let onDuplicateKeyUPDATE = "ON DUPLICATE KEY UPDATE"
    in q
-        { sqlString =
+        { preparedStatement =
             Text.join
               " "
-              [ sqlString,
+              [ preparedStatement,
                 onDuplicateKeyUPDATE,
                 columns
                   |> List.map (\column -> column ++ " = VALUES(" ++ column ++ ")")
@@ -1033,11 +1028,11 @@ onConflictUpdate columns q@Query {sqlString, sqlOperation} =
 onDuplicateDoNothing :: Query () -> Query ()
 onDuplicateDoNothing query =
   query
-    { sqlString =
+    { preparedStatement =
         Lens.over
           ([caselessRegex|^\s*INSERT\s+INTO|] << R.match)
           (\_ -> "INSERT IGNORE INTO")
-          (sqlString query)
+          (preparedStatement query)
     }
 
 -- | Special quasi quoter for accessing yearly tables like `mastery_2019`. Use
@@ -1125,9 +1120,8 @@ lastInsertedPrimaryKey :: Connection -> Task Query.Error (Maybe Int)
 lastInsertedPrimaryKey c =
   let query =
         Query.Query
-          { runQuery = \_ -> pure [],
-            sqlString = "SELECT LAST_INSERT_ID()",
-            preparedMySQLQuery = Query.PreparedMySQLQuery "" [],
+          { preparedStatement = "SELECT LAST_INSERT_ID()",
+            params = Log.mkSecret [],
             quasiQuotedString = "SELECT LAST_INSERT_ID()",
             sqlOperation = "SELECT",
             queriedRelation = "LAST_INSERT_ID()"
@@ -1260,7 +1254,7 @@ doIO conn io =
 -- in the future.
 replace :: Text -> Text -> Query row -> Query row
 replace original replacement query =
-  query {sqlString = Text.replace original replacement (sqlString query)}
+  query {preparedStatement = Text.replace original replacement (preparedStatement query)}
 
 -- Support results with additional columns then what `persistent` supports out
 -- of the box. From version `2.10.2` of persistent onwards up to 12 columns will
