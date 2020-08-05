@@ -117,7 +117,7 @@ qqSQL queryWithPgTypedFlags = do
      in Query
           { preparedStatement = generatePreparedStatement tokens,
             params = collectQueryParams tokens,
-            prepareQuery = Prepare,
+            prepareQuery = shouldPrepare tokens,
             quasiQuotedString = queryWithPgTypedFlags,
             sqlOperation = op,
             queriedRelation = rel
@@ -200,6 +200,18 @@ collectQueryParams tokens =
       )
     |> map List.concat
 
+shouldPrepare :: [SqlToken] -> PrepareQuery
+shouldPrepare tokens =
+  if List.all
+    ( \token ->
+        case token of
+          SqlToken _ -> True
+          SqlParams params -> List.length params <= 3
+    )
+    tokens
+    then Prepare
+    else DontPrepare
+
 tokenE :: String -> TH.ExpQ
 tokenE str = [e|SqlToken str|]
 
@@ -262,7 +274,7 @@ instance MySQLColumn Float where
 instance MySQLColumn Clock.UTCTime where
   mysqlEncode = Base.MySQLDateTime << LocalTime.utcToLocalTime LocalTime.utc
 
--- TODO
+-- DODO
 -- instance MySQLColumn Local where
 --   mysqlEncode = Base.MySQLDateTime
 
