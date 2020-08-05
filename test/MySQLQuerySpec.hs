@@ -8,9 +8,11 @@ where
 import Cherry.Prelude
 import qualified Database.MySQL.Base as Base
 import qualified Expect
+import qualified Fuzz
+import qualified List
 import qualified Log
 import MySQL.Query
-import Test (Test, describe, test)
+import Test (Test, describe, fuzz, test)
 
 tests :: Test
 tests =
@@ -65,5 +67,16 @@ tests =
               quasiQuotedString = "SELECT id FROM monolith.users WHERE username = ${\"?\" :: Text}",
               sqlOperation = "SELECT",
               queriedRelation = "users"
-            }
+            },
+      describe
+        "when to prepare and when not"
+        [ fuzz (Fuzz.list Fuzz.int) "we only prepare queries with 3 or less items" <| \xs ->
+            [sql|SELECT id FROM monolith.users WHERE id IN (${xs})|]
+              |> prepareQuery
+              |> Expect.equal
+                ( if List.length xs <= 3
+                    then Prepare
+                    else DontPrepare
+                )
+        ]
     ]
