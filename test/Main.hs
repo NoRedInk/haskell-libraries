@@ -81,7 +81,7 @@ constant body status _ respond =
 -- | Run a temporary web application to send requests to.
 withServer :: Wai.Application -> (Http.Handler -> Text -> Task e a) -> Prelude.IO (Result e a)
 withServer app run = do
-  log <- Platform.silentContext
+  log <- Platform.silentHandler
   Conduit.withAcquire Http.handler <| \http ->
     Warp.testWithApplication (Prelude.pure app) <| \port ->
       run http ("http://localhost:" ++ Debug.toString port)
