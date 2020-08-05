@@ -86,9 +86,9 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
-  deriving (Show)
+  deriving (Eq, Show)
 
-data PrepareQuery = Prepare | DontPrepare deriving (Show)
+data PrepareQuery = Prepare | DontPrepare deriving (Eq, Show)
 
 qqSQL :: String -> ExpQ
 qqSQL queryWithPgTypedFlags = do
@@ -118,10 +118,7 @@ qqSQL queryWithPgTypedFlags = do
           { preparedStatement = generatePreparedStatement tokens,
             params = collectQueryParams tokens,
             prepareQuery = Prepare,
-            quasiQuotedString =
-              query
-                |> Data.Text.pack
-                |> inToAny,
+            quasiQuotedString = queryWithPgTypedFlags,
             sqlOperation = op,
             queriedRelation = rel
           }

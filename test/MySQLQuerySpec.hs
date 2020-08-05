@@ -15,18 +15,55 @@ import Test (Test, describe, test)
 tests :: Test
 tests =
   describe
-    "MySQL.Query"
-    [ test "removed monolith. prefixes from table names" <| \_ ->
+    "MySQL.sql"
+    [ test "removes monolith. prefixes from table names" <| \_ ->
         [sql|SELECT id FROM monolith.users|]
-          |> preparedStatement
-          |> Expect.equal "SELECT id FROM users",
+          |> Expect.equal Query
+            { preparedStatement = "SELECT id FROM users",
+              params = Log.mkSecret [],
+              prepareQuery = Prepare,
+              quasiQuotedString = "SELECT id FROM monolith.users",
+              sqlOperation = "SELECT",
+              queriedRelation = "users"
+            },
+      test "removes postgresql-typed flags" <| \_ ->
+        [sql|!$SELECT id FROM monolith.users|]
+          |> Expect.equal Query
+            { preparedStatement = "SELECT id FROM users",
+              params = Log.mkSecret [],
+              prepareQuery = Prepare,
+              quasiQuotedString = "!$SELECT id FROM monolith.users",
+              sqlOperation = "SELECT",
+              queriedRelation = "users"
+            },
+      test "replaces interpolation groups with question marks" <| \_ ->
+        [sql|SELECT id FROM monolith.users WHERE username = ${"jasper" :: Text} AND id > ${5 :: Int}|]
+          |> Expect.equal Query
+            { preparedStatement = "SELECT id FROM users WHERE username = ? AND id > ?",
+              params = Log.mkSecret [Base.MySQLText "jasper", Base.MySQLInt64 5],
+              prepareQuery = Prepare,
+              quasiQuotedString = "SELECT id FROM monolith.users WHERE username = ${\"jasper\" :: Text} AND id > ${5 :: Int}",
+              sqlOperation = "SELECT",
+              queriedRelation = "users"
+            },
+      test "expands interpolation groups that are lists" <| \_ ->
+        [sql|SELECT id FROM monolith.users WHERE id IN (${[1, 2, 3] :: [Int]})|]
+          |> Expect.equal Query
+            { preparedStatement = "SELECT id FROM users WHERE id IN (?,?,?)",
+              params = Log.mkSecret [Base.MySQLInt64 1, Base.MySQLInt64 2, Base.MySQLInt64 3],
+              prepareQuery = Prepare,
+              quasiQuotedString = "SELECT id FROM monolith.users WHERE id IN (${[1, 2, 3] :: [Int]})",
+              sqlOperation = "SELECT",
+              queriedRelation = "users"
+            },
       test "stand-alone question mark is replaced with a placeholder" <| \_ ->
         [sql|SELECT id FROM monolith.users WHERE username = ${"?" :: Text}|]
-          |> preparedStatement
-          |> Expect.equal "SELECT id FROM users WHERE username = ?",
-      test "stand-alone question mark ends up in params list" <| \_ ->
-        [sql|SELECT id FROM monolith.users WHERE username = ${"?" :: Text}|]
-          |> params
-          |> Log.unSecret
-          |> Expect.equal [Base.MySQLText "?"]
+          |> Expect.equal Query
+            { preparedStatement = "SELECT id FROM users WHERE username = ?",
+              params = Log.mkSecret [Base.MySQLText "?"],
+              prepareQuery = Prepare,
+              quasiQuotedString = "SELECT id FROM monolith.users WHERE username = ${\"?\" :: Text}",
+              sqlOperation = "SELECT",
+              queriedRelation = "users"
+            }
     ]
