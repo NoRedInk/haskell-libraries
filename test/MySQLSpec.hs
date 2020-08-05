@@ -102,7 +102,7 @@ expectTask :: (MySQL.Connection -> Task Never Expect.Expectation) -> Expect.Expe
 expectTask run =
   Expect.withIO identity <| do
     settings <- Environment.decode MySQL.decoder
-    noLogger <- Platform.silentContext
+    noLogger <- Platform.silentHandler
     Acquire.withAcquire
       (MySQL.connection settings)
       ( \conn ->

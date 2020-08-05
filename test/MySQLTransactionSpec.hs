@@ -30,7 +30,7 @@ spec :: Hedgehog.Property
 spec = Hedgehog.property <| do
   cmd <- Hedgehog.forAll mysqlCommandGen
   settings <- Hedgehog.evalIO <| Environment.decode MySQL.decoder
-  noLogger <- Hedgehog.evalIO <| Platform.silentContext
+  noLogger <- Hedgehog.evalIO <| Platform.silentHandler
   res <- Hedgehog.evalIO <| Acquire.withAcquire (MySQL.connection settings) <| \conn ->
     runCmd conn cmd
       |> Task.attempt noLogger
