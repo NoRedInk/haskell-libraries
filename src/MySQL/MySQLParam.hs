@@ -5,7 +5,10 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
+import qualified Data.ByteString as BS
 import qualified Data.Int
+import qualified Data.String
+import qualified Data.Text
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Database.MySQL.Base as Base
@@ -48,6 +51,10 @@ instance MySQLParam Float where
 instance MySQLParam Text where
   decodeParam (Base.MySQLText n) = n
   decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Text" n)
+
+instance MySQLParam BS.ByteString where
+  decodeParam (Base.MySQLText n) = Data.String.fromString (Data.Text.unpack n)
+  decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "ByteString" n)
 
 instance MySQLParam a => MySQLParam (Maybe a) where
   decodeParam Base.MySQLNull = Nothing
