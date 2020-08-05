@@ -291,22 +291,24 @@ prepareManagerForRequest manager = do
               }
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
     wrapException log req io =
-      Platform.spanIO
-        log
-        "Outoing HTTP Request"
-        ( HttpRequestInfo
-            { requestUri =
-                HTTP.getUri req
-                  |> Network.URI.uriToString (\_ -> "*****")
-                  |> (\showS -> Data.Text.pack (showS "")),
-              requestMethod =
-                HTTP.method req
-                  |> Data.Text.Encoding.decodeUtf8
-            }
-            |> Platform.toSpanDetails
-            |> Just
-        )
-        (\_ -> io)
+      let spanDetails =
+            HttpRequestInfo
+              { requestUri =
+                  HTTP.getUri req
+                    |> Network.URI.uriToString (\_ -> "*****")
+                    |> (\showS -> Data.Text.pack (showS "")),
+                requestMethod =
+                  HTTP.method req
+                    |> Data.Text.Encoding.decodeUtf8
+              }
+       in Platform.spanIO
+            log
+            "Outoing HTTP Request"
+            ( \log' ->
+                Exception.finally
+                  io
+                  (Platform.setSpanDetailsIO log' spanDetails)
+            )
 
 data HttpRequestInfo
   = HttpRequestInfo
