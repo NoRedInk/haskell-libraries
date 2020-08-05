@@ -2,7 +2,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
 -- Description : Helpers for running queries.
@@ -36,9 +35,9 @@ import qualified Database.MySQL.Base as Base
 import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
-import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
 import Internal.Error (Error (..), TimeoutOrigin (..))
+import Internal.Instances ()
 import qualified Internal.QueryParser as Parser
 import Language.Haskell.Meta.Parse (parseExp)
 import Language.Haskell.TH (ExpQ)
@@ -52,7 +51,6 @@ import qualified Log
 import MySQL.Internal (inToAny)
 import qualified Postgres.Settings
 import qualified Text
-import Prelude (fromIntegral)
 import qualified Prelude
 
 -- |
@@ -309,36 +307,3 @@ sql =
       quotePat = fail "sql not supported in patterns",
       quoteDec = fail "sql not supported in declarations"
     }
-
--- |
--- The default `Int` type we use in our Haskell code is an `Int64`. This
--- corresponds to a `bigint` in SQL. Most of our MySQL tables use regular
--- `integers` though, which are 32 bits.
---
--- In our Postgres databases we default to using `bigint` for columns, but in
--- our legacy MySQL database we have missed that boat. We'd still like to be
--- able to write our Haskell default Ints to/from MySQL without ceremony, so
--- we add these instances to make it possible.
-instance PGTypes.PGColumn "integer" Int where
-  pgDecode tid tv =
-    let (i :: Data.Int.Int32) = PGTypes.pgDecode tid tv
-     in fromIntegral i
-
-instance PGTypes.PGParameter "integer" Int where
-  pgEncode tid tv =
-    let (i :: Data.Int.Int32) = fromIntegral tv
-     in PGTypes.pgEncode tid i
-
--- |
--- Several monolith tables use smaller int sizes to represent
--- enumerables; this type class allows us to extract them safely
--- and without too much ceremony
-instance PGTypes.PGColumn "smallint" Int where
-  pgDecode tid tv =
-    let (i :: Data.Int.Int16) = PGTypes.pgDecode tid tv
-     in fromIntegral i
-
-instance PGTypes.PGParameter "smallint" Int where
-  pgEncode tid tv =
-    let (i :: Data.Int.Int16) = fromIntegral tv
-     in PGTypes.pgEncode tid i
