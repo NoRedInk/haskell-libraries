@@ -5,6 +5,7 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
+import qualified Data.Int
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Database.MySQL.Base as Base
@@ -30,6 +31,13 @@ instance MySQLParam Int where
   decodeParam (Base.MySQLInt32 n) = Prelude.fromIntegral n
   decodeParam (Base.MySQLInt64U n) = Prelude.fromIntegral n
   decodeParam (Base.MySQLInt64 n) = n
+  decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Int" n)
+
+instance MySQLParam Data.Int.Int16 where
+  decodeParam (Base.MySQLInt8U n) = Prelude.fromIntegral n
+  decodeParam (Base.MySQLInt8 n) = Prelude.fromIntegral n
+  decodeParam (Base.MySQLInt16U n) = Prelude.fromIntegral n
+  decodeParam (Base.MySQLInt16 n) = n
   decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Int" n)
 
 instance MySQLParam Float where
