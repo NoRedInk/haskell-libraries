@@ -16,6 +16,7 @@ module MySQL.Query
     PrepareQuery (..),
     Error (..),
     TimeoutOrigin (..),
+    MySQLColumn (..),
   )
 where
 

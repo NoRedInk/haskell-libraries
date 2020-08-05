@@ -38,6 +38,7 @@ module MySQL
     lastInsertedPrimaryKey,
     replace,
     MySQLParam,
+    Query.MySQLColumn,
   )
 where
 
