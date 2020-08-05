@@ -159,7 +159,7 @@ parseToken token =
         Prelude.Left err -> fail ("Could not parse: " ++ err)
         Prelude.Right x ->
           [e|
-            flatten $(Prelude.pure x)
+            ensureList $(Prelude.pure x)
               |> map (Log.mkSecret << mysqlEncode)
               |> SqlParams
             |]
@@ -221,21 +221,27 @@ newtype HaskellParseError = HaskellParseError String
 
 instance Exception.Exception HaskellParseError
 
-flatten :: forall a b. Flatten (IsList a) a b => a -> [b]
-flatten = flatten' (Proxy :: Proxy (IsList a))
+-- | `ensureList` is a magical function that takes an argument of any type. If
+-- the argument is a list it is returned unchanged. If the argument is not a
+-- list then it's wrapped in one. The bottom line is it always returns a list.
+--
+--     ensureList [1,2,3]  --> [1,2,3]
+--     ensureList "Hi!"    --> ["Hi!"]
+ensureList :: forall a b. EnsureList (IsList a) a b => a -> [b]
+ensureList = ensureList' (Proxy :: Proxy (IsList a))
 
 type family IsList a :: Bool where
   IsList [a] = 'True
   IsList a = 'False
 
-class Flatten (t :: Bool) a b | t b -> a where
-  flatten' :: Proxy t -> a -> [b]
+class EnsureList (t :: Bool) a b | t b -> a where
+  ensureList' :: Proxy t -> a -> [b]
 
-instance Flatten 'True [a] a where
-  flatten' _ xs = xs
+instance EnsureList 'True [a] a where
+  ensureList' _ xs = xs
 
-instance Flatten 'False a a where
-  flatten' _ x = [x]
+instance EnsureList 'False a a where
+  ensureList' _ x = [x]
 
 -- | A type class describing how to encode values for MySQL. The `MySQLValue`
 -- type is defined by our MySQL driver library (`mysql-haskell`).
