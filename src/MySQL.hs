@@ -35,7 +35,6 @@ module MySQL
     onConflictUpdate,
     onDuplicateDoNothing,
     sqlYearly,
-    lastInsertedPrimaryKey,
     replace,
     MySQLParam,
     Query.MySQLColumn,
@@ -237,8 +236,11 @@ class MySqlQueryable query result | result -> query where
 instance FromRow (CountColumns row) row => MySqlQueryable row [row] where
   executeSql c query = executeQuery c query
 
-instance MySqlQueryable () () where
+instance MySqlQueryable () Int where
   executeSql c query = executeCommand c query
+
+instance MySqlQueryable () () where
+  executeSql c query = executeCommand_ c query
 
 doQuery ::
   (HasCallStack, MySqlQueryable row result) =>
@@ -253,7 +255,7 @@ doQuery conn query handleResponse =
         result <- executeSql conn query
         -- If not currently inside a transaction and original query succeeded, then commit
         case transactionCount conn of
-          Nothing -> executeCommand conn (queryFromText "COMMIT")
+          Nothing -> executeCommand_ conn (queryFromText "COMMIT")
           _ -> pure ()
         pure result
       infoForContext :: Platform.QueryInfo
@@ -294,7 +296,12 @@ executeQuery conn query =
               (_, stream) <- Base.query backend (toBaseQuery query) params
               toRows stream
 
-executeCommand :: Connection -> Query () -> Task Query.Error ()
+executeCommand_ :: Connection -> Query () -> Task Query.Error ()
+executeCommand_ conn query = do
+  _ <- executeCommand conn query
+  Task.succeed ()
+
+executeCommand :: Connection -> Query () -> Task Query.Error Int
 executeCommand conn query =
   withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
@@ -304,11 +311,11 @@ executeCommand conn query =
           <| case Query.prepareQuery query of
             Query.Prepare -> do
               stmtId <- getPreparedQueryStmtID conn backend query
-              _ <- Base.executeStmt backend stmtId params
-              Prelude.pure ()
+              Base.OK {Base.okLastInsertID} <- Base.executeStmt backend stmtId params
+              Prelude.pure (Prelude.fromIntegral okLastInsertID)
             Query.DontPrepare -> do
-              _ <- Base.execute backend (toBaseQuery query) params
-              Prelude.pure ()
+              Base.OK {Base.okLastInsertID} <- Base.execute backend (toBaseQuery query) params
+              Prelude.pure (Prelude.fromIntegral okLastInsertID)
 
 toBaseQuery :: Query row -> Base.Query
 toBaseQuery query =
@@ -429,8 +436,8 @@ begin conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn (queryFromText "BEGIN")
-      Just (TransactionCount current) -> executeCommand conn (queryFromText ("SAVEPOINT pgt" ++ Text.fromInt current))
+      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "BEGIN")
+      Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Rollback to the most recent 'begin'.
 rollback :: Connection -> Task e ()
@@ -438,9 +445,9 @@ rollback conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn (queryFromText "ROLLBACK")
+      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "ROLLBACK")
       Just (TransactionCount current) ->
-        executeCommand conn (queryFromText ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current))
+        executeCommand_ conn (queryFromText ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Commit the most recent 'begin'.
 commit :: Connection -> Task e ()
@@ -448,8 +455,8 @@ commit conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn (queryFromText "COMMIT")
-      Just (TransactionCount current) -> executeCommand conn (queryFromText ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current))
+      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "COMMIT")
+      Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Rollback all active 'begin's.
 rollbackAll :: Connection -> Task e ()
@@ -457,7 +464,7 @@ rollbackAll conn =
   throwRuntimeError
     <| case transactionCount conn of
       Nothing -> pure ()
-      Just _ -> executeCommand conn (queryFromText "ROLLBACK")
+      Just _ -> executeCommand_ conn (queryFromText "ROLLBACK")
 
 throwRuntimeError :: Task Query.Error a -> Task e a
 throwRuntimeError task = do
@@ -544,7 +551,8 @@ unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
 unsafeBulkifyInserts [] = EmptyInsert
 unsafeBulkifyInserts (first : rest) =
   first
-    { preparedStatement =
+    { prepareQuery = Query.DontPrepare,
+      preparedStatement =
         Data.Text.intercalate
           ","
           (preparedStatement first : map (Text.dropLeft splitAt << preparedStatement) rest),
@@ -649,44 +657,6 @@ qqSQLYearly query =
               _ -> Prelude.error ("Unsupported school year: " ++ Prelude.show year)
         )
         |]
-
--- |
--- Get the primary key of the last row inserted by the MySQL connection we're
--- currently in. This uses MySQL's `LAST_INSERT_ID()` function and has all the
--- same caveats and limitations. In particular:
---
--- - This gets the last inserted by the current connection. This means we can
---   only use it within a MySQL transaction created using this library. Such a
---   transaction holds on to a reserved connection, preventing other threads
---   from using the connection to make requests in between our `INSERT` query
---   and our use of this function.
--- - If the last insert inserted multiple rows this function will return the
---   primary key of the first of this batch of rows that was inserted.
---
--- In Postgres use a `RETURNING` statement to get inserted id's for inserted
--- rows:
---
---    insertedIds <-
---      Postgres.doQuery
---        [Postgres.sql|!
---          INSERT INTO peanut_butters (brand, chunkiness)
---          VALUES ('Original', 'granite')
---          RETURNING id
---        |]
---        expectQuerySuccess
---
--- For more information: https://dev.mysql.com/doc/refman/8.0/en/getting-unique-id.html
-lastInsertedPrimaryKey :: Connection -> Task Query.Error (Maybe Int)
-lastInsertedPrimaryKey c =
-  let query = queryFromText "SELECT LAST_INSERT_ID()"
-   in doQuery
-        c
-        query
-        ( \res -> case res of
-            Ok [] -> Task.succeed Nothing
-            Ok (x : _) -> Task.succeed x
-            Err err -> Task.fail err
-        )
 
 sql :: QuasiQuoter
 sql =

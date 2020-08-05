@@ -66,7 +66,7 @@ queriesWithQuestionMarks =
           MySQL.doQuery
             conn
             [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES ('?', 5)|]
-            (\(_ :: (Result MySQL.Error ())) -> Task.succeed ())
+            (\(_ :: (Result MySQL.Error Int)) -> Task.succeed ())
           MySQL.doQuery
             conn
             [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = '?'|]
@@ -87,7 +87,7 @@ exceptionTests =
           MySQL.doQuery
             conn
             [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
-            (\(_ :: (Result MySQL.Error ())) -> Task.succeed ())
+            (\(_ :: (Result MySQL.Error Int)) -> Task.succeed ())
           MySQL.doQuery
             conn
             [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
@@ -95,7 +95,7 @@ exceptionTests =
                 Task.succeed
                   <| case res of
                     Err err -> Expect.equal (Debug.toString err) "Query failed with unexpected error: MySQL query failed with error code 1062"
-                    Ok () -> Expect.fail "Expected an error, but none was returned."
+                    Ok (_ :: Int) -> Expect.fail "Expected an error, but none was returned."
             )
     ]
 
