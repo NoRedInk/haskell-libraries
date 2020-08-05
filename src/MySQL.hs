@@ -221,6 +221,7 @@ queryFromText :: Text -> Query a
 queryFromText text = Query
   { preparedStatement = text,
     params = Log.mkSecret [],
+    prepareQuery = Query.DontPrepare,
     quasiQuotedString = text,
     sqlOperation = "",
     queriedRelation = ""
@@ -274,33 +275,46 @@ doQuery conn query handleResponse =
 executeQuery :: forall row. FromRow (CountColumns row) row => Connection -> Query row -> Task Query.Error [row]
 executeQuery conn query =
   withConnection conn <| \backend ->
-    withTimeout conn
-      <| Platform.doAnything (doAnything conn)
-      <| handleMySqlException
-      <| do
-        stmtId <- getPreparedQueryStmtID conn backend query
-        (_, stream) <-
-          Query.params query
-            |> Log.unSecret
-            |> Base.queryStmt backend stmtId
-        rows <- System.IO.Streams.List.toList stream
-        rows
-          |> map (fromRow (Proxy :: Proxy (CountColumns row)))
-          |> pure
+    let params = Query.params query |> Log.unSecret
+        toRows stream = do
+          rows <- System.IO.Streams.List.toList stream
+          rows
+            |> map (fromRow (Proxy :: Proxy (CountColumns row)))
+            |> pure
+     in withTimeout conn
+          <| Platform.doAnything (doAnything conn)
+          <| handleMySqlException
+          <| case prepareQuery query of
+            Query.Prepare -> do
+              stmtId <- getPreparedQueryStmtID conn backend query
+              (_, stream) <- Base.queryStmt backend stmtId params
+              toRows stream
+            Query.DontPrepare -> do
+              (_, stream) <- Base.query backend (toBaseQuery query) params
+              toRows stream
 
 executeCommand :: Connection -> Query () -> Task Query.Error ()
 executeCommand conn query =
   withConnection conn <| \backend ->
-    withTimeout conn
-      <| Platform.doAnything (doAnything conn)
-      <| handleMySqlException
-      <| do
-        stmtId <- getPreparedQueryStmtID conn backend query
-        _ <-
-          Query.params query
-            |> Log.unSecret
-            |> Base.executeStmt backend stmtId
-        Prelude.pure ()
+    let params = Query.params query |> Log.unSecret
+     in withTimeout conn
+          <| Platform.doAnything (doAnything conn)
+          <| handleMySqlException
+          <| case Query.prepareQuery query of
+            Query.Prepare -> do
+              stmtId <- getPreparedQueryStmtID conn backend query
+              _ <- Base.executeStmt backend stmtId params
+              Prelude.pure ()
+            Query.DontPrepare -> do
+              _ <- Base.execute backend (toBaseQuery query) params
+              Prelude.pure ()
+
+toBaseQuery :: Query row -> Base.Query
+toBaseQuery query =
+  Query.preparedStatement query
+    |> Data.Text.Encoding.encodeUtf8
+    |> Data.ByteString.Lazy.fromStrict
+    |> Base.Query
 
 -- | Get the prepared statement id for a particular query. If such an ID exists
 -- MySQL already knows this query and has it parsed in memory. We just have to
@@ -308,18 +322,15 @@ executeCommand conn query =
 -- MySQL can run it.
 getPreparedQueryStmtID :: Connection -> Base.MySQLConn -> Query a -> IO Base.StmtID
 getPreparedQueryStmtID conn backend query = do
-  let queryString =
-        Query.preparedStatement query
-          |> Data.Text.Encoding.encodeUtf8
-          |> Data.ByteString.Lazy.fromStrict
-  let queryHash = PreparedQueryHash (Hashable.hash queryString)
+  let baseQuery = toBaseQuery query
+  let queryHash = PreparedQueryHash (Hashable.hash (Base.fromQuery baseQuery))
   alreadyPrepped <- IORef.readIORef (preparedQueries conn)
   case Dict.get queryHash alreadyPrepped of
     -- We've already prepared this statement before and stored the id.
     Just stmtId -> pure stmtId
     -- We've not prepared this statement before, so we do so now.
     Nothing -> do
-      stmtId <- Base.prepareStmt backend (Base.Query queryString)
+      stmtId <- Base.prepareStmt backend baseQuery
       IORef.atomicModifyIORef'
         (preparedQueries conn)
         (\dict -> (Dict.insert queryHash stmtId dict, ()))

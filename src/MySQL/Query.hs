@@ -13,6 +13,7 @@
 module MySQL.Query
   ( sql,
     Query (..),
+    PrepareQuery (..),
     Error (..),
     TimeoutOrigin (..),
   )
@@ -27,7 +28,6 @@ import Data.String (String)
 import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder as Builder
-import qualified Data.Text.Lazy.Builder.Int as Builder.Int
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Data.Word
@@ -51,7 +51,6 @@ import qualified Log
 import MySQL.Internal (inToAny)
 import qualified Postgres.Settings
 import qualified Text
-import qualified Tuple
 import Prelude (fromIntegral)
 import qualified Prelude
 
@@ -76,6 +75,10 @@ data Query row
         preparedStatement :: Text,
         -- | The parameters that fill the placeholders in this query
         params :: Log.Secret [Base.MySQLValue],
+        -- | Whether to prepare this query or not. Prepared queries have
+        -- better performance, but not all queries can be prepared and for some
+        -- that have dynamic parts it would be inefficient.
+        prepareQuery :: PrepareQuery,
         -- | The query string as extracted from an `sql` quasi quote.
         quasiQuotedString :: Text,
         -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
@@ -84,6 +87,8 @@ data Query row
         queriedRelation :: Text
       }
   deriving (Show)
+
+data PrepareQuery = Prepare | DontPrepare deriving (Show)
 
 qqSQL :: String -> ExpQ
 qqSQL queryWithPgTypedFlags = do
@@ -112,6 +117,7 @@ qqSQL queryWithPgTypedFlags = do
      in Query
           { preparedStatement = generatePreparedStatement tokens,
             params = collectQueryParams tokens,
+            prepareQuery = Prepare,
             quasiQuotedString =
               query
                 |> Data.Text.pack
@@ -174,23 +180,15 @@ parseToken token =
 generatePreparedStatement :: [SqlToken] -> Text
 generatePreparedStatement tokens =
   tokens
-    |> List.foldl
-      ( \token (counter, queryAcc) ->
+    |> Prelude.foldMap
+      ( \token ->
           case token of
-            SqlToken str -> (counter, queryAcc ++ Builder.fromString str)
+            SqlToken str -> Builder.fromString str
             SqlParams params ->
-              let paramsCount = List.length params
-               in ( counter + paramsCount,
-                    queryAcc
-                      ++ ( List.range counter (counter + paramsCount - 1)
-                             |> map (\n -> "$" ++ Builder.Int.decimal n)
-                             |> List.intersperse ","
-                             |> Prelude.mconcat
-                         )
-                  )
+              List.repeat (List.length params) "?"
+                |> List.intersperse ","
+                |> Prelude.mconcat
       )
-      (0 :: Int, "")
-    |> Tuple.second
     |> Builder.toLazyText
     |> Data.Text.Lazy.toStrict
 

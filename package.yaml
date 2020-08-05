@@ -42,6 +42,7 @@ library:
   - Postgres
   # Exposed for tests only
   - MySQL.Internal
+  - MySQL.Query
   - Internal.QueryParser
   - Postgres.Settings
   - Internal.Time

@@ -10,13 +10,14 @@ import qualified Data.Acquire as Acquire
 import qualified Debug
 import qualified Environment
 import qualified Expect
+import qualified Log
 import qualified MySQL
 import MySQL.Query (Query (..))
+import qualified MySQL.Query as Query
 import qualified Platform
 import qualified Task
 import Test (Test, describe, test)
 import qualified Text
-import qualified Prelude
 
 tests :: Test
 tests =
@@ -35,7 +36,7 @@ unsafeBulkifyInsertsTests =
     [ test "works when passed a single insert" <| \_ ->
         [mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)"]
           |> MySQL.unsafeBulkifyInserts
-          |> map sqlString
+          |> map preparedStatement
           |> Expect.equal
             (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)"),
       test "works when passed multiple inserts" <| \_ ->
@@ -43,7 +44,7 @@ unsafeBulkifyInsertsTests =
           mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (4,5,6)"
         ]
           |> MySQL.unsafeBulkifyInserts
-          |> map sqlString
+          |> map preparedStatement
           |> Expect.equal
             (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3), (4,5,6)"),
       test "works with inconsistent casing of the word VALUES" <| \_ ->
@@ -51,7 +52,7 @@ unsafeBulkifyInsertsTests =
           mockQuery "INSERT INTO foos (id, bars, bazs) vALues (4,5,6)"
         ]
           |> MySQL.unsafeBulkifyInserts
-          |> map sqlString
+          |> map preparedStatement
           |> Expect.equal
             (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)")
     ]
@@ -113,8 +114,9 @@ expectTask run =
 mockQuery :: Text -> Query a
 mockQuery sqlString =
   Query
-    { sqlString,
-      runQuery = \_ -> Prelude.pure [],
+    { preparedStatement = sqlString,
+      params = Log.mkSecret [],
+      prepareQuery = Query.Prepare,
       quasiQuotedString = "",
       sqlOperation = "",
       queriedRelation = ""
@@ -132,6 +134,6 @@ onDuplicateDoNothingTests =
           |> Text.join "\n"
           |> mockQuery
           |> MySQL.onDuplicateDoNothing
-          |> sqlString
+          |> preparedStatement
           |> Expect.equal "INSERT IGNORE INTO\nfoo"
     ]

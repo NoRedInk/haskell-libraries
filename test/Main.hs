@@ -4,6 +4,7 @@ module Main
 where
 
 import qualified MySQLInternalSpec
+import qualified MySQLQuerySpec
 import qualified MySQLSpec
 import qualified PostgresSettingsSpec
 import qualified QueryParserSpec
@@ -33,5 +34,6 @@ tests =
       MySQLInternalSpec.tests,
       QueryParserSpec.tests,
       TimeSpec.tests,
+      MySQLQuerySpec.tests,
       MySQLSpec.tests
     ]
