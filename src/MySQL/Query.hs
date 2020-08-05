@@ -120,7 +120,7 @@ qqSQL queryWithPgTypedFlags = do
             prepareQuery = shouldPrepare tokens,
             quasiQuotedString = queryWithPgTypedFlags,
             sqlOperation = op,
-            queriedRelation = rel
+            queriedRelation = Data.Text.pack rel
           }
     |]
 
