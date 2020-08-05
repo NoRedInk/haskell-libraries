@@ -14,6 +14,7 @@ module MySQL.Settings
     MysqlPoolMaxIdleTime (..),
     decoder,
     defaultSettings,
+    defaultPoolSettings,
     defaultConnectionSettings,
   )
 where
@@ -58,17 +59,20 @@ defaultSettings :: Settings
 defaultSettings =
   Settings
     { mysqlConnection = defaultConnectionSettings,
-      mysqlPool = PoolSettings
-        { mysqlPoolSize =
-            -- Connections in the pool are allocated on demand, so we won't
-            -- create all these connections unless the application can make use
-            -- of them.
-            MysqlPoolSize 1000,
-          mysqlPoolMaxIdleTime = MysqlPoolMaxIdleTime (toNominalDiffTime 3600),
-          mysqlPoolStripes = MysqlPoolStripes 1
-        },
+      mysqlPool = defaultPoolSettings,
       mysqlQueryTimeoutSeconds = Time.fromSeconds 5
     }
+
+defaultPoolSettings :: PoolSettings
+defaultPoolSettings = PoolSettings
+  { mysqlPoolSize =
+      -- Connections in the pool are allocated on demand, so we won't
+      -- create all these connections unless the application can make use
+      -- of them.
+      MysqlPoolSize 1000,
+    mysqlPoolMaxIdleTime = MysqlPoolMaxIdleTime (toNominalDiffTime 3600),
+    mysqlPoolStripes = MysqlPoolStripes 1
+  }
 
 defaultConnectionSettings :: ConnectionSettings
 defaultConnectionSettings =
