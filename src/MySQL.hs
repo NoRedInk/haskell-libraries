@@ -88,9 +88,6 @@ newtype TransactionCount
 data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
-        singleOrPool :: SingleOrPool Base.MySQLConn,
-        logContext :: Platform.QueryConnectionInfo,
-        timeout :: Time.Interval,
         -- | In this IORef we keep a list of statements we've prepared with
         -- MySQL. These are SQL commands with some placeholders that MySQL has
         -- parsed and is ready to run, if we only provide the placeholders. This
@@ -106,8 +103,12 @@ data Connection
         -- with the memory they use because they won't get cleaned up after
         -- every request. That's why we're using a hash of the query as the key
         -- in the dictionary below instead of the query itself.
-        preparedQueries :: IORef.IORef (Dict.Dict PreparedQueryHash Base.StmtID)
+        singleOrPool :: SingleOrPool (Base.MySQLConn, PreparedQueries),
+        logContext :: Platform.QueryConnectionInfo,
+        timeout :: Time.Interval
       }
+
+type PreparedQueries = IORef.IORef (Dict.Dict PreparedQueryHash Base.StmtID)
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -133,19 +134,21 @@ connection settings =
       pool <-
         map Pool
           <| Data.Pool.createPool
-            (Base.connect database)
-            Base.close
+            ( do
+                conn <- Base.connect database
+                preparedQueries <- IORef.newIORef Dict.empty
+                pure (conn, preparedQueries)
+            )
+            (Tuple.first >> Base.close)
             stripes
             maxIdleTime
             size
-      preparedQueries <- IORef.newIORef Dict.empty
       pure
         ( Connection
             doAnything
             pool
             (toConnectionLogContext settings)
             (Settings.mysqlQueryTimeoutSeconds settings)
-            preparedQueries
         )
     release Connection {singleOrPool} =
       case singleOrPool of
@@ -277,7 +280,7 @@ doQuery conn query handleResponse =
 
 executeQuery :: forall row. FromRow (CountColumns row) row => Connection -> Query row -> Task Query.Error [row]
 executeQuery conn query =
-  withConnection conn <| \backend ->
+  withConnection conn <| \(backend, preparedQueries) ->
     let params = Query.params query |> Log.unSecret
         toRows stream = do
           rows <- System.IO.Streams.List.toList stream
@@ -289,7 +292,7 @@ executeQuery conn query =
           <| handleMySqlException
           <| case prepareQuery query of
             Query.Prepare -> do
-              stmtId <- getPreparedQueryStmtID conn backend query
+              stmtId <- getPreparedQueryStmtID preparedQueries backend query
               (_, stream) <- Base.queryStmt backend stmtId params
               toRows stream
             Query.DontPrepare -> do
@@ -303,14 +306,14 @@ executeCommand_ conn query = do
 
 executeCommand :: Connection -> Query () -> Task Query.Error Int
 executeCommand conn query =
-  withConnection conn <| \backend ->
+  withConnection conn <| \(backend, preparedQueries) ->
     let params = Query.params query |> Log.unSecret
      in withTimeout conn
           <| Platform.doAnything (doAnything conn)
           <| handleMySqlException
           <| case Query.prepareQuery query of
             Query.Prepare -> do
-              stmtId <- getPreparedQueryStmtID conn backend query
+              stmtId <- getPreparedQueryStmtID preparedQueries backend query
               Base.OK {Base.okLastInsertID} <- Base.executeStmt backend stmtId params
               Prelude.pure (Prelude.fromIntegral okLastInsertID)
             Query.DontPrepare -> do
@@ -328,11 +331,11 @@ toBaseQuery query =
 -- MySQL already knows this query and has it parsed in memory. We just have to
 -- provide it with the values for the placeholder fields in the query, and
 -- MySQL can run it.
-getPreparedQueryStmtID :: Connection -> Base.MySQLConn -> Query a -> IO Base.StmtID
-getPreparedQueryStmtID conn backend query = do
+getPreparedQueryStmtID :: PreparedQueries -> Base.MySQLConn -> Query a -> IO Base.StmtID
+getPreparedQueryStmtID preparedQueries backend query = do
   let baseQuery = toBaseQuery query
   let queryHash = PreparedQueryHash (Hashable.hash (Base.fromQuery baseQuery))
-  alreadyPrepped <- IORef.readIORef (preparedQueries conn)
+  alreadyPrepped <- IORef.readIORef preparedQueries
   case Dict.get queryHash alreadyPrepped of
     -- We've already prepared this statement before and stored the id.
     Just stmtId -> pure stmtId
@@ -340,7 +343,7 @@ getPreparedQueryStmtID conn backend query = do
     Nothing -> do
       stmtId <- Base.prepareStmt backend baseQuery
       IORef.atomicModifyIORef'
-        (preparedQueries conn)
+        preparedQueries
         (\dict -> (Dict.insert queryHash stmtId dict, ()))
       pure stmtId
 
@@ -495,7 +498,7 @@ withTransaction conn func =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Connection -> (Base.MySQLConn -> Task e a) -> Task e a
+withConnection :: Connection -> ((Base.MySQLConn, PreparedQueries) -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
@@ -503,7 +506,7 @@ withConnection conn func =
           <| doIO conn
           <| Data.Pool.takeResource pool
       --
-      release :: Data.Pool.Pool Base.MySQLConn -> (Base.MySQLConn, Data.Pool.LocalPool Base.MySQLConn) -> ExitCase x -> Task y ()
+      release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> ExitCase x -> Task y ()
       release pool (c, localPool) exitCase =
         doIO conn
           <| case exitCase of
