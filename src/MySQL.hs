@@ -557,7 +557,7 @@ unsafeBulkifyInserts all@(first : rest) =
   first
     { prepareQuery =
         if List.length all <= 3
-          then Query.Prepare
+          then prepareQuery first
           else Query.DontPrepare,
       preparedStatement =
         Data.Text.intercalate
