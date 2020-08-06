@@ -75,7 +75,7 @@ import qualified MySQL.Query as Query
 import MySQL.Query (Query (..))
 import qualified MySQL.Settings as Settings
 import qualified Platform
-import qualified System.IO.Streams.List
+import qualified System.IO.Streams as Streams
 import qualified Task
 import qualified Text
 import qualified Tuple
@@ -286,11 +286,10 @@ executeQuery :: forall row. FromRow (CountColumns row) row => Connection -> Quer
 executeQuery conn query =
   withConnection conn <| \(backend, preparedQueries) ->
     let params = Query.params query |> Log.unSecret
-        toRows stream = do
-          rows <- System.IO.Streams.List.toList stream
-          rows
-            |> map (fromRow (Proxy :: Proxy (CountColumns row)))
-            |> pure
+        toRows stream =
+          stream
+            |> Streams.map (fromRow (Proxy :: Proxy (CountColumns row)))
+            |> andThen Streams.toList
      in withTimeout conn
           <| Platform.doAnything (doAnything conn)
           <| handleMySqlException
