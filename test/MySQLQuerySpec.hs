@@ -48,6 +48,16 @@ tests =
               sqlOperation = "SELECT",
               queriedRelation = "users"
             },
+      test "deals with empty lists correctly" <| \_ ->
+        [sql|SELECT id FROM monolith.users WHERE id IN (${[] :: [Int]})|]
+          |> Expect.equal Query
+            { preparedStatement = "SELECT id FROM users WHERE id IN (\"THIS_IS_NEVER_TRUE_ELSE_COMPLAIN_TO_PUFFERFISH\")",
+              params = Log.mkSecret [],
+              prepareQuery = Prepare,
+              quasiQuotedString = "SELECT id FROM monolith.users WHERE id IN (${[] :: [Int]})",
+              sqlOperation = "SELECT",
+              queriedRelation = "users"
+            },
       test "expands interpolation groups that are lists" <| \_ ->
         [sql|SELECT id FROM monolith.users WHERE id IN (${[1, 2, 3] :: [Int]})|]
           |> Expect.equal Query

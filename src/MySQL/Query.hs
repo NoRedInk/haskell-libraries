@@ -180,6 +180,7 @@ generatePreparedStatement tokens =
       ( \token ->
           case token of
             SqlToken str -> Builder.fromString str
+            SqlParams [] -> "\"THIS_IS_NEVER_TRUE_ELSE_COMPLAIN_TO_PUFFERFISH\""
             SqlParams params ->
               List.repeat (List.length params) "?"
                 |> List.intersperse ","
