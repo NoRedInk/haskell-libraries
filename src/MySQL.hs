@@ -37,7 +37,7 @@ module MySQL
     sqlYearly,
     replace,
     MySQLParam (..),
-    Query.MySQLColumn (..),
+    MySQL.MySQLColumn.MySQLColumn (..),
   )
 where
 
@@ -70,6 +70,7 @@ import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import qualified List
 import qualified Log
 import MySQL.FromRow (CountColumns, FromRow (fromRow))
+import qualified MySQL.MySQLColumn
 import MySQL.MySQLParam (MySQLParam (..))
 import qualified MySQL.Query as Query
 import MySQL.Query (Query (..))
