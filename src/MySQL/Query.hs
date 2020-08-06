@@ -30,25 +30,18 @@ import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
+import qualified MySQL.MySQLColumn as MySQLColumn
 import qualified Postgres.Settings
 import qualified Text
 import qualified Prelude
 
 -- |
--- A wrapper around a `postgresql-typed` query. This type has a number of
--- different purposes.
+-- A type representing a MySQL query.
 --
--- 1. By not using the native `postgresql-typed` Query type we ensure all our
---    queries are made through the `database` package, which in turn ensures
---    they're all logged and traced.
--- 2. The `postgresql-typed` query type is parametrized over `q`. It's not
---    immediately clear what this `q` means. Our query type is parametrized over
---    `row`, the type of the rows this query returns. That's conceptually much
---    easier to gok.
--- 3. We attach a bunch of meta data that can be derived from the wrapped
---    `postgresql-typed` query type. Although this information could be
---    calculated on the fly for each query, attaching it to our own `Query`
---    type ensures we only need to calculate the metadata once, at compile time.
+-- This gets generated at compile time by using the `sql` quasi quoter. Creating
+-- one of these requires parsing an SQL string and performing some interpolation
+-- operations in it. As much of this as we can we do at compile time, to ensure
+-- we have less work to do when we run a query.
 data Query row
   = Query
       { -- | The query as a prepared statement
@@ -143,7 +136,7 @@ parseToken token =
         Prelude.Right x ->
           [e|
             ensureList $(Prelude.pure x)
-              |> map (Log.mkSecret << mysqlEncode)
+              |> map (Log.mkSecret << MySQLColumn.mysqlEncode)
               |> SqlParams
             |]
     SQLToken.SQLToken _ -> tokenE (Prelude.show token)
