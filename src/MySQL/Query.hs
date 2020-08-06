@@ -280,19 +280,6 @@ instance MySQLColumn Float where
 instance MySQLColumn Clock.UTCTime where
   mysqlEncode = Base.MySQLDateTime << LocalTime.utcToLocalTime LocalTime.utc
 
--- DODO
--- instance MySQLColumn Local where
---   mysqlEncode = Base.MySQLDateTime
-
--- instance MySQLColumn _ where
---   mysqlEncode = Base.MySQLTimeStamp
-
--- instance MySQLColumn _ where
---   mysqlEncode = Base.MySQLDate
-
--- instance MySQLColumn _ where
---   mysqlEncode = Base.MySQLTime
-
 instance MySQLColumn Text where
   mysqlEncode = Base.MySQLText
 
