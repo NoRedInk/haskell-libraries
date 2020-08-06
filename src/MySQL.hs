@@ -22,7 +22,7 @@ module MySQL
     Settings.Settings,
     Settings.decoder,
     -- Querying
-    Query,
+    Query.Query,
     Query.Error (..),
     sql,
     doQuery,
@@ -36,23 +36,23 @@ module MySQL
     onDuplicateDoNothing,
     sqlYearly,
     replace,
-    MySQLParam (..),
-    MySQL.MySQLColumn.MySQLColumn (..),
+    MySQL.MySQLParam.MySQLParam,
+    MySQL.MySQLColumn.MySQLColumn,
   )
 where
 
-import Cherry.Prelude hiding (e)
+import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
-import Control.Monad.Catch (ExitCase (ExitCaseAbort, ExitCaseException, ExitCaseSuccess))
+import qualified Control.Monad.Catch as Catch
 import qualified Data.Acquire
 import qualified Data.ByteString.Lazy
 import qualified Data.Hashable as Hashable
 import qualified Data.IORef as IORef
 import qualified Data.Int
 import qualified Data.Pool
-import Data.Proxy (Proxy (Proxy))
+import qualified Data.Proxy as Proxy
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.MySQL.Base as Base
@@ -61,26 +61,24 @@ import qualified Database.MySQL.Protocol.Packet
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Debug
 import qualified Dict
-import GHC.Stack (HasCallStack, withFrozenCallStack)
+import qualified GHC.Stack as Stack
 import qualified Health
-import Internal.CaselessRegex (caselessRegex)
+import qualified Internal.CaselessRegex as CaselessRegex
 import qualified Internal.Time as Time
-import Language.Haskell.TH (ExpQ)
-import Language.Haskell.TH.Quote (QuasiQuoter (..))
+import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
-import MySQL.FromRow (CountColumns, FromRow (fromRow))
+import qualified MySQL.FromRow as FromRow
 import qualified MySQL.MySQLColumn
-import MySQL.MySQLParam (MySQLParam (..))
+import qualified MySQL.MySQLParam
 import qualified MySQL.Query as Query
-import MySQL.Query (Query (..))
 import qualified MySQL.Settings as Settings
 import qualified Platform
 import qualified System.IO.Streams as Streams
 import qualified Task
 import qualified Text
 import qualified Tuple
-import Prelude (IO, error, fromIntegral, pure, show)
 import qualified Prelude
 
 newtype TransactionCount
@@ -139,13 +137,13 @@ connection settings =
             ( do
                 conn <- Base.connect database
                 preparedQueries <- IORef.newIORef Dict.empty
-                pure (conn, preparedQueries)
+                Prelude.pure (conn, preparedQueries)
             )
             (Tuple.first >> Base.close)
             stripes
             maxIdleTime
             size
-      pure
+      Prelude.pure
         ( Connection
             doAnything
             pool
@@ -155,10 +153,21 @@ connection settings =
     release Connection {singleOrPool} =
       case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
-        Single _ _ -> pure ()
-    stripes = Settings.unMysqlPoolStripes (Settings.mysqlPoolStripes (Settings.mysqlPool settings)) |> fromIntegral
-    maxIdleTime = Settings.unMysqlPoolMaxIdleTime (Settings.mysqlPoolMaxIdleTime (Settings.mysqlPool settings))
-    size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
+        Single _ _ -> Prelude.pure ()
+    stripes =
+      Settings.mysqlPool settings
+        |> Settings.mysqlPoolStripes
+        |> Settings.unMysqlPoolStripes
+        |> Prelude.fromIntegral
+    maxIdleTime =
+      Settings.mysqlPool settings
+        |> Settings.mysqlPoolMaxIdleTime
+        |> Settings.unMysqlPoolMaxIdleTime
+    size =
+      Settings.mysqlPool settings
+        |> Settings.mysqlPoolSize
+        |> Settings.unMysqlPoolSize
+        |> Prelude.fromIntegral
     database = toConnectInfo settings
 
 --
@@ -179,7 +188,7 @@ toConnectionLogContext settings =
           Platform.TcpSocket
             Platform.MySQL
             (Settings.unHost host)
-            (Data.Text.pack (show (Settings.unPort port)))
+            (Text.fromInt (Settings.unPort port))
             database
 
 toConnectInfo :: Settings.Settings -> Base.ConnectInfo
@@ -203,7 +212,7 @@ toConnectInfo settings =
               Base.ciUser = user,
               Base.ciPassword = password,
               Base.ciDatabase = database,
-              Base.ciPort = fromIntegral (Settings.unPort port),
+              Base.ciPort = Prelude.fromIntegral (Settings.unPort port),
               Base.ciCharset = Database.MySQL.Connection.utf8mb4_unicode_ci
             }
 
@@ -222,24 +231,24 @@ readiness log conn =
     |> map Health.fromResult
     |> Health.mkCheck "mysql"
 
-queryFromText :: Text -> Query a
+queryFromText :: Text -> Query.Query a
 queryFromText text =
-  Query
-    { preparedStatement = text,
-      params = Log.mkSecret [],
-      prepareQuery = Query.DontPrepare,
-      quasiQuotedString = text,
-      sqlOperation = "",
-      queriedRelation = ""
+  Query.Query
+    { Query.preparedStatement = text,
+      Query.params = Log.mkSecret [],
+      Query.prepareQuery = Query.DontPrepare,
+      Query.quasiQuotedString = text,
+      Query.sqlOperation = "",
+      Query.queriedRelation = ""
     }
 
 --
 -- EXECUTE QUERIES
 --
 class MySqlQueryable query result | result -> query where
-  executeSql :: Connection -> Query query -> Task Query.Error result
+  executeSql :: Connection -> Query.Query query -> Task Query.Error result
 
-instance FromRow (CountColumns row) row => MySqlQueryable row [row] where
+instance FromRow.FromRow (FromRow.CountColumns row) row => MySqlQueryable row [row] where
   executeSql c query = executeQuery c query
 
 instance MySqlQueryable () Int where
@@ -249,7 +258,7 @@ instance MySqlQueryable () () where
   executeSql c query = executeCommand_ c query
 
 doQuery ::
-  (HasCallStack, MySqlQueryable row result) =>
+  (Stack.HasCallStack, MySqlQueryable row result) =>
   Connection ->
   Query.Query row ->
   (Result Query.Error result -> Task e a) ->
@@ -257,13 +266,13 @@ doQuery ::
 doQuery conn query handleResponse =
   let --
       runQuery = do
-        withFrozenCallStack Log.info "Running MySQL query" []
+        Stack.withFrozenCallStack Log.info "Running MySQL query" []
         result <- executeSql conn query
         -- If not currently inside a transaction and original query succeeded, then commit
         case transactionCount conn of
           Nothing -> executeCommand_ conn (queryFromText "COMMIT")
-          _ -> pure ()
-        pure result
+          _ -> Task.succeed ()
+        Task.succeed result
       infoForContext :: Platform.QueryInfo
       infoForContext =
         Platform.QueryInfo
@@ -282,18 +291,23 @@ doQuery conn query handleResponse =
         |> Task.andThen handleResponse
         |> Log.withContext "mysql-query" [Platform.queryContext infoForContext]
 
-executeQuery :: forall row. FromRow (CountColumns row) row => Connection -> Query row -> Task Query.Error [row]
+executeQuery ::
+  forall row.
+  FromRow.FromRow (FromRow.CountColumns row) row =>
+  Connection ->
+  Query.Query row ->
+  Task Query.Error [row]
 executeQuery conn query =
   withConnection conn <| \(backend, preparedQueries) ->
     let params = Query.params query |> Log.unSecret
         toRows stream =
           stream
-            |> Streams.map (fromRow (Proxy :: Proxy (CountColumns row)))
+            |> Streams.map (FromRow.fromRow (Proxy.Proxy :: Proxy.Proxy (FromRow.CountColumns row)))
             |> andThen Streams.toList
      in withTimeout conn
           <| Platform.doAnything (doAnything conn)
           <| handleMySqlException
-          <| case prepareQuery query of
+          <| case Query.prepareQuery query of
             Query.Prepare -> do
               stmtId <- getPreparedQueryStmtID preparedQueries backend query
               (_, stream) <- Base.queryStmt backend stmtId params
@@ -302,12 +316,12 @@ executeQuery conn query =
               (_, stream) <- Base.query backend (toBaseQuery query) params
               toRows stream
 
-executeCommand_ :: Connection -> Query () -> Task Query.Error ()
+executeCommand_ :: Connection -> Query.Query () -> Task Query.Error ()
 executeCommand_ conn query = do
   _ <- executeCommand conn query
   Task.succeed ()
 
-executeCommand :: Connection -> Query () -> Task Query.Error Int
+executeCommand :: Connection -> Query.Query () -> Task Query.Error Int
 executeCommand conn query =
   withConnection conn <| \(backend, preparedQueries) ->
     let params = Query.params query |> Log.unSecret
@@ -323,7 +337,7 @@ executeCommand conn query =
               Base.OK {Base.okLastInsertID} <- Base.execute backend (toBaseQuery query) params
               Prelude.pure (Prelude.fromIntegral okLastInsertID)
 
-toBaseQuery :: Query row -> Base.Query
+toBaseQuery :: Query.Query row -> Base.Query
 toBaseQuery query =
   Query.preparedStatement query
     |> Data.Text.Encoding.encodeUtf8
@@ -334,23 +348,23 @@ toBaseQuery query =
 -- MySQL already knows this query and has it parsed in memory. We just have to
 -- provide it with the values for the placeholder fields in the query, and
 -- MySQL can run it.
-getPreparedQueryStmtID :: PreparedQueries -> Base.MySQLConn -> Query a -> IO Base.StmtID
+getPreparedQueryStmtID :: PreparedQueries -> Base.MySQLConn -> Query.Query a -> Prelude.IO Base.StmtID
 getPreparedQueryStmtID preparedQueries backend query = do
   let baseQuery = toBaseQuery query
   let queryHash = PreparedQueryHash (Hashable.hash (Base.fromQuery baseQuery))
   alreadyPrepped <- IORef.readIORef preparedQueries
   case Dict.get queryHash alreadyPrepped of
     -- We've already prepared this statement before and stored the id.
-    Just stmtId -> pure stmtId
+    Just stmtId -> Prelude.pure stmtId
     -- We've not prepared this statement before, so we do so now.
     Nothing -> do
       stmtId <- Base.prepareStmt backend baseQuery
       IORef.atomicModifyIORef'
         preparedQueries
         (\dict -> (Dict.insert queryHash stmtId dict, ()))
-      pure stmtId
+      Prelude.pure stmtId
 
-handleMySqlException :: IO result -> IO (Result Query.Error result)
+handleMySqlException :: Prelude.IO result -> Prelude.IO (Result Query.Error result)
 handleMySqlException io =
   Exception.catches
     (map Ok io)
@@ -360,18 +374,18 @@ handleMySqlException io =
                 errState = Database.MySQL.Protocol.Packet.errState err
                 errMsg = Database.MySQL.Protocol.Packet.errMsg err
              in Query.Other
-                  ("MySQL query failed with error code " ++ Text.fromInt (fromIntegral errCode))
+                  ("MySQL query failed with error code " ++ Text.fromInt (Prelude.fromIntegral errCode))
                   [ Log.context "error state" (Data.Text.Encoding.decodeUtf8 errState),
                     Log.context "error message" (Data.Text.Encoding.decodeUtf8 errMsg)
                   ]
                   |> Err
-                  |> pure
+                  |> Prelude.pure
         ),
       Exception.Handler
         ( \Base.NetworkException ->
             Query.Other "MySQL query failed with a network exception" []
               |> Err
-              |> pure
+              |> Prelude.pure
         ),
       Exception.Handler
         ( \(err :: Exception.SomeException) ->
@@ -385,7 +399,7 @@ handleMySqlException io =
               -- itself.
               |> (\err' -> Query.Other ("MySQL query failed with unexpected error: " ++ Debug.toString err') [])
               |> Err
-              |> pure
+              |> Prelude.pure
         )
     ]
 
@@ -412,9 +426,9 @@ transaction conn' func =
       (begin conn)
       ( \() exitCase ->
           case exitCase of
-            ExitCaseSuccess _ -> commit conn
-            ExitCaseException _ -> rollback conn
-            ExitCaseAbort -> rollback conn
+            Catch.ExitCaseSuccess _ -> commit conn
+            Catch.ExitCaseException _ -> rollback conn
+            Catch.ExitCaseAbort -> rollback conn
       )
       (\() -> func conn)
       |> map Tuple.first
@@ -441,7 +455,7 @@ begin :: Connection -> Task e ()
 begin conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
+      Nothing -> Prelude.pure ()
       Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "BEGIN")
       Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("SAVEPOINT pgt" ++ Text.fromInt current))
 
@@ -450,7 +464,7 @@ rollback :: Connection -> Task e ()
 rollback conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
+      Nothing -> Prelude.pure ()
       Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "ROLLBACK")
       Just (TransactionCount current) ->
         executeCommand_ conn (queryFromText ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current))
@@ -460,7 +474,7 @@ commit :: Connection -> Task e ()
 commit conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
+      Nothing -> Prelude.pure ()
       Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "COMMIT")
       Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current))
 
@@ -469,7 +483,7 @@ rollbackAll :: Connection -> Task e ()
 rollbackAll conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
+      Nothing -> Prelude.pure ()
       Just _ -> executeCommand_ conn (queryFromText "ROLLBACK")
 
 throwRuntimeError :: Task Query.Error a -> Task e a
@@ -509,15 +523,15 @@ withConnection conn func =
           <| doIO conn
           <| Data.Pool.takeResource pool
       --
-      release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> ExitCase x -> Task y ()
+      release :: Data.Pool.Pool conn -> (conn, Data.Pool.LocalPool conn) -> Catch.ExitCase x -> Task y ()
       release pool (c, localPool) exitCase =
         doIO conn
           <| case exitCase of
-            ExitCaseSuccess _ ->
+            Catch.ExitCaseSuccess _ ->
               Data.Pool.putResource localPool c
-            ExitCaseException _ ->
+            Catch.ExitCaseException _ ->
               Data.Pool.destroyResource pool localPool c
-            ExitCaseAbort ->
+            Catch.ExitCaseAbort ->
               Data.Pool.destroyResource pool localPool c
    in --
       case singleOrPool conn of
@@ -553,26 +567,28 @@ data BulkifiedInsert a
   | EmptyInsert
   deriving (Prelude.Functor, Show, Eq)
 
-unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
+unsafeBulkifyInserts :: [Query.Query ()] -> BulkifiedInsert (Query.Query ())
 unsafeBulkifyInserts [] = EmptyInsert
 unsafeBulkifyInserts all@(first : rest) =
   first
-    { prepareQuery =
+    { Query.prepareQuery =
         if List.length all > 3 || List.any (\q -> Query.prepareQuery q == Query.DontPrepare) all
           then Query.DontPrepare
           else Query.Prepare,
-      preparedStatement =
+      Query.preparedStatement =
         Data.Text.intercalate
           ","
-          (preparedStatement first : map (Text.dropLeft splitAt << preparedStatement) rest),
-      params =
-        Prelude.traverse params all
+          ( Query.preparedStatement first
+              : map (Text.dropLeft splitAt << Query.preparedStatement) rest
+          ),
+      Query.params =
+        Prelude.traverse Query.params all
           |> map List.concat
     }
     |> BulkifiedInsert
   where
     splitAt =
-      preparedStatement first
+      Query.preparedStatement first
         |> Data.Text.toLower
         |> Data.Text.breakOn "values"
         |> Tuple.first
@@ -581,20 +597,20 @@ unsafeBulkifyInserts all@(first : rest) =
 
 -- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
 -- the key isn't unique.
-onConflictUpdate :: [Text] -> Query () -> Query ()
-onConflictUpdate columns q@Query {preparedStatement, sqlOperation} =
+onConflictUpdate :: [Text] -> Query.Query () -> Query.Query ()
+onConflictUpdate columns query =
   let onDuplicateKeyUPDATE = "ON DUPLICATE KEY UPDATE"
-   in q
-        { preparedStatement =
+   in query
+        { Query.preparedStatement =
             Text.join
               " "
-              [ preparedStatement,
+              [ Query.preparedStatement query,
                 onDuplicateKeyUPDATE,
                 columns
                   |> List.map (\column -> column ++ " = VALUES(" ++ column ++ ")")
                   |> Text.join ","
               ],
-          sqlOperation = sqlOperation ++ " " ++ onDuplicateKeyUPDATE
+          Query.sqlOperation = Query.sqlOperation query ++ " " ++ onDuplicateKeyUPDATE
         }
 
 -- | Use for insert queries that are allowed to fail. In Postgres we would use
@@ -602,14 +618,14 @@ onConflictUpdate columns q@Query {preparedStatement, sqlOperation} =
 -- `MySQL` recommends using `INSERT IGNORE` syntax, but that Postgres does not
 -- support. This helper hacks the `IGNORE` clause into a query after we run
 -- Postgres compile-time checks.
-onDuplicateDoNothing :: Query () -> Query ()
+onDuplicateDoNothing :: Query.Query () -> Query.Query ()
 onDuplicateDoNothing query =
   query
-    { preparedStatement =
+    { Query.preparedStatement =
         Lens.over
-          ([caselessRegex|^\s*INSERT\s+INTO|] << R.match)
+          ([CaselessRegex.caselessRegex|^\s*INSERT\s+INTO|] << R.match)
           (\_ -> "INSERT IGNORE INTO")
-          (preparedStatement query)
+          (Query.preparedStatement query)
     }
 
 -- | Special quasi quoter for accessing yearly tables like `mastery_2019`. Use
@@ -629,16 +645,16 @@ onDuplicateDoNothing query =
 -- `Query row`, `sqlYearly` generates code of a type `Int -> Query row`: That's
 -- a function that takes a year and substitutes it in the place of the
 -- `[[YEAR]]` placeholder.
-sqlYearly :: QuasiQuoter
+sqlYearly :: QQ.QuasiQuoter
 sqlYearly =
-  QuasiQuoter
-    { quoteExp = qqSQLYearly,
-      quoteType = Prelude.fail "sql not supported in types",
-      quotePat = Prelude.fail "sql not supported in patterns",
-      quoteDec = Prelude.fail "sql not supported in declarations"
+  QQ.QuasiQuoter
+    { QQ.quoteExp = qqSQLYearly,
+      QQ.quoteType = Prelude.fail "sql not supported in types",
+      QQ.quotePat = Prelude.fail "sql not supported in patterns",
+      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
     }
 
-qqSQLYearly :: Prelude.String -> ExpQ
+qqSQLYearly :: Prelude.String -> TH.ExpQ
 qqSQLYearly query =
   let queryFor :: Int -> Prelude.String
       queryFor year =
@@ -648,32 +664,32 @@ qqSQLYearly query =
    in [e|
         ( \(year :: Int) ->
             case year of
-              2015 -> $(quoteExp sql (queryFor 2015))
-              2016 -> $(quoteExp sql (queryFor 2016))
-              2017 -> $(quoteExp sql (queryFor 2017))
-              2018 -> $(quoteExp sql (queryFor 2018))
-              2019 -> $(quoteExp sql (queryFor 2019))
-              2020 -> $(quoteExp sql (queryFor 2020))
-              2021 -> $(quoteExp sql (queryFor 2021))
-              2022 -> $(quoteExp sql (queryFor 2022))
-              2023 -> $(quoteExp sql (queryFor 2023))
-              2024 -> $(quoteExp sql (queryFor 2024))
-              2025 -> $(quoteExp sql (queryFor 2025))
-              2026 -> $(quoteExp sql (queryFor 2026))
-              2027 -> $(quoteExp sql (queryFor 2027))
-              2028 -> $(quoteExp sql (queryFor 2028))
-              2029 -> $(quoteExp sql (queryFor 2029))
-              _ -> Prelude.error ("Unsupported school year: " ++ Prelude.show year)
+              2015 -> $(QQ.quoteExp sql (queryFor 2015))
+              2016 -> $(QQ.quoteExp sql (queryFor 2016))
+              2017 -> $(QQ.quoteExp sql (queryFor 2017))
+              2018 -> $(QQ.quoteExp sql (queryFor 2018))
+              2019 -> $(QQ.quoteExp sql (queryFor 2019))
+              2020 -> $(QQ.quoteExp sql (queryFor 2020))
+              2021 -> $(QQ.quoteExp sql (queryFor 2021))
+              2022 -> $(QQ.quoteExp sql (queryFor 2022))
+              2023 -> $(QQ.quoteExp sql (queryFor 2023))
+              2024 -> $(QQ.quoteExp sql (queryFor 2024))
+              2025 -> $(QQ.quoteExp sql (queryFor 2025))
+              2026 -> $(QQ.quoteExp sql (queryFor 2026))
+              2027 -> $(QQ.quoteExp sql (queryFor 2027))
+              2028 -> $(QQ.quoteExp sql (queryFor 2028))
+              2029 -> $(QQ.quoteExp sql (queryFor 2029))
+              _ -> Prelude.error ("Unsupported school year: " ++ Data.Text.unpack (Text.fromInt year))
         )
         |]
 
-sql :: QuasiQuoter
+sql :: QQ.QuasiQuoter
 sql =
-  QuasiQuoter
-    { quoteExp = quoteExp Query.sql,
-      quoteType = Prelude.fail "sql not supported in types",
-      quotePat = Prelude.fail "sql not supported in patterns",
-      quoteDec = Prelude.fail "sql not supported in declarations"
+  QQ.QuasiQuoter
+    { QQ.quoteExp = QQ.quoteExp Query.sql,
+      QQ.quoteType = Prelude.fail "sql not supported in types",
+      QQ.quotePat = Prelude.fail "sql not supported in patterns",
+      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
     }
 
 instance PGTypes.PGColumn "boolean" Data.Int.Int16 where
@@ -691,7 +707,7 @@ boolToSmallInt b =
     then 1
     else 0
 
-doIO :: Connection -> IO a -> Task x a
+doIO :: Connection -> Prelude.IO a -> Task x a
 doIO conn io =
   Platform.doAnything (doAnything conn) (io |> map Ok)
 
@@ -704,6 +720,9 @@ doIO conn io =
 -- code is using the Rails MySQL client, so we cannot enable it for queries from
 -- Haskell alone, and are scared to enable it for all queries. This might change
 -- in the future.
-replace :: Text -> Text -> Query row -> Query row
+replace :: Text -> Text -> Query.Query row -> Query.Query row
 replace original replacement query =
-  query {preparedStatement = Text.replace original replacement (preparedStatement query)}
+  query
+    { Query.preparedStatement =
+        Text.replace original replacement (Query.preparedStatement query)
+    }
