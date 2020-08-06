@@ -552,15 +552,18 @@ data BulkifiedInsert a
 
 unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
 unsafeBulkifyInserts [] = EmptyInsert
-unsafeBulkifyInserts (first : rest) =
+unsafeBulkifyInserts all@(first : rest) =
   first
-    { prepareQuery = Query.DontPrepare,
+    { prepareQuery =
+        if List.length all <= 3
+          then Query.Prepare
+          else Query.DontPrepare,
       preparedStatement =
         Data.Text.intercalate
           ","
           (preparedStatement first : map (Text.dropLeft splitAt << preparedStatement) rest),
       params =
-        Prelude.traverse params (first : rest)
+        Prelude.traverse params all
           |> map List.concat
     }
     |> BulkifiedInsert
