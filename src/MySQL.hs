@@ -71,8 +71,8 @@ import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
 import qualified MySQL.FromRow as FromRow
-import qualified MySQL.MySQLParameter
 import qualified MySQL.MySQLColumn
+import qualified MySQL.MySQLParameter
 import qualified MySQL.Query as Query
 import qualified MySQL.Settings as Settings
 import qualified Platform
