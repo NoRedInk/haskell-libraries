@@ -8,7 +8,6 @@ dependencies:
 - base
 - bytestring
 - cherry-core
-- directory
 - env-parser
 - exceptions
 - filepath
@@ -18,23 +17,18 @@ dependencies:
 - io-streams
 - lens
 - lens-regex-pcre
-- monad-logger
-- mtl
 - mysql-haskell
 - network
 - oops
 - pcre-light
 - postgresql-simple
 - postgresql-typed
-- process
 - resource-pool
 - resourcet
 - safe-exceptions
 - template-haskell
 - text
 - time
-- typed-process
-- unix
 library:
   exposed-modules:
   - MySQL
