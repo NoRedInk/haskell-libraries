@@ -3,47 +3,33 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
--- |
--- Description : Helpers for running queries.
---
--- This module expose some helpers for running postgresql-typed queries. They
--- return the correct amount of results in a Servant handler, or throw a
--- Rollbarred error.
+-- | This module expose some helpers for running mysql typed.
 module MySQL.Query
   ( sql,
     Query (..),
     PrepareQuery (..),
-    Error (..),
-    TimeoutOrigin (..),
   )
 where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
-import Control.Monad (fail, void)
-import Data.Proxy (Proxy (Proxy))
-import Data.String (String)
+import qualified Data.Proxy as Proxy
 import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder as Builder
 import qualified Database.MySQL.Base as Base
-import Database.PostgreSQL.Typed (pgSQL, useTPGDatabase)
+import qualified Database.PostgreSQL.Typed as PGTyped
 import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
 import qualified Environment
-import Internal.Error (Error (..), TimeoutOrigin (..))
 import Internal.Instances ()
 import qualified Internal.QueryParser as Parser
-import Language.Haskell.Meta.Parse (parseExp)
-import Language.Haskell.TH (ExpQ)
+import qualified Language.Haskell.Meta.Parse as Parse
 import qualified Language.Haskell.TH as TH
-import Language.Haskell.TH.Quote
-  ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
-  )
-import Language.Haskell.TH.Syntax (runIO)
+import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
-import MySQL.Internal (inToAny)
+import qualified MySQL.Internal as Internal
 import qualified Postgres.Settings
 import qualified Text
 import qualified Prelude
@@ -84,18 +70,22 @@ data Query row
 
 data PrepareQuery = Prepare | DontPrepare deriving (Eq, Show)
 
-qqSQL :: String -> ExpQ
+qqSQL :: Prelude.String -> TH.ExpQ
 qqSQL queryWithPgTypedFlags = do
   let db =
         Environment.decode Postgres.Settings.decoder
           |> map Postgres.Settings.toPGDatabase
-  db' <- runIO db
-  void (useTPGDatabase db')
+  db' <- TH.runIO db
+  _ <- PGTyped.useTPGDatabase db'
   -- We run the postgresql-typed quasi quoter for it's type-checking logic, but
   -- we're uninterested in the results it produces. At runtime we're taking our
   -- queries straight to MySQL. Consider the line below like a validation
   -- function running against the query string at compile time.
-  _ <- quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack queryWithPgTypedFlags)))
+  _ <-
+    Data.Text.pack queryWithPgTypedFlags
+      |> Internal.inToAny
+      |> Data.Text.unpack
+      |> QQ.quoteExp PGTyped.pgSQL
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
   let query =
         queryWithPgTypedFlags
@@ -124,7 +114,7 @@ qqSQL queryWithPgTypedFlags = do
 -- query string and the list of placeholder values to fill it with.
 data SqlToken
   = -- | Just a regular bit of SQL string.
-    SqlToken String
+    SqlToken Prelude.String
   | -- | A dynamic part of the SQL string, where we want to insert one or more
     -- values. Typically the list of values will contain only a single element,
     -- but in a `WHERE x IN (${listTime})` clause we will pass in a list of
@@ -134,7 +124,7 @@ data SqlToken
 -- | Take a query string and parse it, turning it into a list of SQL tokens.
 -- We do this at compile time, which is why the return type is not `[SqlToken]`
 -- but rather `TH.ExpQ` (which means 'generated haskell code').
-tokenize :: String -> TH.ExpQ
+tokenize :: Prelude.String -> TH.ExpQ
 tokenize query =
   SQLToken.sqlTokens query
     |> Prelude.traverse parseToken
@@ -148,8 +138,8 @@ parseToken :: SQLToken.SQLToken -> TH.ExpQ
 parseToken token =
   case token of
     SQLToken.SQLExpr expr ->
-      case parseExp expr of
-        Prelude.Left err -> fail ("Could not parse: " ++ err)
+      case Parse.parseExp expr of
+        Prelude.Left err -> Prelude.fail ("Could not parse: " ++ err)
         Prelude.Right x ->
           [e|
             ensureList $(Prelude.pure x)
@@ -207,10 +197,10 @@ shouldPrepare tokens =
     then Prepare
     else DontPrepare
 
-tokenE :: String -> TH.ExpQ
+tokenE :: Prelude.String -> TH.ExpQ
 tokenE str = [e|SqlToken str|]
 
-newtype HaskellParseError = HaskellParseError String
+newtype HaskellParseError = HaskellParseError Prelude.String
   deriving (Show)
 
 instance Exception.Exception HaskellParseError
@@ -222,14 +212,14 @@ instance Exception.Exception HaskellParseError
 --     ensureList [1,2,3]  --> [1,2,3]
 --     ensureList "Hi!"    --> ["Hi!"]
 ensureList :: forall a b. EnsureList (IsList a) a b => a -> [b]
-ensureList = ensureList' (Proxy :: Proxy (IsList a))
+ensureList = ensureList' (Proxy.Proxy :: Proxy.Proxy (IsList a))
 
 type family IsList a :: Bool where
   IsList [a] = 'True
   IsList a = 'False
 
 class EnsureList (t :: Bool) a b | t b -> a where
-  ensureList' :: Proxy t -> a -> [b]
+  ensureList' :: Proxy.Proxy t -> a -> [b]
 
 instance EnsureList 'True [a] a where
   ensureList' _ xs = xs
@@ -237,11 +227,11 @@ instance EnsureList 'True [a] a where
 instance EnsureList 'False a a where
   ensureList' _ x = [x]
 
-sql :: QuasiQuoter
+sql :: QQ.QuasiQuoter
 sql =
-  QuasiQuoter
-    { quoteExp = qqSQL,
-      quoteType = fail "sql not supported in types",
-      quotePat = fail "sql not supported in patterns",
-      quoteDec = fail "sql not supported in declarations"
+  QQ.QuasiQuoter
+    { QQ.quoteExp = qqSQL,
+      QQ.quoteType = Prelude.fail "sql not supported in types",
+      QQ.quotePat = Prelude.fail "sql not supported in patterns",
+      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
     }

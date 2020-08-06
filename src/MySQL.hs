@@ -17,15 +17,17 @@ module MySQL
   ( -- Connection
     Connection,
     connection,
-    readiness, -- Creating a connection handler.
+    readiness,
     -- Settings
     Settings.Settings,
     Settings.decoder,
     -- Querying
-    Query.Query,
-    Query.Error (..),
     sql,
     doQuery,
+    Query.Query,
+    MySQL.MySQLParam.MySQLParam,
+    MySQL.MySQLColumn.MySQLColumn,
+    Error.Error (..),
     -- Handling transactions
     transaction,
     inTestTransaction,
@@ -36,8 +38,6 @@ module MySQL
     onDuplicateDoNothing,
     sqlYearly,
     replace,
-    MySQL.MySQLParam.MySQLParam,
-    MySQL.MySQLColumn.MySQLColumn,
   )
 where
 
@@ -64,6 +64,7 @@ import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Internal.CaselessRegex as CaselessRegex
+import qualified Internal.Error as Error
 import qualified Internal.Time as Time
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as QQ
@@ -246,7 +247,7 @@ queryFromText text =
 -- EXECUTE QUERIES
 --
 class MySqlQueryable query result | result -> query where
-  executeSql :: Connection -> Query.Query query -> Task Query.Error result
+  executeSql :: Connection -> Query.Query query -> Task Error.Error result
 
 instance FromRow.FromRow (FromRow.CountColumns row) row => MySqlQueryable row [row] where
   executeSql c query = executeQuery c query
@@ -261,7 +262,7 @@ doQuery ::
   (Stack.HasCallStack, MySqlQueryable row result) =>
   Connection ->
   Query.Query row ->
-  (Result Query.Error result -> Task e a) ->
+  (Result Error.Error result -> Task e a) ->
   Task e a
 doQuery conn query handleResponse =
   let --
@@ -296,7 +297,7 @@ executeQuery ::
   FromRow.FromRow (FromRow.CountColumns row) row =>
   Connection ->
   Query.Query row ->
-  Task Query.Error [row]
+  Task Error.Error [row]
 executeQuery conn query =
   withConnection conn <| \(backend, preparedQueries) ->
     let params = Query.params query |> Log.unSecret
@@ -316,12 +317,12 @@ executeQuery conn query =
               (_, stream) <- Base.query backend (toBaseQuery query) params
               toRows stream
 
-executeCommand_ :: Connection -> Query.Query () -> Task Query.Error ()
+executeCommand_ :: Connection -> Query.Query () -> Task Error.Error ()
 executeCommand_ conn query = do
   _ <- executeCommand conn query
   Task.succeed ()
 
-executeCommand :: Connection -> Query.Query () -> Task Query.Error Int
+executeCommand :: Connection -> Query.Query () -> Task Error.Error Int
 executeCommand conn query =
   withConnection conn <| \(backend, preparedQueries) ->
     let params = Query.params query |> Log.unSecret
@@ -364,7 +365,7 @@ getPreparedQueryStmtID preparedQueries backend query = do
         (\dict -> (Dict.insert queryHash stmtId dict, ()))
       Prelude.pure stmtId
 
-handleMySqlException :: Prelude.IO result -> Prelude.IO (Result Query.Error result)
+handleMySqlException :: Prelude.IO result -> Prelude.IO (Result Error.Error result)
 handleMySqlException io =
   Exception.catches
     (map Ok io)
@@ -373,7 +374,7 @@ handleMySqlException io =
             let errCode = Database.MySQL.Protocol.Packet.errCode err
                 errState = Database.MySQL.Protocol.Packet.errState err
                 errMsg = Database.MySQL.Protocol.Packet.errMsg err
-             in Query.Other
+             in Error.Other
                   ("MySQL query failed with error code " ++ Text.fromInt (Prelude.fromIntegral errCode))
                   [ Log.context "error state" (Data.Text.Encoding.decodeUtf8 errState),
                     Log.context "error message" (Data.Text.Encoding.decodeUtf8 errMsg)
@@ -383,7 +384,7 @@ handleMySqlException io =
         ),
       Exception.Handler
         ( \Base.NetworkException ->
-            Query.Other "MySQL query failed with a network exception" []
+            Error.Other "MySQL query failed with a network exception" []
               |> Err
               |> Prelude.pure
         ),
@@ -397,19 +398,19 @@ handleMySqlException io =
               -- generated id's or timestamps which when included in the main
               -- error message would result in each error being grouped by
               -- itself.
-              |> (\err' -> Query.Other ("MySQL query failed with unexpected error: " ++ Debug.toString err') [])
+              |> (\err' -> Error.Other ("MySQL query failed with unexpected error: " ++ Debug.toString err') [])
               |> Err
               |> Prelude.pure
         )
     ]
 
-withTimeout :: Connection -> Task Query.Error a -> Task Query.Error a
+withTimeout :: Connection -> Task Error.Error a -> Task Error.Error a
 withTimeout conn task =
   if Time.microseconds (timeout conn) > 0
     then
       Task.timeout
         (Time.milliseconds (timeout conn))
-        (Query.Timeout Query.ClientTimeout (timeout conn))
+        (Error.Timeout Error.ClientTimeout (timeout conn))
         task
     else task
 
@@ -486,7 +487,7 @@ rollbackAll conn =
       Nothing -> Prelude.pure ()
       Just _ -> executeCommand_ conn (queryFromText "ROLLBACK")
 
-throwRuntimeError :: Task Query.Error a -> Task e a
+throwRuntimeError :: Task Error.Error a -> Task e a
 throwRuntimeError task = do
   logHandler <- Platform.logHandler
   Task.onError
