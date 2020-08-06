@@ -14,24 +14,46 @@
 -- MySQL. They return the correct amount of results in a Servant handler, or throw
 -- a Rollbarred error.
 module MySQL
-  ( -- Connection
+  ( -- * Connection
     Connection,
     connection,
     readiness,
-    -- Settings
+
+    -- * Settings
     Settings.Settings,
     Settings.decoder,
-    -- Querying
+
+    -- * Querying
     sql,
     doQuery,
     Query.Query,
+    Error.Error (..),
+    -- These type classes are for serializing and deserializing data from the
+    -- database.
+    --
+    -- The intent for the PGColumn instance that `postgresql-typed` gives us
+    -- and the `MySQLColumn` instance that we model after it is that it
+    -- describes safe conversions of database types into Haskell types. It's
+    -- intentionally not a decoder with a failure mode.
+    --
+    -- If we try to shoehorn decoding operations into it we have to resort to
+    -- using functions like `Debug.todo ""` in places where decoding fails.
+    -- That's not a great pattern to embrace in our code base.
+    --
+    -- So to prevent ourselves to go down this road we don't expose
+    -- `mysqlDecode`, preventing us from defining custom `PGColumn` instances.
+    -- We can derive them on newtypes, which is fine and safe. If we want to
+    -- read data from the database and transform it into other data in ways
+    -- that can fail we can still do so, but not as part of MySQL parsing
+    -- logic.
     MySQL.MySQLColumn.MySQLColumn,
     MySQL.MySQLParameter.MySQLParameter,
-    Error.Error (..),
-    -- Handling transactions
+
+    -- * Handling transactions
     transaction,
     inTestTransaction,
-    -- Helpers for uncommon queries
+
+    -- * Helpers for uncommon queries
     unsafeBulkifyInserts,
     BulkifiedInsert (..),
     onConflictUpdate,

@@ -1,7 +1,4 @@
-module MySQL.MySQLColumn
-  ( MySQLColumn (..),
-  )
-where
+module MySQL.MySQLColumn (MySQLColumn (..)) where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
