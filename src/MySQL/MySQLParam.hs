@@ -10,6 +10,7 @@ import qualified Data.Int
 import qualified Data.String
 import qualified Data.Text
 import qualified Data.Time.Clock as Clock
+import qualified Data.Time.Format as Format
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Database.MySQL.Base as Base
 import qualified Prelude
@@ -50,6 +51,10 @@ instance MySQLParam Float where
 
 instance MySQLParam Text where
   decodeParam (Base.MySQLText n) = n
+  decodeParam (Base.MySQLDateTime n) =
+    LocalTime.localTimeToUTC LocalTime.utc n
+      |> Format.formatTime Format.defaultTimeLocale (Format.iso8601DateFormat (Just "%H:%M:%S"))
+      |> Data.Text.pack
   decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Text" n)
 
 instance MySQLParam BS.ByteString where
