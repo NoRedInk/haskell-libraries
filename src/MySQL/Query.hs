@@ -30,7 +30,7 @@ import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
-import qualified MySQL.MySQLColumn as MySQLColumn
+import qualified MySQL.MySQLParameter as MySQLParameter
 import qualified Postgres.Settings
 import qualified Text
 import qualified Prelude
@@ -136,7 +136,7 @@ parseToken token =
         Prelude.Right x ->
           [e|
             ensureList $(Prelude.pure x)
-              |> map (Log.mkSecret << MySQLColumn.mysqlEncode)
+              |> map (Log.mkSecret << MySQLParameter.mysqlEncode)
               |> SqlParams
             |]
     SQLToken.SQLToken _ -> tokenE (Prelude.show token)

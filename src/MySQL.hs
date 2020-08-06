@@ -25,8 +25,8 @@ module MySQL
     sql,
     doQuery,
     Query.Query,
-    MySQL.MySQLParam.MySQLParam,
     MySQL.MySQLColumn.MySQLColumn,
+    MySQL.MySQLParameter.MySQLParameter,
     Error.Error (..),
     -- Handling transactions
     transaction,
@@ -71,8 +71,8 @@ import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
 import qualified MySQL.FromRow as FromRow
+import qualified MySQL.MySQLParameter
 import qualified MySQL.MySQLColumn
-import qualified MySQL.MySQLParam
 import qualified MySQL.Query as Query
 import qualified MySQL.Settings as Settings
 import qualified Platform

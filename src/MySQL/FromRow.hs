@@ -11,7 +11,7 @@ import qualified Control.Exception.Safe as Exception
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import qualified Database.MySQL.Base as Base
-import MySQL.MySQLParam (MySQLParam (decodeParam))
+import MySQL.MySQLColumn (MySQLColumn (decodeParam))
 
 data UnexpectedAmountOfResultColumns = UnexpectedAmountOfResultColumns
   deriving (Show)
@@ -42,13 +42,13 @@ type family CountColumns (c :: Type) :: ColumnCount where
   CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = 'MultipleColumns
   CountColumns x = 'SingleColumn
 
-instance (MySQLParam a) => FromRow 'SingleColumn a where
+instance (MySQLColumn a) => FromRow 'SingleColumn a where
   fromRow _ [x] = decodeParam x
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b
+  ( MySQLColumn a,
+    MySQLColumn b
   ) =>
   FromRow 'MultipleColumns (a, b)
   where
@@ -59,9 +59,9 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c
   ) =>
   FromRow 'MultipleColumns (a, b, c)
   where
@@ -69,10 +69,10 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d
   ) =>
   FromRow 'MultipleColumns (a, b, c, d)
   where
@@ -81,11 +81,11 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e)
   where
@@ -94,12 +94,12 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f)
   where
@@ -108,13 +108,13 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g)
   where
@@ -123,14 +123,14 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h)
   where
@@ -139,15 +139,15 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i)
   where
@@ -156,16 +156,16 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j)
   where
@@ -174,17 +174,17 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j,
-    MySQLParam k
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k)
   where
@@ -193,18 +193,18 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j,
-    MySQLParam k,
-    MySQLParam l
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l)
   where
@@ -213,19 +213,19 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j,
-    MySQLParam k,
-    MySQLParam l,
-    MySQLParam m
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m)
   where
@@ -234,20 +234,20 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j,
-    MySQLParam k,
-    MySQLParam l,
-    MySQLParam m,
-    MySQLParam n
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
   where
@@ -256,21 +256,21 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j,
-    MySQLParam k,
-    MySQLParam l,
-    MySQLParam m,
-    MySQLParam n,
-    MySQLParam o
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
   where
@@ -279,22 +279,22 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j,
-    MySQLParam k,
-    MySQLParam l,
-    MySQLParam m,
-    MySQLParam n,
-    MySQLParam o,
-    MySQLParam p
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
   where
@@ -303,23 +303,23 @@ instance
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
 
 instance
-  ( MySQLParam a,
-    MySQLParam b,
-    MySQLParam c,
-    MySQLParam d,
-    MySQLParam e,
-    MySQLParam f,
-    MySQLParam g,
-    MySQLParam h,
-    MySQLParam i,
-    MySQLParam j,
-    MySQLParam k,
-    MySQLParam l,
-    MySQLParam m,
-    MySQLParam n,
-    MySQLParam o,
-    MySQLParam p,
-    MySQLParam q
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q
   ) =>
   FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
   where
