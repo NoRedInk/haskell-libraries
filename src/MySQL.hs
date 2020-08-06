@@ -67,6 +67,7 @@ import qualified Database.MySQL.Protocol.Packet
 import qualified Database.Persist.MySQL as MySQL
 import Database.Persist.MySQL (RawSql (..))
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
+import qualified Debug
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import GHC.TypeLits (Symbol)
 import qualified Health
@@ -299,7 +300,7 @@ handleMySqlException io =
               -- generated id's or timestamps which when included in the main
               -- error message would result in each error being grouped by
               -- itself.
-              |> (\err' -> Query.Other "MySQL query failed with unexpected error" [Log.context "error" err'])
+              |> (\err' -> Query.Other ("MySQL query failed with unexpected error: " ++ Debug.toString err') [])
               |> Err
               |> pure
         )
