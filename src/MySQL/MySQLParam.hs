@@ -42,7 +42,10 @@ instance MySQLParam Data.Int.Int16 where
   decodeParam (Base.MySQLInt8 n) = Prelude.fromIntegral n
   decodeParam (Base.MySQLInt16U n) = Prelude.fromIntegral n
   decodeParam (Base.MySQLInt16 n) = n
-  decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Int" n)
+  -- HACK WARNING: We get a Int64 from calculated values in selects
+  -- unfortunatelly even if it should be a Int16 that represents a boolean.
+  decodeParam (Base.MySQLInt64 n) = Prelude.fromIntegral n
+  decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Int16" n)
 
 instance MySQLParam Float where
   decodeParam (Base.MySQLDouble n) = n
