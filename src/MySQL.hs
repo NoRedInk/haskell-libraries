@@ -59,6 +59,7 @@ import qualified Database.MySQL.Base as Base
 import qualified Database.MySQL.Connection
 import qualified Database.MySQL.Protocol.Packet
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
+import qualified Debug
 import qualified Dict
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
@@ -221,14 +222,15 @@ readiness log conn =
     |> Health.mkCheck "mysql"
 
 queryFromText :: Text -> Query a
-queryFromText text = Query
-  { preparedStatement = text,
-    params = Log.mkSecret [],
-    prepareQuery = Query.DontPrepare,
-    quasiQuotedString = text,
-    sqlOperation = "",
-    queriedRelation = ""
-  }
+queryFromText text =
+  Query
+    { preparedStatement = text,
+      params = Log.mkSecret [],
+      prepareQuery = Query.DontPrepare,
+      quasiQuotedString = text,
+      sqlOperation = "",
+      queriedRelation = ""
+    }
 
 --
 -- EXECUTE QUERIES
@@ -262,14 +264,15 @@ doQuery conn query handleResponse =
           _ -> pure ()
         pure result
       infoForContext :: Platform.QueryInfo
-      infoForContext = Platform.QueryInfo
-        { Platform.queryText = Log.mkSecret (Query.preparedStatement query),
-          Platform.queryTemplate = Query.quasiQuotedString query,
-          Platform.preparedStatement = Just (Query.preparedStatement query),
-          Platform.queryConn = logContext conn,
-          Platform.queryOperation = Query.sqlOperation query,
-          Platform.queryCollection = Query.queriedRelation query
-        }
+      infoForContext =
+        Platform.QueryInfo
+          { Platform.queryText = Log.mkSecret (Query.preparedStatement query),
+            Platform.queryTemplate = Query.quasiQuotedString query,
+            Platform.preparedStatement = Just (Query.preparedStatement query),
+            Platform.queryConn = logContext conn,
+            Platform.queryOperation = Query.sqlOperation query,
+            Platform.queryCollection = Query.queriedRelation query
+          }
    in runQuery
         -- Handle the response before wrapping the operation in a context. This way,
         -- if the response handling logic creates errors, those errors can inherit
@@ -381,7 +384,7 @@ handleMySqlException io =
               -- generated id's or timestamps which when included in the main
               -- error message would result in each error being grouped by
               -- itself.
-              |> (\err' -> Query.Other "MySQL query failed with unexpected error" [Log.context "error" err'])
+              |> (\err' -> Query.Other ("MySQL query failed with unexpected error: " ++ Debug.toString err') [])
               |> Err
               |> pure
         )
