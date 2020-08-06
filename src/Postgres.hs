@@ -226,7 +226,6 @@ doQuery conn query handleResponse = do
     queryInfo = Platform.QueryInfo
       { Platform.queryText = Log.mkSecret (Query.sqlString query),
         Platform.queryTemplate = Query.quasiQuotedString query,
-        Platform.preparedStatement = Nothing,
         Platform.queryConn = logContext conn,
         Platform.queryOperation = Query.sqlOperation query,
         Platform.queryCollection = Query.queriedRelation query
