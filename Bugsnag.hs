@@ -9,16 +9,54 @@ where
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Text
+import qualified Debug
 import qualified Environment
 import qualified Health
+import qualified Http
 import qualified Log
 import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client
 import qualified Platform
 import qualified Prelude
 
-logger :: Platform.Span -> Prelude.IO ()
-logger = Prelude.undefined
+logger :: Http.Handler -> Settings -> Platform.Span -> Prelude.IO ()
+logger http settings span = do
+  let send' = send http settings
+  case Platform.succeeded span of
+    Platform.Succeeded -> Prelude.pure ()
+    Platform.Failed -> send' (toEvent Nothing span)
+    Platform.FailedWith err -> send' (toEvent (Just err) span)
+
+send :: Http.Handler -> Settings -> Bugsnag.Event -> Prelude.IO ()
+send http settings event = do
+  log <- Platform.silentHandler
+  Http.withThirdPartyIO log http <| \manager -> do
+    -- Logging to Bugsnag might fail, but if it does we can't very well send the
+    -- error to Bugsnag. This is the end of the line, these errors disappear
+    -- into the aether.
+    _ <- Bugsnag.sendEvents manager (Log.unSecret (apiKey settings)) [event]
+    Prelude.pure ()
+
+toEvent :: Maybe Exception.SomeException -> Platform.Span -> Bugsnag.Event
+toEvent _ _ =
+  Bugsnag.defaultEvent
+    { Bugsnag.event_exceptions = [Debug.todo "Bugsnag.Exception"],
+      Bugsnag.event_breadcrumbs = Just [Debug.todo "Bugsnag.Breadcrumb"],
+      Bugsnag.event_request = Just (Debug.todo "Bugsnag.Request"),
+      -- Bugsnag supports sending information about the thread we're running on,
+      -- but this seems catered to heavyweight threads, surviving multiple
+      -- requests. That's not Haskell and so we keep this empty.
+      Bugsnag.event_threads = Nothing,
+      Bugsnag.event_context = Just (Debug.todo "Text: what's happening"),
+      Bugsnag.event_groupingHash = Just (Debug.todo "Text: override bugsnag's grouping logic"),
+      Bugsnag.event_severity = Just (Debug.todo "Bugsnag.Severity"),
+      Bugsnag.event_severityReason = Just (Debug.todo "Bugsnag.SeverityReason"),
+      Bugsnag.event_user = Just (Debug.todo "Bugsnag.User"),
+      Bugsnag.event_app = Just (Debug.todo "Bugsnag.App"),
+      Bugsnag.event_device = Just (Debug.todo "Bugsnag.Device"),
+      Bugsnag.event_session = Just (Debug.todo "Bugsnag.Session"),
+      Bugsnag.event_metaData = Just (Debug.todo "Data.Aeson.Object")
+    }
 
 newtype Settings
   = Settings
