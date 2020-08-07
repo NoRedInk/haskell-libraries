@@ -4,7 +4,7 @@
 -- in the root SQL query. We assume the root query to be the first query not
 -- in a sub query. We assume everything between parens `( ... )` to be a
 -- sub query.
-module Internal.Query.Parser
+module Internal.QueryParser
   ( parse,
     QueryMeta (..),
   )

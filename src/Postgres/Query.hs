@@ -1,6 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
 -- Description : Helpers for running queries.
@@ -8,7 +7,7 @@
 -- This module expose some helpers for running postgresql-typed queries. They
 -- return the correct amount of results in a Servant handler, or throw a
 -- Rollbarred error.
-module Internal.Query
+module Postgres.Query
   ( sql,
     Query (..),
     Error (..),
@@ -17,26 +16,23 @@ module Internal.Query
     format,
     QueryInfo (..),
     QueryConnectionInfo (..),
-    QueryEngine (..),
   )
 where
 
 import Cherry.Prelude
-import qualified Control.Exception.Safe as Exception
 import Control.Monad (fail, void)
 import qualified Data.Aeson as Aeson
-import qualified Data.Int
 import Data.String (String)
 import qualified Data.Text
 import qualified Data.Text.Encoding
-import qualified Database.Persist.MySQL as MySQL
 import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
 import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
-import qualified Internal.Query.Parser as Parser
-import qualified Internal.Time as Time
+import Internal.Error (Error (..), TimeoutOrigin (..))
+import Internal.Instances ()
+import qualified Internal.QueryParser as Parser
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
@@ -48,7 +44,7 @@ import MySQL.Internal (inToAny)
 import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
-import Prelude (IO, Show (show), fromIntegral)
+import Prelude (IO)
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -78,21 +74,6 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
-
-data Error
-  = Timeout TimeoutOrigin Time.Interval
-  | UniqueViolation Text
-  | Other Text [Log.Context]
-
-instance Show Error where
-  show (Timeout _ interval) = "Query timed out after " ++ Data.Text.unpack (Text.fromFloat (Time.seconds interval)) ++ " seconds"
-  show (UniqueViolation err) = "Query violated uniqueness constraint: " ++ Data.Text.unpack err
-  show (Other msg _) = "Query failed with unexpected error: " ++ Data.Text.unpack msg
-
-instance Exception.Exception Error
-
-data TimeoutOrigin = ClientTimeout | ServerTimeout
-  deriving (Show)
 
 qqSQL :: String -> ExpQ
 qqSQL query = do
@@ -126,44 +107,6 @@ sql =
       quotePat = fail "sql not supported in patterns",
       quoteDec = fail "sql not supported in declarations"
     }
-
--- |
--- The default `Int` type we use in our Haskell code is an `Int64`. This
--- corresponds to a `bigint` in SQL. Most of our MySQL tables use regular
--- `integers` though, which are 32 bits.
---
--- In our Postgres databases we default to using `bigint` for columns, but in
--- our legacy MySQL database we have missed that boat. We'd still like to be
--- able to write our Haskell default Ints to/from MySQL without ceremony, so
--- we add these instances to make it possible.
-instance PGTypes.PGColumn "integer" Int where
-  pgDecode tid tv =
-    let (i :: Data.Int.Int32) = PGTypes.pgDecode tid tv
-     in fromIntegral i
-
-instance PGTypes.PGParameter "integer" Int where
-  pgEncode tid tv =
-    let (i :: Data.Int.Int32) = fromIntegral tv
-     in PGTypes.pgEncode tid i
-
-instance PGTypes.PGColumn t a => PGTypes.PGColumn t (MySQL.Single a) where
-  pgDecode tid tv =
-    PGTypes.pgDecode tid tv
-      |> MySQL.Single
-
--- |
--- Several monolith tables use smaller int sizes to represent
--- enumerables; this type class allows us to extract them safely
--- and without too much ceremony
-instance PGTypes.PGColumn "smallint" Int where
-  pgDecode tid tv =
-    let (i :: Data.Int.Int16) = PGTypes.pgDecode tid tv
-     in fromIntegral i
-
-instance PGTypes.PGParameter "smallint" Int where
-  pgEncode tid tv =
-    let (i :: Data.Int.Int16) = fromIntegral tv
-     in PGTypes.pgEncode tid i
 
 -- |
 -- | Formatter for logging
@@ -216,8 +159,8 @@ instance Aeson.ToJSON QueryInfo
 instance Platform.SpanDetails QueryInfo
 
 data QueryConnectionInfo
-  = TcpSocket QueryEngine Host Port DatabaseName
-  | UnixSocket QueryEngine SocketPath DatabaseName
+  = TcpSocket Host Port DatabaseName
+  | UnixSocket SocketPath DatabaseName
   deriving (Generic)
 
 type Host = Text
@@ -229,10 +172,3 @@ type SocketPath = Text
 type DatabaseName = Text
 
 instance Aeson.ToJSON QueryConnectionInfo
-
-data QueryEngine
-  = Postgres
-  | MySQL
-  deriving (Generic)
-
-instance Aeson.ToJSON QueryEngine

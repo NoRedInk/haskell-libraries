@@ -8,23 +8,25 @@ module MySQL.Settings
     Password (..),
     Port (..),
     Socket (..),
-    PoolSettings
-      ( PoolSettings,
-        mysqlPoolSize
-      ),
-    MysqlPoolSize (MysqlPoolSize, unMysqlPoolSize),
+    PoolSettings (..),
+    MysqlPoolSize (..),
+    MysqlPoolStripes (..),
+    MysqlPoolMaxIdleTime (..),
     decoder,
     defaultSettings,
+    defaultPoolSettings,
     defaultConnectionSettings,
   )
 where
 
 import Cherry.Prelude
 import qualified Data.Text
+import qualified Data.Time
 import qualified Environment
 import qualified Internal.Time as Time
 import qualified Log
 import Prelude (FilePath, pure, show)
+import qualified Prelude
 
 data Settings
   = Settings
@@ -45,9 +47,11 @@ data ConnectionType
   = ConnectTcp Host Port
   | ConnectSocket Socket
 
-newtype PoolSettings
+data PoolSettings
   = PoolSettings
-      { mysqlPoolSize :: MysqlPoolSize
+      { mysqlPoolSize :: MysqlPoolSize,
+        mysqlPoolMaxIdleTime :: MysqlPoolMaxIdleTime,
+        mysqlPoolStripes :: MysqlPoolStripes
       }
   deriving (Eq, Show, Generic)
 
@@ -55,15 +59,20 @@ defaultSettings :: Settings
 defaultSettings =
   Settings
     { mysqlConnection = defaultConnectionSettings,
-      mysqlPool = PoolSettings
-        { mysqlPoolSize =
-            -- Connections in the pool are allocated on demand, so we won't
-            -- create all these connections unless the application can make use
-            -- of them.
-            MysqlPoolSize 1000
-        },
+      mysqlPool = defaultPoolSettings,
       mysqlQueryTimeoutSeconds = Time.fromSeconds 5
     }
+
+defaultPoolSettings :: PoolSettings
+defaultPoolSettings = PoolSettings
+  { mysqlPoolSize =
+      -- Connections in the pool are allocated on demand, so we won't
+      -- create all these connections unless the application can make use
+      -- of them.
+      MysqlPoolSize 1000,
+    mysqlPoolMaxIdleTime = MysqlPoolMaxIdleTime (toNominalDiffTime 3600),
+    mysqlPoolStripes = MysqlPoolStripes 1
+  }
 
 defaultConnectionSettings :: ConnectionSettings
 defaultConnectionSettings =
@@ -99,6 +108,8 @@ poolDecoder :: Environment.Decoder PoolSettings
 poolDecoder =
   pure PoolSettings
     |> andMap mysqlPoolSizeDecoder
+    |> andMap mysqlPoolMaxIdleTimeDecoder
+    |> andMap mysqlPoolStripesDecoder
 
 decoderTcp :: Environment.Decoder ConnectionType
 decoderTcp =
@@ -200,6 +211,42 @@ socketDecoder =
         Environment.defaultValue = ""
       }
     (map (Data.Text.unpack >> Socket) Environment.text)
+
+newtype MysqlPoolStripes
+  = MysqlPoolStripes {unMysqlPoolStripes :: Int}
+  deriving (Eq, Show, Generic)
+
+mysqlPoolStripesDecoder :: Environment.Decoder MysqlPoolStripes
+mysqlPoolStripesDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "MYSQL_POOL_STRIPES",
+        Environment.description = "The amount of sub-connection pools to create. Best refer to the resource-pool package for more info on this one. 1 is a good value for most applications.",
+        Environment.defaultValue =
+          defaultSettings |> mysqlPool |> mysqlPoolStripes |> unMysqlPoolStripes |> show |> Data.Text.pack
+      }
+    (Environment.int |> map MysqlPoolStripes)
+
+newtype MysqlPoolMaxIdleTime
+  = MysqlPoolMaxIdleTime {unMysqlPoolMaxIdleTime :: Data.Time.NominalDiffTime}
+  deriving (Eq, Show, Generic)
+
+mysqlPoolMaxIdleTimeDecoder :: Environment.Decoder MysqlPoolMaxIdleTime
+mysqlPoolMaxIdleTimeDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "MYSQL_POOL_MAX_IDLE_TIME",
+        Environment.description = "The maximum time a database connection will be able remain idle until it is closed.",
+        Environment.defaultValue =
+          defaultSettings |> mysqlPool |> mysqlPoolMaxIdleTime |> unMysqlPoolMaxIdleTime |> fromNominalDiffTime |> show |> Data.Text.pack
+      }
+    (Environment.int |> map (MysqlPoolMaxIdleTime << toNominalDiffTime))
+
+toNominalDiffTime :: Int -> Data.Time.NominalDiffTime
+toNominalDiffTime = Prelude.realToFrac
+
+fromNominalDiffTime :: Data.Time.NominalDiffTime -> Int
+fromNominalDiffTime = Prelude.round
 
 newtype MysqlPoolSize
   = MysqlPoolSize {unMysqlPoolSize :: Int}

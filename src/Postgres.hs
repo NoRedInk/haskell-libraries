@@ -61,12 +61,12 @@ import Database.PostgreSQL.Typed.Protocol
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
-import qualified Internal.Query as Query
 import qualified Internal.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (..))
 import qualified Oops
 import qualified Platform
+import qualified Postgres.Query as Query
 import qualified Postgres.Settings as Settings
 import qualified System.Exit
 import qualified Task
@@ -278,13 +278,13 @@ toConnectionLogContext :: PGDatabase -> Query.QueryConnectionInfo
 toConnectionLogContext db =
   case pgDBAddr db of
     Left (hostName, serviceName) ->
-      Query.TcpSocket Query.Postgres (Data.Text.pack hostName) (Data.Text.pack serviceName) databaseName
+      Query.TcpSocket (Data.Text.pack hostName) (Data.Text.pack serviceName) databaseName
     Right (SockAddrInet portNum hostAddr) ->
-      Query.TcpSocket Query.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
+      Query.TcpSocket (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
     Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-      Query.TcpSocket Query.Postgres (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
+      Query.TcpSocket (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
     Right (SockAddrUnix sockPath) ->
-      Query.UnixSocket Query.Postgres (Data.Text.pack sockPath) databaseName
+      Query.UnixSocket (Data.Text.pack sockPath) databaseName
     Right somethingElse ->
       -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
       error

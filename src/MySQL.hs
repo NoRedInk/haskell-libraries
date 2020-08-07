@@ -14,76 +14,93 @@
 -- MySQL. They return the correct amount of results in a Servant handler, or throw
 -- a Rollbarred error.
 module MySQL
-  ( -- Connection
+  ( -- * Connection
     Connection,
     connection,
-    readiness, -- Creating a connection handler.
-    -- Settings
+    readiness,
+
+    -- * Settings
     Settings.Settings,
     Settings.decoder,
-    -- Querying
-    Query,
-    Query.Error (..),
+
+    -- * Querying
     sql,
     doQuery,
-    -- Handling transactions
+    Query.Query,
+    Error.Error (..),
+    -- These type classes are for serializing and deserializing data from the
+    -- database.
+    --
+    -- The intent for the PGColumn instance that `postgresql-typed` gives us
+    -- and the `MySQLColumn` instance that we model after it is that it
+    -- describes safe conversions of database types into Haskell types. It's
+    -- intentionally not a decoder with a failure mode.
+    --
+    -- If we try to shoehorn decoding operations into it we have to resort to
+    -- using functions like `Debug.todo ""` in places where decoding fails.
+    -- That's not a great pattern to embrace in our code base.
+    --
+    -- So to prevent ourselves to go down this road we don't expose
+    -- `mysqlDecode`, preventing us from defining custom `PGColumn` instances.
+    -- We can derive them on newtypes, which is fine and safe. If we want to
+    -- read data from the database and transform it into other data in ways
+    -- that can fail we can still do so, but not as part of MySQL parsing
+    -- logic.
+    MySQL.MySQLColumn.MySQLColumn,
+    MySQL.MySQLParameter.MySQLParameter,
+
+    -- * Handling transactions
     transaction,
     inTestTransaction,
-    -- Reexposing useful Database.Persist.MySQL types
-    MySQL.PersistField (..),
-    -- Helpers for uncommon queries
+
+    -- * Helpers for uncommon queries
     unsafeBulkifyInserts,
     BulkifiedInsert (..),
     onConflictUpdate,
     onDuplicateDoNothing,
     sqlYearly,
-    lastInsertedPrimaryKey,
-    escape,
     replace,
   )
 where
 
-import Cherry.Prelude hiding (e)
+import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
-import qualified Control.Monad.Logger
-import Control.Monad.Reader (runReaderT)
 import qualified Data.Acquire
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BSC
-import qualified Data.Coerce
+import qualified Data.ByteString.Lazy
+import qualified Data.Hashable as Hashable
+import qualified Data.IORef as IORef
 import qualified Data.Int
-import Data.Kind (Type)
 import qualified Data.Pool
-import Data.Proxy (Proxy (Proxy))
+import qualified Data.Proxy as Proxy
 import qualified Data.Text
 import qualified Data.Text.Encoding
-import qualified Database.MySQL.Base
+import qualified Database.MySQL.Base as Base
 import qualified Database.MySQL.Connection
-import qualified Database.MySQL.Protocol.Escape as Escape
 import qualified Database.MySQL.Protocol.Packet
-import qualified Database.Persist.MySQL as MySQL
-import Database.Persist.MySQL (RawSql (..))
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
-import GHC.Stack (HasCallStack, withFrozenCallStack)
-import GHC.TypeLits (Symbol)
+import qualified Debug
+import qualified Dict
+import qualified GHC.Stack as Stack
 import qualified Health
-import Internal.CaselessRegex (caselessRegex)
-import qualified Internal.Query as Query
-import Internal.Query (Query (..))
+import qualified Internal.CaselessRegex as CaselessRegex
+import qualified Internal.Error as Error
 import qualified Internal.Time as Time
-import Language.Haskell.TH (ExpQ)
-import Language.Haskell.TH.Quote (QuasiQuoter (..))
+import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
-import qualified MySQL.Internal as Internal
+import qualified MySQL.FromRow as FromRow
+import qualified MySQL.MySQLColumn
+import qualified MySQL.MySQLParameter
+import qualified MySQL.Query as Query
 import qualified MySQL.Settings as Settings
 import qualified Platform
+import qualified System.IO.Streams as Streams
 import qualified Task
 import qualified Text
 import qualified Tuple
-import Prelude (IO, error, fromIntegral, pure, show)
 import qualified Prelude
 
 newtype TransactionCount
@@ -93,10 +110,27 @@ newtype TransactionCount
 data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
-        singleOrPool :: SingleOrPool MySQL.SqlBackend,
+        -- | In this IORef we keep a list of statements we've prepared with
+        -- MySQL. These are SQL commands with some placeholders that MySQL has
+        -- parsed and is ready to run, if we only provide the placeholders. This
+        -- is a faster way of running similar queries multiple times than
+        -- sending MySQL full query strings every time, which it then has to
+        -- parse first.
+        --
+        -- If we prepare a query MySQL makes it available for the current
+        -- connection only, which is why we're not sharing this hash between
+        -- database connections.
+        --
+        -- Database connections can live for a long time. We have to be careful
+        -- with the memory they use because they won't get cleaned up after
+        -- every request. That's why we're using a hash of the query as the key
+        -- in the dictionary below instead of the query itself.
+        singleOrPool :: SingleOrPool (Base.MySQLConn, PreparedQueries),
         logContext :: Query.QueryConnectionInfo,
         timeout :: Time.Interval
       }
+
+type PreparedQueries = IORef.IORef (Dict.Dict PreparedQueryHash Base.StmtID)
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -110,6 +144,9 @@ data SingleOrPool c
     --   we need to insure several SQL statements happen on the same connection.
     Single TransactionCount c
 
+newtype PreparedQueryHash = PreparedQueryHash Prelude.Int
+  deriving (Eq, Ord)
+
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
   Data.Acquire.mkAcquire acquire release
@@ -117,10 +154,18 @@ connection settings =
     acquire = do
       doAnything <- Platform.doAnythingHandler
       pool <-
-        MySQL.createMySQLPool database size
-          |> Control.Monad.Logger.runNoLoggingT
-          |> map Pool
-      pure
+        map Pool
+          <| Data.Pool.createPool
+            ( do
+                conn <- Base.connect database
+                preparedQueries <- IORef.newIORef Dict.empty
+                Prelude.pure (conn, preparedQueries)
+            )
+            (Tuple.first >> Base.close)
+            stripes
+            maxIdleTime
+            size
+      Prelude.pure
         ( Connection
             doAnything
             pool
@@ -130,8 +175,21 @@ connection settings =
     release Connection {singleOrPool} =
       case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
-        Single _ _ -> pure ()
-    size = Settings.unMysqlPoolSize (Settings.mysqlPoolSize (Settings.mysqlPool settings)) |> fromIntegral
+        Single _ _ -> Prelude.pure ()
+    stripes =
+      Settings.mysqlPool settings
+        |> Settings.mysqlPoolStripes
+        |> Settings.unMysqlPoolStripes
+        |> Prelude.fromIntegral
+    maxIdleTime =
+      Settings.mysqlPool settings
+        |> Settings.mysqlPoolMaxIdleTime
+        |> Settings.unMysqlPoolMaxIdleTime
+    size =
+      Settings.mysqlPool settings
+        |> Settings.mysqlPoolSize
+        |> Settings.unMysqlPoolSize
+        |> Prelude.fromIntegral
     database = toConnectInfo settings
 
 --
@@ -145,17 +203,15 @@ toConnectionLogContext settings =
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
           Query.UnixSocket
-            Query.MySQL
             (Data.Text.pack (Settings.unSocket socket))
             database
         Settings.ConnectTcp host port ->
           Query.TcpSocket
-            Query.MySQL
             (Settings.unHost host)
-            (Data.Text.pack (show (Settings.unPort port)))
+            (Text.fromInt (Settings.unPort port))
             database
 
-toConnectInfo :: Settings.Settings -> MySQL.MySQLConnectInfo
+toConnectInfo :: Settings.Settings -> Base.ConnectInfo
 toConnectInfo settings =
   let connectionSettings = Settings.mysqlConnection settings
       database = Data.Text.Encoding.encodeUtf8 (Settings.unDatabase (Settings.database connectionSettings))
@@ -163,20 +219,22 @@ toConnectInfo settings =
       password = Data.Text.Encoding.encodeUtf8 (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
-          MySQL.mkMySQLConnectInfo
-            (Settings.unSocket socket)
-            user
-            password
-            database
-            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+          Base.defaultConnectInfo
+            { Base.ciHost = Settings.unSocket socket,
+              Base.ciUser = user,
+              Base.ciPassword = password,
+              Base.ciDatabase = database,
+              Base.ciCharset = Database.MySQL.Connection.utf8mb4_unicode_ci
+            }
         Settings.ConnectTcp host port ->
-          MySQL.mkMySQLConnectInfo
-            (Data.Text.unpack (Settings.unHost host))
-            user
-            password
-            database
-            |> MySQL.setMySQLConnectInfoPort (fromIntegral (Settings.unPort port))
-            |> MySQL.setMySQLConnectInfoCharset Database.MySQL.Connection.utf8mb4_unicode_ci
+          Base.defaultConnectInfo
+            { Base.ciHost = Data.Text.unpack (Settings.unHost host),
+              Base.ciUser = user,
+              Base.ciPassword = password,
+              Base.ciDatabase = database,
+              Base.ciPort = Prelude.fromIntegral (Settings.unPort port),
+              Base.ciCharset = Database.MySQL.Connection.utf8mb4_unicode_ci
+            }
 
 --
 -- READINESS
@@ -186,111 +244,171 @@ toConnectInfo settings =
 -- Check that we are ready to be take traffic.
 readiness :: Platform.LogHandler -> Connection -> Health.Check
 readiness log conn =
-  executeQuery conn "SELECT 1"
+  executeQuery conn (queryFromText "SELECT 1")
     |> Task.map (\(_ :: [Int]) -> ())
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
     |> map Health.fromResult
     |> Health.mkCheck "mysql"
 
+queryFromText :: Text -> Query.Query a
+queryFromText text =
+  Query.Query
+    { Query.preparedStatement = text,
+      Query.params = Log.mkSecret [],
+      Query.prepareQuery = Query.DontPrepare,
+      Query.quasiQuotedString = text,
+      Query.sqlOperation = "",
+      Query.queriedRelation = ""
+    }
+
 --
 -- EXECUTE QUERIES
 --
 class MySqlQueryable query result | result -> query where
-  executeSql :: Connection -> Query query -> Task Query.Error result
+  executeSql :: Connection -> Query.Query query -> Task Error.Error result
 
-instance QueryResults (CountColumns row) row => MySqlQueryable row [row] where
-  executeSql c query = executeQuery c (queryAsText query)
+instance FromRow.FromRow (FromRow.CountColumns row) row => MySqlQueryable row [row] where
+  executeSql c query = executeQuery c query
+
+instance MySqlQueryable () Int where
+  executeSql c query = executeCommand c query
 
 instance MySqlQueryable () () where
-  executeSql c query = executeCommand c (queryAsText query)
+  executeSql c query = executeCommand_ c query
 
 doQuery ::
-  (HasCallStack, MySqlQueryable row result) =>
+  (Stack.HasCallStack, MySqlQueryable row result) =>
   Connection ->
   Query.Query row ->
-  (Result Query.Error result -> Task e a) ->
+  (Result Error.Error result -> Task e a) ->
   Task e a
 doQuery conn query handleResponse =
   let --
       runQuery = do
+        Stack.withFrozenCallStack Log.info "Running MySQL query" []
         result <- executeSql conn query
         -- If not currently inside a transaction and original query succeeded, then commit
         case transactionCount conn of
-          Nothing -> executeCommand conn "COMMIT"
-          _ -> pure ()
-        pure result
+          Nothing -> executeCommand_ conn (queryFromText "COMMIT")
+          _ -> Task.succeed ()
+        Task.succeed result
       infoForContext :: Query.QueryInfo
       infoForContext = Query.QueryInfo
-        { Query.queryText = Log.mkSecret (Query.sqlString query),
+        { Query.queryText = Log.mkSecret (Query.preparedStatement query),
           Query.queryTemplate = Query.quasiQuotedString query,
           Query.queryConn = logContext conn,
           Query.queryOperation = Query.sqlOperation query,
           Query.queryCollection = Query.queriedRelation query
         }
-   in do
-        withFrozenCallStack Log.info (Query.asMessage query) []
-        runQuery
-          -- Handle the response before wrapping the operation in a context. This way,
-          -- if the response handling logic creates errors, those errors can inherit
-          -- context values like the query string.
-          |> Task.map Ok
-          |> Task.onError (Task.succeed << Err)
-          |> Task.andThen handleResponse
-          |> ( \task ->
-                 Platform.span
-                   "MySQL Query"
-                   (Platform.finally task (Platform.setSpanDetails infoForContext))
-             )
+   in runQuery
+        -- Handle the response before wrapping the operation in a context. This way,
+        -- if the response handling logic creates errors, those errors can inherit
+        -- context values like the query string.
+        |> Task.map Ok
+        |> Task.onError (Task.succeed << Err)
+        |> Task.andThen handleResponse
+        |> ( \task ->
+               Platform.span
+                 "MySQL Query"
+                 (Platform.finally task (Platform.setSpanDetails infoForContext))
+           )
 
-queryAsText :: Query q -> Text
-queryAsText query =
-  Query.sqlString query
-    -- We need this prefix on tables to allow compile-time checks of the query.
-    |> Text.replace "monolith." ""
-    |> Internal.anyToIn
-
-executeQuery :: forall row. QueryResults (CountColumns row) row => Connection -> Text -> Task Query.Error [row]
+executeQuery ::
+  forall row.
+  FromRow.FromRow (FromRow.CountColumns row) row =>
+  Connection ->
+  Query.Query row ->
+  Task Error.Error [row]
 executeQuery conn query =
-  withConnection conn <| \backend ->
-    MySQL.rawSql query []
-      |> (\reader -> runReaderT reader backend)
-      |> map (map (toQueryResult (Proxy :: Proxy (CountColumns row))))
-      |> handleMySqlException
-      |> Platform.doAnything (doAnything conn)
-      |> withTimeout conn
+  withConnection conn <| \(backend, preparedQueries) ->
+    let params = Query.params query |> Log.unSecret
+        toRows stream =
+          stream
+            |> Streams.map (FromRow.fromRow (Proxy.Proxy :: Proxy.Proxy (FromRow.CountColumns row)))
+            |> andThen Streams.toList
+     in withTimeout conn
+          <| Platform.doAnything (doAnything conn)
+          <| handleMySqlException
+          <| case Query.prepareQuery query of
+            Query.Prepare -> do
+              stmtId <- getPreparedQueryStmtID preparedQueries backend query
+              (_, stream) <- Base.queryStmt backend stmtId params
+              toRows stream
+            Query.DontPrepare -> do
+              (_, stream) <- Base.query backend (toBaseQuery query) params
+              toRows stream
 
-executeCommand :: Connection -> Text -> Task Query.Error ()
+executeCommand_ :: Connection -> Query.Query () -> Task Error.Error ()
+executeCommand_ conn query = do
+  _ <- executeCommand conn query
+  Task.succeed ()
+
+executeCommand :: Connection -> Query.Query () -> Task Error.Error Int
 executeCommand conn query =
-  withConnection conn <| \backend ->
-    MySQL.rawExecute query []
-      |> (\reader -> runReaderT reader backend)
-      |> handleMySqlException
-      |> Platform.doAnything (doAnything conn)
-      |> withTimeout conn
+  withConnection conn <| \(backend, preparedQueries) ->
+    let params = Query.params query |> Log.unSecret
+     in withTimeout conn
+          <| Platform.doAnything (doAnything conn)
+          <| handleMySqlException
+          <| case Query.prepareQuery query of
+            Query.Prepare -> do
+              stmtId <- getPreparedQueryStmtID preparedQueries backend query
+              Base.OK {Base.okLastInsertID} <- Base.executeStmt backend stmtId params
+              Prelude.pure (Prelude.fromIntegral okLastInsertID)
+            Query.DontPrepare -> do
+              Base.OK {Base.okLastInsertID} <- Base.execute backend (toBaseQuery query) params
+              Prelude.pure (Prelude.fromIntegral okLastInsertID)
 
-handleMySqlException :: IO result -> IO (Result Query.Error result)
+toBaseQuery :: Query.Query row -> Base.Query
+toBaseQuery query =
+  Query.preparedStatement query
+    |> Data.Text.Encoding.encodeUtf8
+    |> Data.ByteString.Lazy.fromStrict
+    |> Base.Query
+
+-- | Get the prepared statement id for a particular query. If such an ID exists
+-- MySQL already knows this query and has it parsed in memory. We just have to
+-- provide it with the values for the placeholder fields in the query, and
+-- MySQL can run it.
+getPreparedQueryStmtID :: PreparedQueries -> Base.MySQLConn -> Query.Query a -> Prelude.IO Base.StmtID
+getPreparedQueryStmtID preparedQueries backend query = do
+  let baseQuery = toBaseQuery query
+  let queryHash = PreparedQueryHash (Hashable.hash (Base.fromQuery baseQuery))
+  alreadyPrepped <- IORef.readIORef preparedQueries
+  case Dict.get queryHash alreadyPrepped of
+    -- We've already prepared this statement before and stored the id.
+    Just stmtId -> Prelude.pure stmtId
+    -- We've not prepared this statement before, so we do so now.
+    Nothing -> do
+      stmtId <- Base.prepareStmt backend baseQuery
+      IORef.atomicModifyIORef'
+        preparedQueries
+        (\dict -> (Dict.insert queryHash stmtId dict, ()))
+      Prelude.pure stmtId
+
+handleMySqlException :: Prelude.IO result -> Prelude.IO (Result Error.Error result)
 handleMySqlException io =
   Exception.catches
     (map Ok io)
     [ Exception.Handler
-        ( \(Database.MySQL.Base.ERRException err) ->
+        ( \(Base.ERRException err) ->
             let errCode = Database.MySQL.Protocol.Packet.errCode err
                 errState = Database.MySQL.Protocol.Packet.errState err
                 errMsg = Database.MySQL.Protocol.Packet.errMsg err
-             in Query.Other
-                  ("MySQL query failed with error code " ++ Text.fromInt (fromIntegral errCode))
+             in Error.Other
+                  ("MySQL query failed with error code " ++ Text.fromInt (Prelude.fromIntegral errCode))
                   [ Log.context "error state" (Data.Text.Encoding.decodeUtf8 errState),
                     Log.context "error message" (Data.Text.Encoding.decodeUtf8 errMsg)
                   ]
                   |> Err
-                  |> pure
+                  |> Prelude.pure
         ),
       Exception.Handler
-        ( \Database.MySQL.Base.NetworkException ->
-            Query.Other "MySQL query failed with a network exception" []
+        ( \Base.NetworkException ->
+            Error.Other "MySQL query failed with a network exception" []
               |> Err
-              |> pure
+              |> Prelude.pure
         ),
       Exception.Handler
         ( \(err :: Exception.SomeException) ->
@@ -302,19 +420,19 @@ handleMySqlException io =
               -- generated id's or timestamps which when included in the main
               -- error message would result in each error being grouped by
               -- itself.
-              |> (\err' -> Query.Other "MySQL query failed with unexpected error" [Log.context "error" err'])
+              |> (\err' -> Error.Other ("MySQL query failed with unexpected error: " ++ Debug.toString err') [])
               |> Err
-              |> pure
+              |> Prelude.pure
         )
     ]
 
-withTimeout :: Connection -> Task Query.Error a -> Task Query.Error a
+withTimeout :: Connection -> Task Error.Error a -> Task Error.Error a
 withTimeout conn task =
   if Time.microseconds (timeout conn) > 0
     then
       Task.timeout
         (Time.milliseconds (timeout conn))
-        (Query.Timeout Query.ClientTimeout (timeout conn))
+        (Error.Timeout Error.ClientTimeout (timeout conn))
         task
     else task
 
@@ -358,39 +476,39 @@ begin :: Connection -> Task e ()
 begin conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn "BEGIN"
-      Just (TransactionCount current) -> executeCommand conn ("SAVEPOINT pgt" ++ Text.fromInt current)
+      Nothing -> Prelude.pure ()
+      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "BEGIN")
+      Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Rollback to the most recent 'begin'.
 rollback :: Connection -> Task e ()
 rollback conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn "ROLLBACK"
+      Nothing -> Prelude.pure ()
+      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "ROLLBACK")
       Just (TransactionCount current) ->
-        executeCommand conn ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current)
+        executeCommand_ conn (queryFromText ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Commit the most recent 'begin'.
 commit :: Connection -> Task e ()
 commit conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
-      Just (TransactionCount 0) -> executeCommand conn "COMMIT"
-      Just (TransactionCount current) -> executeCommand conn ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current)
+      Nothing -> Prelude.pure ()
+      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "COMMIT")
+      Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Rollback all active 'begin's.
 rollbackAll :: Connection -> Task e ()
 rollbackAll conn =
   throwRuntimeError
     <| case transactionCount conn of
-      Nothing -> pure ()
-      Just _ -> executeCommand conn "ROLLBACK"
+      Nothing -> Prelude.pure ()
+      Just _ -> executeCommand_ conn (queryFromText "ROLLBACK")
 
-throwRuntimeError :: Task Query.Error a -> Task e a
-throwRuntimeError task =
+throwRuntimeError :: Task Error.Error a -> Task e a
+throwRuntimeError task = do
   Task.onError
     ( \err ->
         Exception.displayException err
@@ -412,7 +530,7 @@ withTransaction conn func =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Connection -> (MySQL.SqlBackend -> Task e a) -> Task e a
+withConnection :: Connection -> ((Base.MySQLConn, PreparedQueries) -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
@@ -420,11 +538,7 @@ withConnection conn func =
           <| doIO conn
           <| Data.Pool.takeResource pool
       --
-      release ::
-        Data.Pool.Pool MySQL.SqlBackend ->
-        Platform.Succeeded ->
-        (MySQL.SqlBackend, Data.Pool.LocalPool MySQL.SqlBackend) ->
-        Task y ()
+      release :: Data.Pool.Pool conn -> Platform.Succeeded -> (conn, Data.Pool.LocalPool conn) -> Task y ()
       release pool succeeded (c, localPool) =
         doIO conn
           <| case succeeded of
@@ -445,527 +559,7 @@ withConnection conn func =
 --
 -- TYPE CLASSES
 --
-
--- |
--- The persistent library gives us back types matching the constaint `RawSql`.
--- These instances are tuples correspoding to rows, as we like, but
--- unfortunately every field is wrapped in a `Single` constructor. The purpose
--- of this typeclass is to unwrap these constructors so we can return records
--- of plain unwrapped values from this module.
-class MySQL.RawSql (FromRawSql c a) => QueryResults (c :: ColumnCount) a where
-
-  type FromRawSql c a
-
-  toQueryResult :: Proxy c -> FromRawSql c a -> a
-
-data ColumnCount = SingleColumn | MultipleColumns
-
-type family CountColumns (c :: Type) :: ColumnCount where
-  CountColumns (a, b) = 'MultipleColumns
-  CountColumns (a, b, c) = 'MultipleColumns
-  CountColumns (a, b, c, d) = 'MultipleColumns
-  CountColumns (a, b, c, d, e) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j, k) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = 'MultipleColumns
-  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = 'MultipleColumns
-  CountColumns x = 'SingleColumn
-
-instance (MySQL.PersistField a) => QueryResults 'SingleColumn a where
-
-  type
-    FromRawSql 'SingleColumn a =
-      (MySQL.Single a)
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b
-  ) =>
-  QueryResults 'MultipleColumns (a, b)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b) =
-      ( MySQL.Single a,
-        MySQL.Single b
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j,
-    MySQL.PersistField k
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j,
-        MySQL.Single k
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j,
-    MySQL.PersistField k,
-    MySQL.PersistField l
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j,
-        MySQL.Single k,
-        MySQL.Single l
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j,
-    MySQL.PersistField k,
-    MySQL.PersistField l,
-    MySQL.PersistField m
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j,
-        MySQL.Single k,
-        MySQL.Single l,
-        MySQL.Single m
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j,
-    MySQL.PersistField k,
-    MySQL.PersistField l,
-    MySQL.PersistField m,
-    MySQL.PersistField n
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j,
-        MySQL.Single k,
-        MySQL.Single l,
-        MySQL.Single m,
-        MySQL.Single n
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j,
-    MySQL.PersistField k,
-    MySQL.PersistField l,
-    MySQL.PersistField m,
-    MySQL.PersistField n,
-    MySQL.PersistField o
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j,
-        MySQL.Single k,
-        MySQL.Single l,
-        MySQL.Single m,
-        MySQL.Single n,
-        MySQL.Single o
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j,
-    MySQL.PersistField k,
-    MySQL.PersistField l,
-    MySQL.PersistField m,
-    MySQL.PersistField n,
-    MySQL.PersistField o,
-    MySQL.PersistField p
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j,
-        MySQL.Single k,
-        MySQL.Single l,
-        MySQL.Single m,
-        MySQL.Single n,
-        MySQL.Single o,
-        MySQL.Single p
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
-
-instance
-  ( MySQL.PersistField a,
-    MySQL.PersistField b,
-    MySQL.PersistField c,
-    MySQL.PersistField d,
-    MySQL.PersistField e,
-    MySQL.PersistField f,
-    MySQL.PersistField g,
-    MySQL.PersistField h,
-    MySQL.PersistField i,
-    MySQL.PersistField j,
-    MySQL.PersistField k,
-    MySQL.PersistField l,
-    MySQL.PersistField m,
-    MySQL.PersistField n,
-    MySQL.PersistField o,
-    MySQL.PersistField p,
-    MySQL.PersistField q
-  ) =>
-  QueryResults 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
-  where
-
-  type
-    FromRawSql 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) =
-      ( MySQL.Single a,
-        MySQL.Single b,
-        MySQL.Single c,
-        MySQL.Single d,
-        MySQL.Single e,
-        MySQL.Single f,
-        MySQL.Single g,
-        MySQL.Single h,
-        MySQL.Single i,
-        MySQL.Single j,
-        MySQL.Single k,
-        MySQL.Single l,
-        MySQL.Single m,
-        MySQL.Single n,
-        MySQL.Single o,
-        MySQL.Single p,
-        MySQL.Single q
-      )
-
-  toQueryResult _ = Data.Coerce.coerce
+--
 
 -- | Combine a number of insert queries that all insert a single row into the
 -- same table into a single query.
@@ -987,19 +581,28 @@ data BulkifiedInsert a
   | EmptyInsert
   deriving (Prelude.Functor, Show, Eq)
 
-unsafeBulkifyInserts :: [Query ()] -> BulkifiedInsert (Query ())
+unsafeBulkifyInserts :: [Query.Query ()] -> BulkifiedInsert (Query.Query ())
 unsafeBulkifyInserts [] = EmptyInsert
-unsafeBulkifyInserts (first : rest) =
+unsafeBulkifyInserts all@(first : rest) =
   first
-    { sqlString =
+    { Query.prepareQuery =
+        if List.length all > 3 || List.any (\q -> Query.prepareQuery q == Query.DontPrepare) all
+          then Query.DontPrepare
+          else Query.Prepare,
+      Query.preparedStatement =
         Data.Text.intercalate
           ","
-          (sqlString first : map (Text.dropLeft splitAt << sqlString) rest)
+          ( Query.preparedStatement first
+              : map (Text.dropLeft splitAt << Query.preparedStatement) rest
+          ),
+      Query.params =
+        Prelude.traverse Query.params all
+          |> map List.concat
     }
     |> BulkifiedInsert
   where
     splitAt =
-      sqlString first
+      Query.preparedStatement first
         |> Data.Text.toLower
         |> Data.Text.breakOn "values"
         |> Tuple.first
@@ -1008,20 +611,20 @@ unsafeBulkifyInserts (first : rest) =
 
 -- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
 -- the key isn't unique.
-onConflictUpdate :: [Text] -> Query () -> Query ()
-onConflictUpdate columns q@Query {sqlString, sqlOperation} =
+onConflictUpdate :: [Text] -> Query.Query () -> Query.Query ()
+onConflictUpdate columns query =
   let onDuplicateKeyUPDATE = "ON DUPLICATE KEY UPDATE"
-   in q
-        { sqlString =
+   in query
+        { Query.preparedStatement =
             Text.join
               " "
-              [ sqlString,
+              [ Query.preparedStatement query,
                 onDuplicateKeyUPDATE,
                 columns
                   |> List.map (\column -> column ++ " = VALUES(" ++ column ++ ")")
                   |> Text.join ","
               ],
-          sqlOperation = sqlOperation ++ " " ++ onDuplicateKeyUPDATE
+          Query.sqlOperation = Query.sqlOperation query ++ " " ++ onDuplicateKeyUPDATE
         }
 
 -- | Use for insert queries that are allowed to fail. In Postgres we would use
@@ -1029,14 +632,14 @@ onConflictUpdate columns q@Query {sqlString, sqlOperation} =
 -- `MySQL` recommends using `INSERT IGNORE` syntax, but that Postgres does not
 -- support. This helper hacks the `IGNORE` clause into a query after we run
 -- Postgres compile-time checks.
-onDuplicateDoNothing :: Query () -> Query ()
+onDuplicateDoNothing :: Query.Query () -> Query.Query ()
 onDuplicateDoNothing query =
   query
-    { sqlString =
+    { Query.preparedStatement =
         Lens.over
-          ([caselessRegex|^\s*INSERT\s+INTO|] << R.match)
+          ([CaselessRegex.caselessRegex|^\s*INSERT\s+INTO|] << R.match)
           (\_ -> "INSERT IGNORE INTO")
-          (sqlString query)
+          (Query.preparedStatement query)
     }
 
 -- | Special quasi quoter for accessing yearly tables like `mastery_2019`. Use
@@ -1056,16 +659,16 @@ onDuplicateDoNothing query =
 -- `Query row`, `sqlYearly` generates code of a type `Int -> Query row`: That's
 -- a function that takes a year and substitutes it in the place of the
 -- `[[YEAR]]` placeholder.
-sqlYearly :: QuasiQuoter
+sqlYearly :: QQ.QuasiQuoter
 sqlYearly =
-  QuasiQuoter
-    { quoteExp = qqSQLYearly,
-      quoteType = Prelude.fail "sql not supported in types",
-      quotePat = Prelude.fail "sql not supported in patterns",
-      quoteDec = Prelude.fail "sql not supported in declarations"
+  QQ.QuasiQuoter
+    { QQ.quoteExp = qqSQLYearly,
+      QQ.quoteType = Prelude.fail "sql not supported in types",
+      QQ.quotePat = Prelude.fail "sql not supported in patterns",
+      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
     }
 
-qqSQLYearly :: Prelude.String -> ExpQ
+qqSQLYearly :: Prelude.String -> TH.ExpQ
 qqSQLYearly query =
   let queryFor :: Int -> Prelude.String
       queryFor year =
@@ -1075,158 +678,33 @@ qqSQLYearly query =
    in [e|
         ( \(year :: Int) ->
             case year of
-              2015 -> $(quoteExp sql (queryFor 2015))
-              2016 -> $(quoteExp sql (queryFor 2016))
-              2017 -> $(quoteExp sql (queryFor 2017))
-              2018 -> $(quoteExp sql (queryFor 2018))
-              2019 -> $(quoteExp sql (queryFor 2019))
-              2020 -> $(quoteExp sql (queryFor 2020))
-              2021 -> $(quoteExp sql (queryFor 2021))
-              2022 -> $(quoteExp sql (queryFor 2022))
-              2023 -> $(quoteExp sql (queryFor 2023))
-              2024 -> $(quoteExp sql (queryFor 2024))
-              2025 -> $(quoteExp sql (queryFor 2025))
-              2026 -> $(quoteExp sql (queryFor 2026))
-              2027 -> $(quoteExp sql (queryFor 2027))
-              2028 -> $(quoteExp sql (queryFor 2028))
-              2029 -> $(quoteExp sql (queryFor 2029))
-              _ -> Prelude.error ("Unsupported school year: " ++ Prelude.show year)
+              2015 -> $(QQ.quoteExp sql (queryFor 2015))
+              2016 -> $(QQ.quoteExp sql (queryFor 2016))
+              2017 -> $(QQ.quoteExp sql (queryFor 2017))
+              2018 -> $(QQ.quoteExp sql (queryFor 2018))
+              2019 -> $(QQ.quoteExp sql (queryFor 2019))
+              2020 -> $(QQ.quoteExp sql (queryFor 2020))
+              2021 -> $(QQ.quoteExp sql (queryFor 2021))
+              2022 -> $(QQ.quoteExp sql (queryFor 2022))
+              2023 -> $(QQ.quoteExp sql (queryFor 2023))
+              2024 -> $(QQ.quoteExp sql (queryFor 2024))
+              2025 -> $(QQ.quoteExp sql (queryFor 2025))
+              2026 -> $(QQ.quoteExp sql (queryFor 2026))
+              2027 -> $(QQ.quoteExp sql (queryFor 2027))
+              2028 -> $(QQ.quoteExp sql (queryFor 2028))
+              2029 -> $(QQ.quoteExp sql (queryFor 2029))
+              _ -> Prelude.error ("Unsupported school year: " ++ Data.Text.unpack (Text.fromInt year))
         )
         |]
 
--- |
--- Get the primary key of the last row inserted by the MySQL connection we're
--- currently in. This uses MySQL's `LAST_INSERT_ID()` function and has all the
--- same caveats and limitations. In particular:
---
--- - This gets the last inserted by the current connection. This means we can
---   only use it within a MySQL transaction created using this library. Such a
---   transaction holds on to a reserved connection, preventing other threads
---   from using the connection to make requests in between our `INSERT` query
---   and our use of this function.
--- - If the last insert inserted multiple rows this function will return the
---   primary key of the first of this batch of rows that was inserted.
---
--- In Postgres use a `RETURNING` statement to get inserted id's for inserted
--- rows:
---
---    insertedIds <-
---      Postgres.doQuery
---        [Postgres.sql|!
---          INSERT INTO peanut_butters (brand, chunkiness)
---          VALUES ('Original', 'granite')
---          RETURNING id
---        |]
---        expectQuerySuccess
---
--- For more information: https://dev.mysql.com/doc/refman/8.0/en/getting-unique-id.html
-lastInsertedPrimaryKey :: Connection -> Task Query.Error (Maybe Int)
-lastInsertedPrimaryKey c =
-  let query =
-        Query.Query
-          { runQuery = \_ -> pure [],
-            sqlString = "SELECT LAST_INSERT_ID()",
-            quasiQuotedString = "SELECT LAST_INSERT_ID()",
-            sqlOperation = "SELECT",
-            queriedRelation = "LAST_INSERT_ID()"
-          }
-   in doQuery
-        c
-        query
-        ( \res -> case res of
-            Ok [] -> Task.succeed Nothing
-            Ok (x : _) -> Task.succeed x
-            Err err -> Task.fail err
-        )
-
-sql :: QuasiQuoter
+sql :: QQ.QuasiQuoter
 sql =
-  QuasiQuoter
-    { quoteExp = qqSQL,
-      quoteType = Prelude.fail "sql not supported in types",
-      quotePat = Prelude.fail "sql not supported in patterns",
-      quoteDec = Prelude.fail "sql not supported in declarations"
+  QQ.QuasiQuoter
+    { QQ.quoteExp = QQ.quoteExp Query.sql,
+      QQ.quoteType = Prelude.fail "sql not supported in types",
+      QQ.quotePat = Prelude.fail "sql not supported in patterns",
+      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
     }
-
-qqSQL :: Prelude.String -> ExpQ
-qqSQL query =
-  [e|
-    $(quoteExp Query.sql (Data.Text.unpack (escapeInterpolations (Data.Text.pack query))))
-    |]
-
-escapeInterpolations :: Text -> Text
-escapeInterpolations =
-  Lens.over
-    ([caselessRegex|\$\{([^\}]+)\}|] << R.group 0)
-    (\match -> "MySQL.escape (" ++ match ++ ")")
-
--- | Types wrapped in `Escaped` get escaped in a MySQL rather than a
--- Postgresql fashion when used as column values.
-newtype Escaped a = Escaped a deriving (Show, Eq, PGTypes.PGColumn t)
-
-instance
-  ( PGTypes.PGParameter t a,
-    KnownEscapingStrategy t a (HowToEscape t a)
-  ) =>
-  PGTypes.PGParameter t (MySQL.Escaped a)
-  where
-
-  pgEncode p (Escaped t) = PGTypes.pgEncode p t
-
-  pgLiteral p (Escaped t) =
-    escapeType (Proxy :: Proxy (HowToEscape t a)) p t
-
--- A type family is a function for types. The type family (function) below
--- takes two arguments: The postgres type to encode into and the Haskell type
--- to encode. It returns a type representing the escaping strategy to use.
--- Example usage:
---
---     HowToEscape "text" Text       --> EscapeMySQLText
---     HowToEscape "text" Maybe Text --> Nullable EscapeMySQLText
-type family HowToEscape (t :: Symbol) (a :: Type) :: EscapingStrategy where
-  HowToEscape t (Maybe a) = 'Nullable (HowToEscape t a)
-  HowToEscape "text" a = 'EscapeMySqlText
-  HowToEscape "character varying" a = 'EscapeMySqlText
-  HowToEscape "json" a = 'EscapeMySqlText
-  HowToEscape t a = 'EscapeSameAsPostgres
-
--- The different escaping strategies we perform for different types.
-data EscapingStrategy
-  = EscapeSameAsPostgres -- We let `postgresql-typed` escape for us.
-  | EscapeMySqlText -- MySQL-specific escaping for text-columns.
-  | Nullable EscapingStrategy -- We don't want to escape `NULL` values.
-
--- The type above enumerates the escaping strategies. The class below and it's
--- instances represent the implementations for the enumerated strategies.
-class KnownEscapingStrategy t a (e :: EscapingStrategy) where
-  escapeType :: PGTypes.PGParameter t a => Proxy e -> PGTypes.PGTypeID t -> a -> BS.ByteString
-
-instance KnownEscapingStrategy t a 'EscapeSameAsPostgres where
-  escapeType _ p t = PGTypes.pgLiteral p t
-
-instance KnownEscapingStrategy t a 'EscapeMySqlText where
-  escapeType _ p t = mysqlEscape (PGTypes.pgEncode p t)
-
-instance
-  (KnownEscapingStrategy t a e, PGTypes.PGParameter t a) =>
-  KnownEscapingStrategy t (Maybe a) ('Nullable e)
-  where
-  escapeType _ p t =
-    case t of
-      Nothing -> BSC.pack "NULL"
-      Just justT -> escapeType (Proxy :: Proxy e) p justT
-
--- | Wrap a value in a newtype that will ensure correct MySQL escaping logic is
--- applied. You don't need to do this manually, the `sql` quasiquoter will wrap
--- for you automatically.
-escape :: a -> Escaped a
-escape = Escaped
-
-mysqlEscape :: BS.ByteString -> BS.ByteString
-mysqlEscape = wrapInSingleQuotes << Escape.escapeBytes
-
-wrapInSingleQuotes :: BS.ByteString -> BS.ByteString
-wrapInSingleQuotes s = BSC.snoc (BSC.cons '\'' s) '\''
 
 instance PGTypes.PGColumn "boolean" Data.Int.Int16 where
   pgDecode tid tv =
@@ -1243,7 +721,7 @@ boolToSmallInt b =
     then 1
     else 0
 
-doIO :: Connection -> IO a -> Task x a
+doIO :: Connection -> Prelude.IO a -> Task x a
 doIO conn io =
   Platform.doAnything (doAnything conn) (io |> map Ok)
 
@@ -1256,280 +734,9 @@ doIO conn io =
 -- code is using the Rails MySQL client, so we cannot enable it for queries from
 -- Haskell alone, and are scared to enable it for all queries. This might change
 -- in the future.
-replace :: Text -> Text -> Query row -> Query row
+replace :: Text -> Text -> Query.Query row -> Query.Query row
 replace original replacement query =
-  query {sqlString = Text.replace original replacement (sqlString query)}
-
--- Support results with additional columns then what `persistent` supports out
--- of the box. From version `2.10.2` of persistent onwards up to 12 columns will
--- be supported by default. We'll need to remove our custom instances for up to
--- twelve columns once we reach that point.
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i)
-  where
-
-  rawSqlCols e = rawSqlCols e << from9
-
-  rawSqlColCountReason = rawSqlColCountReason << from9
-
-  rawSqlProcessRow = fmap to9 << rawSqlProcessRow
-
-from9 :: (a, b, c, d, e, f, g, h, i) -> ((a, b), (c, d), (e, f), (g, h), i)
-from9 (a, b, c, d, e, f, g, h, i) = ((a, b), (c, d), (e, f), (g, h), i)
-
-to9 :: ((a, b), (c, d), (e, f), (g, h), i) -> (a, b, c, d, e, f, g, h, i)
-to9 ((a, b), (c, d), (e, f), (g, h), i) = (a, b, c, d, e, f, g, h, i)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j)
-  where
-
-  rawSqlCols e = rawSqlCols e << from10
-
-  rawSqlColCountReason = rawSqlColCountReason << from10
-
-  rawSqlProcessRow = fmap to10 << rawSqlProcessRow
-
-from10 :: (a, b, c, d, e, f, g, h, i, j) -> ((a, b), (c, d), (e, f), (g, h), (i, j))
-from10 (a, b, c, d, e, f, g, h, i, j) = ((a, b), (c, d), (e, f), (g, h), (i, j))
-
-to10 :: ((a, b), (c, d), (e, f), (g, h), (i, j)) -> (a, b, c, d, e, f, g, h, i, j)
-to10 ((a, b), (c, d), (e, f), (g, h), (i, j)) = (a, b, c, d, e, f, g, h, i, j)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j,
-    RawSql k
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j, k)
-  where
-
-  rawSqlCols e = rawSqlCols e << from11
-
-  rawSqlColCountReason = rawSqlColCountReason << from11
-
-  rawSqlProcessRow = fmap to11 << rawSqlProcessRow
-
-from11 :: (a, b, c, d, e, f, g, h, i, j, k) -> ((a, b), (c, d), (e, f), (g, h), (i, j), k)
-from11 (a, b, c, d, e, f, g, h, i, j, k) = ((a, b), (c, d), (e, f), (g, h), (i, j), k)
-
-to11 :: ((a, b), (c, d), (e, f), (g, h), (i, j), k) -> (a, b, c, d, e, f, g, h, i, j, k)
-to11 ((a, b), (c, d), (e, f), (g, h), (i, j), k) = (a, b, c, d, e, f, g, h, i, j, k)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j,
-    RawSql k,
-    RawSql l
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j, k, l)
-  where
-
-  rawSqlCols e = rawSqlCols e << from12
-
-  rawSqlColCountReason = rawSqlColCountReason << from12
-
-  rawSqlProcessRow = fmap to12 << rawSqlProcessRow
-
-from12 :: (a, b, c, d, e, f, g, h, i, j, k, l) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l))
-from12 (a, b, c, d, e, f, g, h, i, j, k, l) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l))
-
-to12 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l)) -> (a, b, c, d, e, f, g, h, i, j, k, l)
-to12 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l)) = (a, b, c, d, e, f, g, h, i, j, k, l)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j,
-    RawSql k,
-    RawSql l,
-    RawSql m
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m)
-  where
-
-  rawSqlCols e = rawSqlCols e << from13
-
-  rawSqlColCountReason = rawSqlColCountReason << from13
-
-  rawSqlProcessRow = fmap to13 << rawSqlProcessRow
-
-from13 :: (a, b, c, d, e, f, g, h, i, j, k, l, m) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m)
-from13 (a, b, c, d, e, f, g, h, i, j, k, l, m) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m)
-
-to13 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m) -> (a, b, c, d, e, f, g, h, i, j, k, l, m)
-to13 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), m) = (a, b, c, d, e, f, g, h, i, j, k, l, m)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j,
-    RawSql k,
-    RawSql l,
-    RawSql m,
-    RawSql n
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
-  where
-
-  rawSqlCols e = rawSqlCols e << from14
-
-  rawSqlColCountReason = rawSqlColCountReason << from14
-
-  rawSqlProcessRow = fmap to14 << rawSqlProcessRow
-
-from14 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n))
-from14 (a, b, c, d, e, f, g, h, i, j, k, l, m, n) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n))
-
-to14 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n)) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
-to14 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n)) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j,
-    RawSql k,
-    RawSql l,
-    RawSql m,
-    RawSql n,
-    RawSql o
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-  where
-
-  rawSqlCols e = rawSqlCols e << from15
-
-  rawSqlColCountReason = rawSqlColCountReason << from15
-
-  rawSqlProcessRow = fmap to15 << rawSqlProcessRow
-
-from15 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o)
-from15 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o)
-
-to15 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-to15 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), o) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j,
-    RawSql k,
-    RawSql l,
-    RawSql m,
-    RawSql n,
-    RawSql o,
-    RawSql p
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
-  where
-
-  rawSqlCols e = rawSqlCols e << from16
-
-  rawSqlColCountReason = rawSqlColCountReason << from16
-
-  rawSqlProcessRow = fmap to16 << rawSqlProcessRow
-
-from16 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p))
-from16 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p))
-
-to16 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p)) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
-to16 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p)) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p)
-
-instance
-  ( RawSql a,
-    RawSql b,
-    RawSql c,
-    RawSql d,
-    RawSql e,
-    RawSql f,
-    RawSql g,
-    RawSql h,
-    RawSql i,
-    RawSql j,
-    RawSql k,
-    RawSql l,
-    RawSql m,
-    RawSql n,
-    RawSql o,
-    RawSql p,
-    RawSql q
-  ) =>
-  RawSql (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
-  where
-
-  rawSqlCols e = rawSqlCols e << from17
-
-  rawSqlColCountReason = rawSqlColCountReason << from17
-
-  rawSqlProcessRow = fmap to17 << rawSqlProcessRow
-
-from17 :: (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) -> ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q)
-from17 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q)
-
-to17 :: ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q) -> (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
-to17 ((a, b), (c, d), (e, f), (g, h), (i, j), (k, l), (m, n), (o, p), q) = (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q)
+  query
+    { Query.preparedStatement =
+        Text.replace original replacement (Query.preparedStatement query)
+    }

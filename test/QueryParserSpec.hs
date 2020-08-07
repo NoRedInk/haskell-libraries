@@ -2,7 +2,7 @@ module QueryParserSpec (tests) where
 
 import Cherry.Prelude
 import qualified Expect
-import qualified Internal.Query.Parser as Parser
+import qualified Internal.QueryParser as Parser
 import Test (Test, describe, test)
 import qualified Text
 
@@ -12,7 +12,7 @@ import qualified Text
 tests :: Test
 tests =
   describe
-    "Internal.Query.Parser"
+    "Internal.QueryParser"
     [ describe
         "parse SQL"
         [ test "simple select" <| \_ ->

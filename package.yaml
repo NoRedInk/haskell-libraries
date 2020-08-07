@@ -9,31 +9,27 @@ dependencies:
 - base
 - bytestring
 - cherry-core
-- directory
 - env-parser
 - exceptions
 - filepath
+- hashable
+- haskell-src-meta
 - health
+- io-streams
 - lens
 - lens-regex-pcre
-- monad-logger
-- mtl
 - mysql-haskell
 - network
 - oops
 - pcre-light
-- persistent-mysql-haskell
 - postgresql-simple
 - postgresql-typed
-- process
 - resource-pool
 - resourcet
 - safe-exceptions
 - template-haskell
 - text
 - time
-- typed-process
-- unix
 library:
   exposed-modules:
   - MySQL
@@ -41,8 +37,8 @@ library:
   - Postgres
   # Exposed for tests only
   - MySQL.Internal
-  - Internal.Query.Parser
-  - Internal.Query
+  - MySQL.Query
+  - Internal.QueryParser
   - Postgres.Settings
   - Internal.Time
   source-dirs: src
