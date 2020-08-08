@@ -21,6 +21,7 @@ import qualified Http
 import qualified Log
 import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client
+import qualified Network.HostName
 import qualified Platform
 import qualified Prelude
 
@@ -61,12 +62,10 @@ import qualified Prelude
 -- reporting.
 reporter :: Http.Handler -> Settings -> Platform.Span -> Prelude.IO ()
 reporter http settings span = do
-  app <- eventApp settings
-  let send' event = send http settings (event {Bugsnag.event_app = Just app})
-  case Platform.succeeded span of
-    Platform.Succeeded -> Prelude.pure ()
-    Platform.Failed -> send' (toEvent span)
-    Platform.FailedWith _ -> send' (toEvent span)
+  defaultEvent <- mkDefaultEvent settings
+  if failed span
+    then send http settings (toEvent defaultEvent span)
+    else Prelude.pure ()
 
 send :: Http.Handler -> Settings -> Bugsnag.Event -> Prelude.IO ()
 send http settings event = do
@@ -78,9 +77,9 @@ send http settings event = do
     _ <- Bugsnag.sendEvents manager (Log.unSecret (apiKey settings)) [event]
     Prelude.pure ()
 
-toEvent :: Platform.Span -> Bugsnag.Event
-toEvent span =
-  Bugsnag.defaultEvent
+toEvent :: Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+toEvent defaultEvent span =
+  defaultEvent
     { Bugsnag.event_exceptions = [rootCause [] span],
       Bugsnag.event_unhandled = case Platform.succeeded span of
         Platform.Succeeded -> Nothing
@@ -214,21 +213,30 @@ _getRevision :: Prelude.IO Text
 _getRevision = do
   eitherRevision <- Exception.tryAny <| Prelude.readFile "revision"
   case eitherRevision of
-    Prelude.Left _err ->
-      Prelude.pure "no revision file found"
+    Prelude.Left _err -> Prelude.pure "no revision file found"
     Prelude.Right version -> Prelude.pure <| Data.Text.pack version
 
-eventApp :: Settings -> Prelude.IO Bugsnag.App
-eventApp settings = do
+mkDefaultEvent :: Settings -> Prelude.IO Bugsnag.Event
+mkDefaultEvent settings = do
   revision <- getRevision
+  hostname <- Network.HostName.getHostName
   let appId = unNamespace (appName settings)
+  let app =
+        Bugsnag.defaultApp
+          { Bugsnag.app_id = Just appId,
+            -- Same format as what bugsnag-build-notify uses for appVersion
+            Bugsnag.app_version = Just (appId ++ "-" ++ unRevision revision),
+            Bugsnag.app_releaseStage = Just (unEnvironment (appEnvironment settings)),
+            Bugsnag.app_type = Just "haskell"
+          }
+  let device =
+        Bugsnag.defaultDevice
+          { Bugsnag.device_hostname = Just (Data.Text.pack hostname)
+          }
   Prelude.pure
-    Bugsnag.defaultApp
-      { Bugsnag.app_id = Just appId,
-        -- Same format as what bugsnag-build-notify uses for appVersion
-        Bugsnag.app_version = Just (appId ++ "-" ++ unRevision revision),
-        Bugsnag.app_releaseStage = Just (unEnvironment (appEnvironment settings)),
-        Bugsnag.app_type = Just "haskell"
+    Bugsnag.defaultEvent
+      { Bugsnag.event_app = Just app,
+        Bugsnag.event_device = Just device
       }
 
 newtype Revision = Revision {unRevision :: Text}
