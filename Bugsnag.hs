@@ -3,13 +3,15 @@ module Observability.Bugsnag
     Settings,
     decoder,
     readiness,
+    toEvent,
   )
 where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
+import qualified Data.Proxy as Proxy
 import qualified Data.Text
-import qualified Debug
+import qualified Data.Typeable as Typeable
 import qualified Environment
 import qualified Health
 import qualified Http
@@ -38,25 +40,33 @@ send http settings event = do
     Prelude.pure ()
 
 toEvent :: Maybe Exception.SomeException -> Platform.Span -> Bugsnag.Event
-toEvent _ _ =
+toEvent _ span =
   Bugsnag.defaultEvent
-    { Bugsnag.event_exceptions = [Debug.todo "Bugsnag.Exception"],
-      Bugsnag.event_breadcrumbs = Just [Debug.todo "Bugsnag.Breadcrumb"],
-      Bugsnag.event_request = Just (Debug.todo "Bugsnag.Request"),
-      -- Bugsnag supports sending information about the thread we're running on,
-      -- but this seems catered to heavyweight threads, surviving multiple
-      -- requests. That's not Haskell and so we keep this empty.
-      Bugsnag.event_threads = Nothing,
-      Bugsnag.event_context = Just (Debug.todo "Text: what's happening"),
-      Bugsnag.event_groupingHash = Just (Debug.todo "Text: override bugsnag's grouping logic"),
-      Bugsnag.event_severity = Just (Debug.todo "Bugsnag.Severity"),
-      Bugsnag.event_severityReason = Just (Debug.todo "Bugsnag.SeverityReason"),
-      Bugsnag.event_user = Just (Debug.todo "Bugsnag.User"),
-      Bugsnag.event_app = Just (Debug.todo "Bugsnag.App"),
-      Bugsnag.event_device = Just (Debug.todo "Bugsnag.Device"),
-      Bugsnag.event_session = Just (Debug.todo "Bugsnag.Session"),
-      Bugsnag.event_metaData = Just (Debug.todo "Data.Aeson.Object")
+    { Bugsnag.event_exceptions = [toException span]
     }
+
+toException :: Platform.Span -> Bugsnag.Exception
+toException span =
+  case Platform.succeeded span of
+    Platform.Succeeded -> Bugsnag.defaultException
+    Platform.Failed ->
+      Bugsnag.defaultException
+        { Bugsnag.exception_errorClass = "Failed: " ++ Platform.name span
+        }
+    Platform.FailedWith (Exception.SomeException exception) ->
+      Bugsnag.defaultException
+        { Bugsnag.exception_errorClass = typeName exception,
+          Bugsnag.exception_message =
+            Exception.displayException exception
+              |> Data.Text.pack
+              |> Just
+        }
+
+typeName :: forall a. Typeable.Typeable a => a -> Text
+typeName _ =
+  Typeable.typeRep (Proxy.Proxy :: Proxy.Proxy a)
+    |> Prelude.show
+    |> Data.Text.pack
 
 newtype Settings
   = Settings
