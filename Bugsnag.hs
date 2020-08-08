@@ -12,6 +12,7 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.List
 import qualified Data.Proxy as Proxy
 import qualified Data.Text
+import qualified Data.Text.IO
 import qualified Data.Typeable as Typeable
 import qualified Environment
 import qualified GHC.Stack as Stack
@@ -60,7 +61,8 @@ import qualified Prelude
 -- reporting.
 reporter :: Http.Handler -> Settings -> Platform.Span -> Prelude.IO ()
 reporter http settings span = do
-  let send' = send http settings
+  app <- eventApp settings
+  let send' event = send http settings (event {Bugsnag.event_app = Just app})
   case Platform.succeeded span of
     Platform.Succeeded -> Prelude.pure ()
     Platform.Failed -> send' (toEvent span)
@@ -147,15 +149,19 @@ typeName _ =
     |> Prelude.show
     |> Data.Text.pack
 
-newtype Settings
+data Settings
   = Settings
-      { apiKey :: Log.Secret Bugsnag.ApiKey
+      { apiKey :: Log.Secret Bugsnag.ApiKey,
+        appName :: Namespace,
+        appEnvironment :: Environment
       }
 
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
     |> andMap apiKeyDecoder
+    |> andMap namespaceDecoder
+    |> andMap environmentDecoder
 
 apiKeyDecoder :: Environment.Decoder (Log.Secret Bugsnag.ApiKey)
 apiKeyDecoder =
@@ -166,6 +172,30 @@ apiKeyDecoder =
         Environment.defaultValue = "*****"
       }
     (Environment.text |> map Bugsnag.apiKey |> Environment.secret)
+
+newtype Namespace = Namespace {unNamespace :: Text}
+
+namespaceDecoder :: Environment.Decoder Namespace
+namespaceDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "LOG_ROOT_NAMESPACE",
+        Environment.description = "Root of the log namespace. This should be the name of the application.",
+        Environment.defaultValue = "your-application-name-here"
+      }
+    (map Namespace Environment.text)
+
+newtype Environment = Environment {unEnvironment :: Text}
+
+environmentDecoder :: Environment.Decoder Environment
+environmentDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "ENVIRONMENT",
+        Environment.description = "Environment to display in logs.",
+        Environment.defaultValue = "development"
+      }
+    (map Environment Environment.text)
 
 -- |
 -- Check if Bugsnag is ready to receive requests.
@@ -187,3 +217,25 @@ _getRevision = do
     Prelude.Left _err ->
       Prelude.pure "no revision file found"
     Prelude.Right version -> Prelude.pure <| Data.Text.pack version
+
+eventApp :: Settings -> Prelude.IO Bugsnag.App
+eventApp settings = do
+  revision <- getRevision
+  let appId = unNamespace (appName settings)
+  Prelude.pure
+    Bugsnag.defaultApp
+      { Bugsnag.app_id = Just appId,
+        -- Same format as what bugsnag-build-notify uses for appVersion
+        Bugsnag.app_version = Just (appId ++ "-" ++ unRevision revision),
+        Bugsnag.app_releaseStage = Just (unEnvironment (appEnvironment settings)),
+        Bugsnag.app_type = Just "haskell"
+      }
+
+newtype Revision = Revision {unRevision :: Text}
+
+getRevision :: Prelude.IO Revision
+getRevision = do
+  eitherRevision <- Exception.tryAny <| Data.Text.IO.readFile "revision"
+  case eitherRevision of
+    Prelude.Left _err -> Prelude.pure (Revision "no revision file found")
+    Prelude.Right version -> Prelude.pure (Revision version)
