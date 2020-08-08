@@ -63,8 +63,8 @@ reporter http settings span = do
   let send' = send http settings
   case Platform.succeeded span of
     Platform.Succeeded -> Prelude.pure ()
-    Platform.Failed -> send' (toEvent Nothing span)
-    Platform.FailedWith err -> send' (toEvent (Just err) span)
+    Platform.Failed -> send' (toEvent span)
+    Platform.FailedWith _ -> send' (toEvent span)
 
 send :: Http.Handler -> Settings -> Bugsnag.Event -> Prelude.IO ()
 send http settings event = do
@@ -76,10 +76,19 @@ send http settings event = do
     _ <- Bugsnag.sendEvents manager (Log.unSecret (apiKey settings)) [event]
     Prelude.pure ()
 
-toEvent :: Maybe Exception.SomeException -> Platform.Span -> Bugsnag.Event
-toEvent _ span =
+toEvent :: Platform.Span -> Bugsnag.Event
+toEvent span =
   Bugsnag.defaultEvent
-    { Bugsnag.event_exceptions = [rootCause [] span]
+    { Bugsnag.event_exceptions = [rootCause [] span],
+      Bugsnag.event_unhandled = case Platform.succeeded span of
+        Platform.Succeeded -> Nothing
+        -- `Failed` indicates a span was marked as failed by the application
+        -- author. Something went wrong, but we wrote logic to handle it.
+        Platform.Failed -> Just False
+        -- `FailedWith` indicates a Haskell exception was thrown. We don't throw
+        -- in our applications, so this indicates a library is doing something
+        -- we didn't expect.
+        Platform.FailedWith _ -> Just True
     }
 
 -- | Find the most recently started span that failed. This span is closest to
