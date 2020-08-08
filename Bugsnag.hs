@@ -138,7 +138,8 @@ renderRemainingSpanDetails span event details =
 renderIncomingHttpRequest :: Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
 renderIncomingHttpRequest event request =
   event
-    { Bugsnag.event_request =
+    { Bugsnag.event_context = Just (Monitoring.method request ++ " " ++ Monitoring.endpoint request),
+      Bugsnag.event_request =
         Just
           Bugsnag.defaultRequest
             { Bugsnag.request_httpMethod = Just (Monitoring.method request),
