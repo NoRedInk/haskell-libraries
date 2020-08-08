@@ -119,9 +119,21 @@ decorateEventWithSpanData span event =
   Platform.details span
     |> Maybe.andThen
       ( Platform.renderSpanDetails
-          [Platform.Renderer (renderIncomingHttpRequest event)]
+          [ Platform.Renderer (renderIncomingHttpRequest event),
+            Platform.Renderer (renderRemainingSpanDetails span event)
+          ]
       )
     |> Maybe.withDefault event
+
+renderRemainingSpanDetails :: Platform.Span -> Bugsnag.Event -> Platform.SomeSpanDetails -> Bugsnag.Event
+renderRemainingSpanDetails span event details =
+  event
+    { Bugsnag.event_metaData =
+        Aeson.toJSON details
+          |> HashMap.singleton (Platform.name span)
+          |> Just
+          |> (++) (Bugsnag.event_metaData event)
+    }
 
 renderIncomingHttpRequest :: Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
 renderIncomingHttpRequest event request =
