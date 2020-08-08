@@ -294,13 +294,7 @@ doQuery conn query handleResponse =
           _ -> Task.succeed ()
         Task.succeed result
       infoForContext :: Query.QueryInfo
-      infoForContext = Query.QueryInfo
-        { Query.queryText = Log.mkSecret (Query.preparedStatement query),
-          Query.queryTemplate = Query.quasiQuotedString query,
-          Query.queryConn = logContext conn,
-          Query.queryOperation = Query.sqlOperation query,
-          Query.queryCollection = Query.queriedRelation query
-        }
+      infoForContext = Query.mkQueryInfo query (logContext conn)
    in runQuery
         -- Handle the response before wrapping the operation in a context. This way,
         -- if the response handling logic creates errors, those errors can inherit

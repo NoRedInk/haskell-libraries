@@ -1,4 +1,5 @@
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -10,6 +11,7 @@ module MySQL.Query
     PrepareQuery (..),
     QueryInfo (..),
     QueryConnectionInfo (..),
+    mkQueryInfo,
   )
 where
 
@@ -63,9 +65,13 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-data PrepareQuery = Prepare | DontPrepare deriving (Eq, Show)
+instance Aeson.ToJSON (Query row)
+
+data PrepareQuery = Prepare | DontPrepare deriving (Eq, Show, Generic)
+
+instance Aeson.ToJSON PrepareQuery
 
 qqSQL :: Prelude.String -> TH.ExpQ
 qqSQL queryWithPgTypedFlags = do
@@ -239,26 +245,28 @@ sql =
 
 data QueryInfo
   = QueryInfo
-      { -- | The full query we're sending to a database. Wrapped in a Secret
-        -- because some queries might contain sensitive information, and we
-        -- don't know which ones.
-        queryText :: Log.Secret Text,
-        -- | The query template (QuasiQuote) that was used to build the template.
-        -- This we don't need to wrap in a `Secret` and can be safely logged.
-        queryTemplate :: Text,
+      { -- | The full query we're executing
+        query :: QueryWithoutParam,
         -- | Connection information of the database we're sending the query to.
-        queryConn :: QueryConnectionInfo,
-        -- | Our best guess of the relation we're querying.
-        queryCollection :: Text,
-        -- | Our best guess of the SQL operation we're performing (SELECT /
-        -- DELETE / ...).
-        queryOperation :: Text
+        connection :: QueryConnectionInfo
       }
   deriving (Generic)
 
 instance Aeson.ToJSON QueryInfo
 
 instance Platform.SpanDetails QueryInfo
+
+data QueryWithoutParam where
+  QueryWithoutParam :: Query row -> QueryWithoutParam
+
+instance Aeson.ToJSON QueryWithoutParam where
+
+  toJSON (QueryWithoutParam query) = Aeson.toJSON query
+
+  toEncoding (QueryWithoutParam query) = Aeson.toEncoding query
+
+mkQueryInfo :: Query row -> QueryConnectionInfo -> QueryInfo
+mkQueryInfo query conn = QueryInfo (QueryWithoutParam query) conn
 
 data QueryConnectionInfo
   = TcpSocket Host Port DatabaseName
