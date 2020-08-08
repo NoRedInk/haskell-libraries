@@ -9,6 +9,9 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
+import Data.Aeson ((.=))
+import qualified Data.Aeson as Aeson
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
 import qualified Data.Text
@@ -19,6 +22,8 @@ import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Http
 import qualified Log
+import qualified Maybe
+import qualified Monitoring
 import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client
 import qualified Network.HostName
@@ -78,33 +83,66 @@ send http settings event = do
     Prelude.pure ()
 
 toEvent :: Bugsnag.Event -> Platform.Span -> Bugsnag.Event
-toEvent defaultEvent span =
-  defaultEvent
-    { Bugsnag.event_exceptions = [rootCause [] span],
-      Bugsnag.event_unhandled = case Platform.succeeded span of
-        Platform.Succeeded -> Nothing
-        -- `Failed` indicates a span was marked as failed by the application
-        -- author. Something went wrong, but we wrote logic to handle it.
-        Platform.Failed -> Just False
-        -- `FailedWith` indicates a Haskell exception was thrown. We don't throw
-        -- in our applications, so this indicates a library is doing something
-        -- we didn't expect.
-        Platform.FailedWith _ -> Just True
-    }
+toEvent = rootCause []
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Platform.Span -> Bugsnag.Exception
-rootCause frames span =
+rootCause :: [Bugsnag.StackFrame] -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+rootCause frames event span =
   let newFrames =
         case Platform.frame span of
           Nothing -> frames
           Just (name, src) -> toStackFrame name src : frames
+      newEvent = decorateEventWithSpanData span event
    in case Data.List.find failed (Platform.children span) of
-        Nothing -> toException newFrames span
-        Just child -> rootCause newFrames child
+        Just child -> rootCause newFrames newEvent child
+        Nothing ->
+          newEvent
+            { Bugsnag.event_exceptions = [toException newFrames span],
+              Bugsnag.event_unhandled = case Platform.succeeded span of
+                Platform.Succeeded -> Nothing
+                -- `Failed` indicates a span was marked as failed by the application
+                -- author. Something went wrong, but we wrote logic to handle it.
+                Platform.Failed -> Just False
+                -- `FailedWith` indicates a Haskell exception was thrown. We don't throw
+                -- in our applications, so this indicates a library is doing something
+                -- we didn't expect.
+                Platform.FailedWith _ -> Just True
+            }
+
+decorateEventWithSpanData :: Platform.Span -> Bugsnag.Event -> Bugsnag.Event
+decorateEventWithSpanData span event =
+  Platform.details span
+    |> Maybe.andThen
+      ( Platform.renderSpanDetails
+          [Platform.Renderer (renderIncomingHttpRequest event)]
+      )
+    |> Maybe.withDefault event
+
+renderIncomingHttpRequest :: Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
+renderIncomingHttpRequest event request =
+  event
+    { Bugsnag.event_request =
+        Just
+          Bugsnag.defaultRequest
+            { Bugsnag.request_httpMethod = Just (Monitoring.method request),
+              Bugsnag.request_url = Just (Monitoring.path request ++ Monitoring.queryString request)
+            },
+      -- Extra request data that Bugsnag doesn't ask for in its API, but which
+      -- we can make appear on the 'request' tab anyway by logging it on the
+      -- 'request' key of the event metadata.
+      Bugsnag.event_metaData =
+        [ "endpoint" .= Monitoring.endpoint request,
+          "http version" .= Monitoring.httpVersion request,
+          "response status" .= Monitoring.responseStatus request
+        ]
+          |> Aeson.object
+          |> HashMap.singleton "request"
+          |> Just
+          |> (++) (Bugsnag.event_metaData event)
+    }
 
 failed :: Platform.Span -> Bool
 failed span =
