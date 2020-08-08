@@ -1,5 +1,5 @@
 module Observability.Bugsnag
-  ( logger,
+  ( reporter,
     Settings,
     decoder,
     readiness,
@@ -23,8 +23,43 @@ import qualified Network.HTTP.Client
 import qualified Platform
 import qualified Prelude
 
-logger :: Http.Handler -> Settings -> Platform.Span -> Prelude.IO ()
-logger http settings span = do
+-- | Reporting to Bugsnag.
+--
+-- This function takes the root span of a completed request and reports it to
+-- Bugsnag, if there has been a failure. A request that completed succesfully
+-- is not reported.
+--
+-- If we squint a bit, the rough shape of data that Bugsnag expects of us is:
+--
+--    event {attributes} [breadcrumbs]
+--
+-- Meaning: we can use various attributes to describe an event and in addition
+-- pass a list of "breadcrumbs", other events that took place before the one the
+-- report we're making is about.
+--
+-- The root span we pass in is a tree structure. It can have child spans, which
+-- in turn can have child spans, etc. Each span is marked with whether it
+-- succeeded or failed. If one of the children of a span failed, the span itself
+-- failed too.
+--
+-- To turn this tree structure into the data that Bugsnag expects we're going to
+-- take the following approach. First we're going to find the 'root cause span'.
+-- This is the most recently started span that failed. The data in this span and
+-- it's parents is going to make up the main event to Bugsnag. All other spans
+-- that completed before the root cause span started we'll turn into
+-- breadcrumbs. For some span tree it might look like this:
+--
+--     ^     failed span, a = 1            -> event { a = 1,
+--     t         succeeded span
+--     i         failed span, b = 2        ->         b = 2,
+--     m             failed span, c = 3    ->         c = 3 }
+--     e                 succeeded span    ->       [ breadcrumb1
+--     ^         succeeded span            ->       , breadcrumb2 ]
+--
+-- A span that happened _after_ the root cause event completed we're not
+-- reporting.
+reporter :: Http.Handler -> Settings -> Platform.Span -> Prelude.IO ()
+reporter http settings span = do
   let send' = send http settings
   case Platform.succeeded span of
     Platform.Succeeded -> Prelude.pure ()
