@@ -11,10 +11,12 @@ import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.CaseInsensitive as CI
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
 import qualified Data.Text
+import qualified Data.Text.Encoding
 import qualified Data.Text.IO
 import qualified Data.Typeable as Typeable
 import qualified Environment
@@ -128,7 +130,17 @@ renderIncomingHttpRequest event request =
         Just
           Bugsnag.defaultRequest
             { Bugsnag.request_httpMethod = Just (Monitoring.method request),
-              Bugsnag.request_url = Just (Monitoring.path request ++ Monitoring.queryString request)
+              Bugsnag.request_headers =
+                Monitoring.requestHeaders request
+                  |> Monitoring.unHeaders
+                  |> map
+                    ( \(key, value) ->
+                        ( Data.Text.Encoding.decodeUtf8 (CI.original key),
+                          Data.Text.Encoding.decodeUtf8 value
+                        )
+                    )
+                  |> HashMap.fromList
+                  |> Just
             },
       -- Extra request data that Bugsnag doesn't ask for in its API, but which
       -- we can make appear on the 'request' tab anyway by logging it on the
@@ -136,7 +148,9 @@ renderIncomingHttpRequest event request =
       Bugsnag.event_metaData =
         [ "endpoint" .= Monitoring.endpoint request,
           "http version" .= Monitoring.httpVersion request,
-          "response status" .= Monitoring.responseStatus request
+          "response status" .= Monitoring.responseStatus request,
+          "path" .= Monitoring.path request,
+          "query string" .= Monitoring.queryString request
         ]
           |> Aeson.object
           |> HashMap.singleton "request"
