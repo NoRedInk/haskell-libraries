@@ -21,6 +21,7 @@ module Http
     Internal.Http.Error (..),
     Internal.Http.Settings (..),
     Internal.Http.Body (..),
+    HttpRequestInfo (..),
   )
 where
 
