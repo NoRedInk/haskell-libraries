@@ -225,7 +225,8 @@ customizeBreadcrumb details breadcrumb =
     |> Platform.renderSpanDetails
       [ Platform.Renderer (outgoingHttpRequestAsBreadcrumb breadcrumb),
         Platform.Renderer (mysqlQueryAsBreadcrumb breadcrumb),
-        Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb)
+        Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb),
+        Platform.Renderer (logAsBreadcrumb breadcrumb)
       ]
     |> Maybe.withDefault breadcrumb
 
@@ -247,6 +248,13 @@ postgresQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> Postgres.Info -> Bugsnag.Brea
 postgresQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
+      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+    }
+
+logAsBreadcrumb :: Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
+logAsBreadcrumb breadcrumb details =
+  breadcrumb
+    { Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType,
       Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
     }
 
