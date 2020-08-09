@@ -91,7 +91,7 @@ toEvent = rootCause [] Prelude.mempty
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Breadcrumbs -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
 rootCause frames breadcrumbs event span =
   let newFrames =
         case Platform.frame span of
@@ -120,7 +120,7 @@ rootCause frames breadcrumbs event span =
                 -- after the last of these child spans, making all child spans
                 -- breadcrumbs.
                 addCrumbs childSpans ++ breadcrumbs
-                  |> breadcrumbsAsList
+                  |> crumbsAsList
                   |> Just,
               Bugsnag.event_unhandled = case Platform.succeeded span of
                 Platform.Succeeded -> Nothing
@@ -146,11 +146,11 @@ rootCause frames breadcrumbs event span =
 -- breadcrumb collection, because if the span tree gets large we'd be doing a
 -- lot of it.
 --
--- To help us avoid doing appends we create a helper type `Breadcrumbs a`, which
+-- To help us avoid doing appends we create a helper type `Crumbs a`, which
 -- is a wrapper around a state monad. The only helper function it exposes for
 -- adding a breadcrumb is one that cons that breadcrumb to the front of the
 -- list, so no appends.
-addCrumbs :: [Platform.Span] -> Breadcrumbs
+addCrumbs :: [Platform.Span] -> Crumbs
 addCrumbs spans =
   case spans of
     [] -> Prelude.mempty
@@ -158,24 +158,24 @@ addCrumbs spans =
       addCrumbsForSpan span
         ++ addCrumbs after
 
-addCrumbsForSpan :: Platform.Span -> Breadcrumbs
+addCrumbsForSpan :: Platform.Span -> Crumbs
 addCrumbsForSpan span =
   case Platform.children span of
     [] ->
-      addBreadcrumb (toBreadcrumb DoSpan span)
+      addCrumb (toBreadcrumb DoSpan span)
     children ->
-      addBreadcrumb (toBreadcrumb EndSpan span)
+      addCrumb (toBreadcrumb EndSpan span)
         ++ addCrumbs children
-        ++ addBreadcrumb (toBreadcrumb StartSpan span)
+        ++ addCrumb (toBreadcrumb StartSpan span)
 
-newtype Breadcrumbs = Breadcrumbs ([Bugsnag.Breadcrumb] -> [Bugsnag.Breadcrumb])
+newtype Crumbs = Crumbs ([Bugsnag.Breadcrumb] -> [Bugsnag.Breadcrumb])
   deriving (Prelude.Semigroup, Prelude.Monoid)
 
-breadcrumbsAsList :: Breadcrumbs -> [Bugsnag.Breadcrumb]
-breadcrumbsAsList (Breadcrumbs f) = f []
+crumbsAsList :: Crumbs -> [Bugsnag.Breadcrumb]
+crumbsAsList (Crumbs f) = f []
 
-addBreadcrumb :: Bugsnag.Breadcrumb -> Breadcrumbs
-addBreadcrumb crumb = Breadcrumbs (crumb :)
+addCrumb :: Bugsnag.Breadcrumb -> Crumbs
+addCrumb crumb = Crumbs (crumb :)
 
 data BreadcrumbType = StartSpan | DoSpan | EndSpan
 
