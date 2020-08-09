@@ -229,16 +229,11 @@ customizeBreadcrumb details breadcrumb =
       ]
     |> Maybe.withDefault breadcrumb
 
-outgoingHttpRequestAsBreadcrumb :: Bugsnag.Breadcrumb -> Http.HttpRequestInfo -> Bugsnag.Breadcrumb
+outgoingHttpRequestAsBreadcrumb :: Bugsnag.Breadcrumb -> Http.Info -> Bugsnag.Breadcrumb
 outgoingHttpRequestAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData =
-        [ ("uri", Http.requestUri details),
-          ("method", Http.requestMethod details)
-        ]
-          |> HashMap.fromList
-          |> Just
+      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
     }
 
 mysqlQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> MySQL.Info -> Bugsnag.Breadcrumb
