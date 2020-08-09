@@ -9,6 +9,7 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
+import qualified Control.Monad.Writer as Writer
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.CaseInsensitive as CI
@@ -23,6 +24,7 @@ import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Http
+import qualified List
 import qualified Log
 import qualified Maybe
 import qualified Monitoring
@@ -30,6 +32,7 @@ import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client
 import qualified Network.HostName
 import qualified Platform
+import qualified Tuple
 import qualified Prelude
 
 -- | Reporting to Bugsnag.
@@ -85,24 +88,45 @@ send http settings event = do
     Prelude.pure ()
 
 toEvent :: Bugsnag.Event -> Platform.Span -> Bugsnag.Event
-toEvent = rootCause []
+toEvent = rootCause [] []
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
-rootCause frames event span =
+rootCause :: [Bugsnag.StackFrame] -> [Bugsnag.Breadcrumb] -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+rootCause frames breadcrumbs event span =
   let newFrames =
         case Platform.frame span of
           Nothing -> frames
           Just (name, src) -> toStackFrame name src : frames
       newEvent = decorateEventWithSpanData span event
-   in case Data.List.find failed (Platform.children span) of
-        Just child -> rootCause newFrames newEvent child
-        Nothing ->
+      childSpans = Platform.children span
+   in -- We're not interested in child spans that happened _after_ the root
+      -- cause took place. These are not breadcrumbs (leading up to the error)
+      -- nor can they have caused the error itself because they happened after.
+      -- Since child spans are ordered most-recent first we can keep dropping
+      -- child spans until we hit the one where the most recent error happened.
+      case Data.List.dropWhile (not << failed) childSpans of
+        child : preErrorSpans ->
+          rootCause
+            newFrames
+            ((breadcrumbs, preErrorSpans) |> andThen addCrumbs |> Tuple.first)
+            newEvent
+            child
+        [] ->
           newEvent
             { Bugsnag.event_exceptions = [toException newFrames span],
+              Bugsnag.event_breadcrumbs =
+                -- This is the innermost span that failed, so all it's children
+                -- succeeded. We're going to assume that the error happened
+                -- after the last of these child spans, making all child spans
+                -- breadcrumbs.
+                (breadcrumbs, childSpans)
+                  |> andThen addCrumbs
+                  |> Tuple.first
+                  |> List.reverse
+                  |> Just,
               Bugsnag.event_unhandled = case Platform.succeeded span of
                 Platform.Succeeded -> Nothing
                 -- `Failed` indicates a span was marked as failed by the application
@@ -113,6 +137,29 @@ rootCause frames event span =
                 -- we didn't expect.
                 Platform.FailedWith _ -> Just True
             }
+
+addCrumbs :: [Platform.Span] -> ([Bugsnag.Breadcrumb], ())
+addCrumbs spans =
+  case spans of
+    [] -> Prelude.pure ()
+    span : after ->
+      case Platform.children span of
+        [] -> do
+          addCrumbs after
+          Writer.tell [toBreadcrumb DoSpan span]
+        children -> do
+          addCrumbs after
+          Writer.tell [toBreadcrumb EndSpan span]
+          addCrumbs children
+          Writer.tell [toBreadcrumb StartSpan span]
+
+data BreadcrumbType = StartSpan | DoSpan | EndSpan
+
+toBreadcrumb :: BreadcrumbType -> Platform.Span -> Bugsnag.Breadcrumb
+toBreadcrumb _ span =
+  Bugsnag.defaultBreadcrumb
+    { Bugsnag.breadcrumb_name = Platform.name span
+    }
 
 decorateEventWithSpanData :: Platform.Span -> Bugsnag.Event -> Bugsnag.Event
 decorateEventWithSpanData span event =
