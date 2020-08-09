@@ -11,7 +11,6 @@ import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
@@ -25,6 +24,7 @@ import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Http
+import qualified List
 import qualified Log
 import qualified Maybe
 import qualified Monitoring
@@ -34,6 +34,7 @@ import qualified Network.HTTP.Client
 import qualified Network.HostName
 import qualified Platform
 import qualified Postgres
+import qualified Text
 import qualified Prelude
 
 -- | Reporting to Bugsnag.
@@ -258,27 +259,52 @@ logAsBreadcrumb breadcrumb details =
       Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
     }
 
+-- | Our span details are arbitrary JSON structures, but for breadcrumb metadata
+-- bugsnag expects a flat list of key,value pairs. This function flattens JSON
+-- so we can pass it into the breadcrumb format.
+--
+-- Given a type that has the following JSON representation:
+--
+--     {
+--       "treasure": {
+--         "coords: { "x": 12, "y" 14 },
+--         "worth": "Tons!"
+--       }
+--     }
+--
+-- It will create a flat list of key,value pairs like this:
+--
+--     HashMap.fromList
+--       [ ("treasure.coords.x", "12"   )
+--       , ("treasure.coords.y", "14"   )
+--       , ("treasure.worth"   , "Tons!")
+--       ]
 breadcrumbMetaDataViaJson :: Aeson.ToJSON a => a -> HashMap.HashMap Text Text
 breadcrumbMetaDataViaJson x =
   case Aeson.toJSON x of
-    Aeson.Object dict -> map jsonAsText dict
-    val -> HashMap.singleton "value" (jsonAsText val)
+    Aeson.Object dict ->
+      HashMap.foldlWithKey'
+        (\acc key value -> acc ++ jsonAsText key value)
+        HashMap.empty
+        dict
+    val -> jsonAsText "value" val
 
-jsonAsText :: Aeson.Value -> Text
-jsonAsText val =
+jsonAsText :: Text -> Aeson.Value -> HashMap.HashMap Text Text
+jsonAsText key val =
   case val of
     Aeson.Object dict ->
-      Aeson.encode dict
-        |> Data.ByteString.Lazy.toStrict
-        |> Data.Text.Encoding.decodeUtf8
+      HashMap.foldlWithKey'
+        (\acc key2 value -> acc ++ jsonAsText (key ++ "." ++ key2) value)
+        HashMap.empty
+        dict
     Aeson.Array vals ->
-      map jsonAsText vals
-        |> Foldable.toList
-        |> Data.Text.intercalate ",\n"
-    Aeson.String str -> str
-    Aeson.Number n -> Data.Text.pack (Prelude.show n)
-    Aeson.Bool bool -> Data.Text.pack (Prelude.show bool)
-    Aeson.Null -> "null"
+      Foldable.toList vals
+        |> List.indexedMap (\i elem -> jsonAsText (key ++ "." ++ Text.fromInt i) elem)
+        |> HashMap.unions
+    Aeson.String str -> HashMap.singleton key str
+    Aeson.Number n -> HashMap.singleton key (Data.Text.pack (Prelude.show n))
+    Aeson.Bool bool -> HashMap.singleton key (Data.Text.pack (Prelude.show bool))
+    Aeson.Null -> HashMap.empty
 
 decorateEventWithSpanData :: Platform.Span -> Bugsnag.Event -> Bugsnag.Event
 decorateEventWithSpanData span event =
