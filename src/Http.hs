@@ -21,7 +21,7 @@ module Http
     Internal.Http.Error (..),
     Internal.Http.Settings (..),
     Internal.Http.Body (..),
-    HttpRequestInfo (..),
+    Info (..),
   )
 where
 
@@ -37,6 +37,7 @@ import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import qualified Internal.Http
+import qualified List
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.Internal as HTTP.Internal
@@ -293,12 +294,12 @@ prepareManagerForRequest manager = do
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
     wrapException log req io =
       let spanDetails =
-            HttpRequestInfo
-              { requestUri =
+            Info
+              { infoUri =
                   HTTP.getUri req
                     |> Network.URI.uriToString (\_ -> "*****")
                     |> (\showS -> Data.Text.pack (showS "")),
-                requestMethod =
+                infoRequestMethod =
                   HTTP.method req
                     |> Data.Text.Encoding.decodeUtf8
               }
@@ -311,13 +312,23 @@ prepareManagerForRequest manager = do
                   (Platform.setSpanDetailsIO log' spanDetails)
             )
 
-data HttpRequestInfo
-  = HttpRequestInfo
-      { requestUri :: Text,
-        requestMethod :: Text
+data Info
+  = Info
+      { infoUri :: Text,
+        infoRequestMethod :: Text
       }
   deriving (Generic)
 
-instance Aeson.ToJSON HttpRequestInfo
+instance Aeson.ToJSON Info where
 
-instance Platform.SpanDetails HttpRequestInfo
+  toJSON = Aeson.genericToJSON infoEncodingOptions
+
+  toEncoding = Aeson.genericToEncoding infoEncodingOptions
+
+infoEncodingOptions :: Aeson.Options
+infoEncodingOptions =
+  Aeson.defaultOptions
+    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
+    }
+
+instance Platform.SpanDetails Info
