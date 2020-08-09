@@ -162,11 +162,11 @@ addCrumbsForSpan :: Platform.Span -> Crumbs
 addCrumbsForSpan span =
   case Platform.children span of
     [] ->
-      addCrumb (toBreadcrumb DoSpan span)
+      addCrumb (doBreadcrumb span)
     children ->
-      addCrumb (toBreadcrumb StartSpan span)
+      addCrumb (startBreadcrumb span)
         |> followedBy (addCrumbs children)
-        |> followedBy (addCrumb (toBreadcrumb EndSpan span))
+        |> followedBy (addCrumb (endBreadcrumb span))
 
 -- | A type representing a list of breadcrumbs. We're not using just a list
 -- directly, because then in constructing the full list of breadcrumbs we'd have
@@ -191,16 +191,35 @@ crumbsAsList (Crumbs f) = f []
 addCrumb :: Bugsnag.Breadcrumb -> Crumbs
 addCrumb crumb = Crumbs (crumb :)
 
-data BreadcrumbType = StartSpan | DoSpan | EndSpan
-
-toBreadcrumb :: BreadcrumbType -> Platform.Span -> Bugsnag.Breadcrumb
-toBreadcrumb breadcrumbType span =
+endBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb
+endBreadcrumb span =
   Bugsnag.defaultBreadcrumb
-    { Bugsnag.breadcrumb_name = case breadcrumbType of
-        DoSpan -> Platform.name span
-        StartSpan -> "Starting: " ++ Platform.name span
-        EndSpan -> "Finished: " ++ Platform.name span
+    { Bugsnag.breadcrumb_name = "Finished: " ++ Platform.name span,
+      Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType
     }
+
+startBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb
+startBreadcrumb span =
+  (doBreadcrumb span)
+    { Bugsnag.breadcrumb_name = "Starting: " ++ Platform.name span
+    }
+
+doBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb
+doBreadcrumb span =
+  let defaultBreadcrumb =
+        Bugsnag.defaultBreadcrumb
+          { Bugsnag.breadcrumb_name = Platform.name span,
+            Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType
+          }
+   in case Platform.details span of
+        Nothing -> defaultBreadcrumb
+        Just details -> customizeBreadcrumb details defaultBreadcrumb
+
+customizeBreadcrumb :: Platform.SomeSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
+customizeBreadcrumb details breadcrumb =
+  details
+    |> Platform.renderSpanDetails []
+    |> Maybe.withDefault breadcrumb
 
 decorateEventWithSpanData :: Platform.Span -> Bugsnag.Event -> Bugsnag.Event
 decorateEventWithSpanData span event =
