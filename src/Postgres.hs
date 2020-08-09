@@ -22,6 +22,7 @@ module Postgres
     Query.Error (..),
     Query.sql,
     doQuery,
+    Query.Info (..),
     -- Handling transactions
     transaction,
     inTestTransaction,
@@ -77,7 +78,7 @@ data Connection
   = Connection
       { doAnything :: Platform.DoAnythingHandler,
         singleOrPool :: SingleOrPool PGConnection,
-        logContext :: Query.QueryConnectionInfo,
+        logContext :: Query.ConnectionInfo,
         timeout :: Time.Interval
       }
 
@@ -224,13 +225,7 @@ doQuery conn query handleResponse = do
              (Platform.finally task (Platform.setSpanDetails queryInfo))
        )
   where
-    queryInfo = Query.QueryInfo
-      { Query.queryText = Log.mkSecret (Query.sqlString query),
-        Query.queryTemplate = Query.quasiQuotedString query,
-        Query.queryConn = logContext conn,
-        Query.queryOperation = Query.sqlOperation query,
-        Query.queryCollection = Query.queriedRelation query
-      }
+    queryInfo = Query.mkInfo query (logContext conn)
 
 fromPGError :: Connection -> PGError -> Query.Error
 fromPGError c pgError =
@@ -274,7 +269,7 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
     ] ::
     Text
 
-toConnectionLogContext :: PGDatabase -> Query.QueryConnectionInfo
+toConnectionLogContext :: PGDatabase -> Query.ConnectionInfo
 toConnectionLogContext db =
   case pgDBAddr db of
     Left (hostName, serviceName) ->

@@ -9,9 +9,9 @@ module MySQL.Query
   ( sql,
     Query (..),
     PrepareQuery (..),
-    QueryInfo (..),
-    QueryConnectionInfo (..),
-    mkQueryInfo,
+    Info (..),
+    ConnectionInfo (..),
+    mkInfo,
   )
 where
 
@@ -243,32 +243,50 @@ sql =
 -- SpanDetails
 --
 
-data QueryInfo
-  = QueryInfo
-      { -- | The full query we're executing
-        query :: QueryWithoutParam,
+data Info
+  = Info
+      { -- | The full query we're executing (prepared statement).
+        infoQuery :: Text,
+        -- | The quasi-quoted string of the query we're executing.
+        infoQueryTemplate :: Text,
+        -- | Whether we execute this query as a prepared statement.
+        infoRanAsPreparedStatement :: Bool,
+        -- | Our best guess of the SQL operation we're performing (SELECT /
+        -- DELETE / ...).
+        infoSqlOperation :: Text,
+        -- | Our best guess of the relation we're querying.
+        infoQueriedRelation :: Text,
         -- | Connection information of the database we're sending the query to.
-        connection :: QueryConnectionInfo
+        infoConnectionString :: Text
       }
   deriving (Generic)
 
-instance Aeson.ToJSON QueryInfo
+instance Aeson.ToJSON Info where
 
-instance Platform.SpanDetails QueryInfo
+  toJSON = Aeson.genericToJSON infoEncodingOptions
 
-data QueryWithoutParam where
-  QueryWithoutParam :: Query row -> QueryWithoutParam
+  toEncoding = Aeson.genericToEncoding infoEncodingOptions
 
-instance Aeson.ToJSON QueryWithoutParam where
+infoEncodingOptions :: Aeson.Options
+infoEncodingOptions =
+  Aeson.defaultOptions
+    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
+    }
 
-  toJSON (QueryWithoutParam query) = Aeson.toJSON query
+instance Platform.SpanDetails Info
 
-  toEncoding (QueryWithoutParam query) = Aeson.toEncoding query
+mkInfo :: Query row -> ConnectionInfo -> Info
+mkInfo query conn =
+  Info
+    { infoQuery = preparedStatement query,
+      infoQueryTemplate = quasiQuotedString query,
+      infoRanAsPreparedStatement = prepareQuery query == Prepare,
+      infoSqlOperation = sqlOperation query,
+      infoQueriedRelation = queriedRelation query,
+      infoConnectionString = connectionToText conn
+    }
 
-mkQueryInfo :: Query row -> QueryConnectionInfo -> QueryInfo
-mkQueryInfo query conn = QueryInfo (QueryWithoutParam query) conn
-
-data QueryConnectionInfo
+data ConnectionInfo
   = TcpSocket Host Port DatabaseName
   | UnixSocket SocketPath DatabaseName
   deriving (Generic)
@@ -281,4 +299,6 @@ type SocketPath = Text
 
 type DatabaseName = Text
 
-instance Aeson.ToJSON QueryConnectionInfo
+connectionToText :: ConnectionInfo -> Text
+connectionToText (TcpSocket host port db) = host ++ ":" ++ port ++ "/" ++ db
+connectionToText (UnixSocket path db) = path ++ ":" ++ db

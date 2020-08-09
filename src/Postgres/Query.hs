@@ -14,8 +14,9 @@ module Postgres.Query
     TimeoutOrigin (..),
     asMessage,
     format,
-    QueryInfo (..),
-    QueryConnectionInfo (..),
+    Info (..),
+    ConnectionInfo (..),
+    mkInfo,
   )
 where
 
@@ -135,30 +136,50 @@ format query =
 -- SpanDetails
 --
 
-data QueryInfo
-  = QueryInfo
+data Info
+  = Info
       { -- | The full query we're sending to a database. Wrapped in a Secret
         -- because some queries might contain sensitive information, and we
         -- don't know which ones.
-        queryText :: Log.Secret Text,
+        infoQuery :: Log.Secret Text,
         -- | The query template (QuasiQuote) that was used to build the template.
         -- This we don't need to wrap in a `Secret` and can be safely logged.
-        queryTemplate :: Text,
+        infoQueryTemplate :: Text,
         -- | Connection information of the database we're sending the query to.
-        queryConn :: QueryConnectionInfo,
+        infoConnectionString :: Text,
         -- | Our best guess of the relation we're querying.
-        queryCollection :: Text,
+        infoQueriedRelation :: Text,
         -- | Our best guess of the SQL operation we're performing (SELECT /
         -- DELETE / ...).
-        queryOperation :: Text
+        infoSqlOperation :: Text
       }
   deriving (Generic)
 
-instance Aeson.ToJSON QueryInfo
+mkInfo :: Query row -> ConnectionInfo -> Info
+mkInfo query conn =
+  Info
+    { infoQuery = Log.mkSecret (sqlString query),
+      infoQueryTemplate = quasiQuotedString query,
+      infoConnectionString = connectionToText conn,
+      infoSqlOperation = sqlOperation query,
+      infoQueriedRelation = queriedRelation query
+    }
 
-instance Platform.SpanDetails QueryInfo
+instance Aeson.ToJSON Info where
 
-data QueryConnectionInfo
+  toJSON = Aeson.genericToJSON infoEncodingOptions
+
+  toEncoding = Aeson.genericToEncoding infoEncodingOptions
+
+infoEncodingOptions :: Aeson.Options
+infoEncodingOptions =
+  Aeson.defaultOptions
+    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
+    }
+
+instance Platform.SpanDetails Info
+
+data ConnectionInfo
   = TcpSocket Host Port DatabaseName
   | UnixSocket SocketPath DatabaseName
   deriving (Generic)
@@ -171,4 +192,6 @@ type SocketPath = Text
 
 type DatabaseName = Text
 
-instance Aeson.ToJSON QueryConnectionInfo
+connectionToText :: ConnectionInfo -> Text
+connectionToText (TcpSocket host port db) = host ++ ":" ++ port ++ "/" ++ db
+connectionToText (UnixSocket path db) = path ++ ":" ++ db

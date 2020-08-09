@@ -28,6 +28,7 @@ module MySQL
     doQuery,
     Query.Query,
     Error.Error (..),
+    Query.Info (..),
     -- These type classes are for serializing and deserializing data from the
     -- database.
     --
@@ -126,7 +127,7 @@ data Connection
         -- every request. That's why we're using a hash of the query as the key
         -- in the dictionary below instead of the query itself.
         singleOrPool :: SingleOrPool (Base.MySQLConn, PreparedQueries),
-        logContext :: Query.QueryConnectionInfo,
+        logContext :: Query.ConnectionInfo,
         timeout :: Time.Interval
       }
 
@@ -196,7 +197,7 @@ connection settings =
 -- CONNECTION HELPERS
 --
 
-toConnectionLogContext :: Settings.Settings -> Query.QueryConnectionInfo
+toConnectionLogContext :: Settings.Settings -> Query.ConnectionInfo
 toConnectionLogContext settings =
   let connectionSettings = Settings.mysqlConnection settings
       database = Settings.unDatabase (Settings.database connectionSettings)
@@ -293,8 +294,8 @@ doQuery conn query handleResponse =
           Nothing -> executeCommand_ conn (queryFromText "COMMIT")
           _ -> Task.succeed ()
         Task.succeed result
-      infoForContext :: Query.QueryInfo
-      infoForContext = Query.mkQueryInfo query (logContext conn)
+      infoForContext :: Query.Info
+      infoForContext = Query.mkInfo query (logContext conn)
    in runQuery
         -- Handle the response before wrapping the operation in a context. This way,
         -- if the response handling logic creates errors, those errors can inherit
