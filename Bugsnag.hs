@@ -236,8 +236,8 @@ customizeBreadcrumb details breadcrumb =
       [ Platform.Renderer (outgoingHttpRequestAsBreadcrumb breadcrumb),
         Platform.Renderer (mysqlQueryAsBreadcrumb breadcrumb),
         Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb),
-        Platform.Renderer (logAsBreadcrumb breadcrumb)
-        -- TODO: falback renderer
+        Platform.Renderer (logAsBreadcrumb breadcrumb),
+        Platform.Renderer (unknownAsBreadcrumb breadcrumb)
       ]
     |> Maybe.withDefault breadcrumb
 
@@ -266,6 +266,13 @@ logAsBreadcrumb :: Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
 logAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType,
+      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+    }
+
+unknownAsBreadcrumb :: Bugsnag.Breadcrumb -> Platform.SomeSpanDetails -> Bugsnag.Breadcrumb
+unknownAsBreadcrumb breadcrumb details =
+  breadcrumb
+    { Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
       Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
     }
 
