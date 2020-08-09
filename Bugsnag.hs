@@ -228,7 +228,7 @@ doBreadcrumb (Timer toTime) span =
           }
    in case Platform.details span of
         Nothing -> defaultBreadcrumb
-        Just details -> customizeBreadcrumb details defaultBreadcrumb
+        Just details -> customizeBreadcrumb span details defaultBreadcrumb
 
 causeBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
 causeBreadcrumb (Timer toTime) span =
@@ -238,14 +238,14 @@ causeBreadcrumb (Timer toTime) span =
       Bugsnag.breadcrumb_timestamp = toTime (Platform.finished span) |> formatTime
     }
 
-customizeBreadcrumb :: Platform.SomeSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
-customizeBreadcrumb details breadcrumb =
+customizeBreadcrumb :: Platform.Span -> Platform.SomeSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
+customizeBreadcrumb span details breadcrumb =
   details
     |> Platform.renderSpanDetails
       [ Platform.Renderer (outgoingHttpRequestAsBreadcrumb breadcrumb),
         Platform.Renderer (mysqlQueryAsBreadcrumb breadcrumb),
         Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb),
-        Platform.Renderer (logAsBreadcrumb breadcrumb),
+        Platform.Renderer (logAsBreadcrumb span breadcrumb),
         Platform.Renderer (unknownAsBreadcrumb breadcrumb)
       ]
     |> Maybe.withDefault breadcrumb
@@ -271,10 +271,13 @@ postgresQueryAsBreadcrumb breadcrumb details =
       Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
     }
 
-logAsBreadcrumb :: Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
-logAsBreadcrumb breadcrumb details =
+logAsBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
+logAsBreadcrumb span breadcrumb details =
   breadcrumb
-    { Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType,
+    { Bugsnag.breadcrumb_type =
+        if List.isEmpty (Platform.children span)
+          then Bugsnag.logBreadcrumbType
+          else Bugsnag.processBreadcrumbType,
       Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
     }
 
