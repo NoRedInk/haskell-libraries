@@ -4,6 +4,7 @@ module Observability.Bugsnag
     decoder,
     readiness,
     toEvent,
+    Timer (..),
   )
 where
 
@@ -19,8 +20,12 @@ import qualified Data.Proxy as Proxy
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.IO
+import qualified Data.Time.Clock as Clock
+import qualified Data.Time.Format as Format
 import qualified Data.Typeable as Typeable
+import qualified Data.Word
 import qualified Environment
+import qualified GHC.Clock
 import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Http
@@ -75,8 +80,9 @@ import qualified Prelude
 reporter :: Http.Handler -> Settings -> Platform.Span -> Prelude.IO ()
 reporter http settings span = do
   defaultEvent <- mkDefaultEvent settings
+  timer <- mkTimer
   if failed span
-    then send http settings (toEvent defaultEvent span)
+    then send http settings (toEvent timer defaultEvent span)
     else Prelude.pure ()
 
 send :: Http.Handler -> Settings -> Bugsnag.Event -> Prelude.IO ()
@@ -89,15 +95,15 @@ send http settings event = do
     _ <- Bugsnag.sendEvents manager (Log.unSecret (apiKey settings)) [event]
     Prelude.pure ()
 
-toEvent :: Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+toEvent :: Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
 toEvent = rootCause [] emptyCrumbs
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
-rootCause frames breadcrumbs event span =
+rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+rootCause frames breadcrumbs timer event span =
   let newFrames =
         case Platform.frame span of
           Nothing -> frames
@@ -113,7 +119,8 @@ rootCause frames breadcrumbs event span =
         child : preErrorSpans ->
           rootCause
             newFrames
-            (breadcrumbs |> followedBy (addCrumbs preErrorSpans))
+            (breadcrumbs |> followedBy (addCrumbs timer preErrorSpans))
+            timer
             newEvent
             child
         [] ->
@@ -125,7 +132,7 @@ rootCause frames breadcrumbs event span =
                 -- after the last of these child spans, making all child spans
                 -- breadcrumbs.
                 breadcrumbs
-                  |> followedBy (addCrumbs childSpans)
+                  |> followedBy (addCrumbs timer childSpans)
                   |> crumbsAsList
                   |> Just,
               Bugsnag.event_unhandled = case Platform.succeeded span of
@@ -155,23 +162,23 @@ rootCause frames breadcrumbs event span =
 -- To help us avoid doing appends we create a helper type `Crumbs a`. The only
 -- helper function it exposes for adding a breadcrumb is one that cons that
 -- breadcrumb to the front of the list, so no appends.
-addCrumbs :: [Platform.Span] -> Crumbs
-addCrumbs spans =
+addCrumbs :: Timer -> [Platform.Span] -> Crumbs
+addCrumbs timer spans =
   case spans of
     [] -> emptyCrumbs
     span : after ->
-      addCrumbs after
-        |> followedBy (addCrumbsForSpan span)
+      addCrumbs timer after
+        |> followedBy (addCrumbsForSpan timer span)
 
-addCrumbsForSpan :: Platform.Span -> Crumbs
-addCrumbsForSpan span =
+addCrumbsForSpan :: Timer -> Platform.Span -> Crumbs
+addCrumbsForSpan timer span =
   case Platform.children span of
     [] ->
-      addCrumb (doBreadcrumb span)
+      addCrumb (doBreadcrumb timer span)
     children ->
-      addCrumb (startBreadcrumb span)
-        |> followedBy (addCrumbs children)
-        |> followedBy (addCrumb (endBreadcrumb span))
+      addCrumb (startBreadcrumb timer span)
+        |> followedBy (addCrumbs timer children)
+        |> followedBy (addCrumb (endBreadcrumb timer span))
 
 -- | A type representing a list of breadcrumbs. We're not using just a list
 -- directly, because then in constructing the full list of breadcrumbs we'd have
@@ -196,25 +203,27 @@ crumbsAsList (Crumbs f) = f []
 addCrumb :: Bugsnag.Breadcrumb -> Crumbs
 addCrumb crumb = Crumbs (crumb :)
 
-endBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb
-endBreadcrumb span =
+endBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
+endBreadcrumb (Timer toTime) span =
   Bugsnag.defaultBreadcrumb
     { Bugsnag.breadcrumb_name = "Finished: " ++ Platform.name span,
-      Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType
+      Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType,
+      Bugsnag.breadcrumb_timestamp = toTime (Platform.finished span) |> formatTime
     }
 
-startBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb
-startBreadcrumb span =
-  (doBreadcrumb span)
+startBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
+startBreadcrumb timer span =
+  (doBreadcrumb timer span)
     { Bugsnag.breadcrumb_name = "Starting: " ++ Platform.name span
     }
 
-doBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb
-doBreadcrumb span =
+doBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
+doBreadcrumb (Timer toTime) span =
   let defaultBreadcrumb =
         Bugsnag.defaultBreadcrumb
           { Bugsnag.breadcrumb_name = Platform.name span,
-            Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType
+            Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
+            Bugsnag.breadcrumb_timestamp = toTime (Platform.started span) |> formatTime
           }
    in case Platform.details span of
         Nothing -> defaultBreadcrumb
@@ -228,6 +237,7 @@ customizeBreadcrumb details breadcrumb =
         Platform.Renderer (mysqlQueryAsBreadcrumb breadcrumb),
         Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb),
         Platform.Renderer (logAsBreadcrumb breadcrumb)
+        -- TODO: falback renderer
       ]
     |> Maybe.withDefault breadcrumb
 
@@ -504,3 +514,35 @@ getRevision = do
   case eitherRevision of
     Prelude.Left _err -> Prelude.pure (Revision "no revision file found")
     Prelude.Right version -> Prelude.pure (Revision version)
+
+-- | Our spans' timestamps are produced by the `GHC.Clock` module and consist of
+-- the amount of nanoseconds passed since some arbitrary (but constant) moment
+-- in the past. This is the faster and more accurate way to measure precisely
+-- what the running time of spans is.
+--
+-- Now we want to turn these times into regular dates. The `Timer` type is a
+-- wrapper around a function that allows us to do that.
+newtype Timer = Timer (Data.Word.Word64 -> Clock.UTCTime)
+
+mkTimer :: Prelude.IO Timer
+mkTimer = do
+  -- 'Sync our clocks', to find our how monotonic time and actual time relate.
+  nowTime <- Clock.getCurrentTime
+  nowClock <- GHC.Clock.getMonotonicTimeNSec
+  Prelude.pure
+    <| Timer
+      ( \thenClock ->
+          nowTime
+            |> Clock.addUTCTime (-1 * clockToDiffTime (nowClock - thenClock))
+      )
+
+clockToDiffTime :: Data.Word.Word64 -> Clock.NominalDiffTime
+clockToDiffTime clock = 1e-9 * Prelude.fromIntegral clock
+
+formatTime :: Clock.UTCTime -> Text
+formatTime time =
+  time
+    |> Format.formatTime
+      Format.defaultTimeLocale
+      "%FT%T%QZ"
+    |> Data.Text.pack
