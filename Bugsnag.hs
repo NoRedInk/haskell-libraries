@@ -85,7 +85,7 @@ send http settings event = do
     Prelude.pure ()
 
 toEvent :: Bugsnag.Event -> Platform.Span -> Bugsnag.Event
-toEvent = rootCause [] Prelude.mempty
+toEvent = rootCause [] emptyCrumbs
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
@@ -108,7 +108,7 @@ rootCause frames breadcrumbs event span =
         child : preErrorSpans ->
           rootCause
             newFrames
-            (addCrumbs preErrorSpans ++ breadcrumbs)
+            (breadcrumbs |> followedBy (addCrumbs preErrorSpans))
             newEvent
             child
         [] ->
@@ -119,7 +119,8 @@ rootCause frames breadcrumbs event span =
                 -- succeeded. We're going to assume that the error happened
                 -- after the last of these child spans, making all child spans
                 -- breadcrumbs.
-                addCrumbs childSpans ++ breadcrumbs
+                breadcrumbs
+                  |> followedBy (addCrumbs childSpans)
                   |> crumbsAsList
                   |> Just,
               Bugsnag.event_unhandled = case Platform.succeeded span of
@@ -146,17 +147,16 @@ rootCause frames breadcrumbs event span =
 -- breadcrumb collection, because if the span tree gets large we'd be doing a
 -- lot of it.
 --
--- To help us avoid doing appends we create a helper type `Crumbs a`, which
--- is a wrapper around a state monad. The only helper function it exposes for
--- adding a breadcrumb is one that cons that breadcrumb to the front of the
--- list, so no appends.
+-- To help us avoid doing appends we create a helper type `Crumbs a`. The only
+-- helper function it exposes for adding a breadcrumb is one that cons that
+-- breadcrumb to the front of the list, so no appends.
 addCrumbs :: [Platform.Span] -> Crumbs
 addCrumbs spans =
   case spans of
-    [] -> Prelude.mempty
+    [] -> emptyCrumbs
     span : after ->
-      addCrumbsForSpan span
-        ++ addCrumbs after
+      addCrumbs after
+        |> followedBy (addCrumbsForSpan span)
 
 addCrumbsForSpan :: Platform.Span -> Crumbs
 addCrumbsForSpan span =
@@ -164,12 +164,26 @@ addCrumbsForSpan span =
     [] ->
       addCrumb (toBreadcrumb DoSpan span)
     children ->
-      addCrumb (toBreadcrumb EndSpan span)
-        ++ addCrumbs children
-        ++ addCrumb (toBreadcrumb StartSpan span)
+      addCrumb (toBreadcrumb StartSpan span)
+        |> followedBy (addCrumbs children)
+        |> followedBy (addCrumb (toBreadcrumb EndSpan span))
 
+-- | A type representing a list of breadcrumbs. We're not using just a list
+-- directly, because then in constructing the full list of breadcrumbs we'd have
+-- to do list appends often, which aren't very efficient. Instead we store a
+-- function that describes creation of the eventual list of breadcrumbs from an
+-- initially empty list.
 newtype Crumbs = Crumbs ([Bugsnag.Breadcrumb] -> [Bugsnag.Breadcrumb])
-  deriving (Prelude.Semigroup, Prelude.Monoid)
+
+emptyCrumbs :: Crumbs
+emptyCrumbs = Crumbs identity
+
+-- | Combine breadcrumbs, placing one set after the other.
+--
+--     earlyCrumbs
+--       |> followedBy laterCrumbs
+followedBy :: Crumbs -> Crumbs -> Crumbs
+followedBy (Crumbs f) (Crumbs g) = Crumbs (f << g)
 
 crumbsAsList :: Crumbs -> [Bugsnag.Breadcrumb]
 crumbsAsList (Crumbs f) = f []
