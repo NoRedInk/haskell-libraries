@@ -9,7 +9,6 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
-import qualified Control.Monad.State.Strict as State
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.CaseInsensitive as CI
@@ -86,13 +85,13 @@ send http settings event = do
     Prelude.pure ()
 
 toEvent :: Bugsnag.Event -> Platform.Span -> Bugsnag.Event
-toEvent = rootCause [] emptyBreadcrumbs
+toEvent = rootCause [] Prelude.mempty
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Breadcrumbs () -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+rootCause :: [Bugsnag.StackFrame] -> Breadcrumbs -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
 rootCause frames breadcrumbs event span =
   let newFrames =
         case Platform.frame span of
@@ -109,7 +108,7 @@ rootCause frames breadcrumbs event span =
         child : preErrorSpans ->
           rootCause
             newFrames
-            (andThen (\_ -> addCrumbs preErrorSpans) breadcrumbs)
+            (addCrumbs preErrorSpans ++ breadcrumbs)
             newEvent
             child
         [] ->
@@ -120,8 +119,7 @@ rootCause frames breadcrumbs event span =
                 -- succeeded. We're going to assume that the error happened
                 -- after the last of these child spans, making all child spans
                 -- breadcrumbs.
-                breadcrumbs
-                  |> andThen (\_ -> addCrumbs childSpans)
+                addCrumbs childSpans ++ breadcrumbs
                   |> breadcrumbsAsList
                   |> Just,
               Bugsnag.event_unhandled = case Platform.succeeded span of
@@ -152,35 +150,32 @@ rootCause frames breadcrumbs event span =
 -- is a wrapper around a state monad. The only helper function it exposes for
 -- adding a breadcrumb is one that cons that breadcrumb to the front of the
 -- list, so no appends.
-addCrumbs :: [Platform.Span] -> Breadcrumbs ()
+addCrumbs :: [Platform.Span] -> Breadcrumbs
 addCrumbs spans =
   case spans of
-    [] -> Prelude.pure ()
-    span : after -> do
-      addCrumbs after
+    [] -> Prelude.mempty
+    span : after ->
       addCrumbsForSpan span
+        ++ addCrumbs after
 
-addCrumbsForSpan :: Platform.Span -> Breadcrumbs ()
+addCrumbsForSpan :: Platform.Span -> Breadcrumbs
 addCrumbsForSpan span =
   case Platform.children span of
     [] ->
       addBreadcrumb (toBreadcrumb DoSpan span)
-    children -> do
-      addBreadcrumb (toBreadcrumb StartSpan span)
-      addCrumbs children
+    children ->
       addBreadcrumb (toBreadcrumb EndSpan span)
+        ++ addCrumbs children
+        ++ addBreadcrumb (toBreadcrumb StartSpan span)
 
-newtype Breadcrumbs a = Breadcrumbs (State.State [Bugsnag.Breadcrumb] a)
-  deriving (Prelude.Functor, Prelude.Applicative, Prelude.Monad, State.MonadState [Bugsnag.Breadcrumb])
+newtype Breadcrumbs = Breadcrumbs ([Bugsnag.Breadcrumb] -> [Bugsnag.Breadcrumb])
+  deriving (Prelude.Semigroup, Prelude.Monoid)
 
-emptyBreadcrumbs :: Breadcrumbs ()
-emptyBreadcrumbs = State.put []
+breadcrumbsAsList :: Breadcrumbs -> [Bugsnag.Breadcrumb]
+breadcrumbsAsList (Breadcrumbs f) = f []
 
-breadcrumbsAsList :: Breadcrumbs a -> [Bugsnag.Breadcrumb]
-breadcrumbsAsList (Breadcrumbs m) = State.execState m []
-
-addBreadcrumb :: Bugsnag.Breadcrumb -> Breadcrumbs ()
-addBreadcrumb crumb = State.modify' (crumb :)
+addBreadcrumb :: Bugsnag.Breadcrumb -> Breadcrumbs
+addBreadcrumb crumb = Breadcrumbs (crumb :)
 
 data BreadcrumbType = StartSpan | DoSpan | EndSpan
 
