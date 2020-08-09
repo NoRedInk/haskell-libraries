@@ -11,7 +11,9 @@ import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy
 import qualified Data.CaseInsensitive as CI
+import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
@@ -26,10 +28,12 @@ import qualified Http
 import qualified Log
 import qualified Maybe
 import qualified Monitoring
+import qualified MySQL
 import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client
 import qualified Network.HostName
 import qualified Platform
+import qualified Postgres
 import qualified Prelude
 
 -- | Reporting to Bugsnag.
@@ -218,8 +222,60 @@ doBreadcrumb span =
 customizeBreadcrumb :: Platform.SomeSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
 customizeBreadcrumb details breadcrumb =
   details
-    |> Platform.renderSpanDetails []
+    |> Platform.renderSpanDetails
+      [ Platform.Renderer (outgoingHttpRequestAsBreadcrumb breadcrumb),
+        Platform.Renderer (mysqlQueryAsBreadcrumb breadcrumb),
+        Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb)
+      ]
     |> Maybe.withDefault breadcrumb
+
+outgoingHttpRequestAsBreadcrumb :: Bugsnag.Breadcrumb -> Http.HttpRequestInfo -> Bugsnag.Breadcrumb
+outgoingHttpRequestAsBreadcrumb breadcrumb details =
+  breadcrumb
+    { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
+      Bugsnag.breadcrumb_metaData =
+        [ ("uri", Http.requestUri details),
+          ("method", Http.requestMethod details)
+        ]
+          |> HashMap.fromList
+          |> Just
+    }
+
+mysqlQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> MySQL.Info -> Bugsnag.Breadcrumb
+mysqlQueryAsBreadcrumb breadcrumb details =
+  breadcrumb
+    { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
+      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+    }
+
+postgresQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> Postgres.Info -> Bugsnag.Breadcrumb
+postgresQueryAsBreadcrumb breadcrumb details =
+  breadcrumb
+    { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
+      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+    }
+
+breadcrumbMetaDataViaJson :: Aeson.ToJSON a => a -> HashMap.HashMap Text Text
+breadcrumbMetaDataViaJson x =
+  case Aeson.toJSON x of
+    Aeson.Object dict -> map jsonAsText dict
+    val -> HashMap.singleton "value" (jsonAsText val)
+
+jsonAsText :: Aeson.Value -> Text
+jsonAsText val =
+  case val of
+    Aeson.Object dict ->
+      Aeson.encode dict
+        |> Data.ByteString.Lazy.toStrict
+        |> Data.Text.Encoding.decodeUtf8
+    Aeson.Array vals ->
+      map jsonAsText vals
+        |> Foldable.toList
+        |> Data.Text.intercalate ",\n"
+    Aeson.String str -> str
+    Aeson.Number n -> Data.Text.pack (Prelude.show n)
+    Aeson.Bool bool -> Data.Text.pack (Prelude.show bool)
+    Aeson.Null -> "null"
 
 decorateEventWithSpanData :: Platform.Span -> Bugsnag.Event -> Bugsnag.Event
 decorateEventWithSpanData span event =
