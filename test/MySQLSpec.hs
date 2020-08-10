@@ -6,27 +6,26 @@ module MySQLSpec
 where
 
 import Cherry.Prelude
-import qualified Data.Acquire as Acquire
 import qualified Debug
-import qualified Environment
 import qualified Expect
+import qualified Expect.Task
 import qualified Log
 import qualified MySQL
 import MySQL.Query (Query (..))
 import qualified MySQL.Query as Query
-import qualified Platform
 import qualified Task
 import Test (Test, describe, test)
+import qualified Test
 import qualified Text
 
-tests :: Test
-tests =
+tests :: MySQL.Connection -> Test
+tests mysqlConn =
   describe
     "MySQL"
     [ unsafeBulkifyInsertsTests,
       onDuplicateDoNothingTests,
-      queriesWithQuestionMarks,
-      exceptionTests
+      queriesWithQuestionMarks mysqlConn,
+      exceptionTests mysqlConn
     ]
 
 unsafeBulkifyInsertsTests :: Test
@@ -57,59 +56,57 @@ unsafeBulkifyInsertsTests =
             (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)")
     ]
 
-queriesWithQuestionMarks :: Test
-queriesWithQuestionMarks =
+queriesWithQuestionMarks :: MySQL.Connection -> Test
+queriesWithQuestionMarks mysqlConn =
   describe
     "queries with question marks don't fail"
-    [ test "inserts and selects" <| \_ ->
-        expectTask <| \conn -> do
-          MySQL.doQuery
-            conn
-            [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES ('?', 5)|]
-            (\(_ :: (Result MySQL.Error Int)) -> Task.succeed ())
+    [ Test.task "inserts and selects"
+        <| MySQL.inTestTransaction mysqlConn
+        <| \conn -> do
+          (_ :: Int) <-
+            MySQL.doQuery
+              conn
+              [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES ('?', 5)|]
+              resultToTask
+              |> Expect.Task.succeeds
           MySQL.doQuery
             conn
             [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = '?'|]
-            ( \res ->
-                Task.succeed
-                  <| case res of
-                    Ok (results :: List (Text, Int)) -> Expect.equal [("?", 5)] results
-                    Err err -> Expect.fail (Debug.toString err)
-            )
+            resultToTask
+            |> Expect.Task.andCheck (Expect.equal [("?", 5) :: (Text, Int)])
     ]
 
-exceptionTests :: Test
-exceptionTests =
+exceptionTests :: MySQL.Connection -> Test
+exceptionTests mysqlConn =
   describe
     "exceptions"
-    [ test "dupplicate key errors have groupable error messages" <| \_ ->
-        expectTask <| \conn -> do
-          MySQL.doQuery
-            conn
-            [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
-            (\(_ :: (Result MySQL.Error Int)) -> Task.succeed ())
+    [ Test.task "dupplicate key errors have groupable error messages"
+        <| MySQL.inTestTransaction mysqlConn
+        <| \conn -> do
+          (_ :: Int) <-
+            MySQL.doQuery
+              conn
+              [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+              resultToTask
+              |> Expect.Task.succeeds
           MySQL.doQuery
             conn
             [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
             ( \res ->
-                Task.succeed
-                  <| case res of
-                    Err err -> Expect.equal (Debug.toString err) "Query failed with unexpected error: MySQL query failed with error code 1062"
-                    Ok (_ :: Int) -> Expect.fail "Expected an error, but none was returned."
+                case res of
+                  Err err -> Task.succeed err
+                  Ok (_ :: Int) -> Task.fail ("Expected an error, but none was returned." :: Text)
             )
+            |> Expect.Task.andCheck
+              ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Debug.toString
+              )
     ]
 
-expectTask :: (MySQL.Connection -> Task Never Expect.Expectation) -> Expect.Expectation
-expectTask run =
-  Expect.withIO identity <| do
-    settings <- Environment.decode MySQL.decoder
-    noLogger <- Platform.silentContext
-    Acquire.withAcquire
-      (MySQL.connection settings)
-      ( \conn ->
-          MySQL.inTestTransaction conn run
-            |> Task.perform noLogger
-      )
+resultToTask :: Result e a -> Task e a
+resultToTask res =
+  case res of
+    Ok x -> Task.succeed x
+    Err x -> Task.fail x
 
 mockQuery :: Text -> Query a
 mockQuery sqlString =

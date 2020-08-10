@@ -3,6 +3,10 @@ module Main
   )
 where
 
+import Cherry.Prelude
+import qualified Data.Acquire as Acquire
+import qualified Environment
+import qualified MySQL
 import qualified MySQLInternalSpec
 import qualified MySQLQuerySpec
 import qualified MySQLSpec
@@ -23,11 +27,14 @@ import qualified Prelude
 -- The test was useful for debugging a problem and so we keep it around, but
 -- it's not essential as a regression test.
 main :: Prelude.IO ()
-main =
-  Test.Runner.Tasty.main tests
+main = do
+  settings <- Environment.decode MySQL.decoder
+  Acquire.withAcquire
+    (MySQL.connection settings)
+    (Test.Runner.Tasty.main << tests)
 
-tests :: Test
-tests =
+tests :: MySQL.Connection -> Test
+tests conn =
   describe
     "lib/database"
     [ PostgresSettingsSpec.tests,
@@ -35,5 +42,5 @@ tests =
       QueryParserSpec.tests,
       TimeSpec.tests,
       MySQLQuerySpec.tests,
-      MySQLSpec.tests
+      MySQLSpec.tests conn
     ]
