@@ -15,7 +15,6 @@ import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
 
 -- TODO:
--- [ ] Ignore transaction if reporting on any part of it fails.
 -- [ ] Strategy for dealing with exceptions that reach the reporter.
 -- [ ] Figure out which attributes to report.
 
@@ -27,9 +26,18 @@ reporter timer app span =
 
 reportWebTransaction :: Timer -> NewRelic.App -> Platform.Span -> Monitoring.RequestDetails -> Prelude.IO ()
 reportWebTransaction timer app span details =
-  Exception.bracket
+  Exception.bracketWithError
     (startWebTransaction app (Monitoring.endpoint details))
-    endTransaction
+    ( \maybeException tx -> do
+        -- If we encountered any sort of failure ignore the transaction. We
+        -- don't know which bits of the transaction we managed to apply
+        -- successfully and which not, so to prevent skewing the data best leave
+        -- this one out entirely.
+        case maybeException of
+          Nothing -> Prelude.pure ()
+          Just _ -> ignoreTransaction tx
+        endTransaction tx
+    )
     ( \tx -> do
         setTransactionTiming tx (startTime timer span) (toDuration span)
         reportSpan timer tx Nothing span
@@ -96,6 +104,11 @@ startWebTransaction app name = do
 endTransaction :: NewRelic.Transaction -> Prelude.IO ()
 endTransaction tx =
   NewRelic.endTransaction tx
+    |> andThen expectSuccess
+
+ignoreTransaction :: NewRelic.Transaction -> Prelude.IO ()
+ignoreTransaction tx =
+  NewRelic.ignoreTransaction tx
     |> andThen expectSuccess
 
 setTransactionTiming ::
