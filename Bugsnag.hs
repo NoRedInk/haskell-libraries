@@ -4,7 +4,6 @@ module Observability.Bugsnag
     decoder,
     readiness,
     toEvent,
-    Timer (..),
   )
 where
 
@@ -20,12 +19,8 @@ import qualified Data.Proxy as Proxy
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.IO
-import qualified Data.Time.Clock as Clock
-import qualified Data.Time.Format as Format
 import qualified Data.Typeable as Typeable
-import qualified Data.Word
 import qualified Environment
-import qualified GHC.Clock
 import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Http
@@ -37,6 +32,7 @@ import qualified MySQL
 import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client
 import qualified Network.HostName
+import Observability.Timer (Timer, toISO8601)
 import qualified Platform
 import qualified Postgres
 import qualified Text
@@ -77,10 +73,9 @@ import qualified Prelude
 --
 -- A span that happened _after_ the root cause event completed we're not
 -- reporting.
-reporter :: Http.Handler -> Settings -> Platform.Span -> Prelude.IO ()
-reporter http settings span = do
+reporter :: Http.Handler -> Timer -> Settings -> Platform.Span -> Prelude.IO ()
+reporter http timer settings span = do
   defaultEvent <- mkDefaultEvent settings
-  timer <- mkTimer
   if failed span
     then send http settings (toEvent timer defaultEvent span)
     else Prelude.pure ()
@@ -205,11 +200,11 @@ addCrumb :: Bugsnag.Breadcrumb -> Crumbs
 addCrumb crumb = Crumbs (crumb :)
 
 endBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
-endBreadcrumb (Timer toTime) span =
+endBreadcrumb timer span =
   Bugsnag.defaultBreadcrumb
     { Bugsnag.breadcrumb_name = "Finished: " ++ Platform.name span,
       Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType,
-      Bugsnag.breadcrumb_timestamp = toTime (Platform.finished span) |> formatTime
+      Bugsnag.breadcrumb_timestamp = toISO8601 timer (Platform.finished span)
     }
 
 startBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
@@ -219,23 +214,23 @@ startBreadcrumb timer span =
     }
 
 doBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
-doBreadcrumb (Timer toTime) span =
+doBreadcrumb timer span =
   let defaultBreadcrumb =
         Bugsnag.defaultBreadcrumb
           { Bugsnag.breadcrumb_name = Platform.name span,
             Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
-            Bugsnag.breadcrumb_timestamp = toTime (Platform.started span) |> formatTime
+            Bugsnag.breadcrumb_timestamp = toISO8601 timer (Platform.started span)
           }
    in case Platform.details span of
         Nothing -> defaultBreadcrumb
         Just details -> customizeBreadcrumb span details defaultBreadcrumb
 
 causeBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
-causeBreadcrumb (Timer toTime) span =
+causeBreadcrumb timer span =
   Bugsnag.defaultBreadcrumb
     { Bugsnag.breadcrumb_name = "Error received",
       Bugsnag.breadcrumb_type = Bugsnag.errorBreadcrumbType,
-      Bugsnag.breadcrumb_timestamp = toTime (Platform.finished span) |> formatTime
+      Bugsnag.breadcrumb_timestamp = toISO8601 timer (Platform.finished span)
     }
 
 customizeBreadcrumb :: Platform.Span -> Platform.SomeSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
@@ -533,35 +528,3 @@ getRevision = do
   case eitherRevision of
     Prelude.Left _err -> Prelude.pure (Revision "no revision file found")
     Prelude.Right version -> Prelude.pure (Revision version)
-
--- | Our spans' timestamps are produced by the `GHC.Clock` module and consist of
--- the amount of nanoseconds passed since some arbitrary (but constant) moment
--- in the past. This is the faster and more accurate way to measure precisely
--- what the running time of spans is.
---
--- Now we want to turn these times into regular dates. The `Timer` type is a
--- wrapper around a function that allows us to do that.
-newtype Timer = Timer (Data.Word.Word64 -> Clock.UTCTime)
-
-mkTimer :: Prelude.IO Timer
-mkTimer = do
-  -- 'Sync our clocks', to find our how monotonic time and actual time relate.
-  nowTime <- Clock.getCurrentTime
-  nowClock <- GHC.Clock.getMonotonicTimeNSec
-  Prelude.pure
-    <| Timer
-      ( \thenClock ->
-          nowTime
-            |> Clock.addUTCTime (-1 * clockToDiffTime (nowClock - thenClock))
-      )
-
-clockToDiffTime :: Data.Word.Word64 -> Clock.NominalDiffTime
-clockToDiffTime clock = 1e-9 * Prelude.fromIntegral clock
-
-formatTime :: Clock.UTCTime -> Text
-formatTime time =
-  time
-    |> Format.formatTime
-      Format.defaultTimeLocale
-      "%FT%T%QZ"
-    |> Data.Text.pack
