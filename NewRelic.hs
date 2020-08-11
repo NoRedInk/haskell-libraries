@@ -16,6 +16,7 @@ import qualified Prelude
 
 -- TODO:
 -- [ ] Strategy for dealing with exceptions that reach the reporter.
+-- [ ] Handle failing transactions and segments.
 -- [ ] Figure out which attributes to report.
 
 reporter :: Timer -> NewRelic.App -> Platform.Span -> Prelude.IO ()
@@ -68,7 +69,8 @@ chooseAndStartSegment tx span =
     |> andThen
       ( Platform.renderSpanDetails
           [ Platform.Renderer (startDatastoreSegment tx << mysqlToDatastore),
-            Platform.Renderer (startDatastoreSegment tx << postgresToDatastore)
+            Platform.Renderer (startDatastoreSegment tx << postgresToDatastore),
+            Platform.Renderer (startExternalSegment tx << httpToExternalSegment)
           ]
       )
     |> Maybe.withDefault
@@ -108,6 +110,14 @@ postgresToDatastore info =
         Postgres.TcpSocket _ _ dbname -> Just dbname
         Postgres.UnixSocket _ dbname -> Just dbname,
       NewRelic.datastoreSegmentQuery = Just (Postgres.infoQueryTemplate info)
+    }
+
+httpToExternalSegment :: Http.Info -> NewRelic.ExternalSegment
+httpToExternalSegment info =
+  NewRelic.ExternalSegment
+    { NewRelic.externalSegmentUri = Http.infoUri info,
+      NewRelic.externalSegmentProcedure = Just (Http.infoRequestMethod info),
+      NewRelic.externalSegmentLibrary = Nothing
     }
 
 startTime :: Timer -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
@@ -181,6 +191,14 @@ startDatastoreSegment ::
   Prelude.IO NewRelic.Segment
 startDatastoreSegment tx config =
   NewRelic.startDatastoreSegment tx config
+    |> andThen expectJust
+
+startExternalSegment ::
+  NewRelic.Transaction ->
+  NewRelic.ExternalSegment ->
+  Prelude.IO NewRelic.Segment
+startExternalSegment tx config =
+  NewRelic.startExternalSegment tx config
     |> andThen expectJust
 
 endSegment :: NewRelic.Segment -> Prelude.IO ()
