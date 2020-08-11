@@ -80,9 +80,15 @@ mysqlToDatastore info =
     { NewRelic.datastoreSegmentProduct = NewRelic.MySQL,
       NewRelic.datastoreSegmentCollection = Just (MySQL.infoQueriedRelation info),
       NewRelic.datastoreSegmentOperation = Just (MySQL.infoSqlOperation info),
-      NewRelic.datastoreSegmentHost = Prelude.undefined,
-      NewRelic.datastoreSegmentPortPathOrId = Prelude.undefined,
-      NewRelic.datastoreSegmentDatabaseName = Prelude.undefined,
+      NewRelic.datastoreSegmentHost = case MySQL.infoConnection info of
+        MySQL.TcpSocket host _ _ -> Just host
+        MySQL.UnixSocket _ _ -> Nothing,
+      NewRelic.datastoreSegmentPortPathOrId = case MySQL.infoConnection info of
+        MySQL.TcpSocket _ port _ -> Just port
+        MySQL.UnixSocket path _ -> Just path,
+      NewRelic.datastoreSegmentDatabaseName = case MySQL.infoConnection info of
+        MySQL.TcpSocket _ _ dbname -> Just dbname
+        MySQL.UnixSocket _ dbname -> Just dbname,
       NewRelic.datastoreSegmentQuery = Just (MySQL.infoQueryTemplate info)
     }
 
@@ -92,9 +98,15 @@ postgresToDatastore info =
     { NewRelic.datastoreSegmentProduct = NewRelic.Postgres,
       NewRelic.datastoreSegmentCollection = Just (Postgres.infoQueriedRelation info),
       NewRelic.datastoreSegmentOperation = Just (Postgres.infoSqlOperation info),
-      NewRelic.datastoreSegmentHost = Prelude.undefined,
-      NewRelic.datastoreSegmentPortPathOrId = Prelude.undefined,
-      NewRelic.datastoreSegmentDatabaseName = Prelude.undefined,
+      NewRelic.datastoreSegmentHost = case Postgres.infoConnection info of
+        Postgres.TcpSocket host _ _ -> Just host
+        Postgres.UnixSocket _ _ -> Nothing,
+      NewRelic.datastoreSegmentPortPathOrId = case Postgres.infoConnection info of
+        Postgres.TcpSocket _ port _ -> Just port
+        Postgres.UnixSocket path _ -> Just path,
+      NewRelic.datastoreSegmentDatabaseName = case Postgres.infoConnection info of
+        Postgres.TcpSocket _ _ dbname -> Just dbname
+        Postgres.UnixSocket _ dbname -> Just dbname,
       NewRelic.datastoreSegmentQuery = Just (Postgres.infoQueryTemplate info)
     }
 
@@ -154,14 +166,6 @@ setTransactionTiming tx start duration =
   NewRelic.setTransactionTiming tx start duration
     |> andThen expectSuccess
 
-startDatastoreSegment ::
-  NewRelic.Transaction ->
-  NewRelic.DatastoreSegment ->
-  Prelude.IO NewRelic.Segment
-startDatastoreSegment tx config =
-  NewRelic.startDatastoreSegment tx config
-    |> andThen expectJust
-
 startSegment ::
   NewRelic.Transaction ->
   Text ->
@@ -169,6 +173,14 @@ startSegment ::
   Prelude.IO NewRelic.Segment
 startSegment tx name cat =
   NewRelic.startSegment tx (Just name) (Just cat)
+    |> andThen expectJust
+
+startDatastoreSegment ::
+  NewRelic.Transaction ->
+  NewRelic.DatastoreSegment ->
+  Prelude.IO NewRelic.Segment
+startDatastoreSegment tx config =
+  NewRelic.startDatastoreSegment tx config
     |> andThen expectJust
 
 endSegment :: NewRelic.Segment -> Prelude.IO ()
