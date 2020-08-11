@@ -51,7 +51,7 @@ reportSpan ::
   Prelude.IO ()
 reportSpan timer tx maybeParent span =
   Exception.bracket
-    (startSegment tx (Platform.name span) (category span))
+    (chooseAndStartSegment tx span)
     endSegment
     ( \segment -> do
         setSegmentTiming segment (startTime timer span) (toDuration span)
@@ -61,6 +61,42 @@ reportSpan timer tx maybeParent span =
         Platform.children span
           |> Foldable.traverse_ (reportSpan timer tx (Just segment))
     )
+
+chooseAndStartSegment :: NewRelic.Transaction -> Platform.Span -> Prelude.IO NewRelic.Segment
+chooseAndStartSegment tx span =
+  Platform.details span
+    |> andThen
+      ( Platform.renderSpanDetails
+          [ Platform.Renderer (startDatastoreSegment tx << mysqlToDatastore),
+            Platform.Renderer (startDatastoreSegment tx << postgresToDatastore)
+          ]
+      )
+    |> Maybe.withDefault
+      (startSegment tx (Platform.name span) (category span))
+
+mysqlToDatastore :: MySQL.Info -> NewRelic.DatastoreSegment
+mysqlToDatastore info =
+  NewRelic.DatastoreSegment
+    { NewRelic.datastoreSegmentProduct = NewRelic.MySQL,
+      NewRelic.datastoreSegmentCollection = Just (MySQL.infoQueriedRelation info),
+      NewRelic.datastoreSegmentOperation = Just (MySQL.infoSqlOperation info),
+      NewRelic.datastoreSegmentHost = Prelude.undefined,
+      NewRelic.datastoreSegmentPortPathOrId = Prelude.undefined,
+      NewRelic.datastoreSegmentDatabaseName = Prelude.undefined,
+      NewRelic.datastoreSegmentQuery = Just (MySQL.infoQueryTemplate info)
+    }
+
+postgresToDatastore :: Postgres.Info -> NewRelic.DatastoreSegment
+postgresToDatastore info =
+  NewRelic.DatastoreSegment
+    { NewRelic.datastoreSegmentProduct = NewRelic.Postgres,
+      NewRelic.datastoreSegmentCollection = Just (Postgres.infoQueriedRelation info),
+      NewRelic.datastoreSegmentOperation = Just (Postgres.infoSqlOperation info),
+      NewRelic.datastoreSegmentHost = Prelude.undefined,
+      NewRelic.datastoreSegmentPortPathOrId = Prelude.undefined,
+      NewRelic.datastoreSegmentDatabaseName = Prelude.undefined,
+      NewRelic.datastoreSegmentQuery = Just (Postgres.infoQueryTemplate info)
+    }
 
 startTime :: Timer -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
 startTime timer span =
@@ -95,11 +131,9 @@ category span =
 --
 
 startWebTransaction :: NewRelic.App -> Text -> Prelude.IO NewRelic.Transaction
-startWebTransaction app name = do
-  maybeTx <- NewRelic.startWebTransaction app name
-  case maybeTx of
-    Nothing -> Exception.throwIO NewRelicFailure
-    Just tx -> Prelude.pure tx
+startWebTransaction app name =
+  NewRelic.startWebTransaction app name
+    |> andThen expectJust
 
 endTransaction :: NewRelic.Transaction -> Prelude.IO ()
 endTransaction tx =
@@ -120,16 +154,22 @@ setTransactionTiming tx start duration =
   NewRelic.setTransactionTiming tx start duration
     |> andThen expectSuccess
 
+startDatastoreSegment ::
+  NewRelic.Transaction ->
+  NewRelic.DatastoreSegment ->
+  Prelude.IO NewRelic.Segment
+startDatastoreSegment tx config =
+  NewRelic.startDatastoreSegment tx config
+    |> andThen expectJust
+
 startSegment ::
   NewRelic.Transaction ->
   Text ->
   Text ->
   Prelude.IO NewRelic.Segment
-startSegment tx name cat = do
-  maybeSegment <- NewRelic.startSegment tx (Just name) (Just cat)
-  case maybeSegment of
-    Nothing -> Exception.throwIO NewRelicFailure
-    Just segment -> Prelude.pure segment
+startSegment tx name cat =
+  NewRelic.startSegment tx (Just name) (Just cat)
+    |> andThen expectJust
 
 endSegment :: NewRelic.Segment -> Prelude.IO ()
 endSegment segment =
@@ -160,6 +200,12 @@ expectSuccess success =
   if success
     then Prelude.pure ()
     else Exception.throwIO NewRelicFailure
+
+expectJust :: Maybe a -> Prelude.IO a
+expectJust maybe =
+  case maybe of
+    Nothing -> Exception.throwIO NewRelicFailure
+    Just val -> Prelude.pure val
 
 data NewRelicFailure = NewRelicFailure deriving (Show)
 
