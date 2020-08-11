@@ -3,6 +3,10 @@ module Observability.NewRelic (reporter) where
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Foldable as Foldable
+import qualified Data.Int
+import qualified Data.Proxy as Proxy
+import qualified Data.Text
+import qualified Data.Typeable as Typeable
 import qualified Http
 import qualified Log
 import qualified Maybe
@@ -11,12 +15,12 @@ import qualified MySQL
 import Observability.Timer (Timer, toWord64)
 import qualified Platform
 import qualified Postgres
+import qualified Text
 import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
 
 -- TODO:
 -- [ ] Strategy for dealing with exceptions that reach the reporter.
--- [ ] Handle failing transactions and segments.
 -- [ ] Figure out which attributes to report.
 
 reporter :: Timer -> NewRelic.App -> Platform.Span -> Prelude.IO ()
@@ -41,8 +45,16 @@ reportWebTransaction timer app span details =
     )
     ( \tx -> do
         setTransactionTiming tx (startTime timer span) (toDuration span)
+        case Platform.succeeded span of
+          Platform.Succeeded -> Prelude.pure ()
+          Platform.Failed -> reportError tx "Error logged during request" details
+          Platform.FailedWith err -> reportError tx (typeName err) details
         reportSpan timer tx Nothing span
     )
+
+reportError :: NewRelic.Transaction -> Text -> Monitoring.RequestDetails -> Prelude.IO ()
+reportError tx msg details =
+  noticeError tx 1 msg (Text.fromInt (Monitoring.responseStatus details))
 
 reportSpan ::
   Timer ->
@@ -225,6 +237,9 @@ setSegmentParentRoot segment =
   NewRelic.setSegmentParentRoot segment
     |> andThen expectSuccess
 
+noticeError :: NewRelic.Transaction -> Data.Int.Int32 -> Text -> Text -> Prelude.IO ()
+noticeError = NewRelic.noticeError
+
 expectSuccess :: Bool -> Prelude.IO ()
 expectSuccess success =
   if success
@@ -240,3 +255,9 @@ expectJust maybe =
 data NewRelicFailure = NewRelicFailure deriving (Show)
 
 instance Exception.Exception NewRelicFailure
+
+typeName :: forall a. Typeable.Typeable a => a -> Text
+typeName _ =
+  Typeable.typeRep (Proxy.Proxy :: Proxy.Proxy a)
+    |> Prelude.show
+    |> Data.Text.pack
