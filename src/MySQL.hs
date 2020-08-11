@@ -29,6 +29,7 @@ module MySQL
     Query.Query,
     Error.Error (..),
     Query.Info (..),
+    Query.ConnectionInfo (..),
     -- These type classes are for serializing and deserializing data from the
     -- database.
     --

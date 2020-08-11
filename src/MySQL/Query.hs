@@ -257,7 +257,7 @@ data Info
         -- | Our best guess of the relation we're querying.
         infoQueriedRelation :: Text,
         -- | Connection information of the database we're sending the query to.
-        infoConnectionString :: Text
+        infoConnection :: ConnectionInfo
       }
   deriving (Generic)
 
@@ -283,13 +283,19 @@ mkInfo query conn =
       infoRanAsPreparedStatement = prepareQuery query == Prepare,
       infoSqlOperation = sqlOperation query,
       infoQueriedRelation = queriedRelation query,
-      infoConnectionString = connectionToText conn
+      infoConnection = conn
     }
 
 data ConnectionInfo
   = TcpSocket Host Port DatabaseName
   | UnixSocket SocketPath DatabaseName
   deriving (Generic)
+
+instance Aeson.ToJSON ConnectionInfo where
+
+  toJSON = Aeson.toJSON << connectionToText
+
+  toEncoding = Aeson.toEncoding << connectionToText
 
 type Host = Text
 

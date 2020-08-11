@@ -145,13 +145,13 @@ data Info
         -- | The query template (QuasiQuote) that was used to build the template.
         -- This we don't need to wrap in a `Secret` and can be safely logged.
         infoQueryTemplate :: Text,
-        -- | Connection information of the database we're sending the query to.
-        infoConnectionString :: Text,
         -- | Our best guess of the relation we're querying.
         infoQueriedRelation :: Text,
         -- | Our best guess of the SQL operation we're performing (SELECT /
         -- DELETE / ...).
-        infoSqlOperation :: Text
+        infoSqlOperation :: Text,
+        -- | Connection information of the database we're sending the query to.
+        infoConnection :: ConnectionInfo
       }
   deriving (Generic)
 
@@ -160,9 +160,9 @@ mkInfo query conn =
   Info
     { infoQuery = Log.mkSecret (sqlString query),
       infoQueryTemplate = quasiQuotedString query,
-      infoConnectionString = connectionToText conn,
       infoSqlOperation = sqlOperation query,
-      infoQueriedRelation = queriedRelation query
+      infoQueriedRelation = queriedRelation query,
+      infoConnection = conn
     }
 
 instance Aeson.ToJSON Info where
@@ -183,6 +183,12 @@ data ConnectionInfo
   = TcpSocket Host Port DatabaseName
   | UnixSocket SocketPath DatabaseName
   deriving (Generic)
+
+instance Aeson.ToJSON ConnectionInfo where
+
+  toJSON = Aeson.toJSON << connectionToText
+
+  toEncoding = Aeson.toEncoding << connectionToText
 
 type Host = Text
 

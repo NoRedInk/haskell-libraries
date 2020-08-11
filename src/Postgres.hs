@@ -23,6 +23,7 @@ module Postgres
     Query.sql,
     doQuery,
     Query.Info (..),
+    Query.ConnectionInfo (..),
     -- Handling transactions
     transaction,
     inTestTransaction,
