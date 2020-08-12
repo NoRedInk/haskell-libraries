@@ -1,6 +1,8 @@
 module Observability.Bugsnag
   ( reporter,
     Settings,
+    Handler,
+    handler,
     decoder,
     readiness,
     toEvent,
@@ -73,21 +75,27 @@ import qualified Prelude
 --
 -- A span that happened _after_ the root cause event completed we're not
 -- reporting.
-reporter :: Http.Handler -> Timer -> Settings -> Platform.Span -> Prelude.IO ()
-reporter http timer settings span = do
-  defaultEvent <- mkDefaultEvent settings
+reporter :: Handler -> Platform.Span -> Prelude.IO ()
+reporter (Handler http timer defaultEvent apiKey) span =
   if failed span
-    then send http settings (toEvent timer defaultEvent span)
+    then send http apiKey (toEvent timer defaultEvent span)
     else Prelude.pure ()
 
-send :: Http.Handler -> Settings -> Bugsnag.Event -> Prelude.IO ()
-send http settings event = do
+data Handler = Handler Http.Handler Timer Bugsnag.Event (Log.Secret Bugsnag.ApiKey)
+
+handler :: Http.Handler -> Timer -> Settings -> Prelude.IO Handler
+handler http timer settings = do
+  defaultEvent <- mkDefaultEvent settings
+  Prelude.pure (Handler http timer defaultEvent (apiKey settings))
+
+send :: Http.Handler -> Log.Secret Bugsnag.ApiKey -> Bugsnag.Event -> Prelude.IO ()
+send http key event = do
   log <- Platform.silentHandler
   Http.withThirdPartyIO log http <| \manager -> do
     -- Logging to Bugsnag might fail, but if it does we can't very well send the
     -- error to Bugsnag. This is the end of the line, these errors disappear
     -- into the aether.
-    _ <- Bugsnag.sendEvents manager (Log.unSecret (apiKey settings)) [event]
+    _ <- Bugsnag.sendEvents manager (Log.unSecret key) [event]
     Prelude.pure ()
 
 toEvent :: Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
