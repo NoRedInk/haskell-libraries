@@ -17,6 +17,7 @@ import qualified Path
 import qualified Path.IO
 import qualified Platform
 import qualified System.IO
+import qualified System.Random as Random
 import qualified Prelude
 
 reporter :: Handler -> Platform.Span -> Prelude.IO ()
@@ -105,7 +106,9 @@ handler timer settings =
           Control.Monad.IO.Class.liftIO <| do
             let skipLogging span =
                   case Platform.succeeded span of
-                    Platform.Succeeded -> Prelude.pure False
+                    Platform.Succeeded -> do
+                      roll <- Random.randomRIO (0, 1)
+                      Prelude.pure (roll > fractionOfSuccessRequestsLogged settings)
                     Platform.Failed -> Prelude.pure True
                     Platform.FailedWith _ -> Prelude.pure True
             logEnv <-
@@ -140,7 +143,8 @@ data Settings
   = Settings
       { logFile :: Prelude.FilePath,
         appName :: Katip.Namespace,
-        appEnvironment :: Katip.Environment
+        appEnvironment :: Katip.Environment,
+        fractionOfSuccessRequestsLogged :: Float
       }
 
 decoder :: Environment.Decoder Settings
@@ -149,6 +153,7 @@ decoder =
     |> andMap logFileDecoder
     |> andMap namespaceDecoder
     |> andMap environmentDecoder
+    |> andMap fractionOfSuccessRequestsLoggedDecoder
 
 logFileDecoder :: Environment.Decoder Prelude.FilePath
 logFileDecoder =
@@ -179,6 +184,16 @@ environmentDecoder =
         Environment.defaultValue = "development"
       }
     (map Katip.Environment Environment.text)
+
+fractionOfSuccessRequestsLoggedDecoder :: Environment.Decoder Float
+fractionOfSuccessRequestsLoggedDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "FRACTION_OF_SUCCESS_REQUESTS_LOGGED",
+        Environment.description = "The fraction of successful requests logged. Defaults to logging all successful requests.",
+        Environment.defaultValue = "1"
+      }
+    Environment.float
 
 resolvePath :: Prelude.FilePath -> Prelude.IO (Path.Path Path.Abs Path.File)
 resolvePath file =
