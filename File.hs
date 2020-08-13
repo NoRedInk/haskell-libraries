@@ -5,6 +5,8 @@ import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.Aeson as Aeson
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Word as Word
 import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified Katip
@@ -33,7 +35,7 @@ logItem (Handler env) timer namespace span =
       Katip._itemThread = Katip.ThreadIdText "",
       Katip._itemHost = Katip._logEnvHost env,
       Katip._itemProcess = Katip._logEnvPid env,
-      Katip._itemPayload = LogItem (Platform.details span),
+      Katip._itemPayload = LogItem (duration span) (Platform.details span),
       Katip._itemMessage = Katip.logStr (Platform.name span),
       Katip._itemTime = toUTC timer (Platform.started span),
       Katip._itemNamespace = Katip._logEnvApp env ++ namespace,
@@ -56,9 +58,17 @@ srcLocToLoc (_, srcLoc) =
         )
     }
 
-newtype LogItem a = LogItem a deriving (Aeson.ToJSON)
+duration :: Platform.Span -> Word.Word64
+duration span = Platform.finished span - Platform.started span
 
-instance Aeson.ToJSON a => Katip.ToObject (LogItem a)
+data LogItem a = LogItem Word.Word64 a
+
+instance Aeson.ToJSON a => Katip.ToObject (LogItem a) where
+  toObject (LogItem dt x) =
+    HashMap.singleton "duration in ms" (Aeson.toJSON (dt `Prelude.div` 1000000))
+      ++ case Aeson.toJSON x of
+        Aeson.Object obj -> obj
+        val -> HashMap.singleton "value" val
 
 instance Aeson.ToJSON a => Katip.LogItem (LogItem a) where
   payloadKeys _ _ = Katip.AllKeys
