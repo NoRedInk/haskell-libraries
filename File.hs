@@ -20,9 +20,13 @@ import qualified System.IO
 import qualified Prelude
 
 reporter :: Handler -> Timer -> Platform.Span -> Prelude.IO ()
-reporter handler' timer span =
-  logItemRecursively handler' timer Prelude.mempty span
-    |> Katip.runKatipT (logEnv handler')
+reporter handler' timer span = do
+  skip <- skipLogging handler' span
+  if skip
+    then Prelude.pure ()
+    else
+      logItemRecursively handler' timer Prelude.mempty span
+        |> Katip.runKatipT (logEnv handler')
 
 logItemRecursively :: Handler -> Timer -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
 logItemRecursively handler' timer namespace span = do
@@ -32,7 +36,7 @@ logItemRecursively handler' timer namespace span = do
     (Platform.children span)
 
 logItem :: Handler -> Timer -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
-logItem (Handler env) timer namespace span =
+logItem (Handler env _) timer namespace span =
   Katip.logKatipItem Katip.Item
     { Katip._itemApp = Katip._logEnvApp env,
       Katip._itemEnv = Katip._logEnvEnv env,
@@ -81,17 +85,30 @@ instance Aeson.ToJSON a => Katip.ToObject (LogItem a) where
 instance Aeson.ToJSON a => Katip.LogItem (LogItem a) where
   payloadKeys _ _ = Katip.AllKeys
 
-newtype Handler = Handler {logEnv :: Katip.LogEnv}
+data Handler
+  = Handler
+      { -- | A bit of configuration that Katip needs to log.
+        logEnv :: Katip.LogEnv,
+        -- | A function that determines for a particular span if it should be
+        -- skipped in logging.
+        skipLogging :: Platform.Span -> Prelude.IO Bool
+      }
 
 handler :: Settings -> Conduit.Acquire Handler
 handler settings =
   scribe settings
     |> andThen
       ( \scribe' ->
-          Katip.initLogEnv (appName settings) (appEnvironment settings)
-            |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
-            |> map Handler
-            |> Control.Monad.IO.Class.liftIO
+          Control.Monad.IO.Class.liftIO <| do
+            let skipLogging span =
+                  case Platform.succeeded span of
+                    Platform.Succeeded -> Prelude.pure False
+                    Platform.Failed -> Prelude.pure True
+                    Platform.FailedWith _ -> Prelude.pure True
+            logEnv <-
+              Katip.initLogEnv (appName settings) (appEnvironment settings)
+                |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
+            Prelude.pure Handler {logEnv, skipLogging}
       )
 
 scribe :: Settings -> Conduit.Acquire Katip.Scribe
