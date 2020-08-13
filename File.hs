@@ -19,24 +19,24 @@ import qualified Platform
 import qualified System.IO
 import qualified Prelude
 
-reporter :: Handler -> Timer -> Platform.Span -> Prelude.IO ()
-reporter handler' timer span = do
+reporter :: Handler -> Platform.Span -> Prelude.IO ()
+reporter handler' span = do
   skip <- skipLogging handler' span
   if skip
     then Prelude.pure ()
     else
-      logItemRecursively handler' timer Prelude.mempty span
+      logItemRecursively handler' Prelude.mempty span
         |> Katip.runKatipT (logEnv handler')
 
-logItemRecursively :: Handler -> Timer -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
-logItemRecursively handler' timer namespace span = do
-  logItem handler' timer namespace span
+logItemRecursively :: Handler -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
+logItemRecursively handler' namespace span = do
+  logItem handler' namespace span
   Foldable.traverse_
-    (logItemRecursively handler' timer (namespace ++ Katip.Namespace [Platform.name span]))
+    (logItemRecursively handler' (namespace ++ Katip.Namespace [Platform.name span]))
     (Platform.children span)
 
-logItem :: Handler -> Timer -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
-logItem (Handler env _) timer namespace span =
+logItem :: Handler -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
+logItem (Handler env timer _) namespace span =
   Katip.logKatipItem Katip.Item
     { Katip._itemApp = Katip._logEnvApp env,
       Katip._itemEnv = Katip._logEnvEnv env,
@@ -89,13 +89,16 @@ data Handler
   = Handler
       { -- | A bit of configuration that Katip needs to log.
         logEnv :: Katip.LogEnv,
+        -- | A bit of state that can be used to turn the clock values attached
+        -- to spans into real timestamps.
+        timer :: Timer,
         -- | A function that determines for a particular span if it should be
         -- skipped in logging.
         skipLogging :: Platform.Span -> Prelude.IO Bool
       }
 
-handler :: Settings -> Conduit.Acquire Handler
-handler settings =
+handler :: Timer -> Settings -> Conduit.Acquire Handler
+handler timer settings =
   scribe settings
     |> andThen
       ( \scribe' ->
@@ -108,7 +111,7 @@ handler settings =
             logEnv <-
               Katip.initLogEnv (appName settings) (appEnvironment settings)
                 |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
-            Prelude.pure Handler {logEnv, skipLogging}
+            Prelude.pure Handler {logEnv, timer, skipLogging}
       )
 
 scribe :: Settings -> Conduit.Acquire Katip.Scribe
