@@ -1,9 +1,8 @@
-module Observability.File (reporter, handler, Handler, Settings, decoder) where
+module Observability.File (reporter, handler, Handler, Settings (..), decoder) where
 
 import Cherry.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
-import qualified Control.Monad.IO.Class
 import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
@@ -99,36 +98,33 @@ data Handler
       }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
-handler timer settings =
-  scribe settings
-    |> andThen
-      ( \scribe' ->
-          Control.Monad.IO.Class.liftIO <| do
+handler timer settings = do
             let skipLogging span =
                   case Platform.succeeded span of
                     Platform.Succeeded -> do
                       roll <- Random.randomRIO (0, 1)
                       Prelude.pure (roll > fractionOfSuccessRequestsLogged settings)
-                    Platform.Failed -> Prelude.pure True
-                    Platform.FailedWith _ -> Prelude.pure True
-            logEnv <-
-              Katip.initLogEnv (appName settings) (appEnvironment settings)
-                |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
+                    Platform.Failed -> Prelude.pure False
+                    Platform.FailedWith _ -> Prelude.pure False
+            logEnv <- mkLogEnv settings
             Prelude.pure Handler {logEnv, timer, skipLogging}
-      )
 
-scribe :: Settings -> Conduit.Acquire Katip.Scribe
-scribe settings = do
+mkLogEnv :: Settings -> Conduit.Acquire Katip.LogEnv
+mkLogEnv settings = do
   handle <- fileHandle settings
   Conduit.mkAcquire
-    ( Katip.mkHandleScribeWithFormatter
-        Katip.jsonFormat
-        (Katip.ColorLog False)
-        handle
-        (Katip.permitItem Katip.DebugS)
-        Katip.V3
+    ( do
+        scribe' <-
+          Katip.mkHandleScribeWithFormatter
+              Katip.jsonFormat
+              (Katip.ColorLog False)
+              handle
+              (Katip.permitItem Katip.DebugS)
+              Katip.V3
+        Katip.initLogEnv (appName settings) (appEnvironment settings)
+          |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
     )
-    Katip.scribeFinalizer
+    (Katip.closeScribes >> map (\_ -> ()))
 
 fileHandle :: Settings -> Conduit.Acquire System.IO.Handle
 fileHandle settings =
