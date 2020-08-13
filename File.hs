@@ -5,6 +5,7 @@ import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.Aeson as Aeson
+import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Word as Word
 import qualified Environment
@@ -20,8 +21,15 @@ import qualified Prelude
 
 reporter :: Handler -> Timer -> Platform.Span -> Prelude.IO ()
 reporter handler' timer span =
-  logItem handler' timer Prelude.mempty span
+  logItemRecursively handler' timer Prelude.mempty span
     |> Katip.runKatipT (logEnv handler')
+
+logItemRecursively :: Handler -> Timer -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
+logItemRecursively handler' timer namespace span = do
+  logItem handler' timer namespace span
+  Foldable.traverse_
+    (logItemRecursively handler' timer (namespace ++ Katip.Namespace [Platform.name span]))
+    (Platform.children span)
 
 logItem :: Handler -> Timer -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
 logItem (Handler env) timer namespace span =
