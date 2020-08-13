@@ -47,7 +47,7 @@ logItem (Handler env timer _) namespace span =
       Katip._itemThread = Katip.ThreadIdText "",
       Katip._itemHost = Katip._logEnvHost env,
       Katip._itemProcess = Katip._logEnvPid env,
-      Katip._itemPayload = LogItem (duration span) (Platform.details span),
+      Katip._itemPayload = LogItem span,
       Katip._itemMessage = Katip.logStr (Platform.name span),
       Katip._itemTime = toUTC timer (Platform.started span),
       Katip._itemNamespace = Katip._logEnvApp env ++ namespace,
@@ -73,16 +73,29 @@ srcLocToLoc (_, srcLoc) =
 duration :: Platform.Span -> Word.Word64
 duration span = Platform.finished span - Platform.started span
 
-data LogItem a = LogItem Word.Word64 a
+newtype LogItem = LogItem Platform.Span
 
-instance Aeson.ToJSON a => Katip.ToObject (LogItem a) where
-  toObject (LogItem dt x) =
-    HashMap.singleton "duration in ms" (Aeson.toJSON (dt `Prelude.div` 1000000))
-      ++ case Aeson.toJSON x of
-        Aeson.Object obj -> obj
-        val -> HashMap.singleton "value" val
+instance Katip.ToObject LogItem where
+  toObject (LogItem span) =
+    let genericFields =
+          HashMap.fromList
+            [ ("duration in ms", Aeson.toJSON (duration span `Prelude.div` 1000000)),
+              ( "exception",
+                Aeson.toJSON
+                  <| case Platform.succeeded span of
+                    Platform.Succeeded -> Nothing
+                    Platform.Failed -> Nothing
+                    Platform.FailedWith err -> Just (Exception.displayException err)
+              )
+            ]
+        detailFields =
+          case Aeson.toJSON (Platform.details span) of
+            Aeson.Object obj -> obj
+            val -> HashMap.singleton "details" val
+     in genericFields ++ detailFields
+          |> HashMap.filter (Aeson.Null /=)
 
-instance Aeson.ToJSON a => Katip.LogItem (LogItem a) where
+instance Katip.LogItem LogItem where
   payloadKeys _ _ = Katip.AllKeys
 
 data Handler
@@ -99,15 +112,15 @@ data Handler
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
-            let skipLogging span =
-                  case Platform.succeeded span of
-                    Platform.Succeeded -> do
-                      roll <- Random.randomRIO (0, 1)
-                      Prelude.pure (roll > fractionOfSuccessRequestsLogged settings)
-                    Platform.Failed -> Prelude.pure False
-                    Platform.FailedWith _ -> Prelude.pure False
-            logEnv <- mkLogEnv settings
-            Prelude.pure Handler {logEnv, timer, skipLogging}
+  let skipLogging span =
+        case Platform.succeeded span of
+          Platform.Succeeded -> do
+            roll <- Random.randomRIO (0, 1)
+            Prelude.pure (roll > fractionOfSuccessRequestsLogged settings)
+          Platform.Failed -> Prelude.pure False
+          Platform.FailedWith _ -> Prelude.pure False
+  logEnv <- mkLogEnv settings
+  Prelude.pure Handler {logEnv, timer, skipLogging}
 
 mkLogEnv :: Settings -> Conduit.Acquire Katip.LogEnv
 mkLogEnv settings = do
@@ -116,11 +129,11 @@ mkLogEnv settings = do
     ( do
         scribe' <-
           Katip.mkHandleScribeWithFormatter
-              Katip.jsonFormat
-              (Katip.ColorLog False)
-              handle
-              (Katip.permitItem Katip.DebugS)
-              Katip.V3
+            Katip.jsonFormat
+            (Katip.ColorLog False)
+            handle
+            (Katip.permitItem Katip.DebugS)
+            Katip.V3
         Katip.initLogEnv (appName settings) (appEnvironment settings)
           |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
     )
