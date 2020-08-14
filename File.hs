@@ -6,11 +6,13 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Text
 import qualified Data.Word as Word
 import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified Katip
 import qualified Language.Haskell.TH as TH
+import qualified Maybe
 import Observability.Timer (Timer, toUTC)
 import qualified Path
 import qualified Path.IO
@@ -135,6 +137,19 @@ mkLogEnv settings = do
             (Katip.permitItem Katip.DebugS)
             Katip.V3
         Katip.initLogEnv (appName settings) (appEnvironment settings)
+          |> map
+            ( \logEnv' ->
+                logEnv'
+                  { Katip._logEnvHost =
+                      mockHostname settings
+                        |> map Data.Text.unpack
+                        |> Maybe.withDefault (Katip._logEnvHost logEnv'),
+                    Katip._logEnvPid =
+                      mockPid settings
+                        |> map Prelude.fromIntegral
+                        |> Maybe.withDefault (Katip._logEnvPid logEnv')
+                  }
+            )
           |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
     )
     (Katip.closeScribes >> map (\_ -> ()))
@@ -153,7 +168,10 @@ data Settings
       { logFile :: Prelude.FilePath,
         appName :: Katip.Namespace,
         appEnvironment :: Katip.Environment,
-        fractionOfSuccessRequestsLogged :: Float
+        fractionOfSuccessRequestsLogged :: Float,
+        -- These mock values are useful in tests to ensure the constant output.
+        mockHostname :: Maybe Text,
+        mockPid :: Maybe Int
       }
 
 decoder :: Environment.Decoder Settings
@@ -163,6 +181,10 @@ decoder =
     |> andMap namespaceDecoder
     |> andMap environmentDecoder
     |> andMap fractionOfSuccessRequestsLoggedDecoder
+    -- We don't define decoders for the mock* fields used by tests. Tests can
+    -- construct a Settings object directly without decoding it from env vars.
+    |> andMap (Prelude.pure Nothing)
+    |> andMap (Prelude.pure Nothing)
 
 logFileDecoder :: Environment.Decoder Prelude.FilePath
 logFileDecoder =
