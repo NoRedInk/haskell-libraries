@@ -244,14 +244,14 @@ toConnectInfo settings =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: Platform.LogHandler -> Connection -> Health.Check
-readiness log conn =
+readiness :: Connection -> Health.Check
+readiness conn = Health.mkCheck "mysql" <| do
+  log <- Platform.silentHandler
   executeQuery conn (queryFromText "SELECT 1")
     |> Task.map (\(_ :: [Int]) -> ())
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
     |> map Health.fromResult
-    |> Health.mkCheck "mysql"
 
 queryFromText :: Text -> Query.Query a
 queryFromText text =

@@ -196,14 +196,14 @@ inTestTransactionIo postgres io = do
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: Platform.LogHandler -> Connection -> Health.Check
-readiness log conn =
+readiness :: Connection -> Health.Check
+readiness conn = Health.mkCheck "postgres" <| do
+  log <- Platform.silentHandler
   runQuery conn [Query.sql|!SELECT 1|]
     |> map (\(_ :: [Int]) -> ())
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
     |> map Health.fromResult
-    |> Health.mkCheck "postgres"
 
 doQuery ::
   HasCallStack =>
