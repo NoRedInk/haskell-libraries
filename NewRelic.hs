@@ -1,4 +1,4 @@
-module Observability.NewRelic (reporter, handler, Handler, Settings, decoder) where
+module Observability.NewRelic (report, handler, Handler, Settings, decoder) where
 
 import Cherry.Prelude
 import qualified Conduit
@@ -21,8 +21,8 @@ import qualified Text
 import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
 
-reporter :: Handler -> Platform.Span -> Prelude.IO ()
-reporter handler' span =
+report :: Handler -> Platform.Span -> Prelude.IO ()
+report handler' span =
   case Platform.details span |> andThen Platform.fromSpanDetails of
     Nothing -> Prelude.pure ()
     Just details -> reportWebTransaction handler' span details

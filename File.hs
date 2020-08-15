@@ -1,4 +1,4 @@
-module Observability.File (reporter, handler, Handler, Settings (..), decoder) where
+module Observability.File (report, handler, Handler, Settings (..), decoder) where
 
 import Cherry.Prelude
 import qualified Conduit
@@ -21,8 +21,8 @@ import qualified System.IO
 import qualified System.Random as Random
 import qualified Prelude
 
-reporter :: Handler -> Platform.Span -> Prelude.IO ()
-reporter handler' span = do
+report :: Handler -> Platform.Span -> Prelude.IO ()
+report handler' span = do
   skip <- skipLogging handler' span
   if skip
     then Prelude.pure ()

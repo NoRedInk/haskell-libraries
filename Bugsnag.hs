@@ -1,5 +1,5 @@
 module Observability.Bugsnag
-  ( reporter,
+  ( report,
     Settings,
     Handler,
     handler,
@@ -72,8 +72,8 @@ import qualified Prelude
 --
 -- A span that happened _after_ the root cause event completed we're not
 -- reporting.
-reporter :: Handler -> Platform.Span -> Prelude.IO ()
-reporter (Handler http timer defaultEvent apiKey) span =
+report :: Handler -> Platform.Span -> Prelude.IO ()
+report (Handler http timer defaultEvent apiKey) span =
   if failed span
     then send http apiKey (toEvent timer defaultEvent span)
     else Prelude.pure ()
