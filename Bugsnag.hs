@@ -4,7 +4,6 @@ module Observability.Bugsnag
     Handler,
     handler,
     decoder,
-    readiness,
     toEvent,
   )
 where
@@ -24,7 +23,6 @@ import qualified Data.Text.IO
 import qualified Data.Typeable as Typeable
 import qualified Environment
 import qualified GHC.Stack as Stack
-import qualified Health
 import qualified Http
 import qualified List
 import qualified Log
@@ -32,7 +30,6 @@ import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
 import qualified Network.Bugsnag as Bugsnag
-import qualified Network.HTTP.Client
 import qualified Network.HostName
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
@@ -484,26 +481,6 @@ environmentDecoder =
         Environment.defaultValue = "development"
       }
     (map Environment Environment.text)
-
--- |
--- Check if Bugsnag is ready to receive requests.
-readiness :: Settings -> Network.HTTP.Client.Manager -> Health.Check
-readiness settings manager =
-  Health.mkCheck "bugsnag" <| do
-    result <- Bugsnag.sendEvents manager (Log.unSecret (apiKey settings)) []
-    Prelude.pure <| case result of
-      Prelude.Right () -> Health.Good
-      Prelude.Left err ->
-        "HTTP request to Bugsnag failed: " ++ Exception.displayException err
-          |> Data.Text.pack
-          |> Health.Bad
-
-_getRevision :: Prelude.IO Text
-_getRevision = do
-  eitherRevision <- Exception.tryAny <| Prelude.readFile "revision"
-  case eitherRevision of
-    Prelude.Left _err -> Prelude.pure "no revision file found"
-    Prelude.Right version -> Prelude.pure <| Data.Text.pack version
 
 mkDefaultEvent :: Settings -> Prelude.IO Bugsnag.Event
 mkDefaultEvent settings = do
