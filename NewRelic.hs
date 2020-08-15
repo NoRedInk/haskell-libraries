@@ -1,6 +1,7 @@
-module Observability.NewRelic (reporter) where
+module Observability.NewRelic (reporter, handler, Handler) where
 
 import Cherry.Prelude
+import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Foldable as Foldable
 import qualified Data.Int
@@ -12,6 +13,7 @@ import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
+import qualified Observability.NewRelic.Settings as Settings
 import Observability.Timer (Timer, toWord64)
 import qualified Platform
 import qualified Postgres
@@ -19,18 +21,26 @@ import qualified Text
 import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
 
--- TODO:
--- [ ] Strategy for dealing with exceptions that reach the reporter.
--- [ ] Figure out which attributes to report.
-
-reporter :: Timer -> NewRelic.App -> Platform.Span -> Prelude.IO ()
-reporter timer app span =
+reporter :: Handler -> Platform.Span -> Prelude.IO ()
+reporter handler' span =
   case Platform.details span |> andThen Platform.fromSpanDetails of
     Nothing -> Prelude.pure ()
-    Just details -> reportWebTransaction timer app span details
+    Just details -> reportWebTransaction handler' span details
 
-reportWebTransaction :: Timer -> NewRelic.App -> Platform.Span -> Monitoring.RequestDetails -> Prelude.IO ()
-reportWebTransaction timer app span details =
+data Handler = Handler Timer NewRelic.App
+
+handler :: Timer -> Settings.Settings -> Conduit.Acquire Handler
+handler timer settings =
+  Conduit.mkAcquire
+    ( do
+        appConfig <- NewRelic.createAppConfig (Settings.appName settings) (Log.unSecret (Settings.licenseKey settings))
+        NewRelic.createApp appConfig (Settings.timeout settings)
+          |> map (Handler timer)
+    )
+    (\_ -> Prelude.pure ())
+
+reportWebTransaction :: Handler -> Platform.Span -> Monitoring.RequestDetails -> Prelude.IO ()
+reportWebTransaction (Handler timer app) span details =
   Exception.bracketWithError
     (startWebTransaction app (Monitoring.endpoint details))
     ( \maybeException tx -> do
