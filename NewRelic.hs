@@ -1,4 +1,4 @@
-module Observability.NewRelic (reporter, handler, Handler) where
+module Observability.NewRelic (reporter, handler, Handler, Settings, decoder) where
 
 import Cherry.Prelude
 import qualified Conduit
@@ -8,12 +8,12 @@ import qualified Data.Int
 import qualified Data.Proxy as Proxy
 import qualified Data.Text
 import qualified Data.Typeable as Typeable
+import qualified Environment
 import qualified Http
 import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
-import qualified Observability.NewRelic.Settings as Settings
 import Observability.Timer (Timer, toWord64)
 import qualified Platform
 import qualified Postgres
@@ -29,12 +29,12 @@ reporter handler' span =
 
 data Handler = Handler Timer NewRelic.App
 
-handler :: Timer -> Settings.Settings -> Conduit.Acquire Handler
+handler :: Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings =
   Conduit.mkAcquire
     ( do
-        appConfig <- NewRelic.createAppConfig (Settings.appName settings) (Log.unSecret (Settings.licenseKey settings))
-        NewRelic.createApp appConfig (Settings.timeout settings)
+        appConfig <- NewRelic.createAppConfig (appName settings) (Log.unSecret (licenseKey settings))
+        NewRelic.createApp appConfig (timeout settings)
           |> map (Handler timer)
     )
     (\_ -> Prelude.pure ())
@@ -271,3 +271,47 @@ typeName _ =
   Typeable.typeRep (Proxy.Proxy :: Proxy.Proxy a)
     |> Prelude.show
     |> Data.Text.pack
+
+data Settings
+  = Settings
+      { appName :: NewRelic.AppName,
+        licenseKey :: Log.Secret NewRelic.LicenseKey,
+        timeout :: NewRelic.TimeoutMs
+      }
+
+decoder :: Environment.Decoder Settings
+decoder =
+  Prelude.pure Settings
+    |> andMap appNameDecoder
+    |> andMap licenseKeyDecoder
+    |> andMap timeoutDecoder
+
+appNameDecoder :: Environment.Decoder NewRelic.AppName
+appNameDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "NEW_RELIC_APP_NAME",
+        Environment.description = "The NewRelic applicat name to connect to.",
+        Environment.defaultValue = ""
+      }
+    (Environment.text |> map NewRelic.AppName)
+
+licenseKeyDecoder :: Environment.Decoder (Log.Secret NewRelic.LicenseKey)
+licenseKeyDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "NEW_RELIC_LICENSE_KEY",
+        Environment.description = "The NewRelic license key to connect with..",
+        Environment.defaultValue = ""
+      }
+    (Environment.text |> map NewRelic.LicenseKey |> Environment.secret)
+
+timeoutDecoder :: Environment.Decoder NewRelic.TimeoutMs
+timeoutDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "NEW_RELIC_TIMEOUT_MS",
+        Environment.description = "The timeout when connecting to NewRelic",
+        Environment.defaultValue = "10000"
+      }
+    (Environment.int |> map NewRelic.TimeoutMs)
