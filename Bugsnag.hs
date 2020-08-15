@@ -9,6 +9,7 @@ module Observability.Bugsnag
 where
 
 import Cherry.Prelude
+import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -30,6 +31,8 @@ import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
 import qualified Network.Bugsnag as Bugsnag
+import qualified Network.HTTP.Client as HTTP
+import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
@@ -78,22 +81,25 @@ report (Handler http timer defaultEvent apiKey) span =
     then send http apiKey (toEvent timer defaultEvent span)
     else Prelude.pure ()
 
-data Handler = Handler Http.Handler Timer Bugsnag.Event (Log.Secret Bugsnag.ApiKey)
+data Handler = Handler HTTP.Manager Timer Bugsnag.Event (Log.Secret Bugsnag.ApiKey)
 
-handler :: Http.Handler -> Timer -> Settings -> Prelude.IO Handler
-handler http timer settings = do
-  defaultEvent <- mkDefaultEvent settings
-  Prelude.pure (Handler http timer defaultEvent (apiKey settings))
+handler :: Timer -> Settings -> Conduit.Acquire Handler
+handler timer settings =
+  Conduit.mkAcquire
+    ( do
+        http <- HTTP.TLS.getGlobalManager
+        defaultEvent <- mkDefaultEvent settings
+        Prelude.pure (Handler http timer defaultEvent (apiKey settings))
+    )
+    (\_ -> Prelude.pure ())
 
-send :: Http.Handler -> Log.Secret Bugsnag.ApiKey -> Bugsnag.Event -> Prelude.IO ()
-send http key event = do
-  log <- Platform.silentHandler
-  Http.withThirdPartyIO log http <| \manager -> do
-    -- Logging to Bugsnag might fail, but if it does we can't very well send the
-    -- error to Bugsnag. This is the end of the line, these errors disappear
-    -- into the aether.
-    _ <- Bugsnag.sendEvents manager (Log.unSecret key) [event]
-    Prelude.pure ()
+send :: HTTP.Manager -> Log.Secret Bugsnag.ApiKey -> Bugsnag.Event -> Prelude.IO ()
+send manager key event = do
+  -- Logging to Bugsnag might fail, but if it does we can't very well send the
+  -- error to Bugsnag. This is the end of the line, these errors disappear
+  -- into the aether.
+  _ <- Bugsnag.sendEvents manager (Log.unSecret key) [event]
+  Prelude.pure ()
 
 toEvent :: Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
 toEvent = rootCause [] emptyCrumbs
