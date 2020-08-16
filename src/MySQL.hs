@@ -504,7 +504,7 @@ rollbackAll conn =
       Just _ -> executeCommand_ conn (queryFromText "ROLLBACK")
 
 throwRuntimeError :: Task Error.Error a -> Task e a
-throwRuntimeError task = do
+throwRuntimeError task =
   Task.onError
     ( \err ->
         Exception.displayException err
