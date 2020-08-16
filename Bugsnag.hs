@@ -125,7 +125,10 @@ rootCause frames breadcrumbs timer event span =
         child : preErrorSpans ->
           rootCause
             newFrames
-            (breadcrumbs |> followedBy (addCrumbs timer preErrorSpans))
+            ( breadcrumbs
+                |> followedBy (addCrumb (startBreadcrumb timer span))
+                |> followedBy (addCrumbs timer preErrorSpans)
+            )
             timer
             newEvent
             child
