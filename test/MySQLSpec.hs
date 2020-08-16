@@ -6,7 +6,7 @@ module MySQLSpec
 where
 
 import Cherry.Prelude
-import qualified Debug
+import qualified Control.Exception.Safe as Exception
 import qualified Expect
 import qualified Expect.Task
 import qualified Log
@@ -86,7 +86,9 @@ exceptionTests mysqlConn =
           (_ :: Int) <-
             MySQL.doQuery
               conn
-              [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+              ( [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+                  |> MySQL.onDuplicateDoNothing
+              )
               resultToTask
               |> Expect.Task.succeeds
           MySQL.doQuery
@@ -98,7 +100,7 @@ exceptionTests mysqlConn =
                   Ok (_ :: Int) -> Task.fail ("Expected an error, but none was returned." :: Text)
             )
             |> Expect.Task.andCheck
-              ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Debug.toString
+              ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Exception.displayException
               )
     ]
 
