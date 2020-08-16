@@ -203,10 +203,6 @@ data TestHandlers
         redisHandlers :: [(Text, Handler)]
       }
 
-getLogHandler :: Conduit.Acquire Platform.LogHandler
-getLogHandler =
-  Platform.mkLogHandler "redis" (Platform.Environment "test") [] Platform.nullTracer
-
 getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, Handler)]
 getRedisHandlers settings =
   Conduit.mkAcquire acquire release
@@ -231,7 +227,7 @@ getRedisHandlers settings =
 
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
-  lh <- getLogHandler
+  lh <- Conduit.liftIO Platform.silentHandler
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
   rh <- getRedisHandlers settings
   pure (TestHandlers lh rh)
