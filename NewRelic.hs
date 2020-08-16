@@ -14,7 +14,7 @@ import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
-import Observability.Timer (Timer, toWord64)
+import Observability.Timer (Timer, toPosixMilliseconds)
 import qualified Platform
 import qualified Postgres
 import qualified Text
@@ -145,12 +145,15 @@ httpToExternalSegment info =
 startTime :: Timer -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
 startTime timer span =
   Platform.started span
-    |> toWord64 timer
+    |> toPosixMilliseconds timer
+    |> (*) 1000
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
 toDuration :: Platform.Span -> NewRelic.DurationUs
 toDuration span =
-  Platform.finished span - Platform.started span `Prelude.div` 1000
+  Platform.finished span - Platform.started span
+    |> Platform.inMilliseconds
+    |> (*) 1000
     |> NewRelic.DurationUs
 
 category :: Platform.Span -> Text

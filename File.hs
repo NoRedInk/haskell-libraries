@@ -7,7 +7,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text
-import qualified Data.Word as Word
 import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified Katip
@@ -72,7 +71,7 @@ srcLocToLoc (_, srcLoc) =
         )
     }
 
-duration :: Platform.Span -> Word.Word64
+duration :: Platform.Span -> Platform.MonotonicTime
 duration span = Platform.finished span - Platform.started span
 
 newtype LogItem = LogItem Platform.Span
@@ -81,7 +80,7 @@ instance Katip.ToObject LogItem where
   toObject (LogItem span) =
     let genericFields =
           HashMap.fromList
-            [ ("duration in ms", Aeson.toJSON (duration span `Prelude.div` 1000000)),
+            [ ("duration in ms", Aeson.toJSON (Platform.inMilliseconds (duration span))),
               ( "exception",
                 Aeson.toJSON
                   <| case Platform.succeeded span of
