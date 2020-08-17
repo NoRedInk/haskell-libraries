@@ -147,31 +147,15 @@ data Handler
       }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
-handler timer' settings =
+handler timer' Settings =
   Conduit.mkAcquire
-    (System.IO.openFile (logFile settings) System.IO.AppendMode)
-    System.IO.hClose
-    |> map (Handler timer')
+    (Prelude.pure (Handler timer' System.IO.stdout))
+    (\_ -> Prelude.pure ())
 
-newtype Settings
-  = Settings
-      { logFile :: Prelude.FilePath
-      }
+data Settings = Settings
 
 decoder :: Environment.Decoder Settings
-decoder =
-  Prelude.pure Settings
-    |> andMap logFileDecoder
-
-logFileDecoder :: Environment.Decoder Prelude.FilePath
-logFileDecoder =
-  Environment.variable
-    Environment.Variable
-      { Environment.name = "LOG_FILE",
-        Environment.description = "File to log too.",
-        Environment.defaultValue = "/dev/stdout"
-      }
-    Environment.filePath
+decoder = Prelude.pure Settings
 
 --
 -- Pretty print helpers for combining lists of docs.
