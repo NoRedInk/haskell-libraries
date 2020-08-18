@@ -14,7 +14,6 @@ import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.CaseInsensitive as CI
-import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
@@ -34,10 +33,10 @@ import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
+import qualified Observability.Helpers
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
 import qualified Postgres
-import qualified Text
 import qualified Prelude
 
 -- | Reporting to Bugsnag.
@@ -263,21 +262,21 @@ outgoingHttpRequestAsBreadcrumb :: Bugsnag.Breadcrumb -> Http.Info -> Bugsnag.Br
 outgoingHttpRequestAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
 mysqlQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> MySQL.Info -> Bugsnag.Breadcrumb
 mysqlQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
 postgresQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> Postgres.Info -> Bugsnag.Breadcrumb
 postgresQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
 logAsBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
@@ -287,62 +286,15 @@ logAsBreadcrumb span breadcrumb details =
         if List.isEmpty (Platform.children span)
           then Bugsnag.logBreadcrumbType
           else Bugsnag.processBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
 unknownAsBreadcrumb :: Bugsnag.Breadcrumb -> Platform.SomeSpanDetails -> Bugsnag.Breadcrumb
 unknownAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (breadcrumbMetaDataViaJson details)
+      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
-
--- | Our span details are arbitrary JSON structures, but for breadcrumb metadata
--- bugsnag expects a flat list of key,value pairs. This function flattens JSON
--- so we can pass it into the breadcrumb format.
---
--- Given a type that has the following JSON representation:
---
---     {
---       "treasure": {
---         "coords: { "x": 12, "y" 14 },
---         "worth": "Tons!"
---       }
---     }
---
--- It will create a flat list of key,value pairs like this:
---
---     HashMap.fromList
---       [ ("treasure.coords.x", "12"   )
---       , ("treasure.coords.y", "14"   )
---       , ("treasure.worth"   , "Tons!")
---       ]
-breadcrumbMetaDataViaJson :: Aeson.ToJSON a => a -> HashMap.HashMap Text Text
-breadcrumbMetaDataViaJson x =
-  case Aeson.toJSON x of
-    Aeson.Object dict ->
-      HashMap.foldlWithKey'
-        (\acc key value -> acc ++ jsonAsText key value)
-        HashMap.empty
-        dict
-    val -> jsonAsText "value" val
-
-jsonAsText :: Text -> Aeson.Value -> HashMap.HashMap Text Text
-jsonAsText key val =
-  case val of
-    Aeson.Object dict ->
-      HashMap.foldlWithKey'
-        (\acc key2 value -> acc ++ jsonAsText (key ++ "." ++ key2) value)
-        HashMap.empty
-        dict
-    Aeson.Array vals ->
-      Foldable.toList vals
-        |> List.indexedMap (\i elem -> jsonAsText (key ++ "." ++ Text.fromInt i) elem)
-        |> HashMap.unions
-    Aeson.String str -> HashMap.singleton key str
-    Aeson.Number n -> HashMap.singleton key (Data.Text.pack (Prelude.show n))
-    Aeson.Bool bool -> HashMap.singleton key (Data.Text.pack (Prelude.show bool))
-    Aeson.Null -> HashMap.empty
 
 decorateEventWithSpanData :: Platform.Span -> Bugsnag.Event -> Bugsnag.Event
 decorateEventWithSpanData span event =
