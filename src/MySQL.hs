@@ -177,7 +177,7 @@ connection settings =
     release Connection {singleOrPool} =
       case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
-        Single _ _ -> Prelude.pure ()
+        Single _ (c, _) -> Base.close c
     stripes =
       Settings.mysqlPool settings
         |> Settings.mysqlPoolStripes

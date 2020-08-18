@@ -17,6 +17,7 @@ import qualified Task
 import Test (Test, describe, test)
 import qualified Test
 import qualified Text
+import qualified Prelude
 
 tests :: MySQL.Connection -> Test
 tests mysqlConn =
@@ -68,7 +69,6 @@ queriesWithQuestionMarks mysqlConn =
               conn
               [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES ('?', 5)|]
               resultToTask
-              |> Expect.Task.succeeds
           MySQL.doQuery
             conn
             [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = '?'|]
@@ -87,28 +87,29 @@ exceptionTests mysqlConn =
             MySQL.doQuery
               conn
               ( [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+                  -- If this topic already exists that's fine for the purpose of
+                  -- this test. Don't fail on that.
                   |> MySQL.onDuplicateDoNothing
               )
               resultToTask
-              |> Expect.Task.succeeds
           MySQL.doQuery
             conn
             [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
             ( \res ->
                 case res of
                   Err err -> Task.succeed err
-                  Ok (_ :: Int) -> Task.fail ("Expected an error, but none was returned." :: Text)
+                  Ok (_ :: Int) -> Expect.Task.fail ("Expected an error, but none was returned." :: Text)
             )
             |> Expect.Task.andCheck
               ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Exception.displayException
               )
     ]
 
-resultToTask :: Result e a -> Task e a
+resultToTask :: Prelude.Show e => Result e a -> Task Expect.Task.TestFailure a
 resultToTask res =
   case res of
     Ok x -> Task.succeed x
-    Err x -> Task.fail x
+    Err x -> Expect.Task.fail (Debug.toString x)
 
 mockQuery :: Text -> Query a
 mockQuery sqlString =
