@@ -288,7 +288,6 @@ doQuery ::
 doQuery conn query handleResponse =
   let --
       runQuery = do
-        Stack.withFrozenCallStack Log.info "Running MySQL query" []
         result <- executeSql conn query
         -- If not currently inside a transaction and original query succeeded, then commit
         case transactionCount conn of

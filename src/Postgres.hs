@@ -211,8 +211,7 @@ doQuery ::
   Query.Query row ->
   (Result Query.Error [row] -> Task e a) ->
   Task e a
-doQuery conn query handleResponse = do
-  withFrozenCallStack Log.info (Query.asMessage query) []
+doQuery conn query handleResponse =
   runQuery conn query
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit

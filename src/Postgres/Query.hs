@@ -12,7 +12,6 @@ module Postgres.Query
     Query (..),
     Error (..),
     TimeoutOrigin (..),
-    asMessage,
     format,
     Info (..),
     ConnectionInfo (..),
@@ -108,13 +107,6 @@ sql =
       quotePat = fail "sql not supported in patterns",
       quoteDec = fail "sql not supported in declarations"
     }
-
--- |
--- | Formatter for logging
--- |
-asMessage :: Query row -> Text.Text
-asMessage query =
-  "I ran the following query:\n\n" ++ format query
 
 format :: Query row -> Text.Text
 format query =
