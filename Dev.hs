@@ -3,6 +3,7 @@ module Observability.Dev (report, logSpanRecursively, Handler, handler, Settings
 import Cherry.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text.Prettyprint.Doc as Doc
 import qualified Data.Text.Prettyprint.Doc.Internal as Doc.Internal
 import qualified Data.Text.Prettyprint.Doc.Render.Terminal as Terminal
@@ -11,6 +12,7 @@ import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified List
 import qualified Maybe
+import qualified Observability.Helpers
 import qualified Observability.Timer as Timer
 import qualified Platform
 import qualified System.IO
@@ -55,7 +57,8 @@ logNoDetails timer' span =
               ],
             trace span,
             exception span,
-            duration span
+            duration span,
+            details span
           ],
         Nothing
       )
@@ -66,7 +69,8 @@ logNoDetails timer' span =
                 label "Started:",
                 name span
               ],
-            trace span
+            trace span,
+            details span
           ],
         vsep
           [ hsep
@@ -84,6 +88,19 @@ logNoDetails timer' span =
 label :: Doc -> Doc
 label text =
   Doc.annotate (Terminal.colorDull Terminal.White) text
+
+details :: Platform.Span -> Doc
+details span =
+  Platform.details span
+    |> Maybe.map flattenDetails
+    |> Maybe.withDefault Doc.emptyDoc
+
+flattenDetails :: Platform.SomeSpanDetails -> Doc
+flattenDetails details' =
+  Observability.Helpers.toHashMap details'
+    |> HashMap.toList
+    |> Prelude.map (\(key, val) -> hsep [label (Doc.pretty key ++ ":"), Doc.pretty val])
+    |> vsep
 
 exception :: Platform.Span -> Doc
 exception span =
