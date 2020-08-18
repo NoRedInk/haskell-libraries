@@ -2,6 +2,8 @@ module Observability.Dev (report, logSpanRecursively, Handler, handler, Settings
 
 import Cherry.Prelude
 import qualified Conduit
+import qualified Control.Concurrent.Async as Async
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text.Prettyprint.Doc as Doc
@@ -25,9 +27,7 @@ import qualified Prelude
 
 report :: Handler -> Platform.Span -> Prelude.IO ()
 report handler' span =
-  Terminal.hPutDoc
-    (handle handler')
-    (logSpanRecursively (timer handler') span)
+  MVar.putMVar (writeLock handler') (logSpanRecursively (timer handler') span)
 
 type Doc = Doc.Doc Terminal.AnsiStyle
 
@@ -191,14 +191,36 @@ failed span =
 data Handler
   = Handler
       { timer :: Timer.Timer,
-        handle :: System.IO.Handle
+        -- If we let each request log to stdout directly the result will be lots
+        -- of unreadable interleaved output from requests that are handled
+        -- concurrently. To prevent this we use an MVar as a lock.
+        --
+        -- After a request is done it can write it's log to the MVar. If the
+        -- MVar already contains a log this operation will block until the MVar
+        -- is empty. We have a logging thread running separately that takes logs
+        -- from the MVar and prints them to stdout one at a time.
+        writeLock :: MVar.MVar Doc,
+        loggingThread :: Async.Async ()
       }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
-handler timer' Settings =
+handler timer Settings =
   Conduit.mkAcquire
-    (Prelude.pure (Handler timer' System.IO.stdout))
-    (\_ -> Prelude.pure ())
+    ( do
+        writeLock <- MVar.newEmptyMVar
+        loggingThread <- Async.async (logLoop writeLock)
+        Prelude.pure Handler {timer, writeLock, loggingThread}
+    )
+    (Async.cancel << loggingThread)
+
+-- | Waits for a log message to become available in the MVar, logs it, then
+-- waits for the next one. This is intended to be ran on a separate thread.
+logLoop :: MVar.MVar Doc -> Prelude.IO ()
+logLoop lock = do
+  doc <- MVar.takeMVar lock
+  Terminal.hPutDoc System.IO.stdout doc
+  System.IO.putStrLn "\n"
+  logLoop lock
 
 data Settings = Settings
 
