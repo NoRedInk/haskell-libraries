@@ -11,11 +11,16 @@ import qualified Data.Time.Format as Format
 import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified List
+import qualified Log
 import qualified Maybe
+import qualified Monitoring
+import qualified MySQL
 import qualified Observability.Helpers
 import qualified Observability.Timer as Timer
 import qualified Platform
+import qualified Postgres
 import qualified System.IO
+import qualified Text
 import qualified Prelude
 
 report :: Handler -> Platform.Span -> Prelude.IO ()
@@ -41,12 +46,6 @@ logSpanRecursively timer' span =
 
 logSingleSpan :: Timer.Timer -> Platform.Span -> (Doc, Maybe Doc)
 logSingleSpan timer' span =
-  Platform.details span
-    |> andThen (Platform.renderSpanDetails [])
-    |> Maybe.withDefault (logNoDetails timer' span)
-
-logNoDetails :: Timer.Timer -> Platform.Span -> (Doc, Maybe Doc)
-logNoDetails timer' span =
   if List.isEmpty (Platform.children span)
     then
       ( vsep
@@ -97,10 +96,42 @@ details span =
 
 flattenDetails :: Platform.SomeSpanDetails -> Doc
 flattenDetails details' =
-  Observability.Helpers.toHashMap details'
+  details'
+    |> Platform.renderSpanDetails
+      -- Some spans contain information that isn't as useful in a development
+      -- setting. We have the opportunity below to pick useful data for specific
+      -- span types.
+      [ Platform.Renderer mysqlQueryToDetails,
+        Platform.Renderer postgresQueryToDetails,
+        Platform.Renderer incomingRequestToDetails
+      ]
+    |> Maybe.withDefault (Observability.Helpers.toHashMap details')
     |> HashMap.toList
     |> Prelude.map (\(key, val) -> hsep [label (Doc.pretty key ++ ":"), Doc.pretty val])
     |> vsep
+
+mysqlQueryToDetails :: MySQL.Info -> HashMap.HashMap Text Text
+mysqlQueryToDetails info =
+  HashMap.fromList
+    [("query", MySQL.infoQuery info)]
+
+postgresQueryToDetails :: Postgres.Info -> HashMap.HashMap Text Text
+postgresQueryToDetails info =
+  HashMap.fromList
+    [ ( "query",
+        -- This is a development logger, and so we're not concerned about
+        -- logging sensitive data here.
+        Log.unSecret (Postgres.infoQuery info)
+      )
+    ]
+
+incomingRequestToDetails :: Monitoring.RequestDetails -> HashMap.HashMap Text Text
+incomingRequestToDetails info =
+  HashMap.fromList
+    [ ("path", Monitoring.method info ++ " " ++ Monitoring.path info ++ Monitoring.queryString info),
+      ("endpoint", Monitoring.endpoint info),
+      ("status", Monitoring.responseStatus info |> Text.fromInt)
+    ]
 
 exception :: Platform.Span -> Doc
 exception span =
