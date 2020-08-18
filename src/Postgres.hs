@@ -61,7 +61,7 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollbackAll,
   )
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
-import GHC.Stack (HasCallStack, withFrozenCallStack)
+import GHC.Stack (HasCallStack)
 import qualified Health
 import qualified Internal.Time as Time
 import qualified Log
