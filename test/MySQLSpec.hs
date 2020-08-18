@@ -7,6 +7,7 @@ where
 
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
+import qualified Debug
 import qualified Expect
 import qualified Expect.Task
 import qualified Log
