@@ -61,7 +61,7 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollbackAll,
   )
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
-import GHC.Stack (HasCallStack)
+import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
 import qualified Internal.Time as Time
 import qualified Log
@@ -220,7 +220,8 @@ doQuery conn query handleResponse =
     |> Task.onError (Task.succeed << Err)
     |> andThen handleResponse
     |> ( \task ->
-           Platform.span
+           withFrozenCallStack
+             Platform.span
              "Postgresql Query"
              (Platform.finally task (Platform.setSpanDetails queryInfo))
        )

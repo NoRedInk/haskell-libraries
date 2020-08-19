@@ -4,15 +4,15 @@ Span
   , finished = MonotonicTime { inMilliseconds = 0 }
   , frame =
       Just
-        ( "mkHandler"
+        ( "rootSpanIO"
         , SrcLoc
-            { srcLocPackage = "cherry-core-1.0.0.0-inplace"
-            , srcLocModule = "Platform.Internal"
-            , srcLocFile = "src/Platform/Internal.hs"
-            , srcLocStartLine = 372
-            , srcLocStartCol = 6
-            , srcLocEndLine = 372
-            , srcLocEndCol = 46
+            { srcLocPackage = "main"
+            , srcLocModule = "ObservabilitySpec"
+            , srcLocFile = "test/ObservabilitySpec.hs"
+            , srcLocStartLine = 60
+            , srcLocStartCol = 5
+            , srcLocEndLine = 64
+            , srcLocEndCol = 38
             }
         )
   , details = Nothing
@@ -24,15 +24,15 @@ Span
           , finished = MonotonicTime { inMilliseconds = 0 }
           , frame =
               Just
-                ( "span"
+                ( "doQuery"
                 , SrcLoc
-                    { srcLocPackage = "database-1.0.0.0-inplace"
-                    , srcLocModule = "MySQL"
-                    , srcLocFile = "src/MySQL.hs"
-                    , srcLocStartLine = 307
-                    , srcLocStartCol = 16
-                    , srcLocEndLine = 309
-                    , srcLocEndCol = 82
+                    { srcLocPackage = "main"
+                    , srcLocModule = "ObservabilitySpec"
+                    , srcLocFile = "test/ObservabilitySpec.hs"
+                    , srcLocStartLine = 44
+                    , srcLocStartCol = 9
+                    , srcLocEndLine = 51
+                    , srcLocEndCol = 12
                     }
                 )
           , details =
@@ -46,15 +46,15 @@ Span
                   , finished = MonotonicTime { inMilliseconds = 0 }
                   , frame =
                       Just
-                        ( "withContext"
+                        ( "withConnection"
                         , SrcLoc
                             { srcLocPackage = "database-1.0.0.0-inplace"
                             , srcLocModule = "MySQL"
                             , srcLocFile = "src/MySQL.hs"
-                            , srcLocStartLine = 532
-                            , srcLocStartCol = 9
-                            , srcLocEndLine = 532
-                            , srcLocEndCol = 66
+                            , srcLocStartLine = 345
+                            , srcLocStartCol = 3
+                            , srcLocEndLine = 345
+                            , srcLocEndCol = 22
                             }
                         )
                   , details = Just "{}"
@@ -67,15 +67,15 @@ Span
                   , finished = MonotonicTime { inMilliseconds = 0 }
                   , frame =
                       Just
-                        ( "withContext"
+                        ( "withConnection"
                         , SrcLoc
                             { srcLocPackage = "database-1.0.0.0-inplace"
                             , srcLocModule = "MySQL"
                             , srcLocFile = "src/MySQL.hs"
-                            , srcLocStartLine = 532
-                            , srcLocStartCol = 9
-                            , srcLocEndLine = 532
-                            , srcLocEndCol = 66
+                            , srcLocStartLine = 320
+                            , srcLocStartCol = 3
+                            , srcLocEndLine = 320
+                            , srcLocEndCol = 22
                             }
                         )
                   , details = Just "{}"

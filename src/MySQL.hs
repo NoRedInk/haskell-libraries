@@ -304,7 +304,8 @@ doQuery conn query handleResponse =
         |> Task.onError (Task.succeed << Err)
         |> Task.andThen handleResponse
         |> ( \task ->
-               Platform.span
+               Stack.withFrozenCallStack
+                 Platform.span
                  "MySQL Query"
                  (Platform.finally task (Platform.setSpanDetails infoForContext))
            )
@@ -525,11 +526,11 @@ withTransaction conn func =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Connection -> ((Base.MySQLConn, PreparedQueries) -> Task e a) -> Task e a
+withConnection :: Stack.HasCallStack => Connection -> ((Base.MySQLConn, PreparedQueries) -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
-        Log.withContext "acquiring MySQL connection from pool" []
+        Stack.withFrozenCallStack Log.withContext "acquiring MySQL connection from pool" []
           <| doIO conn
           <| Data.Pool.takeResource pool
       --

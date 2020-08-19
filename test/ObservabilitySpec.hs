@@ -16,6 +16,15 @@ import qualified Task
 import Test (Test, describe, test)
 import qualified Prelude
 
+-- | Note: the tests below pretty easily break because of code movemenents in
+-- this file. The test logs they expect contain stack traces to function calls
+-- in this module, so if everything shifts down a line because we add an extra
+-- import or something these tests break.
+--
+-- Easiest thing to do is to remove the whole golden-results directory and run
+-- the tests again. That will regenerate the expectation files. Then check the
+-- diff of the new file to make sure it's only line numbers that changed, not
+-- something more significant such as the module name of the stack trace.
 tests :: MySQL.Connection -> Postgres.Connection -> Test
 tests mysql postgres =
   describe
