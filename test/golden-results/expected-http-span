@@ -1,0 +1,45 @@
+Span
+  { name = "test-root"
+  , started = MonotonicTime { inMilliseconds = 0 }
+  , finished = MonotonicTime { inMilliseconds = 0 }
+  , frame =
+      Just
+        ( "rootSpanIO"
+        , SrcLoc
+            { srcLocPackage = "main"
+            , srcLocModule = "Main"
+            , srcLocFile = "test/Main.hs"
+            , srcLocStartLine = 126
+            , srcLocStartCol = 5
+            , srcLocEndLine = 130
+            , srcLocEndCol = 38
+            }
+        )
+  , details = Nothing
+  , succeeded = Succeeded
+  , children =
+      [ Span
+          { name = "Outoing HTTP Request"
+          , started = MonotonicTime { inMilliseconds = 0 }
+          , finished = MonotonicTime { inMilliseconds = 0 }
+          , frame =
+              Just
+                ( "spanIO"
+                , SrcLoc
+                    { srcLocPackage = "http-1.0.0.0-inplace"
+                    , srcLocModule = "Http"
+                    , srcLocFile = "src/Http.hs"
+                    , srcLocStartLine = 306
+                    , srcLocStartCol = 11
+                    , srcLocEndLine = 313
+                    , srcLocEndCol = 14
+                    }
+                )
+          , details =
+              Just
+                "{\"uri\":\"http://localhost:55465/\",\"request method\":\"GET\"}"
+          , succeeded = Succeeded
+          , children = []
+          }
+      ]
+  }

@@ -2,6 +2,7 @@ module Main (main) where
 
 import Cherry.Prelude
 import qualified Conduit
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString.Lazy
 import qualified Data.List
@@ -66,7 +67,15 @@ tests =
       test "When a request is made using `get` with a string body the `Content-Type` header is set to provided mime type" <| \() ->
         expectRequest (\http url -> Http.post http url (Http.stringBody "element/fire" "WOOSH") Http.expectWhatever)
           |> map (map (Data.List.lookup "content-type" << Wai.requestHeaders))
-          |> Expect.withIO (Expect.equal (Ok (Just "element/fire")))
+          |> Expect.withIO (Expect.equal (Ok (Just "element/fire"))),
+      test "Http requests report the span data we expect" <| \_ ->
+        withServerIO
+          (constant "" Status.ok200)
+          ( \http url ->
+              Http.get http url Http.expectWhatever
+                |> spanForTask
+          )
+          |> Expect.withIO (Debug.toString >> Expect.equalToFile "test/golden-results/expected-http-span")
     ]
 
 -- # Wai applications to test against
@@ -82,10 +91,13 @@ constant body status _ respond =
 withServer :: Wai.Application -> (Http.Handler -> Text -> Task e a) -> Prelude.IO (Result e a)
 withServer app run = do
   log <- Platform.silentHandler
+  withServerIO app (\http host -> run http host |> Task.attempt log)
+
+withServerIO :: Wai.Application -> (Http.Handler -> Text -> Prelude.IO a) -> Prelude.IO a
+withServerIO app run =
   Conduit.withAcquire Http.handler <| \http ->
     Warp.testWithApplication (Prelude.pure app) <| \port ->
       run http ("http://localhost:" ++ Debug.toString port)
-        |> Task.attempt log
 
 -- | Run a temporary web application that handles a single request, and then
 -- immediately returns that request so you can run expectations against it.
@@ -106,3 +118,28 @@ expectRequest run =
 newtype FirstRequest = FirstRequest Wai.Request deriving (Show)
 
 instance Exception.Exception FirstRequest
+
+spanForTask :: Show e => Task e () -> Prelude.IO Platform.Span
+spanForTask task = do
+  spanVar <- MVar.newEmptyMVar
+  res <-
+    Platform.rootSpanIO
+      "test-request"
+      (MVar.putMVar spanVar)
+      "test-root"
+      (\log -> Task.attempt log task)
+  case res of
+    Err err -> Prelude.fail (Prelude.show err)
+    Ok _ ->
+      MVar.takeMVar spanVar
+        |> map setAllTimestampsToZero
+
+-- | Timestamps recorded in spans would make each test result different from the
+-- last. This helper sets all timestamps to zero to prevent this.
+setAllTimestampsToZero :: Platform.Span -> Platform.Span
+setAllTimestampsToZero span =
+  span
+    { Platform.started = 0,
+      Platform.finished = 0,
+      Platform.children = map setAllTimestampsToZero (Platform.children span)
+    }
