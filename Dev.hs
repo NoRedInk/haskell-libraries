@@ -165,7 +165,7 @@ name = Doc.pretty << Platform.name
 
 time :: Timer.Timer -> Platform.MonotonicTime -> Doc
 time timer' time' =
-  Timer.toUTC timer' time'
+  Timer.toLocal timer' time'
     |> Format.formatTime Format.defaultTimeLocale "%T"
     |> Doc.pretty
 
