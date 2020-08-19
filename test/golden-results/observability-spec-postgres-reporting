@@ -1,0 +1,67 @@
+Span
+  { name = "test-root"
+  , started = MonotonicTime { inMilliseconds = 0 }
+  , finished = MonotonicTime { inMilliseconds = 0 }
+  , frame =
+      Just
+        ( "mkHandler"
+        , SrcLoc
+            { srcLocPackage = "cherry-core-1.0.0.0-inplace"
+            , srcLocModule = "Platform.Internal"
+            , srcLocFile = "src/Platform/Internal.hs"
+            , srcLocStartLine = 372
+            , srcLocStartCol = 6
+            , srcLocEndLine = 372
+            , srcLocEndCol = 46
+            }
+        )
+  , details = Nothing
+  , succeeded = Succeeded
+  , children =
+      [ Span
+          { name = "Postgresql Query"
+          , started = MonotonicTime { inMilliseconds = 0 }
+          , finished = MonotonicTime { inMilliseconds = 0 }
+          , frame =
+              Just
+                ( "span"
+                , SrcLoc
+                    { srcLocPackage = "database-1.0.0.0-inplace"
+                    , srcLocModule = "Postgres"
+                    , srcLocFile = "src/Postgres.hs"
+                    , srcLocStartLine = 223
+                    , srcLocStartCol = 12
+                    , srcLocEndLine = 225
+                    , srcLocEndCol = 73
+                    }
+                )
+          , details =
+              Just
+                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"queried relation\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"connection\":\"localhost:8088/tutorials\"}"
+          , succeeded = Succeeded
+          , children =
+              [ Span
+                  { name = "acquiring Postgres connection from pool"
+                  , started = MonotonicTime { inMilliseconds = 0 }
+                  , finished = MonotonicTime { inMilliseconds = 0 }
+                  , frame =
+                      Just
+                        ( "withContext"
+                        , SrcLoc
+                            { srcLocPackage = "database-1.0.0.0-inplace"
+                            , srcLocModule = "Postgres"
+                            , srcLocFile = "src/Postgres.hs"
+                            , srcLocStartLine = 348
+                            , srcLocStartCol = 9
+                            , srcLocEndLine = 348
+                            , srcLocEndCol = 69
+                            }
+                        )
+                  , details = Just "{}"
+                  , succeeded = Succeeded
+                  , children = []
+                  }
+              ]
+          }
+      ]
+  }

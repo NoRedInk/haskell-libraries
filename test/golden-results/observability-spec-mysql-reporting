@@ -1,0 +1,88 @@
+Span
+  { name = "test-root"
+  , started = MonotonicTime { inMilliseconds = 0 }
+  , finished = MonotonicTime { inMilliseconds = 0 }
+  , frame =
+      Just
+        ( "mkHandler"
+        , SrcLoc
+            { srcLocPackage = "cherry-core-1.0.0.0-inplace"
+            , srcLocModule = "Platform.Internal"
+            , srcLocFile = "src/Platform/Internal.hs"
+            , srcLocStartLine = 372
+            , srcLocStartCol = 6
+            , srcLocEndLine = 372
+            , srcLocEndCol = 46
+            }
+        )
+  , details = Nothing
+  , succeeded = Succeeded
+  , children =
+      [ Span
+          { name = "MySQL Query"
+          , started = MonotonicTime { inMilliseconds = 0 }
+          , finished = MonotonicTime { inMilliseconds = 0 }
+          , frame =
+              Just
+                ( "span"
+                , SrcLoc
+                    { srcLocPackage = "database-1.0.0.0-inplace"
+                    , srcLocModule = "MySQL"
+                    , srcLocFile = "src/MySQL.hs"
+                    , srcLocStartLine = 307
+                    , srcLocStartCol = 16
+                    , srcLocEndLine = 309
+                    , srcLocEndCol = 82
+                    }
+                )
+          , details =
+              Just
+                "{\"query\":\"SELECT 1\",\"query template\":\"!SELECT 1\",\"ran as prepared statement\":true,\"sql operation\":\"UNKNOWN\",\"queried relation\":\"SELECT 1\",\"connection\":\"127.0.0.1:3306/noredink_development\"}"
+          , succeeded = Succeeded
+          , children =
+              [ Span
+                  { name = "acquiring MySQL connection from pool"
+                  , started = MonotonicTime { inMilliseconds = 0 }
+                  , finished = MonotonicTime { inMilliseconds = 0 }
+                  , frame =
+                      Just
+                        ( "withContext"
+                        , SrcLoc
+                            { srcLocPackage = "database-1.0.0.0-inplace"
+                            , srcLocModule = "MySQL"
+                            , srcLocFile = "src/MySQL.hs"
+                            , srcLocStartLine = 532
+                            , srcLocStartCol = 9
+                            , srcLocEndLine = 532
+                            , srcLocEndCol = 66
+                            }
+                        )
+                  , details = Just "{}"
+                  , succeeded = Succeeded
+                  , children = []
+                  }
+              , Span
+                  { name = "acquiring MySQL connection from pool"
+                  , started = MonotonicTime { inMilliseconds = 0 }
+                  , finished = MonotonicTime { inMilliseconds = 0 }
+                  , frame =
+                      Just
+                        ( "withContext"
+                        , SrcLoc
+                            { srcLocPackage = "database-1.0.0.0-inplace"
+                            , srcLocModule = "MySQL"
+                            , srcLocFile = "src/MySQL.hs"
+                            , srcLocStartLine = 532
+                            , srcLocStartCol = 9
+                            , srcLocEndLine = 532
+                            , srcLocEndCol = 66
+                            }
+                        )
+                  , details = Just "{}"
+                  , succeeded = Succeeded
+                  , children = []
+                  }
+              ]
+          }
+      ]
+  }

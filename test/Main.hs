@@ -10,6 +10,8 @@ import qualified MySQL
 import qualified MySQLInternalSpec
 import qualified MySQLQuerySpec
 import qualified MySQLSpec
+import qualified ObservabilitySpec
+import qualified Postgres
 import qualified PostgresSettingsSpec
 import qualified QueryParserSpec
 import Test (Test, describe)
@@ -28,13 +30,18 @@ import qualified Prelude
 -- it's not essential as a regression test.
 main :: Prelude.IO ()
 main = do
-  settings <- Environment.decode MySQL.decoder
+  mysqlSettings <- Environment.decode MySQL.decoder
+  postgresSettings <- Environment.decode Postgres.decoder
   Acquire.withAcquire
-    (MySQL.connection settings)
+    ( do
+        mysql <- MySQL.connection mysqlSettings
+        postgres <- Postgres.connection postgresSettings
+        Prelude.pure (mysql, postgres)
+    )
     (Test.Runner.Tasty.main << tests)
 
-tests :: MySQL.Connection -> Test
-tests conn =
+tests :: (MySQL.Connection, Postgres.Connection) -> Test
+tests (mysql, postgres) =
   describe
     "lib/database"
     [ PostgresSettingsSpec.tests,
@@ -42,5 +49,6 @@ tests conn =
       QueryParserSpec.tests,
       TimeSpec.tests,
       MySQLQuerySpec.tests,
-      MySQLSpec.tests conn
+      ObservabilitySpec.tests mysql postgres,
+      MySQLSpec.tests mysql
     ]
