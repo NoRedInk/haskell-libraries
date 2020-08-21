@@ -2,6 +2,7 @@ module Observability.Dev (report, logSpanRecursively, Handler, handler, Settings
 
 import Cherry.Prelude
 import qualified Conduit
+import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
@@ -26,7 +27,8 @@ import qualified Text
 import qualified Prelude
 
 report :: Handler -> Platform.Span -> Prelude.IO ()
-report handler' span =
+report handler' span = do
+  Control.Concurrent.threadDelay 10000000
   MVar.putMVar (writeLock handler') (logSpanRecursively (timer handler') span)
 
 type Doc = Doc.Doc Terminal.AnsiStyle
