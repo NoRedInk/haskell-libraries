@@ -64,14 +64,15 @@ queriesWithQuestionMarks mysqlConn =
     [ Test.task "inserts and selects"
         <| MySQL.inTestTransaction mysqlConn
         <| \conn -> do
+          let x = "?" :: Text
           (_ :: Int) <-
             MySQL.doQuery
               conn
-              [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES ('?', 5)|]
+              [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES (${x}, 5)|]
               resultToTask
           MySQL.doQuery
             conn
-            [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = '?'|]
+            [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = ${x}|]
             resultToTask
             |> Expect.Task.andCheck (Expect.equal [("?", 5) :: (Text, Int)])
     ]
