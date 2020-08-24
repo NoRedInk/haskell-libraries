@@ -117,7 +117,7 @@ mockQuery sqlString =
   Query
     { preparedStatement = sqlString,
       params = Log.mkSecret [],
-      prepareQuery = Query.Prepare,
+      prepareQuery = Query.DontPrepare, -- See comment on Query.shouldPrepare
       quasiQuotedString = "",
       sqlOperation = "",
       queriedRelation = ""

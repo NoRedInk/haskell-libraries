@@ -178,17 +178,13 @@ collectQueryParams tokens =
       )
     |> map List.concat
 
+-- | NOTE:
+-- We've had issues in production where we exceeded `max_prepared_stmt_count`.
+-- We are now disabling preparing queries until we figure out how to
+-- reproduce and fix this issue locally.
+-- Once it's fixed can revert this commit.
 shouldPrepare :: [SqlToken] -> PrepareQuery
-shouldPrepare tokens =
-  if List.all
-    ( \token ->
-        case token of
-          SqlToken _ -> True
-          SqlParams params -> List.length params <= 3
-    )
-    tokens
-    then Prepare
-    else DontPrepare
+shouldPrepare _tokens = DontPrepare
 
 tokenE :: Prelude.String -> TH.ExpQ
 tokenE str = [e|SqlToken str|]
