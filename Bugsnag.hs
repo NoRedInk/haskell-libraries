@@ -94,11 +94,10 @@ handler timer settings =
 
 send :: HTTP.Manager -> Log.Secret Bugsnag.ApiKey -> Bugsnag.Event -> Prelude.IO ()
 send manager key event = do
-  -- Logging to Bugsnag might fail, but if it does we can't very well send the
-  -- error to Bugsnag. This is the end of the line, these errors disappear
-  -- into the aether.
-  _ <- Bugsnag.sendEvents manager (Log.unSecret key) [event]
-  Prelude.pure ()
+  result <- Bugsnag.sendEvents manager (Log.unSecret key) [event]
+  case result of
+    Prelude.Left err -> Exception.throwIO err
+    Prelude.Right _ -> Prelude.pure ()
 
 toEvent :: Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
 toEvent = rootCause [] emptyCrumbs
