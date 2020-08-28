@@ -9,7 +9,6 @@ import Cherry.Prelude
 import qualified Database.MySQL.Base as Base
 import qualified Expect
 import qualified Fuzz
-import qualified List
 import qualified Log
 import MySQL.Query
 import Test (Test, describe, fuzz, test)
@@ -23,7 +22,7 @@ tests =
           |> Expect.equal Query
             { preparedStatement = "SELECT id FROM users",
               params = Log.mkSecret [],
-              prepareQuery = Prepare,
+              prepareQuery = DontPrepare, -- NOTE see comment on Query.shouldPrepare
               quasiQuotedString = "SELECT id FROM monolith.users",
               sqlOperation = "SELECT",
               queriedRelation = "users"
@@ -33,7 +32,7 @@ tests =
           |> Expect.equal Query
             { preparedStatement = "SELECT id FROM users",
               params = Log.mkSecret [],
-              prepareQuery = Prepare,
+              prepareQuery = DontPrepare, -- NOTE see comment on Query.shouldPrepare
               quasiQuotedString = "!$SELECT id FROM monolith.users",
               sqlOperation = "SELECT",
               queriedRelation = "users"
@@ -43,7 +42,7 @@ tests =
           |> Expect.equal Query
             { preparedStatement = "SELECT id FROM users WHERE username = ? AND id > ?",
               params = Log.mkSecret [Base.MySQLText "jasper", Base.MySQLInt64 5],
-              prepareQuery = Prepare,
+              prepareQuery = DontPrepare, -- NOTE see comment on Query.shouldPrepare
               quasiQuotedString = "SELECT id FROM monolith.users WHERE username = ${\"jasper\" :: Text} AND id > ${5 :: Int}",
               sqlOperation = "SELECT",
               queriedRelation = "users"
@@ -53,7 +52,7 @@ tests =
           |> Expect.equal Query
             { preparedStatement = "SELECT id FROM users WHERE id IN (\"THIS_IS_NEVER_TRUE_ELSE_COMPLAIN_TO_PUFFERFISH\")",
               params = Log.mkSecret [],
-              prepareQuery = Prepare,
+              prepareQuery = DontPrepare, -- NOTE see comment on Query.shouldPrepare
               quasiQuotedString = "SELECT id FROM monolith.users WHERE id IN (${[] :: [Int]})",
               sqlOperation = "SELECT",
               queriedRelation = "users"
@@ -63,7 +62,7 @@ tests =
           |> Expect.equal Query
             { preparedStatement = "SELECT id FROM users WHERE id IN (?,?,?)",
               params = Log.mkSecret [Base.MySQLInt64 1, Base.MySQLInt64 2, Base.MySQLInt64 3],
-              prepareQuery = Prepare,
+              prepareQuery = DontPrepare, -- NOTE see comment on Query.shouldPrepare
               quasiQuotedString = "SELECT id FROM monolith.users WHERE id IN (${[1, 2, 3] :: [Int]})",
               sqlOperation = "SELECT",
               queriedRelation = "users"
@@ -73,7 +72,7 @@ tests =
           |> Expect.equal Query
             { preparedStatement = "SELECT id FROM users WHERE username = ?",
               params = Log.mkSecret [Base.MySQLText "?"],
-              prepareQuery = Prepare,
+              prepareQuery = DontPrepare, -- NOTE see comment on Query.shouldPrepare
               quasiQuotedString = "SELECT id FROM monolith.users WHERE username = ${\"?\" :: Text}",
               sqlOperation = "SELECT",
               queriedRelation = "users"
@@ -83,10 +82,6 @@ tests =
         [ fuzz (Fuzz.list Fuzz.int) "we only prepare queries with 3 or less items" <| \xs ->
             [sql|SELECT id FROM monolith.users WHERE id IN (${xs})|]
               |> prepareQuery
-              |> Expect.equal
-                ( if List.length xs <= 3
-                    then Prepare
-                    else DontPrepare
-                )
+              |> Expect.equal DontPrepare -- NOTE see comment on Query.shouldPrepare
         ]
     ]
