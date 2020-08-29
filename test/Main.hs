@@ -132,14 +132,27 @@ spanForTask task = do
     Err err -> Prelude.fail (Prelude.show err)
     Ok _ ->
       MVar.takeMVar spanVar
-        |> map setAllTimestampsToZero
+        |> map constantValuesForVariableFields
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.
-setAllTimestampsToZero :: Platform.Span -> Platform.Span
-setAllTimestampsToZero span =
+--
+-- Similarly the host URI changes in each test, because `warp` pickes a random
+-- free port to run a test webserver on. To prevent this from failing tests we
+-- set the URI to a standard value.
+constantValuesForVariableFields :: Platform.Span -> Platform.Span
+constantValuesForVariableFields span =
   span
     { Platform.started = 0,
       Platform.finished = 0,
-      Platform.children = map setAllTimestampsToZero (Platform.children span)
+      Platform.details =
+        Platform.details span
+          |> andThen
+            ( \details ->
+                details
+                  |> Platform.renderSpanDetails
+                    [ Platform.Renderer (\info -> Platform.toSpanDetails info {Http.infoUri = "mock-uri"})
+                    ]
+            ),
+      Platform.children = map constantValuesForVariableFields (Platform.children span)
     }

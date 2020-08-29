@@ -36,8 +36,7 @@ Span
                     }
                 )
           , details =
-              Just
-                "{\"uri\":\"http://localhost:55465/\",\"request method\":\"GET\"}"
+              Just "{\"uri\":\"mock-uri\",\"request method\":\"GET\"}"
           , succeeded = Succeeded
           , children = []
           }
