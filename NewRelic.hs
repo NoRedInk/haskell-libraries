@@ -1,5 +1,13 @@
 module Observability.NewRelic (report, handler, Handler, Settings, decoder) where
 
+-- | Report request tracing data to NewRelic.
+--
+-- NewRelic helps us get statistics about requests, such as average response
+-- times, error rates, and break downs of how much time is spent doing what
+-- when responding to a request.
+--
+-- We report data about each individual request to NewRelic.
+
 import Cherry.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception

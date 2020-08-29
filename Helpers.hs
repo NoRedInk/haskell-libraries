@@ -9,9 +9,8 @@ import qualified List
 import qualified Text
 import qualified Prelude
 
--- | Our span details are arbitrary JSON structures, but for breadcrumb metadata
--- bugsnag expects a flat list of key,value pairs. This function flattens JSON
--- so we can pass it into the breadcrumb format.
+-- | Our span details are arbitrary JSON structures, but some of our reporters
+-- require metadata as a flast list of key,value pairs.
 --
 -- Given a type that has the following JSON representation:
 --
@@ -22,7 +21,7 @@ import qualified Prelude
 --       }
 --     }
 --
--- It will create a flat list of key,value pairs like this:
+-- This function will create a flat list of key,value pairs like this:
 --
 --     HashMap.fromList
 --       [ ("treasure.coords.x", "12"   )

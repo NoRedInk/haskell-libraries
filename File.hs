@@ -1,5 +1,20 @@
 module Observability.File (report, handler, Handler, Settings (..), decoder) where
 
+-- | Reporting to a file.
+--
+-- This reporter logs debugging information about completed requests to a file
+-- or `stdout` (in that case, pass in `/dev/stdout` as the file to log to).
+--
+-- Every line this reporter logs is a JSON string. This 'structured logging'
+-- output is optimized for external logging platforms that display these logs in
+-- a pretty UI.
+--
+-- This logger supports sampling of successful requests, to help us save money.
+--
+-- This reporter is based on Katip for historical reasons. Katip used to run all
+-- of what is now called 'reporting' in our apps, not it's just the file logger.
+-- We maybe be able to remove it entirely at this point.
+
 import Cherry.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
@@ -74,8 +89,13 @@ srcLocToLoc (_, srcLoc) =
 duration :: Platform.Span -> Platform.MonotonicTime
 duration span = Platform.finished span - Platform.started span
 
+-- We need this wrapper around `Span` so we can define some type class instances
+-- for it that `Katip` needs, without having to define them as orphan instances
+-- or defining them in `cherry-core` (which would require it to take a
+-- dependency on `katip` too).
 newtype LogItem = LogItem Platform.Span
 
+-- This instance defines how to turn a `Span` into a JSON object.
 instance Katip.ToObject LogItem where
   toObject (LogItem span) =
     let genericFields =
@@ -96,6 +116,12 @@ instance Katip.ToObject LogItem where
      in genericFields ++ detailFields
           |> HashMap.filter (Aeson.Null /=)
 
+-- This instance would allow us to specify which fields of the JSON-ified `Span`
+-- to log, depending on the log level and verbosity. In following the
+-- 'observability' philosophy we don't make use of this and log all fields all
+-- the time, because we cannot know upfront which information will help us
+-- understand future problems. Instead we use sampling of of successfull
+-- requests to keep logging volumes under control.
 instance Katip.LogItem LogItem where
   payloadKeys _ _ = Katip.AllKeys
 
@@ -135,21 +161,18 @@ mkLogEnv settings = do
             handle
             (Katip.permitItem Katip.DebugS)
             Katip.V3
-        Katip.initLogEnv (appName settings) (appEnvironment settings)
-          |> map
-            ( \logEnv' ->
-                logEnv'
-                  { Katip._logEnvHost =
-                      mockHostname settings
-                        |> map Data.Text.unpack
-                        |> Maybe.withDefault (Katip._logEnvHost logEnv'),
-                    Katip._logEnvPid =
-                      mockPid settings
-                        |> map Prelude.fromIntegral
-                        |> Maybe.withDefault (Katip._logEnvPid logEnv')
-                  }
-            )
-          |> andThen (Katip.registerScribe "file" scribe' Katip.defaultScribeSettings)
+        initLogEnv <- Katip.initLogEnv (appName settings) (appEnvironment settings)
+        initLogEnv
+          { Katip._logEnvHost =
+              mockHostname settings
+                |> map Data.Text.unpack
+                |> Maybe.withDefault (Katip._logEnvHost initLogEnv),
+            Katip._logEnvPid =
+              mockPid settings
+                |> map Prelude.fromIntegral
+                |> Maybe.withDefault (Katip._logEnvPid initLogEnv)
+          }
+          |> Katip.registerScribe "file" scribe' Katip.defaultScribeSettings
     )
     (Katip.closeScribes >> map (\_ -> ()))
 
@@ -168,7 +191,7 @@ data Settings
         appName :: Katip.Namespace,
         appEnvironment :: Katip.Environment,
         fractionOfSuccessRequestsLogged :: Float,
-        -- These mock values are useful in tests to ensure the constant output.
+        -- These mock values are useful in tests to ensure constant output.
         mockHostname :: Maybe Text,
         mockPid :: Maybe Int
       }

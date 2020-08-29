@@ -8,6 +8,11 @@ module Observability.Bugsnag
   )
 where
 
+-- | Reporting to Bugsnag.
+--
+-- This reporter reports failures to Bugsnag. It does nothing for requests that
+-- completed without error.
+
 import Cherry.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
@@ -39,8 +44,6 @@ import qualified Platform
 import qualified Postgres
 import qualified Prelude
 
--- | Reporting to Bugsnag.
---
 -- This function takes the root span of a completed request and reports it to
 -- Bugsnag, if there has been a failure. A request that completed succesfully
 -- is not reported.
@@ -75,12 +78,18 @@ import qualified Prelude
 -- A span that happened _after_ the root cause event completed we're not
 -- reporting.
 report :: Handler -> Platform.Span -> Prelude.IO ()
-report (Handler http timer defaultEvent apiKey) span =
+report Handler {http, timer, defaultEvent, apiKey'} span =
   if failed span
-    then send http apiKey (toEvent timer defaultEvent span)
+    then send http apiKey' (toEvent timer defaultEvent span)
     else Prelude.pure ()
 
-data Handler = Handler HTTP.Manager Timer Bugsnag.Event (Log.Secret Bugsnag.ApiKey)
+data Handler
+  = Handler
+      { http :: HTTP.Manager,
+        timer :: Timer,
+        defaultEvent :: Bugsnag.Event,
+        apiKey' :: Log.Secret Bugsnag.ApiKey
+      }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings =
@@ -157,9 +166,7 @@ rootCause frames breadcrumbs timer event span =
 -- | This function is passed a list of spans and outputs a type representing a
 -- flat list of breadcrumbs.
 --
--- It looks like this function should be able to do a map, to turn each span
--- into a breadcrumb. Each span can contain child breadcrumbs though, requiring
--- us to recurse.
+-- Each span can contain child spans requiring us to recurse.
 --
 -- Our Bugsnag library asks for a value of type `[Bugsnag.Breadcrumb]`, so a
 -- list. It's very performant to add single items to the front of a list, but
@@ -169,7 +176,7 @@ rootCause frames breadcrumbs timer event span =
 --
 -- To help us avoid doing appends we create a helper type `Crumbs a`. The only
 -- helper function it exposes for adding a breadcrumb is one that cons that
--- breadcrumb to the front of the list, so no appends.
+-- breadcrumb to the front of the list, ensuring no appends take place.
 addCrumbs :: Timer -> [Platform.Span] -> Crumbs
 addCrumbs timer spans =
   case spans of
