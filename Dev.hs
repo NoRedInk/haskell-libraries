@@ -1,9 +1,16 @@
-module Observability.Dev (report, logSpanRecursively, Handler, handler, Settings, decoder) where
-
 -- | Reporting for development
 --
 -- This reporter logs information about requests in a human-readable format, for
 -- use in development.
+module Observability.Dev
+  ( report,
+    logSpanRecursively,
+    Handler,
+    handler,
+    Settings,
+    decoder,
+  )
+where
 
 import Cherry.Prelude
 import qualified Conduit

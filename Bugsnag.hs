@@ -1,3 +1,7 @@
+-- | Reporting to Bugsnag.
+--
+-- This reporter reports failures to Bugsnag. It does nothing for requests that
+-- completed without error.
 module Observability.Bugsnag
   ( report,
     Settings,
@@ -7,11 +11,6 @@ module Observability.Bugsnag
     toEvent,
   )
 where
-
--- | Reporting to Bugsnag.
---
--- This reporter reports failures to Bugsnag. It does nothing for requests that
--- completed without error.
 
 import Cherry.Prelude
 import qualified Conduit

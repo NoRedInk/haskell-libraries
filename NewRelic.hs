@@ -1,5 +1,3 @@
-module Observability.NewRelic (report, handler, Handler, Settings, decoder) where
-
 -- | Report request tracing data to NewRelic.
 --
 -- NewRelic helps us get statistics about requests, such as average response
@@ -7,6 +5,14 @@ module Observability.NewRelic (report, handler, Handler, Settings, decoder) wher
 -- when responding to a request.
 --
 -- We report data about each individual request to NewRelic.
+module Observability.NewRelic
+  ( report,
+    handler,
+    Handler,
+    Settings,
+    decoder,
+  )
+where
 
 import Cherry.Prelude
 import qualified Conduit

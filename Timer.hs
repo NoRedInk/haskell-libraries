@@ -1,7 +1,15 @@
-module Observability.Timer (Timer (Timer), mkTimer, toUTC, toLocal, toPosix, toPosixMilliseconds, toISO8601) where
-
 -- | Helper functions for converting the timestamp format used in our `Span`
 -- data to the time formats used by the various platforms we report to.
+module Observability.Timer
+  ( Timer (Timer),
+    mkTimer,
+    toUTC,
+    toLocal,
+    toPosix,
+    toPosixMilliseconds,
+    toISO8601,
+  )
+where
 
 import Cherry.Prelude
 import qualified Data.Text

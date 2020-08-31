@@ -1,5 +1,3 @@
-module Observability.File (report, handler, Handler, Settings (..), decoder) where
-
 -- | Reporting to a file.
 --
 -- This reporter logs debugging information about completed requests to a file
@@ -14,6 +12,14 @@ module Observability.File (report, handler, Handler, Settings (..), decoder) whe
 -- This reporter is based on Katip for historical reasons. Katip used to run all
 -- of what is now called 'reporting' in our apps, not it's just the file logger.
 -- We maybe be able to remove it entirely at this point.
+module Observability.File
+  ( report,
+    handler,
+    Handler,
+    Settings (..),
+    decoder,
+  )
+where
 
 import Cherry.Prelude
 import qualified Conduit
