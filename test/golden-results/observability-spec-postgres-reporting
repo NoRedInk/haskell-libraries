@@ -9,9 +9,9 @@ Span
             { srcLocPackage = "main"
             , srcLocModule = "ObservabilitySpec"
             , srcLocFile = "test/ObservabilitySpec.hs"
-            , srcLocStartLine = 60
+            , srcLocStartLine = 61
             , srcLocStartCol = 5
-            , srcLocEndLine = 64
+            , srcLocEndLine = 65
             , srcLocEndCol = 38
             }
         )
@@ -29,15 +29,15 @@ Span
                     { srcLocPackage = "main"
                     , srcLocModule = "ObservabilitySpec"
                     , srcLocFile = "test/ObservabilitySpec.hs"
-                    , srcLocStartLine = 33
+                    , srcLocStartLine = 34
                     , srcLocStartCol = 9
-                    , srcLocEndLine = 40
+                    , srcLocEndLine = 41
                     , srcLocEndCol = 12
                     }
                 )
           , details =
               Just
-                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"queried relation\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"connection\":\"localhost:8088/tutorials\"}"
+                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"queried relation\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"connection\":\"/mock/db/path.sock:mock-db-name\"}"
           , succeeded = Succeeded
           , children =
               [ Span

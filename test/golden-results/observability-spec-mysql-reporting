@@ -9,9 +9,9 @@ Span
             { srcLocPackage = "main"
             , srcLocModule = "ObservabilitySpec"
             , srcLocFile = "test/ObservabilitySpec.hs"
-            , srcLocStartLine = 60
+            , srcLocStartLine = 61
             , srcLocStartCol = 5
-            , srcLocEndLine = 64
+            , srcLocEndLine = 65
             , srcLocEndCol = 38
             }
         )
@@ -29,9 +29,9 @@ Span
                     { srcLocPackage = "main"
                     , srcLocModule = "ObservabilitySpec"
                     , srcLocFile = "test/ObservabilitySpec.hs"
-                    , srcLocStartLine = 44
+                    , srcLocStartLine = 45
                     , srcLocStartCol = 9
-                    , srcLocEndLine = 51
+                    , srcLocEndLine = 52
                     , srcLocEndCol = 12
                     }
                 )

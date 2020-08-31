@@ -9,6 +9,7 @@ import Cherry.Prelude
 import qualified Control.Concurrent.MVar as MVar
 import qualified Debug
 import qualified Expect
+import qualified Maybe
 import qualified MySQL
 import qualified Platform
 import qualified Postgres
@@ -66,14 +67,29 @@ spanForTask task = do
     Err err -> Prelude.fail (Prelude.show err)
     Ok _ ->
       MVar.takeMVar spanVar
-        |> map setAllTimestampsToZero
+        |> map constantValuesForVariableFields
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.
-setAllTimestampsToZero :: Platform.Span -> Platform.Span
-setAllTimestampsToZero span =
+--
+-- Similarly the db URI changes in each test, because we create temporary test
+-- database. To prevent this from failing tests we set the URI to a standard
+-- value.
+constantValuesForVariableFields :: Platform.Span -> Platform.Span
+constantValuesForVariableFields span =
   span
     { Platform.started = 0,
       Platform.finished = 0,
-      Platform.children = map setAllTimestampsToZero (Platform.children span)
+      Platform.details =
+        Platform.details span
+          |> andThen
+            ( \details ->
+                details
+                  |> Platform.renderSpanDetails
+                    [ Platform.Renderer (\info -> Platform.toSpanDetails info {Postgres.infoConnection = Postgres.UnixSocket "/mock/db/path.sock" "mock-db-name"})
+                    ]
+                  |> Maybe.withDefault details
+                  |> Just
+            ),
+      Platform.children = map constantValuesForVariableFields (Platform.children span)
     }
