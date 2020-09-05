@@ -300,7 +300,7 @@ decorateEventWithSpanData requestId span event =
     |> Maybe.andThen
       ( Platform.renderSpanDetails
           [ Platform.Renderer (renderIncomingHttpRequest requestId event),
-            Platform.Renderer (renderLog span event),
+            Platform.Renderer (renderLog event),
             Platform.Renderer (renderRemainingSpanDetails span event)
           ]
       )
@@ -316,12 +316,12 @@ renderRemainingSpanDetails span event details =
           |> (++) (Bugsnag.event_metaData event)
     }
 
-renderLog :: Platform.Span -> Bugsnag.Event -> Log.LogContexts -> Bugsnag.Event
-renderLog span event details =
+renderLog :: Bugsnag.Event -> Log.LogContexts -> Bugsnag.Event
+renderLog event details =
   event
     { Bugsnag.event_metaData =
-        Aeson.toJSON (HashMap.singleton (Platform.name span) details)
-          |> HashMap.singleton "log"
+        Aeson.toJSON details
+          |> HashMap.singleton "custom"
           |> HashMap.unionWith
             mergeJson
             (Bugsnag.event_metaData event |> Maybe.withDefault HashMap.empty)
