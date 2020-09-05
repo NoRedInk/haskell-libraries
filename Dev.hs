@@ -38,8 +38,8 @@ import qualified System.IO
 import qualified Text
 import qualified Prelude
 
-report :: Handler -> Platform.Span -> Prelude.IO ()
-report handler' span = do
+report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report handler' _requestId span = do
   Control.Concurrent.threadDelay 10000000
   MVar.putMVar (writeLock handler') (logSpanRecursively (timer handler') span)
 

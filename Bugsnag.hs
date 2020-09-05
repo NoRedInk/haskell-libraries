@@ -76,10 +76,10 @@ import qualified Prelude
 --
 -- A span that happened _after_ the root cause event completed we're not
 -- reporting.
-report :: Handler -> Platform.Span -> Prelude.IO ()
-report Handler {http, timer, defaultEvent, apiKey'} span =
+report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report Handler {http, timer, defaultEvent, apiKey'} requestId span =
   if failed span
-    then send http apiKey' (toEvent timer defaultEvent span)
+    then send http apiKey' (toEvent requestId timer defaultEvent span)
     else Prelude.pure ()
 
 data Handler
@@ -107,20 +107,20 @@ send manager key event = do
     Prelude.Left err -> Exception.throwIO err
     Prelude.Right _ -> Prelude.pure ()
 
-toEvent :: Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+toEvent :: Text -> Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
 toEvent = rootCause [] emptyCrumbs
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
-rootCause frames breadcrumbs timer event span =
+rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Text -> Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+rootCause frames breadcrumbs requestId timer event span =
   let newFrames =
         case Platform.frame span of
           Nothing -> frames
           Just (name, src) -> toStackFrame name src : frames
-      newEvent = decorateEventWithSpanData span event
+      newEvent = decorateEventWithSpanData requestId span event
       childSpans = Platform.children span
    in -- We're not interested in child spans that happened _after_ the root
       -- cause took place. These are not breadcrumbs (leading up to the error)
@@ -135,6 +135,7 @@ rootCause frames breadcrumbs timer event span =
                 |> followedBy (addCrumb (startBreadcrumb timer span))
                 |> followedBy (addCrumbs timer preErrorSpans)
             )
+            requestId
             timer
             newEvent
             child
@@ -301,12 +302,12 @@ unknownAsBreadcrumb breadcrumb details =
       Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
-decorateEventWithSpanData :: Platform.Span -> Bugsnag.Event -> Bugsnag.Event
-decorateEventWithSpanData span event =
+decorateEventWithSpanData :: Text -> Platform.Span -> Bugsnag.Event -> Bugsnag.Event
+decorateEventWithSpanData requestId span event =
   Platform.details span
     |> Maybe.andThen
       ( Platform.renderSpanDetails
-          [ Platform.Renderer (renderIncomingHttpRequest event),
+          [ Platform.Renderer (renderIncomingHttpRequest requestId event),
             Platform.Renderer (renderRemainingSpanDetails span event)
           ]
       )
@@ -322,8 +323,8 @@ renderRemainingSpanDetails span event details =
           |> (++) (Bugsnag.event_metaData event)
     }
 
-renderIncomingHttpRequest :: Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
-renderIncomingHttpRequest event request =
+renderIncomingHttpRequest :: Text -> Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
+renderIncomingHttpRequest requestId event request =
   event
     { Bugsnag.event_context = Just (Monitoring.endpoint request),
       Bugsnag.event_request =
@@ -354,6 +355,7 @@ renderIncomingHttpRequest event request =
         ]
           |> Aeson.object
           |> HashMap.singleton "request"
+          |> HashMap.insert "request-id" (Aeson.toJSON requestId)
           |> Just
           |> (++) (Bugsnag.event_metaData event)
     }

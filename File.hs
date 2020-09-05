@@ -41,24 +41,24 @@ import qualified System.IO
 import qualified System.Random as Random
 import qualified Prelude
 
-report :: Handler -> Platform.Span -> Prelude.IO ()
-report handler' span = do
+report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report handler' requestId span = do
   skip <- skipLogging handler' span
   if skip
     then Prelude.pure ()
     else
-      logItemRecursively handler' Prelude.mempty span
+      logItemRecursively handler' Prelude.mempty requestId span
         |> Katip.runKatipT (logEnv handler')
 
-logItemRecursively :: Handler -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
-logItemRecursively handler' namespace span = do
-  logItem handler' namespace span
+logItemRecursively :: Handler -> Katip.Namespace -> Text -> Platform.Span -> Katip.KatipT Prelude.IO ()
+logItemRecursively handler' namespace requestId span = do
+  logItem handler' namespace requestId span
   Foldable.traverse_
-    (logItemRecursively handler' (namespace ++ Katip.Namespace [Platform.name span]))
+    (logItemRecursively handler' (namespace ++ Katip.Namespace [Platform.name span]) requestId)
     (Platform.children span)
 
-logItem :: Handler -> Katip.Namespace -> Platform.Span -> Katip.KatipT Prelude.IO ()
-logItem (Handler env timer _) namespace span =
+logItem :: Handler -> Katip.Namespace -> Text -> Platform.Span -> Katip.KatipT Prelude.IO ()
+logItem (Handler env timer _) namespace requestId span =
   Katip.logKatipItem Katip.Item
     { Katip._itemApp = Katip._logEnvApp env,
       Katip._itemEnv = Katip._logEnvEnv env,
@@ -66,7 +66,7 @@ logItem (Handler env timer _) namespace span =
         Platform.Succeeded -> Katip.InfoS
         Platform.Failed -> Katip.ErrorS
         Platform.FailedWith _ -> Katip.AlertS,
-      Katip._itemThread = Katip.ThreadIdText "",
+      Katip._itemThread = Katip.ThreadIdText requestId,
       Katip._itemHost = Katip._logEnvHost env,
       Katip._itemProcess = Katip._logEnvPid env,
       Katip._itemPayload = LogItem span,

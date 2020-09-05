@@ -35,8 +35,8 @@ import qualified Text
 import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
 
-report :: Handler -> Platform.Span -> Prelude.IO ()
-report handler' span =
+report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report handler' _requestId span =
   case Platform.details span |> andThen Platform.fromSpanDetails of
     Nothing -> Prelude.pure ()
     Just details -> reportWebTransaction handler' span details
