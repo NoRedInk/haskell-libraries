@@ -51,6 +51,7 @@ logSpanRecursively timer' span =
    in vcat
         [ Doc.hang 2 beforeChildren,
           Platform.children span
+            |> List.reverse
             |> Prelude.map (logSpanRecursively timer')
             |> vcat,
           case afterChildren of
