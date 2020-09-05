@@ -149,8 +149,8 @@ rootCause frames breadcrumbs requestId timer event span =
                 -- breadcrumbs.
                 breadcrumbs
                   |> followedBy (addCrumbs timer childSpans)
-                  |> followedBy (addCrumb (causeBreadcrumb timer span))
                   |> crumbsAsList
+                  |> List.reverse
                   |> Just,
               Bugsnag.event_unhandled = case Platform.succeeded span of
                 Platform.Succeeded -> Nothing
@@ -243,14 +243,6 @@ doBreadcrumb timer span =
    in case Platform.details span of
         Nothing -> defaultBreadcrumb
         Just details -> customizeBreadcrumb span details defaultBreadcrumb
-
-causeBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
-causeBreadcrumb timer span =
-  Bugsnag.defaultBreadcrumb
-    { Bugsnag.breadcrumb_name = "Error received",
-      Bugsnag.breadcrumb_type = Bugsnag.errorBreadcrumbType,
-      Bugsnag.breadcrumb_timestamp = toISO8601 timer (Platform.finished span)
-    }
 
 customizeBreadcrumb :: Platform.Span -> Platform.SomeSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
 customizeBreadcrumb span details breadcrumb =
