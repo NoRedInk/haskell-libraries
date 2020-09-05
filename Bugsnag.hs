@@ -308,6 +308,7 @@ decorateEventWithSpanData requestId span event =
     |> Maybe.andThen
       ( Platform.renderSpanDetails
           [ Platform.Renderer (renderIncomingHttpRequest requestId event),
+            Platform.Renderer (renderLog span event),
             Platform.Renderer (renderRemainingSpanDetails span event)
           ]
       )
@@ -322,6 +323,22 @@ renderRemainingSpanDetails span event details =
           |> Just
           |> (++) (Bugsnag.event_metaData event)
     }
+
+renderLog :: Platform.Span -> Bugsnag.Event -> Log.LogContexts -> Bugsnag.Event
+renderLog span event details =
+  event
+    { Bugsnag.event_metaData =
+        Aeson.toJSON (HashMap.singleton (Platform.name span) details)
+          |> HashMap.singleton "log"
+          |> HashMap.unionWith
+            mergeJson
+            (Bugsnag.event_metaData event |> Maybe.withDefault HashMap.empty)
+          |> Just
+    }
+
+mergeJson :: Aeson.Value -> Aeson.Value -> Aeson.Value
+mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (HashMap.unionWith mergeJson x y)
+mergeJson _ last = last
 
 renderIncomingHttpRequest :: Text -> Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
 renderIncomingHttpRequest requestId event request =
