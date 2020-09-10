@@ -14,7 +14,6 @@ where
 
 import Cherry.Prelude
 import qualified Conduit
-import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
@@ -39,8 +38,7 @@ import qualified Text
 import qualified Prelude
 
 report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
-report handler' _requestId span = do
-  Control.Concurrent.threadDelay 10000000
+report handler' _requestId span =
   MVar.putMVar (writeLock handler') (logSpanRecursively (timer handler') span)
 
 type Doc = Doc.Doc Terminal.AnsiStyle
