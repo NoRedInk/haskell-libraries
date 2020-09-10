@@ -73,7 +73,7 @@ reportWebTransaction (Handler timer app) span details =
           Platform.Succeeded -> Prelude.pure ()
           Platform.Failed -> reportError tx "Error logged during request" details
           Platform.FailedWith err -> reportError tx (typeName err) details
-        reportSpan timer tx Nothing span
+        reportSpan (Platform.started span) timer tx Nothing span
     )
 
 reportError :: NewRelic.Transaction -> Text -> Monitoring.RequestDetails -> Prelude.IO ()
@@ -81,22 +81,23 @@ reportError tx msg details =
   noticeError tx 1 msg (Text.fromInt (Monitoring.responseStatus details))
 
 reportSpan ::
+  Platform.MonotonicTime ->
   Timer ->
   NewRelic.Transaction ->
   Maybe NewRelic.Segment ->
   Platform.Span ->
   Prelude.IO ()
-reportSpan timer tx maybeParent span =
+reportSpan txStartTime timer tx maybeParent span =
   Exception.bracket
     (chooseAndStartSegment tx span)
     endSegment
     ( \segment -> do
-        setSegmentTiming segment (startTime timer span) (toDuration span)
+        setSegmentTiming segment (segmentStartTime txStartTime span) (toDuration span)
         case maybeParent of
           Just parent -> setSegmentParent segment parent
           Nothing -> setSegmentParentRoot segment
         Platform.children span
-          |> Foldable.traverse_ (reportSpan timer tx (Just segment))
+          |> Foldable.traverse_ (reportSpan txStartTime timer tx (Just segment))
     )
 
 chooseAndStartSegment :: NewRelic.Transaction -> Platform.Span -> Prelude.IO NewRelic.Segment
@@ -160,6 +161,13 @@ startTime :: Timer -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
 startTime timer span =
   Platform.started span
     |> toPosixMilliseconds timer
+    |> (*) 1000
+    |> NewRelic.StartTimeUsSinceUnixEpoch
+
+segmentStartTime :: Platform.MonotonicTime -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
+segmentStartTime txStartTime span =
+  Platform.started span - txStartTime
+    |> Platform.inMilliseconds
     |> (*) 1000
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
