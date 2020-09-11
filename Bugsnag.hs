@@ -382,7 +382,7 @@ toException frames span =
     Platform.Succeeded -> Bugsnag.defaultException
     Platform.Failed ->
       Bugsnag.defaultException
-        { Bugsnag.exception_errorClass = "Failed: " ++ Platform.name span,
+        { Bugsnag.exception_errorClass = Platform.name span,
           Bugsnag.exception_stacktrace = frames
         }
     Platform.FailedWith (Exception.SomeException exception) ->
