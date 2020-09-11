@@ -176,6 +176,11 @@ toDuration span =
   timeDiff (Platform.started span) (Platform.finished span)
     |> Platform.inMilliseconds
     |> (*) 1000
+    -- When we tell NewRelic a segment lasted 0 microseconds it seems to ignore
+    -- that value and uses other values instead. No idea where it's getting
+    -- those alternative numbers from but they're wrong. Ensuring each duration
+    -- is at least 1 microsecond seems to circumvent this problem.
+    |> Prelude.max 1
     |> NewRelic.DurationUs
 
 -- | We have to be careful when calculating the difference between two times.
