@@ -4,7 +4,7 @@
 -- use in development.
 module Observability.Dev
   ( report,
-    logSpanRecursively,
+    logTracingSpanRecursively,
     Handler,
     handler,
     Settings,
@@ -37,28 +37,28 @@ import qualified System.IO
 import qualified Text
 import qualified Prelude
 
-report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span =
-  MVar.putMVar (writeLock handler') (logSpanRecursively (timer handler') span)
+  MVar.putMVar (writeLock handler') (logTracingSpanRecursively (timer handler') span)
 
 type Doc = Doc.Doc Terminal.AnsiStyle
 
-logSpanRecursively :: Timer.Timer -> Platform.Span -> Doc
-logSpanRecursively timer' span =
-  let (beforeChildren, afterChildren) = logSingleSpan timer' span
+logTracingSpanRecursively :: Timer.Timer -> Platform.TracingSpan -> Doc
+logTracingSpanRecursively timer' span =
+  let (beforeChildren, afterChildren) = logSingleTracingSpan timer' span
    in vcat
         [ Doc.hang 2 beforeChildren,
           Platform.children span
             |> List.reverse
-            |> Prelude.map (logSpanRecursively timer')
+            |> Prelude.map (logTracingSpanRecursively timer')
             |> vcat,
           case afterChildren of
             Nothing -> Doc.emptyDoc
             Just after -> Doc.hang 2 after
         ]
 
-logSingleSpan :: Timer.Timer -> Platform.Span -> (Doc, Maybe Doc)
-logSingleSpan timer' span =
+logSingleTracingSpan :: Timer.Timer -> Platform.TracingSpan -> (Doc, Maybe Doc)
+logSingleTracingSpan timer' span =
   if List.isEmpty (Platform.children span)
     then
       ( vsep
@@ -101,16 +101,16 @@ label :: Doc -> Doc
 label text =
   Doc.annotate (Terminal.colorDull Terminal.White) text
 
-details :: Platform.Span -> Doc
+details :: Platform.TracingSpan -> Doc
 details span =
   Platform.details span
     |> Maybe.map flattenDetails
     |> Maybe.withDefault Doc.emptyDoc
 
-flattenDetails :: Platform.SomeSpanDetails -> Doc
+flattenDetails :: Platform.SomeTracingSpanDetails -> Doc
 flattenDetails details' =
   details'
-    |> Platform.renderSpanDetails
+    |> Platform.renderTracingSpanDetails
       -- Some spans contain information that isn't as useful in a development
       -- setting. We have the opportunity below to pick useful data for specific
       -- span types.
@@ -146,7 +146,7 @@ incomingRequestToDetails info =
       ("status", Monitoring.responseStatus info |> Text.fromInt)
     ]
 
-exception :: Platform.Span -> Doc
+exception :: Platform.TracingSpan -> Doc
 exception span =
   case Platform.succeeded span of
     Platform.Succeeded -> Doc.emptyDoc
@@ -159,7 +159,7 @@ exception span =
             |> Doc.annotate (Terminal.color Terminal.Red)
         ]
 
-trace :: Platform.Span -> Doc
+trace :: Platform.TracingSpan -> Doc
 trace span =
   case Platform.frame span of
     Nothing -> Doc.emptyDoc
@@ -173,7 +173,7 @@ trace span =
           Doc.pretty (Stack.srcLocStartCol frame)
         ]
 
-name :: Platform.Span -> Doc
+name :: Platform.TracingSpan -> Doc
 name = Doc.pretty << Platform.name
 
 time :: Timer.Timer -> Platform.MonotonicTime -> Doc
@@ -182,7 +182,7 @@ time timer' time' =
     |> Format.formatTime Format.defaultTimeLocale "%T"
     |> Doc.pretty
 
-duration :: Platform.Span -> Doc
+duration :: Platform.TracingSpan -> Doc
 duration span =
   let milliseconds =
         Platform.finished span - Platform.started span
@@ -190,7 +190,7 @@ duration span =
           |> Doc.pretty
    in label "duration: " ++ milliseconds ++ "us"
 
-failed :: Platform.Span -> Doc
+failed :: Platform.TracingSpan -> Doc
 failed span =
   case Platform.succeeded span of
     Platform.Succeeded -> Doc.emptyDoc

@@ -41,7 +41,7 @@ import qualified System.IO
 import qualified System.Random as Random
 import qualified Prelude
 
-report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' requestId span = do
   skip <- skipLogging handler' span
   if skip
@@ -50,14 +50,14 @@ report handler' requestId span = do
       logItemRecursively handler' Prelude.mempty requestId span
         |> Katip.runKatipT (logEnv handler')
 
-logItemRecursively :: Handler -> Katip.Namespace -> Text -> Platform.Span -> Katip.KatipT Prelude.IO ()
+logItemRecursively :: Handler -> Katip.Namespace -> Text -> Platform.TracingSpan -> Katip.KatipT Prelude.IO ()
 logItemRecursively handler' namespace requestId span = do
   logItem handler' namespace requestId span
   Foldable.traverse_
     (logItemRecursively handler' (namespace ++ Katip.Namespace [Platform.name span]) requestId)
     (Platform.children span)
 
-logItem :: Handler -> Katip.Namespace -> Text -> Platform.Span -> Katip.KatipT Prelude.IO ()
+logItem :: Handler -> Katip.Namespace -> Text -> Platform.TracingSpan -> Katip.KatipT Prelude.IO ()
 logItem (Handler env timer _) namespace requestId span =
   Katip.logKatipItem Katip.Item
     { Katip._itemApp = Katip._logEnvApp env,
@@ -92,16 +92,16 @@ srcLocToLoc (_, srcLoc) =
         )
     }
 
-duration :: Platform.Span -> Platform.MonotonicTime
+duration :: Platform.TracingSpan -> Platform.MonotonicTime
 duration span = Platform.finished span - Platform.started span
 
--- We need this wrapper around `Span` so we can define some type class instances
+-- We need this wrapper around `TracingSpan` so we can define some type class instances
 -- for it that `Katip` needs, without having to define them as orphan instances
 -- or defining them in `cherry-core` (which would require it to take a
 -- dependency on `katip` too).
-newtype LogItem = LogItem Platform.Span
+newtype LogItem = LogItem Platform.TracingSpan
 
--- This instance defines how to turn a `Span` into a JSON object.
+-- This instance defines how to turn a `TracingSpan` into a JSON object.
 instance Katip.ToObject LogItem where
   toObject (LogItem span) =
     let genericFields =
@@ -122,7 +122,7 @@ instance Katip.ToObject LogItem where
      in genericFields ++ detailFields
           |> HashMap.filter (Aeson.Null /=)
 
--- This instance would allow us to specify which fields of the JSON-ified `Span`
+-- This instance would allow us to specify which fields of the JSON-ified `TracingSpan`
 -- to log, depending on the log level and verbosity. In following the
 -- 'observability' philosophy we don't make use of this and log all fields all
 -- the time, because we cannot know upfront which information will help us
@@ -140,7 +140,7 @@ data Handler
         timer :: Timer,
         -- | A function that determines for a particular span if it should be
         -- skipped in logging.
-        skipLogging :: Platform.Span -> Prelude.IO Bool
+        skipLogging :: Platform.TracingSpan -> Prelude.IO Bool
       }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler

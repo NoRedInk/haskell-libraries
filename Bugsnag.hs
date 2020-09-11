@@ -76,7 +76,7 @@ import qualified Prelude
 --
 -- A span that happened _after_ the root cause event completed we're not
 -- reporting.
-report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report Handler {http, timer, defaultEvent, apiKey'} requestId span =
   if failed span
     then send http apiKey' (toEvent requestId timer defaultEvent span)
@@ -107,33 +107,33 @@ send manager key event = do
     Prelude.Left err -> Exception.throwIO err
     Prelude.Right _ -> Prelude.pure ()
 
-toEvent :: Text -> Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+toEvent :: Text -> Timer -> Bugsnag.Event -> Platform.TracingSpan -> Bugsnag.Event
 toEvent = rootCause [] emptyCrumbs
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Text -> Timer -> Bugsnag.Event -> Platform.Span -> Bugsnag.Event
+rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Text -> Timer -> Bugsnag.Event -> Platform.TracingSpan -> Bugsnag.Event
 rootCause frames breadcrumbs requestId timer event span =
   let newFrames =
         case Platform.frame span of
           Nothing -> frames
           Just (name, src) -> toStackFrame name src : frames
-      newEvent = decorateEventWithSpanData requestId span event
-      childSpans = Platform.children span
+      newEvent = decorateEventWithTracingSpanData requestId span event
+      childTracingSpans = Platform.children span
    in -- We're not interested in child spans that happened _after_ the root
       -- cause took place. These are not breadcrumbs (leading up to the error)
       -- nor can they have caused the error itself because they happened after.
       -- Since child spans are ordered most-recent first we can keep dropping
       -- child spans until we hit the one where the most recent error happened.
-      case Data.List.dropWhile (not << failed) childSpans of
-        child : preErrorSpans ->
+      case Data.List.dropWhile (not << failed) childTracingSpans of
+        child : preErrorTracingSpans ->
           rootCause
             newFrames
             ( breadcrumbs
                 |> followedBy (addCrumb (startBreadcrumb timer span))
-                |> followedBy (addCrumbs timer preErrorSpans)
+                |> followedBy (addCrumbs timer preErrorTracingSpans)
             )
             requestId
             timer
@@ -148,7 +148,7 @@ rootCause frames breadcrumbs requestId timer event span =
                 -- after the last of these child spans, making all child spans
                 -- breadcrumbs.
                 breadcrumbs
-                  |> followedBy (addCrumbs timer childSpans)
+                  |> followedBy (addCrumbs timer childTracingSpans)
                   |> crumbsAsList
                   |> List.reverse
                   |> Just,
@@ -177,16 +177,16 @@ rootCause frames breadcrumbs requestId timer event span =
 -- To help us avoid doing appends we create a helper type `Crumbs a`. The only
 -- helper function it exposes for adding a breadcrumb is one that cons that
 -- breadcrumb to the front of the list, ensuring no appends take place.
-addCrumbs :: Timer -> [Platform.Span] -> Crumbs
+addCrumbs :: Timer -> [Platform.TracingSpan] -> Crumbs
 addCrumbs timer spans =
   case spans of
     [] -> emptyCrumbs
     span : after ->
       addCrumbs timer after
-        |> followedBy (addCrumbsForSpan timer span)
+        |> followedBy (addCrumbsForTracingSpan timer span)
 
-addCrumbsForSpan :: Timer -> Platform.Span -> Crumbs
-addCrumbsForSpan timer span =
+addCrumbsForTracingSpan :: Timer -> Platform.TracingSpan -> Crumbs
+addCrumbsForTracingSpan timer span =
   case Platform.children span of
     [] ->
       addCrumb (doBreadcrumb timer span)
@@ -218,7 +218,7 @@ crumbsAsList (Crumbs f) = f []
 addCrumb :: Bugsnag.Breadcrumb -> Crumbs
 addCrumb crumb = Crumbs (crumb :)
 
-endBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
+endBreadcrumb :: Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
 endBreadcrumb timer span =
   Bugsnag.defaultBreadcrumb
     { Bugsnag.breadcrumb_name = "Finished: " ++ Platform.name span,
@@ -226,13 +226,13 @@ endBreadcrumb timer span =
       Bugsnag.breadcrumb_timestamp = toISO8601 timer (Platform.finished span)
     }
 
-startBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
+startBreadcrumb :: Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
 startBreadcrumb timer span =
   (doBreadcrumb timer span)
     { Bugsnag.breadcrumb_name = "Starting: " ++ Platform.name span
     }
 
-doBreadcrumb :: Timer -> Platform.Span -> Bugsnag.Breadcrumb
+doBreadcrumb :: Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
 doBreadcrumb timer span =
   let defaultBreadcrumb =
         Bugsnag.defaultBreadcrumb
@@ -244,10 +244,10 @@ doBreadcrumb timer span =
         Nothing -> defaultBreadcrumb
         Just details -> customizeBreadcrumb span details defaultBreadcrumb
 
-customizeBreadcrumb :: Platform.Span -> Platform.SomeSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
+customizeBreadcrumb :: Platform.TracingSpan -> Platform.SomeTracingSpanDetails -> Bugsnag.Breadcrumb -> Bugsnag.Breadcrumb
 customizeBreadcrumb span details breadcrumb =
   details
-    |> Platform.renderSpanDetails
+    |> Platform.renderTracingSpanDetails
       [ Platform.Renderer (outgoingHttpRequestAsBreadcrumb breadcrumb),
         Platform.Renderer (mysqlQueryAsBreadcrumb breadcrumb),
         Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb),
@@ -277,7 +277,7 @@ postgresQueryAsBreadcrumb breadcrumb details =
       Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
-logAsBreadcrumb :: Platform.Span -> Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
+logAsBreadcrumb :: Platform.TracingSpan -> Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
 logAsBreadcrumb span breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type =
@@ -287,27 +287,27 @@ logAsBreadcrumb span breadcrumb details =
       Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
-unknownAsBreadcrumb :: Bugsnag.Breadcrumb -> Platform.SomeSpanDetails -> Bugsnag.Breadcrumb
+unknownAsBreadcrumb :: Bugsnag.Breadcrumb -> Platform.SomeTracingSpanDetails -> Bugsnag.Breadcrumb
 unknownAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
       Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
-decorateEventWithSpanData :: Text -> Platform.Span -> Bugsnag.Event -> Bugsnag.Event
-decorateEventWithSpanData requestId span event =
+decorateEventWithTracingSpanData :: Text -> Platform.TracingSpan -> Bugsnag.Event -> Bugsnag.Event
+decorateEventWithTracingSpanData requestId span event =
   Platform.details span
     |> Maybe.andThen
-      ( Platform.renderSpanDetails
+      ( Platform.renderTracingSpanDetails
           [ Platform.Renderer (renderIncomingHttpRequest requestId event),
             Platform.Renderer (renderLog event),
-            Platform.Renderer (renderRemainingSpanDetails span event)
+            Platform.Renderer (renderRemainingTracingSpanDetails span event)
           ]
       )
     |> Maybe.withDefault event
 
-renderRemainingSpanDetails :: Platform.Span -> Bugsnag.Event -> Platform.SomeSpanDetails -> Bugsnag.Event
-renderRemainingSpanDetails span event details =
+renderRemainingTracingSpanDetails :: Platform.TracingSpan -> Bugsnag.Event -> Platform.SomeTracingSpanDetails -> Bugsnag.Event
+renderRemainingTracingSpanDetails span event details =
   event
     { Bugsnag.event_metaData =
         Aeson.toJSON details
@@ -369,14 +369,14 @@ renderIncomingHttpRequest requestId event request =
           |> (++) (Bugsnag.event_metaData event)
     }
 
-failed :: Platform.Span -> Bool
+failed :: Platform.TracingSpan -> Bool
 failed span =
   case Platform.succeeded span of
     Platform.Succeeded -> False
     Platform.Failed -> True
     Platform.FailedWith _ -> True
 
-toException :: [Bugsnag.StackFrame] -> Platform.Span -> Bugsnag.Exception
+toException :: [Bugsnag.StackFrame] -> Platform.TracingSpan -> Bugsnag.Exception
 toException frames span =
   case Platform.succeeded span of
     Platform.Succeeded -> Bugsnag.defaultException

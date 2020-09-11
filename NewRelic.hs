@@ -35,9 +35,9 @@ import qualified Text
 import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
 
-report :: Handler -> Text -> Platform.Span -> Prelude.IO ()
+report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span =
-  case Platform.details span |> andThen Platform.fromSpanDetails of
+  case Platform.details span |> andThen Platform.fromTracingSpanDetails of
     Nothing -> Prelude.pure ()
     Just details -> reportWebTransaction handler' span details
 
@@ -53,7 +53,7 @@ handler timer settings =
     )
     (\_ -> Prelude.pure ())
 
-reportWebTransaction :: Handler -> Platform.Span -> Monitoring.RequestDetails -> Prelude.IO ()
+reportWebTransaction :: Handler -> Platform.TracingSpan -> Monitoring.RequestDetails -> Prelude.IO ()
 reportWebTransaction (Handler timer app) span details =
   Exception.bracketWithError
     (startWebTransaction app (Monitoring.endpoint details))
@@ -74,21 +74,21 @@ reportWebTransaction (Handler timer app) span details =
           Platform.Failed -> reportError tx "Error logged during request" details
           Platform.FailedWith err -> reportError tx (typeName err) details
         Platform.children span
-          |> Foldable.traverse_ (reportSpan (Platform.started span) timer tx Nothing)
+          |> Foldable.traverse_ (reportTracingSpan (Platform.started span) timer tx Nothing)
     )
 
 reportError :: NewRelic.Transaction -> Text -> Monitoring.RequestDetails -> Prelude.IO ()
 reportError tx msg details =
   noticeError tx 1 msg (Text.fromInt (Monitoring.responseStatus details))
 
-reportSpan ::
+reportTracingSpan ::
   Platform.MonotonicTime ->
   Timer ->
   NewRelic.Transaction ->
   Maybe NewRelic.Segment ->
-  Platform.Span ->
+  Platform.TracingSpan ->
   Prelude.IO ()
-reportSpan txStartTime timer tx maybeParent span =
+reportTracingSpan txStartTime timer tx maybeParent span =
   Exception.bracket
     (chooseAndStartSegment tx span)
     endSegment
@@ -98,14 +98,14 @@ reportSpan txStartTime timer tx maybeParent span =
           Just parent -> setSegmentParent segment parent
           Nothing -> setSegmentParentRoot segment
         Platform.children span
-          |> Foldable.traverse_ (reportSpan txStartTime timer tx (Just segment))
+          |> Foldable.traverse_ (reportTracingSpan txStartTime timer tx (Just segment))
     )
 
-chooseAndStartSegment :: NewRelic.Transaction -> Platform.Span -> Prelude.IO NewRelic.Segment
+chooseAndStartSegment :: NewRelic.Transaction -> Platform.TracingSpan -> Prelude.IO NewRelic.Segment
 chooseAndStartSegment tx span =
   Platform.details span
     |> andThen
-      ( Platform.renderSpanDetails
+      ( Platform.renderTracingSpanDetails
           [ Platform.Renderer (startDatastoreSegment tx << mysqlToDatastore),
             Platform.Renderer (startDatastoreSegment tx << postgresToDatastore),
             Platform.Renderer (startExternalSegment tx << httpToExternalSegment)
@@ -158,19 +158,19 @@ httpToExternalSegment info =
       NewRelic.externalSegmentLibrary = Nothing
     }
 
-startTime :: Timer -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
+startTime :: Timer -> Platform.TracingSpan -> NewRelic.StartTimeUsSinceUnixEpoch
 startTime timer span =
   Platform.started span
     |> toPosixMicroseconds timer
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
-segmentStartTime :: Platform.MonotonicTime -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
+segmentStartTime :: Platform.MonotonicTime -> Platform.TracingSpan -> NewRelic.StartTimeUsSinceUnixEpoch
 segmentStartTime txStartTime span =
   timeDiff txStartTime (Platform.started span)
     |> Platform.inMicroseconds
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
-toDuration :: Platform.Span -> NewRelic.DurationUs
+toDuration :: Platform.TracingSpan -> NewRelic.DurationUs
 toDuration span =
   timeDiff (Platform.started span) (Platform.finished span)
     |> Platform.inMicroseconds
@@ -203,11 +203,11 @@ timeDiff start end =
     then end - start
     else 0
 
-category :: Platform.Span -> Text
+category :: Platform.TracingSpan -> Text
 category span =
   Platform.details span
     |> Maybe.andThen
-      ( Platform.renderSpanDetails
+      ( Platform.renderTracingSpanDetails
           [ Platform.Renderer (\(_ :: MySQL.Info) -> "mysql"),
             Platform.Renderer (\(_ :: Postgres.Info) -> "postgres"),
             Platform.Renderer (\(_ :: Http.Info) -> "http"),
