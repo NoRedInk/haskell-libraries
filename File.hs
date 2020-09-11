@@ -106,7 +106,7 @@ instance Katip.ToObject LogItem where
   toObject (LogItem span) =
     let genericFields =
           HashMap.fromList
-            [ ("duration in ms", Aeson.toJSON (Platform.inMilliseconds (duration span))),
+            [ ("duration in us", Aeson.toJSON (Platform.inMicroseconds (duration span))),
               ( "exception",
                 Aeson.toJSON
                   <| case Platform.succeeded span of

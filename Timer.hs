@@ -6,7 +6,7 @@ module Observability.Timer
     toUTC,
     toLocal,
     toPosix,
-    toPosixMilliseconds,
+    toPosixMicroseconds,
     toISO8601,
   )
 where
@@ -29,7 +29,7 @@ import qualified Prelude
 -- dates.
 data Timer
   = Timer
-      { -- | The POSIX time in milliseconds that corresponds with t=0 according
+      { -- | The POSIX time in microseconds that corresponds with t=0 according
         -- to `GHC.Clock`. We can use this to calculate other `GHC.Clock`
         -- values.
         tzero :: Word.Word64,
@@ -44,7 +44,7 @@ mkTimer = do
   nowTime <- Clock.POSIX.getPOSIXTime
   nowClock <- GHC.Clock.getMonotonicTimeNSec
   timezone <- LocalTime.getCurrentTimeZone
-  let tzero = Prelude.floor (1e3 * nowTime) - (nowClock `Prelude.div` 1000000)
+  let tzero = Prelude.floor (1e6 * nowTime) - (nowClock `Prelude.div` 1000)
   Prelude.pure Timer {tzero, timezone}
 
 toUTC :: Timer -> Platform.MonotonicTime -> Clock.UTCTime
@@ -57,14 +57,14 @@ toLocal timer clock =
   toUTC timer clock
     |> LocalTime.utcToLocalTime (timezone timer)
 
-toPosixMilliseconds :: Timer -> Platform.MonotonicTime -> Word.Word64
-toPosixMilliseconds timer clock = tzero timer + Platform.inMilliseconds clock
+toPosixMicroseconds :: Timer -> Platform.MonotonicTime -> Word.Word64
+toPosixMicroseconds timer clock = tzero timer + Platform.inMicroseconds clock
 
 toPosix :: Timer -> Platform.MonotonicTime -> Clock.POSIX.POSIXTime
 toPosix timer clock =
-  toPosixMilliseconds timer clock
+  toPosixMicroseconds timer clock
     |> Prelude.fromIntegral
-    |> (*) 1e-3
+    |> (*) 1e-6
 
 toISO8601 :: Timer -> Platform.MonotonicTime -> Text
 toISO8601 timer clock =

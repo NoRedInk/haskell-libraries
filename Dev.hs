@@ -186,9 +186,9 @@ duration :: Platform.Span -> Doc
 duration span =
   let milliseconds =
         Platform.finished span - Platform.started span
-          |> Platform.inMilliseconds
+          |> Platform.inMicroseconds
           |> Doc.pretty
-   in label "duration: " ++ milliseconds ++ "ms"
+   in label "duration: " ++ milliseconds ++ "us"
 
 failed :: Platform.Span -> Doc
 failed span =

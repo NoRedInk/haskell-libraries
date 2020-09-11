@@ -28,7 +28,7 @@ import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
-import Observability.Timer (Timer, toPosixMilliseconds)
+import Observability.Timer (Timer, toPosixMicroseconds)
 import qualified Platform
 import qualified Postgres
 import qualified Text
@@ -160,22 +160,19 @@ httpToExternalSegment info =
 startTime :: Timer -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
 startTime timer span =
   Platform.started span
-    |> toPosixMilliseconds timer
-    |> (*) 1000
+    |> toPosixMicroseconds timer
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
 segmentStartTime :: Platform.MonotonicTime -> Platform.Span -> NewRelic.StartTimeUsSinceUnixEpoch
 segmentStartTime txStartTime span =
   timeDiff txStartTime (Platform.started span)
-    |> Platform.inMilliseconds
-    |> (*) 1000
+    |> Platform.inMicroseconds
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
 toDuration :: Platform.Span -> NewRelic.DurationUs
 toDuration span =
   timeDiff (Platform.started span) (Platform.finished span)
-    |> Platform.inMilliseconds
-    |> (*) 1000
+    |> Platform.inMicroseconds
     -- When we tell NewRelic a segment lasted 0 microseconds it seems to ignore
     -- that value and uses other values instead. No idea where it's getting
     -- those alternative numbers from but they're wrong. Ensuring each duration
