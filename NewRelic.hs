@@ -73,7 +73,8 @@ reportWebTransaction (Handler timer app) span details =
           Platform.Succeeded -> Prelude.pure ()
           Platform.Failed -> reportError tx "Error logged during request" details
           Platform.FailedWith err -> reportError tx (typeName err) details
-        reportSpan (Platform.started span) timer tx Nothing span
+        Platform.children span
+          |> Foldable.traverse_ (reportSpan (Platform.started span) timer tx Nothing)
     )
 
 reportError :: NewRelic.Transaction -> Text -> Monitoring.RequestDetails -> Prelude.IO ()
