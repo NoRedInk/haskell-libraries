@@ -17,10 +17,14 @@ where
 import Cherry.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy
 import qualified Data.Foldable as Foldable
 import qualified Data.Int
 import qualified Data.Proxy as Proxy
+import qualified Data.Scientific
 import qualified Data.Text
+import qualified Data.Text.Encoding
 import qualified Data.Typeable as Typeable
 import qualified Environment
 import qualified Http
@@ -97,6 +101,7 @@ reportTracingSpan txStartTime timer tx maybeParent span =
         case maybeParent of
           Just parent -> setSegmentParent segment parent
           Nothing -> setSegmentParentRoot segment
+        addAttributesForSpan tx span
         Platform.children span
           |> Foldable.traverse_ (reportTracingSpan txStartTime timer tx (Just segment))
     )
@@ -217,6 +222,39 @@ category span =
       )
     |> Maybe.withDefault "unknown"
 
+addAttributesForSpan :: NewRelic.Transaction -> Platform.TracingSpan -> Prelude.IO ()
+addAttributesForSpan tx span =
+  Platform.details span
+    |> Maybe.andThen
+      ( Platform.renderTracingSpanDetails
+          [ Platform.Renderer (\contexts -> addAttributes tx contexts)
+          ]
+      )
+    |> Maybe.withDefault (Prelude.pure ())
+
+addAttributes :: NewRelic.Transaction -> Log.LogContexts -> Prelude.IO ()
+addAttributes tx (Log.LogContexts contexts) =
+  Foldable.traverse_
+    (\(Log.Context key val) -> addAttribute tx key (Aeson.toJSON val))
+    contexts
+
+addAttribute :: NewRelic.Transaction -> Text -> Aeson.Value -> Prelude.IO ()
+addAttribute tx key value =
+  case value of
+    Aeson.String text -> addAttributeText tx key text
+    Aeson.Number number ->
+      case Data.Scientific.floatingOrInteger number of
+        Prelude.Left double -> addAttributeDouble tx key double
+        Prelude.Right long -> addAttributeLong tx key long
+    Aeson.Bool bool' ->
+      addAttributeText tx key (if bool' then "True" else "False")
+    Aeson.Null -> addAttributeText tx key "null"
+    _ ->
+      addAttributeText
+        tx
+        key
+        (Data.Text.Encoding.decodeUtf8 (Data.ByteString.Lazy.toStrict (Aeson.encode value)))
+
 --
 -- NewRelic API
 --
@@ -300,11 +338,32 @@ setSegmentParentRoot segment =
 noticeError :: NewRelic.Transaction -> Data.Int.Int32 -> Text -> Text -> Prelude.IO ()
 noticeError = NewRelic.noticeError
 
+addAttributeText :: NewRelic.Transaction -> Text -> Text -> Prelude.IO ()
+addAttributeText tx key value =
+  NewRelic.addAttributeText tx key value
+    |> andThen allowFailure
+
+addAttributeLong :: NewRelic.Transaction -> Text -> Int -> Prelude.IO ()
+addAttributeLong tx key value =
+  NewRelic.addAttributeLong tx key value
+    |> andThen allowFailure
+
+addAttributeDouble :: NewRelic.Transaction -> Text -> Float -> Prelude.IO ()
+addAttributeDouble tx key value =
+  NewRelic.addAttributeDouble tx key value
+    |> andThen allowFailure
+
+-- | Don't report the transaction if reporting
 expectSuccess :: Bool -> Prelude.IO ()
 expectSuccess success =
   if success
     then Prelude.pure ()
     else Exception.throwIO NewRelicFailure
+
+-- | Don't fail the report for the transaction as a whole if this specific
+-- NewRelic reporting step fails.
+allowFailure :: Bool -> Prelude.IO ()
+allowFailure _ = Prelude.pure ()
 
 expectJust :: Maybe a -> Prelude.IO a
 expectJust maybe =
