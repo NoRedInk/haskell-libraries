@@ -119,11 +119,11 @@ newtype FirstRequest = FirstRequest Wai.Request deriving (Show)
 
 instance Exception.Exception FirstRequest
 
-spanForTask :: Show e => Task e () -> Prelude.IO Platform.Span
+spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
 spanForTask task = do
   spanVar <- MVar.newEmptyMVar
   res <-
-    Platform.rootSpanIO
+    Platform.rootTracingSpanIO
       "test-request"
       (MVar.putMVar spanVar)
       "test-root"
@@ -140,7 +140,7 @@ spanForTask task = do
 -- Similarly the host URI changes in each test, because `warp` pickes a random
 -- free port to run a test webserver on. To prevent this from failing tests we
 -- set the URI to a standard value.
-constantValuesForVariableFields :: Platform.Span -> Platform.Span
+constantValuesForVariableFields :: Platform.TracingSpan -> Platform.TracingSpan
 constantValuesForVariableFields span =
   span
     { Platform.started = 0,
@@ -150,8 +150,8 @@ constantValuesForVariableFields span =
           |> andThen
             ( \details ->
                 details
-                  |> Platform.renderSpanDetails
-                    [ Platform.Renderer (\info -> Platform.toSpanDetails info {Http.infoUri = "mock-uri"})
+                  |> Platform.renderTracingSpanDetails
+                    [ Platform.Renderer (\info -> Platform.toTracingSpanDetails info {Http.infoUri = "mock-uri"})
                     ]
             ),
       Platform.children = map constantValuesForVariableFields (Platform.children span)

@@ -303,13 +303,13 @@ prepareManagerForRequest manager = do
                   HTTP.method req
                     |> Data.Text.Encoding.decodeUtf8
               }
-       in Platform.spanIO
+       in Platform.tracingSpanIO
             log
             "Outoing HTTP Request"
             ( \log' ->
                 Exception.finally
                   io
-                  (Platform.setSpanDetailsIO log' spanDetails)
+                  (Platform.setTracingSpanDetailsIO log' spanDetails)
             )
 
 data Info
@@ -331,4 +331,4 @@ infoEncodingOptions =
     { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
     }
 
-instance Platform.SpanDetails Info
+instance Platform.TracingSpanDetails Info
