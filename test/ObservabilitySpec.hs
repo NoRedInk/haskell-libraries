@@ -54,11 +54,11 @@ tests mysql postgres =
           |> Expect.withIO (Debug.toString >> Expect.equalToFile "test/golden-results/observability-spec-mysql-reporting")
     ]
 
-spanForTask :: Show e => Task e () -> Prelude.IO Platform.Span
+spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
 spanForTask task = do
   spanVar <- MVar.newEmptyMVar
   res <-
-    Platform.rootSpanIO
+    Platform.rootTracingSpanIO
       "test-request"
       (MVar.putMVar spanVar)
       "test-root"
@@ -75,7 +75,7 @@ spanForTask task = do
 -- Similarly the db URI changes in each test, because we create temporary test
 -- database. To prevent this from failing tests we set the URI to a standard
 -- value.
-constantValuesForVariableFields :: Platform.Span -> Platform.Span
+constantValuesForVariableFields :: Platform.TracingSpan -> Platform.TracingSpan
 constantValuesForVariableFields span =
   span
     { Platform.started = 0,
@@ -85,8 +85,8 @@ constantValuesForVariableFields span =
           |> andThen
             ( \details ->
                 details
-                  |> Platform.renderSpanDetails
-                    [ Platform.Renderer (\info -> Platform.toSpanDetails info {Postgres.infoConnection = Postgres.UnixSocket "/mock/db/path.sock" "mock-db-name"})
+                  |> Platform.renderTracingSpanDetails
+                    [ Platform.Renderer (\info -> Platform.toTracingSpanDetails info {Postgres.infoConnection = Postgres.UnixSocket "/mock/db/path.sock" "mock-db-name"})
                     ]
                   |> Maybe.withDefault details
                   |> Just

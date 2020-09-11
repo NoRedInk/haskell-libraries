@@ -221,9 +221,9 @@ doQuery conn query handleResponse =
     |> andThen handleResponse
     |> ( \task ->
            withFrozenCallStack
-             Platform.span
+             Platform.tracingSpan
              "Postgresql Query"
-             (Platform.finally task (Platform.setSpanDetails queryInfo))
+             (Platform.finally task (Platform.setTracingSpanDetails queryInfo))
        )
   where
     queryInfo = Query.mkInfo query (logContext conn)

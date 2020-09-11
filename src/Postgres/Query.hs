@@ -125,7 +125,7 @@ format query =
         |> indent
 
 --
--- SpanDetails
+-- TracingSpanDetails
 --
 
 data Info
@@ -169,7 +169,7 @@ infoEncodingOptions =
     { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
     }
 
-instance Platform.SpanDetails Info
+instance Platform.TracingSpanDetails Info
 
 data ConnectionInfo
   = TcpSocket Host Port DatabaseName

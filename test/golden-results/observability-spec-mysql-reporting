@@ -1,10 +1,10 @@
-Span
+TracingSpan
   { name = "test-root"
   , started = MonotonicTime { inMicroseconds = 0 }
   , finished = MonotonicTime { inMicroseconds = 0 }
   , frame =
       Just
-        ( "rootSpanIO"
+        ( "rootTracingSpanIO"
         , SrcLoc
             { srcLocPackage = "main"
             , srcLocModule = "ObservabilitySpec"
@@ -18,7 +18,7 @@ Span
   , details = Nothing
   , succeeded = Succeeded
   , children =
-      [ Span
+      [ TracingSpan
           { name = "MySQL Query"
           , started = MonotonicTime { inMicroseconds = 0 }
           , finished = MonotonicTime { inMicroseconds = 0 }
@@ -40,7 +40,7 @@ Span
                 "{\"query\":\"SELECT 1\",\"query template\":\"!SELECT 1\",\"ran as prepared statement\":false,\"sql operation\":\"UNKNOWN\",\"queried relation\":\"SELECT 1\",\"connection\":\"127.0.0.1:3306/noredink_development\"}"
           , succeeded = Succeeded
           , children =
-              [ Span
+              [ TracingSpan
                   { name = "acquiring MySQL connection from pool"
                   , started = MonotonicTime { inMicroseconds = 0 }
                   , finished = MonotonicTime { inMicroseconds = 0 }
@@ -61,7 +61,7 @@ Span
                   , succeeded = Succeeded
                   , children = []
                   }
-              , Span
+              , TracingSpan
                   { name = "acquiring MySQL connection from pool"
                   , started = MonotonicTime { inMicroseconds = 0 }
                   , finished = MonotonicTime { inMicroseconds = 0 }

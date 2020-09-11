@@ -236,7 +236,7 @@ sql =
     }
 
 --
--- SpanDetails
+-- TracingSpanDetails
 --
 
 data Info
@@ -269,7 +269,7 @@ infoEncodingOptions =
     { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
     }
 
-instance Platform.SpanDetails Info
+instance Platform.TracingSpanDetails Info
 
 mkInfo :: Query row -> ConnectionInfo -> Info
 mkInfo query conn =

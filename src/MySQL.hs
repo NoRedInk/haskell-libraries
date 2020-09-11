@@ -305,9 +305,9 @@ doQuery conn query handleResponse =
         |> Task.andThen handleResponse
         |> ( \task ->
                Stack.withFrozenCallStack
-                 Platform.span
+                 Platform.tracingSpan
                  "MySQL Query"
-                 (Platform.finally task (Platform.setSpanDetails infoForContext))
+                 (Platform.finally task (Platform.setTracingSpanDetails infoForContext))
            )
 
 executeQuery ::
