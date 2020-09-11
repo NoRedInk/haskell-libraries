@@ -1,7 +1,7 @@
 Span
   { name = "test-root"
-  , started = MonotonicTime { inMilliseconds = 0 }
-  , finished = MonotonicTime { inMilliseconds = 0 }
+  , started = MonotonicTime { inMicroseconds = 0 }
+  , finished = MonotonicTime { inMicroseconds = 0 }
   , frame =
       Just
         ( "rootSpanIO"
@@ -20,8 +20,8 @@ Span
   , children =
       [ Span
           { name = "Postgresql Query"
-          , started = MonotonicTime { inMilliseconds = 0 }
-          , finished = MonotonicTime { inMilliseconds = 0 }
+          , started = MonotonicTime { inMicroseconds = 0 }
+          , finished = MonotonicTime { inMicroseconds = 0 }
           , frame =
               Just
                 ( "doQuery"
@@ -42,8 +42,8 @@ Span
           , children =
               [ Span
                   { name = "acquiring Postgres connection from pool"
-                  , started = MonotonicTime { inMilliseconds = 0 }
-                  , finished = MonotonicTime { inMilliseconds = 0 }
+                  , started = MonotonicTime { inMicroseconds = 0 }
+                  , finished = MonotonicTime { inMicroseconds = 0 }
                   , frame =
                       Just
                         ( "withContext"
