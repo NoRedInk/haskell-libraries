@@ -40,7 +40,7 @@ tests mysql postgres =
                 Ok (_ :: [Int]) -> Task.succeed ()
           )
           |> spanForTask
-          |> Expect.withIO (Debug.toString >> Expect.equalToFile "test/golden-results/observability-spec-postgres-reporting"),
+          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-postgres-reporting"),
       test "MySQL queries report the span data we expect" <| \_ ->
         MySQL.doQuery
           mysql
@@ -51,7 +51,7 @@ tests mysql postgres =
                 Ok (_ :: [Int]) -> Task.succeed ()
           )
           |> spanForTask
-          |> Expect.withIO (Debug.toString >> Expect.equalToFile "test/golden-results/observability-spec-mysql-reporting")
+          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-mysql-reporting")
     ]
 
 spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
