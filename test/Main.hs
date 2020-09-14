@@ -75,7 +75,7 @@ tests =
               Http.get http url Http.expectWhatever
                 |> spanForTask
           )
-          |> Expect.withIO (Debug.toString >> Expect.equalToFile "test/golden-results/expected-http-span")
+          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/expected-http-span")
     ]
 
 -- # Wai applications to test against
