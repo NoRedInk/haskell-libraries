@@ -287,21 +287,13 @@ doQuery ::
   (Result Error.Error result -> Task e a) ->
   Task e a
 doQuery conn query handleResponse =
-  let --
-      runQuery = do
-        result <- Stack.withFrozenCallStack executeSql conn query
-        -- If not currently inside a transaction and original query succeeded, then commit
-        case transactionCount conn of
-          Nothing -> Stack.withFrozenCallStack executeCommand_ conn (queryFromText "COMMIT")
-          _ -> Task.succeed ()
-        Task.succeed result
-   in runQuery
-        -- Handle the response before wrapping the operation in a context. This way,
-        -- if the response handling logic creates errors, those errors can inherit
-        -- context values like the query string.
-        |> Task.map Ok
-        |> Task.onError (Task.succeed << Err)
-        |> Task.andThen handleResponse
+  Stack.withFrozenCallStack executeSql conn query
+    -- Handle the response before wrapping the operation in a context. This way,
+    -- if the response handling logic creates errors, those errors can inherit
+    -- context values like the query string.
+    |> Task.map Ok
+    |> Task.onError (Task.succeed << Err)
+    |> Task.andThen handleResponse
 
 executeQuery ::
   forall row.

@@ -37,50 +37,6 @@ TracingSpan
                 )
           , details =
               Just
-                "{\"query\":\"COMMIT\",\"query template\":\"COMMIT\",\"ran as prepared statement\":false,\"sql operation\":\"COMMIT\",\"queried relation\":\"\",\"connection\":\"127.0.0.1:3306/noredink_development\"}"
-          , succeeded = Succeeded
-          , children = []
-          }
-      , TracingSpan
-          { name = "acquiring MySQL connection from pool"
-          , started = MonotonicTime { inMicroseconds = 0 }
-          , finished = MonotonicTime { inMicroseconds = 0 }
-          , frame =
-              Just
-                ( "doQuery"
-                , SrcLoc
-                    { srcLocPackage = "main"
-                    , srcLocModule = "ObservabilitySpec"
-                    , srcLocFile = "test/ObservabilitySpec.hs"
-                    , srcLocStartLine = 45
-                    , srcLocStartCol = 9
-                    , srcLocEndLine = 52
-                    , srcLocEndCol = 12
-                    }
-                )
-          , details = Just "{}"
-          , succeeded = Succeeded
-          , children = []
-          }
-      , TracingSpan
-          { name = "MySQL Query"
-          , started = MonotonicTime { inMicroseconds = 0 }
-          , finished = MonotonicTime { inMicroseconds = 0 }
-          , frame =
-              Just
-                ( "doQuery"
-                , SrcLoc
-                    { srcLocPackage = "main"
-                    , srcLocModule = "ObservabilitySpec"
-                    , srcLocFile = "test/ObservabilitySpec.hs"
-                    , srcLocStartLine = 45
-                    , srcLocStartCol = 9
-                    , srcLocEndLine = 52
-                    , srcLocEndCol = 12
-                    }
-                )
-          , details =
-              Just
                 "{\"query\":\"SELECT 1\",\"query template\":\"!SELECT 1\",\"ran as prepared statement\":false,\"sql operation\":\"UNKNOWN\",\"queried relation\":\"SELECT 1\",\"connection\":\"127.0.0.1:3306/noredink_development\"}"
           , succeeded = Succeeded
           , children = []
