@@ -221,7 +221,7 @@ toConnectInfo settings =
       password = Data.Text.Encoding.encodeUtf8 (Log.unSecret (Settings.unPassword (Settings.password connectionSettings)))
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
-          Base.defaultConnectInfo
+          Base.defaultConnectInfoMB4
             { Base.ciHost = Settings.unSocket socket,
               Base.ciUser = user,
               Base.ciPassword = password,
@@ -229,7 +229,7 @@ toConnectInfo settings =
               Base.ciCharset = Database.MySQL.Connection.utf8mb4_unicode_ci
             }
         Settings.ConnectTcp host port ->
-          Base.defaultConnectInfo
+          Base.defaultConnectInfoMB4
             { Base.ciHost = Data.Text.unpack (Settings.unHost host),
               Base.ciUser = user,
               Base.ciPassword = password,
