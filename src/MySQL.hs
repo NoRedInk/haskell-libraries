@@ -244,10 +244,10 @@ toConnectInfo settings =
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: Connection -> Health.Check
+readiness :: Stack.HasCallStack => Connection -> Health.Check
 readiness conn = Health.mkCheck "mysql" <| do
   log <- Platform.silentHandler
-  executeQuery conn (queryFromText "SELECT 1")
+  Stack.withFrozenCallStack executeQuery conn (queryFromText "SELECT 1")
     |> Task.map (\(_ :: [Int]) -> ())
     |> Task.mapError (Data.Text.pack << Exception.displayException)
     |> Task.attempt log
@@ -260,7 +260,7 @@ queryFromText text =
       Query.params = Log.mkSecret [],
       Query.prepareQuery = Query.DontPrepare,
       Query.quasiQuotedString = text,
-      Query.sqlOperation = "",
+      Query.sqlOperation = text,
       Query.queriedRelation = ""
     }
 
@@ -268,19 +268,20 @@ queryFromText text =
 -- EXECUTE QUERIES
 --
 class MySqlQueryable query result | result -> query where
-  executeSql :: Connection -> Query.Query query -> Task Error.Error result
+  executeSql :: Stack.HasCallStack => Connection -> Query.Query query -> Task Error.Error result
 
 instance FromRow.FromRow (FromRow.CountColumns row) row => MySqlQueryable row [row] where
-  executeSql c query = executeQuery c query
+  executeSql c query = Stack.withFrozenCallStack executeQuery c query
 
 instance MySqlQueryable () Int where
-  executeSql c query = executeCommand c query
+  executeSql c query = Stack.withFrozenCallStack executeCommand c query
 
 instance MySqlQueryable () () where
-  executeSql c query = executeCommand_ c query
+  executeSql c query = Stack.withFrozenCallStack executeCommand_ c query
 
 doQuery ::
-  (Stack.HasCallStack, MySqlQueryable row result) =>
+  Stack.HasCallStack =>
+  (MySqlQueryable row result) =>
   Connection ->
   Query.Query row ->
   (Result Error.Error result -> Task e a) ->
@@ -288,14 +289,12 @@ doQuery ::
 doQuery conn query handleResponse =
   let --
       runQuery = do
-        result <- executeSql conn query
+        result <- Stack.withFrozenCallStack executeSql conn query
         -- If not currently inside a transaction and original query succeeded, then commit
         case transactionCount conn of
-          Nothing -> executeCommand_ conn (queryFromText "COMMIT")
+          Nothing -> Stack.withFrozenCallStack executeCommand_ conn (queryFromText "COMMIT")
           _ -> Task.succeed ()
         Task.succeed result
-      infoForContext :: Query.Info
-      infoForContext = Query.mkInfo query (logContext conn)
    in runQuery
         -- Handle the response before wrapping the operation in a context. This way,
         -- if the response handling logic creates errors, those errors can inherit
@@ -303,15 +302,10 @@ doQuery conn query handleResponse =
         |> Task.map Ok
         |> Task.onError (Task.succeed << Err)
         |> Task.andThen handleResponse
-        |> ( \task ->
-               Stack.withFrozenCallStack
-                 Platform.tracingSpan
-                 "MySQL Query"
-                 (Platform.finally task (Platform.setTracingSpanDetails infoForContext))
-           )
 
 executeQuery ::
   forall row.
+  Stack.HasCallStack =>
   FromRow.FromRow (FromRow.CountColumns row) row =>
   Connection ->
   Query.Query row ->
@@ -324,37 +318,61 @@ executeQuery conn query =
             |> Streams.map (FromRow.fromRow (Proxy.Proxy :: Proxy.Proxy (FromRow.CountColumns row)))
             |> andThen Streams.toList
      in withTimeout conn
-          <| Platform.doAnything (doAnything conn)
-          <| handleMySqlException
           <| case Query.prepareQuery query of
             Query.Prepare -> do
-              stmtId <- getPreparedQueryStmtID preparedQueries backend query
-              (_, stream) <- Base.queryStmt backend stmtId params
-              toRows stream
+              stmtId <-
+                getPreparedQueryStmtID preparedQueries backend query
+                  |> handleMySqlException
+                  |> Platform.doAnything (doAnything conn)
+              Base.queryStmt backend stmtId params
+                |> andThen (toRows << Tuple.second)
+                |> handleMySqlException
+                |> Platform.doAnything (doAnything conn)
+                |> Stack.withFrozenCallStack traceQuery conn query
             Query.DontPrepare -> do
-              (_, stream) <- Base.query backend (toBaseQuery query) params
-              toRows stream
+              let encodedQuery = toBaseQuery query
+              Base.query backend encodedQuery params
+                |> andThen (toRows << Tuple.second)
+                |> handleMySqlException
+                |> Platform.doAnything (doAnything conn)
+                |> Stack.withFrozenCallStack traceQuery conn query
 
-executeCommand_ :: Connection -> Query.Query () -> Task Error.Error ()
+executeCommand_ :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error ()
 executeCommand_ conn query = do
-  _ <- executeCommand conn query
+  _ <- Stack.withFrozenCallStack executeCommand conn query
   Task.succeed ()
 
-executeCommand :: Connection -> Query.Query () -> Task Error.Error Int
+executeCommand :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error Int
 executeCommand conn query =
-  withConnection conn <| \(backend, preparedQueries) ->
+  withConnection conn <| \(backend, preparedQueries) -> do
     let params = Query.params query |> Log.unSecret
-     in withTimeout conn
-          <| Platform.doAnything (doAnything conn)
-          <| handleMySqlException
-          <| case Query.prepareQuery query of
-            Query.Prepare -> do
-              stmtId <- getPreparedQueryStmtID preparedQueries backend query
-              Base.OK {Base.okLastInsertID} <- Base.executeStmt backend stmtId params
-              Prelude.pure (Prelude.fromIntegral okLastInsertID)
-            Query.DontPrepare -> do
-              Base.OK {Base.okLastInsertID} <- Base.execute backend (toBaseQuery query) params
-              Prelude.pure (Prelude.fromIntegral okLastInsertID)
+    withTimeout conn
+      <| case Query.prepareQuery query of
+        Query.Prepare -> do
+          stmtId <-
+            getPreparedQueryStmtID preparedQueries backend query
+              |> handleMySqlException
+              |> Platform.doAnything (doAnything conn)
+          Base.executeStmt backend stmtId params
+            |> map (Prelude.fromIntegral << Base.okLastInsertID)
+            |> handleMySqlException
+            |> Platform.doAnything (doAnything conn)
+            |> Stack.withFrozenCallStack traceQuery conn query
+        Query.DontPrepare -> do
+          let encodedQuery = toBaseQuery query
+          Base.execute backend encodedQuery params
+            |> map (Prelude.fromIntegral << Base.okLastInsertID)
+            |> handleMySqlException
+            |> Platform.doAnything (doAnything conn)
+            |> Stack.withFrozenCallStack traceQuery conn query
+
+traceQuery :: Stack.HasCallStack => Connection -> Query.Query q -> Task e a -> Task e a
+traceQuery conn query task =
+  let infoForContext = Query.mkInfo query (logContext conn)
+   in Stack.withFrozenCallStack
+        Platform.tracingSpan
+        "MySQL Query"
+        (Platform.finally task (Platform.setTracingSpanDetails infoForContext))
 
 toBaseQuery :: Query.Query row -> Base.Query
 toBaseQuery query =
