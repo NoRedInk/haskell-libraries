@@ -58,9 +58,23 @@ handler timer settings =
     (\_ -> Prelude.pure ())
 
 reportWebTransaction :: Handler -> Platform.TracingSpan -> Monitoring.RequestDetails -> Prelude.IO ()
-reportWebTransaction (Handler timer app) span details =
+reportWebTransaction (Handler timer app) span details = do
+  let endpoint =
+        -- We're always going to get some requests to routes that don't exist.
+        -- Users might mystype a URL, or hackers might try to find admin login
+        -- endpoints. If we report these paths to NewRelic directly it's going
+        -- to create a new entry in the list of transactions for each
+        -- non-existing path anyone in the world thinks of request of our
+        -- services. Those quickly add up.
+        --
+        -- So instead we group all these requests for unknown routes together.
+        case (Monitoring.knownRoute details, Monitoring.responseStatus details) of
+          -- Some unknown routes are from middlewares. That's why we also check
+          -- for a 404 response code.
+          (Monitoring.UnknownRoute, 404) -> "404"
+          _ -> Monitoring.endpoint details
   Exception.bracketWithError
-    (startWebTransaction app (Monitoring.endpoint details))
+    (startWebTransaction app endpoint)
     ( \maybeException tx -> do
         -- If we encountered any sort of failure ignore the transaction. We
         -- don't know which bits of the transaction we managed to apply
