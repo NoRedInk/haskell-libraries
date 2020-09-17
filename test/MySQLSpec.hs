@@ -13,7 +13,6 @@ import qualified Expect.Task
 import qualified Log
 import qualified MySQL
 import MySQL.Query (Query (..))
-import qualified MySQL.Query as Query
 import qualified Task
 import Test (Test, describe, test)
 import qualified Test
@@ -118,7 +117,6 @@ mockQuery sqlString =
   Query
     { preparedStatement = sqlString,
       params = Log.mkSecret [],
-      prepareQuery = Query.DontPrepare, -- See comment on Query.shouldPrepare
       quasiQuotedString = "",
       sqlOperation = "",
       queriedRelation = ""

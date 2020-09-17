@@ -7,7 +7,6 @@
 module MySQL.Query
   ( sql,
     Query (..),
-    PrepareQuery (..),
     Info (..),
     ConnectionInfo (..),
     mkInfo,
@@ -53,10 +52,6 @@ data Query row
         preparedStatement :: Text,
         -- | The parameters that fill the placeholders in this query
         params :: Log.Secret [Base.MySQLValue],
-        -- | Whether to prepare this query or not. Prepared queries have
-        -- better performance, but not all queries can be prepared and for some
-        -- that have dynamic parts it would be inefficient.
-        prepareQuery :: PrepareQuery,
         -- | The query string as extracted from an `sql` quasi quote.
         quasiQuotedString :: Text,
         -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
@@ -67,10 +62,6 @@ data Query row
   deriving (Eq, Show, Generic)
 
 instance Aeson.ToJSON (Query row)
-
-data PrepareQuery = Prepare | DontPrepare deriving (Eq, Show, Generic)
-
-instance Aeson.ToJSON PrepareQuery
 
 qqSQL :: Prelude.String -> TH.ExpQ
 qqSQL queryWithPgTypedFlags = do
@@ -103,7 +94,6 @@ qqSQL queryWithPgTypedFlags = do
      in Query
           { preparedStatement = generatePreparedStatement tokens,
             params = collectQueryParams tokens,
-            prepareQuery = shouldPrepare tokens,
             quasiQuotedString = queryWithPgTypedFlags,
             sqlOperation = op,
             queriedRelation = Data.Text.pack rel
@@ -187,14 +177,6 @@ collectQueryParams tokens =
       )
     |> map List.concat
 
--- | NOTE:
--- We've had issues in production where we exceeded `max_prepared_stmt_count`.
--- We are now disabling preparing queries until we figure out how to
--- reproduce and fix this issue locally.
--- Once it's fixed can revert this commit.
-shouldPrepare :: [SqlToken] -> PrepareQuery
-shouldPrepare _tokens = DontPrepare
-
 tokenE :: Prelude.String -> TH.ExpQ
 tokenE str = [e|SqlToken str|]
 
@@ -244,8 +226,6 @@ data Info
         infoQuery :: Text,
         -- | The quasi-quoted string of the query we're executing.
         infoQueryTemplate :: Text,
-        -- | Whether we execute this query as a prepared statement.
-        infoRanAsPreparedStatement :: Bool,
         -- | Our best guess of the SQL operation we're performing (SELECT /
         -- DELETE / ...).
         infoSqlOperation :: Text,
@@ -275,7 +255,6 @@ mkInfo query conn =
   Info
     { infoQuery = preparedStatement query,
       infoQueryTemplate = quasiQuotedString query,
-      infoRanAsPreparedStatement = prepareQuery query == Prepare,
       infoSqlOperation = sqlOperation query,
       infoQueriedRelation = queriedRelation query,
       infoConnection = conn

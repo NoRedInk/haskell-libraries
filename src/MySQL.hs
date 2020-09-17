@@ -71,8 +71,6 @@ import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
 import qualified Data.Acquire
 import qualified Data.ByteString.Lazy
-import qualified Data.Hashable as Hashable
-import qualified Data.IORef as IORef
 import qualified Data.Int
 import qualified Data.Pool
 import qualified Data.Proxy as Proxy
@@ -83,7 +81,6 @@ import qualified Database.MySQL.Connection
 import qualified Database.MySQL.Protocol.Packet
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Debug
-import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Internal.CaselessRegex as CaselessRegex
@@ -127,12 +124,10 @@ data Connection
         -- with the memory they use because they won't get cleaned up after
         -- every request. That's why we're using a hash of the query as the key
         -- in the dictionary below instead of the query itself.
-        singleOrPool :: SingleOrPool (Base.MySQLConn, PreparedQueries),
+        singleOrPool :: SingleOrPool Base.MySQLConn,
         logContext :: Query.ConnectionInfo,
         timeout :: Time.Interval
       }
-
-type PreparedQueries = IORef.IORef (Dict.Dict PreparedQueryHash Base.StmtID)
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -146,9 +141,6 @@ data SingleOrPool c
     --   we need to insure several SQL statements happen on the same connection.
     Single TransactionCount c
 
-newtype PreparedQueryHash = PreparedQueryHash Prelude.Int
-  deriving (Eq, Ord)
-
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
   Data.Acquire.mkAcquire acquire release
@@ -158,12 +150,8 @@ connection settings =
       pool <-
         map Pool
           <| Data.Pool.createPool
-            ( do
-                conn <- Base.connect database
-                preparedQueries <- IORef.newIORef Dict.empty
-                Prelude.pure (conn, preparedQueries)
-            )
-            (Tuple.first >> Base.close)
+            (Base.connect database)
+            Base.close
             stripes
             maxIdleTime
             size
@@ -177,7 +165,7 @@ connection settings =
     release Connection {singleOrPool} =
       case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
-        Single _ (c, _) -> Base.close c
+        Single _ c -> Base.close c
     stripes =
       Settings.mysqlPool settings
         |> Settings.mysqlPoolStripes
@@ -258,7 +246,6 @@ queryFromText text =
   Query.Query
     { Query.preparedStatement = text,
       Query.params = Log.mkSecret [],
-      Query.prepareQuery = Query.DontPrepare,
       Query.quasiQuotedString = text,
       Query.sqlOperation = text,
       Query.queriedRelation = ""
@@ -303,31 +290,19 @@ executeQuery ::
   Query.Query row ->
   Task Error.Error [row]
 executeQuery conn query =
-  withConnection conn <| \(backend, preparedQueries) ->
+  withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
         toRows stream =
           stream
             |> Streams.map (FromRow.fromRow (Proxy.Proxy :: Proxy.Proxy (FromRow.CountColumns row)))
             |> andThen Streams.toList
-     in withTimeout conn
-          <| case Query.prepareQuery query of
-            Query.Prepare -> do
-              stmtId <-
-                getPreparedQueryStmtID preparedQueries backend query
-                  |> handleMySqlException
-                  |> Platform.doAnything (doAnything conn)
-              Base.queryStmt backend stmtId params
-                |> andThen (toRows << Tuple.second)
-                |> handleMySqlException
-                |> Platform.doAnything (doAnything conn)
-                |> Stack.withFrozenCallStack traceQuery conn query
-            Query.DontPrepare -> do
-              let encodedQuery = toBaseQuery query
-              Base.query backend encodedQuery params
-                |> andThen (toRows << Tuple.second)
-                |> handleMySqlException
-                |> Platform.doAnything (doAnything conn)
-                |> Stack.withFrozenCallStack traceQuery conn query
+        encodedQuery = toBaseQuery query
+     in Base.query backend encodedQuery params
+          |> andThen (toRows << Tuple.second)
+          |> handleMySqlException
+          |> Platform.doAnything (doAnything conn)
+          |> Stack.withFrozenCallStack traceQuery conn query
+          |> withTimeout conn
 
 executeCommand_ :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error ()
 executeCommand_ conn query = do
@@ -336,27 +311,15 @@ executeCommand_ conn query = do
 
 executeCommand :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error Int
 executeCommand conn query =
-  withConnection conn <| \(backend, preparedQueries) -> do
+  withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
-    withTimeout conn
-      <| case Query.prepareQuery query of
-        Query.Prepare -> do
-          stmtId <-
-            getPreparedQueryStmtID preparedQueries backend query
-              |> handleMySqlException
-              |> Platform.doAnything (doAnything conn)
-          Base.executeStmt backend stmtId params
-            |> map (Prelude.fromIntegral << Base.okLastInsertID)
-            |> handleMySqlException
-            |> Platform.doAnything (doAnything conn)
-            |> Stack.withFrozenCallStack traceQuery conn query
-        Query.DontPrepare -> do
-          let encodedQuery = toBaseQuery query
-          Base.execute backend encodedQuery params
-            |> map (Prelude.fromIntegral << Base.okLastInsertID)
-            |> handleMySqlException
-            |> Platform.doAnything (doAnything conn)
-            |> Stack.withFrozenCallStack traceQuery conn query
+        encodedQuery = toBaseQuery query
+     in Base.execute backend encodedQuery params
+          |> map (Prelude.fromIntegral << Base.okLastInsertID)
+          |> handleMySqlException
+          |> Platform.doAnything (doAnything conn)
+          |> Stack.withFrozenCallStack traceQuery conn query
+          |> withTimeout conn
 
 traceQuery :: Stack.HasCallStack => Connection -> Query.Query q -> Task e a -> Task e a
 traceQuery conn query task =
@@ -372,26 +335,6 @@ toBaseQuery query =
     |> Data.Text.Encoding.encodeUtf8
     |> Data.ByteString.Lazy.fromStrict
     |> Base.Query
-
--- | Get the prepared statement id for a particular query. If such an ID exists
--- MySQL already knows this query and has it parsed in memory. We just have to
--- provide it with the values for the placeholder fields in the query, and
--- MySQL can run it.
-getPreparedQueryStmtID :: PreparedQueries -> Base.MySQLConn -> Query.Query a -> Prelude.IO Base.StmtID
-getPreparedQueryStmtID preparedQueries backend query = do
-  let baseQuery = toBaseQuery query
-  let queryHash = PreparedQueryHash (Hashable.hash (Base.fromQuery baseQuery))
-  alreadyPrepped <- IORef.readIORef preparedQueries
-  case Dict.get queryHash alreadyPrepped of
-    -- We've already prepared this statement before and stored the id.
-    Just stmtId -> Prelude.pure stmtId
-    -- We've not prepared this statement before, so we do so now.
-    Nothing -> do
-      stmtId <- Base.prepareStmt backend baseQuery
-      IORef.atomicModifyIORef'
-        preparedQueries
-        (\dict -> (Dict.insert queryHash stmtId dict, ()))
-      Prelude.pure stmtId
 
 handleMySqlException :: Prelude.IO result -> Prelude.IO (Result Error.Error result)
 handleMySqlException io =
@@ -536,7 +479,7 @@ withTransaction conn func =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Stack.HasCallStack => Connection -> ((Base.MySQLConn, PreparedQueries) -> Task e a) -> Task e a
+withConnection :: Stack.HasCallStack => Connection -> (Base.MySQLConn -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
@@ -591,11 +534,7 @@ unsafeBulkifyInserts :: [Query.Query ()] -> BulkifiedInsert (Query.Query ())
 unsafeBulkifyInserts [] = EmptyInsert
 unsafeBulkifyInserts all@(first : rest) =
   first
-    { Query.prepareQuery =
-        if List.length all > 3 || List.any (\q -> Query.prepareQuery q == Query.DontPrepare) all
-          then Query.DontPrepare
-          else Query.Prepare,
-      Query.preparedStatement =
+    { Query.preparedStatement =
         Data.Text.intercalate
           ","
           ( Query.preparedStatement first
