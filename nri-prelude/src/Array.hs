@@ -1,42 +1,35 @@
 -- | Fast immutable arrays. The elements in an array must have the same type.
---
--- Arrays
--- @docs Array
---
--- Creation
--- @docs empty, initialize, repeat, fromList
---
--- Query
--- @docs isEmpty, length, get
---
--- Manipulate
--- @docs set, push, append, slice
---
--- Lists
--- @docs toList, toIndexedList
---
--- Transform
--- @docs map, indexedMap, foldl, foldr, filter
 module Array
-  ( Array,
+  ( -- * Arrays
+    Array,
+
+    -- * Creation
     empty,
-    isEmpty,
-    length,
     initialize,
     repeat,
     fromList,
+
+    -- * Query
+    isEmpty,
+    length,
     get,
+
+    -- * Manipulate
     set,
     push,
+    append,
+    slice,
+
+    -- * Lists
     toList,
     toIndexedList,
+
+    -- * Transform
+    map,
+    indexedMap,
     foldr,
     foldl,
     filter,
-    map,
-    indexedMap,
-    append,
-    slice,
   )
 where
 
@@ -71,32 +64,32 @@ unwrap (Array v) = v
 
 -- | Return an empty array.
 --
---    length empty == 0
+-- > length empty == 0
 empty :: Array a
 empty =
   Array Data.Vector.empty
 
 -- | Determine if an array is empty.
 --
---    isEmpty empty == True
+-- > isEmpty empty == True
 isEmpty :: Array a -> Bool
 isEmpty = unwrap >> Data.Vector.null
 
 -- | Return the length of an array.
 --
---    length (fromList [1,2,3]) == 3
+-- > length (fromList [1,2,3]) == 3
 length :: Array a -> Int
 length =
   unwrap
     >> Data.Vector.length
     >> Prelude.fromIntegral
 
--- | Initialize an array. `initialize n f` creates an array of length `n` with
--- the element at index `i` initialized to the result of `(f i)`.
+-- | Initialize an array. @initialize n f@ creates an array of length @n@ with
+-- the element at index @i@ initialized to the result of @(f i)@.
 --
---    initialize 4 identity    == fromList [0,1,2,3]
---    initialize 4 (\n -> n*n) == fromList [0,1,4,9]
---    initialize 4 (always 0)  == fromList [0,0,0,0]
+-- > initialize 4 identity    == fromList [0,1,2,3]
+-- > initialize 4 (\n -> n*n) == fromList [0,1,4,9]
+-- > initialize 4 (always 0)  == fromList [0,0,0,0]
 initialize :: Int -> (Int -> a) -> Array a
 initialize n f =
   Array
@@ -106,26 +99,26 @@ initialize n f =
 
 -- | Creates an array with a given length, filled with a default element.
 --
---    repeat 5 0     == fromList [0,0,0,0,0]
---    repeat 3 "cat" == fromList ["cat","cat","cat"]
+-- > repeat 5 0     == fromList [0,0,0,0,0]
+-- > repeat 3 "cat" == fromList ["cat","cat","cat"]
 --
--- Notice that `repeat 3 x` is the same as `initialize 3 (always x)`.
+-- Notice that @repeat 3 x@ is the same as @initialize 3 (always x)@.
 repeat :: Int -> a -> Array a
 repeat n e =
   Array
     <| Data.Vector.replicate (Prelude.fromIntegral n) e
 
--- | Create an array from a `List`.
+-- | Create an array from a 'List'.
 fromList :: List a -> Array a
 fromList =
   Data.Vector.fromList >> Array
 
--- | Return `Just` the element at the index or `Nothing` if the index is out of range.
+-- | Return @Just@ the element at the index or @Nothing@ if the index is out of range.
 --
---    get  0   (fromList [0,1,2]) == Just 0
---    get  2   (fromList [0,1,2]) == Just 2
---    get  5   (fromList [0,1,2]) == Nothing
---    get (-1) (fromList [0,1,2]) == Nothing
+-- > get  0   (fromList [0,1,2]) == Just 0
+-- > get  2   (fromList [0,1,2]) == Just 2
+-- > get  5   (fromList [0,1,2]) == Nothing
+-- > get (-1) (fromList [0,1,2]) == Nothing
 get :: Int -> Array a -> Maybe a
 get i array =
   unwrap array !? Prelude.fromIntegral i
@@ -133,7 +126,8 @@ get i array =
 -- | Set the element at a particular index. Returns an updated array.
 --
 -- If the index is out of range, the array is unaltered.
---    set 1 7 (fromList [1,2,3]) == fromList [1,7,3]
+--
+-- > set 1 7 (fromList [1,2,3]) == fromList [1,7,3]
 set :: Int -> a -> Array a -> Array a
 set i value array = Array result
   where
@@ -145,21 +139,21 @@ set i value array = Array result
 
 -- | Push an element onto the end of an array.
 --
---    push 3 (fromList [1,2]) == fromList [1,2,3]
+-- > push 3 (fromList [1,2]) == fromList [1,2,3]
 push :: a -> Array a -> Array a
 push a (Array vector) =
   Array (Data.Vector.snoc vector a)
 
 -- | Create a list of elements from an array.
 --
---    toList (fromList [3,5,8]) == [3,5,8]
+-- > toList (fromList [3,5,8]) == [3,5,8]
 toList :: Array a -> List a
 toList = unwrap >> Data.Vector.toList
 
 -- | Create an indexed list from an array. Each element of the array will be
 -- paired with its index.
 --
---   toIndexedList (fromList ["cat","dog"]) == [(0,"cat"), (1,"dog")]
+-- > toIndexedList (fromList ["cat","dog"]) == [(0,"cat"), (1,"dog")]
 toIndexedList :: Array a -> List (Int, a)
 toIndexedList =
   unwrap
@@ -167,63 +161,63 @@ toIndexedList =
     >> Data.Vector.toList
     >> List.map (Tuple.mapFirst Prelude.fromIntegral)
 
--- | Reduce an array from the right. Read `foldr` as fold from the right.
+-- | Reduce an array from the right. Read @foldr@ as fold from the right.
 --
---    foldr (+) 0 (repeat 3 5) == 15
+-- > foldr (+) 0 (repeat 3 5) == 15
 foldr :: (a -> b -> b) -> b -> Array a -> b
 foldr f value array = Prelude.foldr f value (unwrap array)
 
--- | Reduce an array from the left. Read `foldl` as fold from the left.
+-- | Reduce an array from the left. Read @foldl@ as fold from the left.
 --
---    foldl (:) [] (fromList [1,2,3]) == [3,2,1]
+-- > foldl (:) [] (fromList [1,2,3]) == [3,2,1]
 foldl :: (a -> b -> b) -> b -> Array a -> b
 foldl f value array =
   Data.Foldable.foldl' (\a b -> f b a) value (unwrap array)
 
 -- | Keep elements that pass the test.
 --
---    filter isEven (fromList [1,2,3,4,5,6]) == (fromList [2,4,6])
+-- > filter isEven (fromList [1,2,3,4,5,6]) == (fromList [2,4,6])
 filter :: (a -> Bool) -> Array a -> Array a
 filter f (Array vector) =
   Array (Data.Vector.filter f vector)
 
 -- | Apply a function on every element in an array.
 --
---    map sqrt (fromList [1,4,9]) == fromList [1,2,3]
+-- > map sqrt (fromList [1,4,9]) == fromList [1,2,3]
 map :: (a -> b) -> Array a -> Array b
 map f (Array vector) =
   Array (Data.Vector.map f vector)
 
 -- | Apply a function on every element with its index as first argument.
 --
---    indexedMap (*) (fromList [5,5,5]) == fromList [0,5,10]
+-- > indexedMap (*) (fromList [5,5,5]) == fromList [0,5,10]
 indexedMap :: (Int -> a -> b) -> Array a -> Array b
 indexedMap f (Array vector) =
   Array (Data.Vector.imap (Prelude.fromIntegral >> f) vector)
 
 -- | Append two arrays to a new one.
 --
---    append (repeat 2 42) (repeat 3 81) == fromList [42,42,81,81,81]
+-- > append (repeat 2 42) (repeat 3 81) == fromList [42,42,81,81,81]
 append :: Array a -> Array a -> Array a
 append (Array first) (Array second) =
   Array (first ++ second)
 
--- | Get a sub-section of an array: `(slice start end array)`. The `start` is a
--- zero-based index where we will start our slice. The `end` is a zero-based index
+-- | Get a sub-section of an array: @(slice start end array)@. The @start@ is a
+-- zero-based index where we will start our slice. The @end@ is a zero-based index
 -- that indicates the end of the slice. The slice extracts up to but not including
--- `end`.
+-- @end@.
 --
---    slice  0  3 (fromList [0,1,2,3,4]) == fromList [0,1,2]
---    slice  1  4 (fromList [0,1,2,3,4]) == fromList [1,2,3]
+-- > slice  0  3 (fromList [0,1,2,3,4]) == fromList [0,1,2]
+-- > slice  1  4 (fromList [0,1,2,3,4]) == fromList [1,2,3]
 --
--- Both the `start` and `end` indexes can be negative, indicating an offset from
+-- Both the @start@ and @end@ indexes can be negative, indicating an offset from
 -- the end of the array.
 --
---    slice  1    (-1) (fromList [0,1,2,3,4]) == fromList [1,2,3]
---    slice  (-2) 5    (fromList [0,1,2,3,4]) == fromList [3,4]
+-- > slice  1    (-1) (fromList [0,1,2,3,4]) == fromList [1,2,3]
+-- > slice  (-2) 5    (fromList [0,1,2,3,4]) == fromList [3,4]
 --
--- This makes it pretty easy to `pop` the last element off of an array:
--- `slice 0 -1 array`
+-- This makes it pretty easy to @pop@ the last element off of an array:
+-- @slice 0 -1 array@
 slice :: Int -> Int -> Array a -> Array a
 slice from to (Array vector)
   | sliceLen <= 0 = empty
