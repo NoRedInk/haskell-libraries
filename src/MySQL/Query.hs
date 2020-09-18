@@ -59,9 +59,7 @@ data Query row
         -- | The main table/view/.. queried.
         queriedRelation :: Text
       }
-  deriving (Eq, Show, Generic)
-
-instance Aeson.ToJSON (Query row)
+  deriving (Eq, Show)
 
 qqSQL :: Prelude.String -> TH.ExpQ
 qqSQL queryWithPgTypedFlags = do

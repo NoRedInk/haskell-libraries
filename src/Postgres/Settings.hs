@@ -60,7 +60,7 @@ data Settings
         pgPool :: PoolSettings,
         pgQueryTimeout :: Time.Interval
       }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 defaultSettings :: Settings
 defaultSettings = Settings
@@ -91,7 +91,7 @@ data ConnectionSettings
         pgPassword :: PgPassword,
         pgPort :: PgPort
       }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 data PoolSettings
   = PoolSettings
@@ -99,7 +99,7 @@ data PoolSettings
         pgPoolMaxIdleTime :: PgPoolMaxIdleTime,
         pgPoolStripes :: PgPoolStripes
       }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 decoder :: Environment.Decoder Settings
 decoder =
@@ -126,7 +126,7 @@ poolDecoder =
 
 newtype PgPort
   = PgPort {unPgPort :: Int}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgPortDecoder :: Environment.Decoder PgPort
 pgPortDecoder =
@@ -141,7 +141,7 @@ pgPortDecoder =
 
 newtype PgPassword
   = PgPassword {unPgPassword :: Log.Secret Text}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgPasswordDecoder :: Environment.Decoder PgPassword
 pgPasswordDecoder =
@@ -156,7 +156,7 @@ pgPasswordDecoder =
 
 newtype PgHost
   = PgHost {unPgHost :: Text}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgHostDecoder :: Environment.Decoder PgHost
 pgHostDecoder =
@@ -171,7 +171,7 @@ pgHostDecoder =
 
 newtype PgUser
   = PgUser {unPgUser :: Text}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgUserDecoder :: Environment.Decoder PgUser
 pgUserDecoder =
@@ -186,7 +186,7 @@ pgUserDecoder =
 
 newtype PgDatabase
   = PgDatabase {unPgDatabase :: Text}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgDatabaseDecoder :: Environment.Decoder PgDatabase
 pgDatabaseDecoder =
@@ -201,7 +201,7 @@ pgDatabaseDecoder =
 
 newtype PgPoolStripes
   = PgPoolStripes {unPgPoolStripes :: Int}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgPoolStripesDecoder :: Environment.Decoder PgPoolStripes
 pgPoolStripesDecoder =
@@ -216,7 +216,7 @@ pgPoolStripesDecoder =
 
 newtype PgPoolMaxIdleTime
   = PgPoolMaxIdleTime {unPgPoolMaxIdleTime :: Data.Time.NominalDiffTime}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgPoolMaxIdleTimeDecoder :: Environment.Decoder PgPoolMaxIdleTime
 pgPoolMaxIdleTimeDecoder =
@@ -237,7 +237,7 @@ fromNominalDiffTime = Prelude.round
 
 newtype PgPoolSize
   = PgPoolSize {unPgPoolSize :: Int}
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 pgPoolSizeDecoder :: Environment.Decoder PgPoolSize
 pgPoolSizeDecoder =
