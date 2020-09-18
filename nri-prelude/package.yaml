@@ -2,7 +2,7 @@ name: nri-prelude
 synopsis: A Prelude inspired by the Elm programming language
 author: NoRedInk
 version: '0.1.0.0'
-maintainer: eng@noredink.com
+maintainer: haskell-open-source@noredink.com
 copyright: 2020 NoRedInk Corp.
 license-file: LICENSE
 extra-source-files:
