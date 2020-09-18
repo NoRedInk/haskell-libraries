@@ -18,9 +18,12 @@ cabal test nri-prelude            # run the tests
 hpack nri-prelude                 # generate nri-prelude.cabal from package.yaml
 ghcid -c "cabal repl nri-prelude" # start a code watcher
 ormolu -m inplace <file>          # Format a source file
+cabal haddock nri-prelude         # Run documentation generation
 ```
 
 We use [Ormolu][ormolu] for code formatting.
+
+Documentation comments use the [Haddock][haddock] format to ensure they are rendered correctly on package websites.
 
 ### Tips for adding dependencies
 
@@ -55,3 +58,4 @@ To keep things simple for those familiar with semantic versioning this repositor
 [pvp]: https://pvp.haskell.org/faq/
 [stackage]: https://www.stackage.org/
 [ormolu]: https://github.com/tweag/ormolu
+[haddock]: https://haskell-haddock.readthedocs.io
