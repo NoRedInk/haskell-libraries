@@ -34,12 +34,27 @@ import qualified Prelude
 -- TASK
 --
 
+-- | Here are some common tasks:
+
+-- - @now : Task x Posix@
+-- - @query : String -> Task Error ()@
+-- - @sleep : Float -> Task x ()@
+--
+-- In each case we have a Task that will resolve successfully with an a value
+-- or unsuccessfully with an x value. So Postgres.query may fail with an Error
+-- if the query is invalid. Whereas Time.now never fails so I cannot be more
+-- specific than x. No such value will ever exist! Instead it always succeeds
+-- with the current POSIX time.
+--
+-- More generally a task is a /description/ of what you need to do. Like a todo
+-- list. Or like a grocery list. Or like GitHub issues. So saying "the task is
+-- to tell me the current POSIX time" does not complete the task! You need
+-- 'perform' tasks or 'attempt' tasks.
 newtype Task x a
-  = Task {_run :: Handler -> IO (Result x a)}
+  = Task {_run :: LogHandler -> IO (Result x a)}
   deriving (Functor)
 
 instance Applicative (Task a) where
-
   pure a =
     Task (\_ -> Prelude.pure (Ok a))
 
@@ -73,7 +88,7 @@ instance Monad (Task a) where
 -- SPAN
 --
 
--- | A `TracingSpan` contains debugging information related to a section of the
+-- | A @TracingSpan@ contains debugging information related to a section of the
 -- program. TracingSpans can be nested inside other tracingSpans to form a
 -- tree, each tracingSpan representing part of the execution of the program.
 -- This format is a typical way to store tracing data. Check out this section
@@ -113,7 +128,7 @@ data TracingSpan
         started :: MonotonicTime,
         -- | The time this tracingSpan finished.
         finished :: MonotonicTime,
-        -- | The source code location of this tracingSpan. The first `Text` is
+        -- | The source code location of this tracingSpan. The first @Text@ is
         -- the name of the function getting called.
         frame :: Maybe (Text, Stack.SrcLoc),
         -- | Unique information for this tracingSpan.
@@ -131,13 +146,13 @@ data TracingSpan
       }
   deriving (Prelude.Show)
 
--- | The `Succeeded` type is used to indicate whether or not a particular
--- `TracingSpan` ran without encountering user-facing problems.
+-- | The @Succeeded@ type is used to indicate whether or not a particular
+-- @TracingSpan@ ran without encountering user-facing problems.
 data Succeeded
   = -- | A tracingSpan that didn't fail with an unexpected exception, or was
     -- explicitly marked as failed by the user.
     --
-    -- When a tracingSpan returns a failed task we do not count that as `Failed`
+    -- When a tracingSpan returns a failed task we do not count that as @Failed@
     -- here, because a failed task might be part of normal program
     -- operation. We wouldn't want to log those kinds of failures as errors.
     Succeeded
@@ -150,8 +165,8 @@ data Succeeded
   deriving (Prelude.Show)
 
 -- | If the first bit of code succeeded and the second failed, the combination
--- of the two has failed as well. The `SemiGroup` and `Monoid` type instances
--- for `Succeeded` allow us to combine `Succeeded` values in such a fashion.
+-- of the two has failed as well. The @SemiGroup@ and @Monoid@ type instances
+-- for @Succeeded@ allow us to combine @Succeeded@ values in such a fashion.
 --
 -- The rule expressed here is that the Succeeded value of a combination of
 -- computations if the same as the worst thing that happened to any of the
@@ -178,7 +193,7 @@ instance Prelude.Monoid Succeeded where
 -- the SQL of the query, and a tracingSpan for an HTTP request the URL the
 -- request is addressed to.
 --
--- We could define a single `SomeTracingSpanDetails` type that can represent all
+-- We could define a single @SomeTracingSpanDetails@ type that can represent all
 -- of these different types of details. One way would be to write a union:
 --
 --     data SomeTracingSpanDetails
@@ -188,7 +203,7 @@ instance Prelude.Monoid Succeeded where
 --
 -- The disadvantage of this is that nri-prelude will have to know about every
 -- possible type of tracingSpan. If a library wanted to log new information it
--- would have to change `nri-prelude` first to support this. That's a barrier to
+-- would have to change @nri-prelude@ first to support this. That's a barrier to
 -- adding useful logging information we'd prefer not to have.
 --
 -- Another approach is to have the details field take arbitrary JSON:
@@ -206,24 +221,22 @@ instance Prelude.Monoid Succeeded where
 -- We'd like to both let libraries define custom detail types _and_ be able to
 -- read specific fields from those types in loggers that present certain bits of
 -- information in nice ways. To do that we allow a bit of type magic here.
--- Analogous to Haskell's `SomeException` type and `Exception` type class, we
--- define a `SomeTracingSpanDetails` type and `TracingSpanDetails` type class.
+-- Analogous to Haskell's @SomeException@ type and @Exception@ type class, we
+-- define a @SomeTracingSpanDetails@ type and @TracingSpanDetails@ type class.
 --
 -- The SomeTracingSpanDetails type can wrap any custom type, as long as it has
--- `TracingSpanDetails` instance. The `TracingSpanDetails` instance allows us
+-- @TracingSpanDetails@ instance. The @TracingSpanDetails@ instance allows us
 -- to recover the original details type if we want to treat it special in a
 -- custom logger.
 data SomeTracingSpanDetails where
   SomeTracingSpanDetails :: (TracingSpanDetails a) => a -> SomeTracingSpanDetails
 
 instance Aeson.ToJSON SomeTracingSpanDetails where
-
   toJSON (SomeTracingSpanDetails details) = Aeson.toJSON details
 
   toEncoding (SomeTracingSpanDetails details) = Aeson.toEncoding details
 
 instance TracingSpanDetails SomeTracingSpanDetails where
-
   toTracingSpanDetails details = details
 
   fromTracingSpanDetails = Just
@@ -234,32 +247,54 @@ instance Prelude.Show SomeTracingSpanDetails where
       |> Prelude.show
 
 -- | Every type we want to use as tracingSpan metadata needs a
--- `TracingSpanDetails` instance.  The `TracingSpanDetails` class fulfills
+-- @TracingSpanDetails@ instance.  The @TracingSpanDetails@ class fulfills
 -- these roles:
 --
 -- - It allows for conversion between the custom details type and the
---   `SomeTracingSpanDetails` type stored in a `TracingSpan`.
--- - It requires the custom details type to also have a `ToJSON` instance.
+--   @SomeTracingSpanDetails@ type stored in a @TracingSpan@.
+-- - It requires the custom details type to also have a @ToJSON@ instance.
 --
--- This gives a logger two options for rendering a `SomeTracingSpanDetails`
+-- This gives a logger two options for rendering a @SomeTracingSpanDetails@
 -- value into a format understood by a monitoring tool:
 --
--- - It can try `fromTracingSpanDetails` to try to recover one of the custom
+-- - It can try @fromTracingSpanDetails@ to try to recover one of the custom
 --   tracingSpan details types it has implemented custom rendering logic for.
 -- - If this particular tracingSpan details type is unknown to this particular
 --   logger, it can obtain always obtain a generic JSON blob of the information
 --   instead.
 class (Typeable.Typeable e, Aeson.ToJSON e) => TracingSpanDetails e where
-
   toTracingSpanDetails :: e -> SomeTracingSpanDetails
   toTracingSpanDetails = SomeTracingSpanDetails
 
   fromTracingSpanDetails :: SomeTracingSpanDetails -> Maybe e
   fromTracingSpanDetails (SomeTracingSpanDetails d) = Typeable.cast d
 
+-- | A helper type used for @renderTracingSpanDetails@. Used to wrap rendering
+-- functions so they have the same type and can be put in a list together.
 data Renderer a where
   Renderer :: TracingSpanDetails s => (s -> a) -> Renderer a
 
+-- | In reporting logic we'd like to case on the different types a
+-- 'SomeTracingSpanDetails' can contain and write logic for each one. This
+-- helper allows us to do so.
+--
+-- > newtype ImportantFact = ImportantFact Text
+-- > instance ToJSON ImportantFact
+-- > instance SpanDetails ImportantFact
+-- >
+-- > newtype KeyStatistic = KeyStatistic Int
+-- > instance ToJSON KeyStatistic
+-- > instance SpanDetails KeyStatistic
+-- >
+-- > toTracingSpanDetails (ImportantFact "Koala's are adorable")
+-- >   |> renderTracingSpanDetails
+-- >        [ Renderer (\ImportantFact fact -> fact)
+-- >        , Renderer (\KeyStatistic stat -> Text.fromInt stat)
+-- >        ]
+-- >   |> Maybe.withDefault (\details -> show (Data.Aeson.encode details))
+--
+-- Remember that @SomeTracingSpanDetails@ are always JSON-serializable, so you
+-- can use that if you need to render a span of a type you didn't prepare for.
 renderTracingSpanDetails :: [Renderer a] -> SomeTracingSpanDetails -> Maybe a
 renderTracingSpanDetails rs s =
   case rs of
@@ -270,9 +305,12 @@ renderTracingSpanDetails rs s =
 -- HANDLER
 --
 
--- | A handler records debugging information related to a particular request.
--- It gets passed around the application in our task type so all our libraries
--- can add debugging information to it.
+-- | Our @Task@ type secretly passed a value of this type throughout our
+-- application. Anywhere in our application we can add context to the log
+-- handler. For example we might wrap our database queries in a tracingSpan
+-- called "query" and add some bits of context, such as the SQL operation the
+-- query is performing. These bits of metadata will then be used as much as
+-- possible in logging messages, tracing, and error reporting.
 --
 -- Note that we do not report recorded information anywhere (log it to file, or
 -- to an observability platform), until we completely finish a request. This
@@ -281,8 +319,8 @@ renderTracingSpanDetails rs s =
 -- without loosing important signal. We'll only know whether a request succeeds
 -- after it completes though, so we have to hold off on any reporting for a
 -- request until it's done.
-data Handler
-  = Handler
+data LogHandler
+  = LogHandler
       { -- | We're making the assumption that every task we run is ran because
         -- of some sort of request, and that this request has a unique
         -- identifier.  We take this identifier from the incoming request and
@@ -294,7 +332,7 @@ data Handler
         -- debugging information using a handler we'll know which tracingSpan
         -- the information belongs to. This function creates a new handler for
         -- a child tracingSpan of the current handler.
-        startChildTracingSpan :: Stack.HasCallStack => Text -> IO Handler,
+        startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
         -- | There's common fields all tracingSpans have such as a name and
         -- start and finish times. On top of that each tracingSpan can define a
         -- custom type containing useful custom data. This function allows us
@@ -309,52 +347,53 @@ data Handler
         -- reporting on.
         markTracingSpanFailedIO :: IO (),
         -- | Mark the current tracingSpan as finished, which will set the
-        -- `finished` timestamp. What this function does depends on the
+        -- @finished@ timestamp. What this function does depends on the
         -- tracingSpan. Once we're done collecting data for the root
-        -- tracingSpan we'll want to pass the tracingSpan 'out', to some code
+        -- tracingSpan we'll want to pass the tracingSpan "out", to some code
         -- that will report the debugging data to whatever observability
         -- platform(s) are used. Once we're done collecting data for child
-        -- tracingSpans we'll want to add the 'completed' child tracingSpan to
+        -- tracingSpans we'll want to add the "completed" child tracingSpan to
         -- its parent.
         finishTracingSpan :: Maybe Exception.SomeException -> IO ()
       }
 
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
--- library the `rootTracingSpanIO` is the more user-friendly way to get hands
--- on a `Handler`.
+-- library the @rootTracingSpanIO@ is the more user-friendly way to get hands
+-- on a @LogHandler@.
 mkHandler ::
   Stack.HasCallStack =>
   Text ->
   Clock ->
   (TracingSpan -> IO ()) ->
   Text ->
-  IO Handler
+  IO LogHandler
 mkHandler requestId clock onFinish name' = do
   tracingSpanRef <-
     Stack.withFrozenCallStack startTracingSpan clock name'
       |> andThen IORef.newIORef
-  pure Handler
-    { requestId,
-      startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef),
-      setTracingSpanDetailsIO = \details' ->
-        updateIORef
-          tracingSpanRef
-          (\tracingSpan' -> tracingSpan' {details = Just (toTracingSpanDetails details')}),
-      markTracingSpanFailedIO =
-        updateIORef
-          tracingSpanRef
-          (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed}),
-      finishTracingSpan = finalizeTracingSpan clock tracingSpanRef >> andThen onFinish
-    }
+  pure
+    LogHandler
+      { requestId,
+        startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef),
+        setTracingSpanDetailsIO = \details' ->
+          updateIORef
+            tracingSpanRef
+            (\tracingSpan' -> tracingSpan' {details = Just (toTracingSpanDetails details')}),
+        markTracingSpanFailedIO =
+          updateIORef
+            tracingSpanRef
+            (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed}),
+        finishTracingSpan = finalizeTracingSpan clock tracingSpanRef >> andThen onFinish
+      }
 
--- | Set the details for a tracingSpan created using the `tracingSpan`
--- function. Like `tracingSpan` this is intended for use in writing libraries
+-- | Set the details for a tracingSpan created using the @tracingSpan@
+-- function. Like @tracingSpan@ this is intended for use in writing libraries
 -- that define custom types of effects, such as database queries or http
 -- requests.
 --
--- It's often a good idea to use this together with `Platform.finally` or
--- `Platform.bracketWithError`, to ensure we record tracingSpan details even in
+-- It's often a good idea to use this together with @Platform.finally@ or
+-- @Platform.bracketWithError@, to ensure we record tracingSpan details even in
 -- the event of an exception cutting the execution of our tracingSpan short.
 --
 --     tracingSpan "holiday" do
@@ -375,8 +414,8 @@ setTracingSpanDetails details =
           |> map Ok
     )
 
--- | Mark a tracingSpan created with the `tracingSpan` function as failed. Like
--- `tracingSpan` this is intended for use in writing libraries that define
+-- | Mark a tracingSpan created with the @tracingSpan@ function as failed. Like
+-- @tracingSpan@ this is intended for use in writing libraries that define
 -- custom types of effects, such as database queries or http requests.
 --
 --     tracingSpan "plane spotting" do
@@ -390,45 +429,46 @@ markTracingSpanFailed :: Task e ()
 markTracingSpanFailed =
   Task (map Ok << markTracingSpanFailedIO)
 
--- | Create an initial `TracingSpan` with some initial values.
+-- | Create an initial @TracingSpan@ with some initial values.
 startTracingSpan :: Stack.HasCallStack => Clock -> Text -> IO TracingSpan
 startTracingSpan clock name = do
   started <- monotonicTimeInMsec clock
-  pure TracingSpan
-    { name,
-      started,
-      finished = started,
-      frame =
-        -- This records a single stack frame containing the location in source
-        -- code that creates this tracingSpan. It wouldn't be that useful if
-        -- this single stack frame referenced the line in this source file
-        -- where the `startTracingSpan` function itself gets called, that would
-        -- be the same line for every tracingSpan! Instead we'd like the source
-        -- location recorded here to be the line outside this library calling
-        -- into it. For example: the line in the application doing a database
-        -- query, or logging some information.
-        --
-        -- That's why you see the `Stack.HasCallStack` constraints and
-        -- `Stack.withFrozenCallStack` calls on this function's callers all the
-        -- way to the boundary of the library. Unfortunately, that's what we
-        -- need to do to push the stack frame we record out of the library.
-        --
-        -- We record only a single stack frame because that's all we get
-        -- anyway, unless we'd start adding `Stack.HasCallStack` constraints to
-        -- functions in our Haskell applications. But because we record a frame
-        -- for each tracingSpan together these frames can create a stack trace
-        -- with a couple of different frames.
-        --
-        -- See the docs of the `GHC.Stack` module for more information on how
-        -- these traces work.
-        Stack.callStack
-          |> Stack.getCallStack
-          |> List.head
-          |> Shortcut.map (Tuple.mapFirst Data.Text.pack),
-      details = Nothing,
-      succeeded = Succeeded,
-      children = []
-    }
+  pure
+    TracingSpan
+      { name,
+        started,
+        finished = started,
+        frame =
+          -- This records a single stack frame containing the location in source
+          -- code that creates this tracingSpan. It wouldn't be that useful if
+          -- this single stack frame referenced the line in this source file
+          -- where the @startTracingSpan@ function itself gets called, that would
+          -- be the same line for every tracingSpan! Instead we'd like the source
+          -- location recorded here to be the line outside this library calling
+          -- into it. For example: the line in the application doing a database
+          -- query, or logging some information.
+          --
+          -- That's why you see the @Stack.HasCallStack@ constraints and
+          -- @Stack.withFrozenCallStack@ calls on this function's callers all the
+          -- way to the boundary of the library. Unfortunately, that's what we
+          -- need to do to push the stack frame we record out of the library.
+          --
+          -- We record only a single stack frame because that's all we get
+          -- anyway, unless we'd start adding @Stack.HasCallStack@ constraints to
+          -- functions in our Haskell applications. But because we record a frame
+          -- for each tracingSpan together these frames can create a stack trace
+          -- with a couple of different frames.
+          --
+          -- See the docs of the @GHC.Stack@ module for more information on how
+          -- these traces work.
+          Stack.callStack
+            |> Stack.getCallStack
+            |> List.head
+            |> Shortcut.map (Tuple.mapFirst Data.Text.pack),
+        details = Nothing,
+        succeeded = Succeeded,
+        children = []
+      }
 
 -- | Some final properties to set on a tracingSpan before calling it done.
 finalizeTracingSpan :: Clock -> IORef.IORef TracingSpan -> Maybe Exception.SomeException -> IO TracingSpan
@@ -486,28 +526,28 @@ tracingSpan name (Task run) =
           run
     )
 
--- | Like `tracingSpan`, but this one runs in `IO` instead of `Task`. We
--- sometimes need this in libraries. `Task` has the concept of a `Handler`
--- built in but `IO` does not, so we'll have to pass it around ourselves.
+-- | Like @tracingSpan@, but this one runs in @IO@ instead of @Task@. We
+-- sometimes need this in libraries. @Task@ has the concept of a @LogHandler@
+-- built in but @IO@ does not, so we'll have to pass it around ourselves.
 --
 --     tracingSpanIO handler "code dance" <| \childHandler -> do
 --       waltzPassLeft childHandler
 --       clockwiseTurn childHandler 60
-tracingSpanIO :: Stack.HasCallStack => Handler -> Text -> (Handler -> IO a) -> IO a
+tracingSpanIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 tracingSpanIO handler name run =
   Exception.bracketWithError
     (Stack.withFrozenCallStack startChildTracingSpan handler name)
     (Prelude.flip finishTracingSpan)
     run
 
--- | Special version of `tracingSpanIO` to call in the root of your application.
+-- | Special version of @tracingSpanIO@ to call in the root of your application.
 -- Instead of taking a parent handler it takes a continuation that will be
 -- called with this root tracingSpan after it has run.
 --
 --     rootTracingSpanIO "request-23" Prelude.print "incoming request" <| \handler ->
 --       handleRequest
 --       |> Task.perform handler
-rootTracingSpanIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Text -> (Handler -> IO a) -> IO a
+rootTracingSpanIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Text -> (LogHandler -> IO a) -> IO a
 rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError
@@ -520,10 +560,10 @@ rootTracingSpanIO requestId onFinish name runIO = do
 --
 
 -- | A clock we can use to get the current time, to check when tracingSpans are
--- starting or ending. We could call `getCurrentTime` or somesuch whenever we
+-- starting or ending. We could call @getCurrentTime@ or somesuch whenever we
 -- need the time but we'd be calling this a lot: every time a tracingSpan
--- starts or finishes. The `Clock` type we pass around here contains cached
--- version of `getCurrentTime`. We can call it as often as we like and it will
+-- starts or finishes. The @Clock@ type we pass around here contains cached
+-- version of @getCurrentTime@. We can call it as often as we like and it will
 -- only get the current time at most once every millisecond.
 newtype Clock = Clock {monotonicTimeInMsec :: IO MonotonicTime}
 
@@ -544,13 +584,18 @@ mkClock =
 -- can cause them to move backards. This might result in us measuring the
 -- duration of an operation and finding it to be minus 200 milliseconds.
 --
--- We use `GHC.Clock.getMonotonicTimeNSec` to let the OS tell us how much time
+-- We use @GHC.Clock.getMonotonicTimeNSec@ to let the OS tell us how much time
 -- has passed since an arbitrary but constant moment in the past. That might
 -- not seem all that useful, but if we 'sync watches' at one moment by getting
--- the monotonic and 'regular' time in the same moment then we'll able to
+-- the monotonic and "regular" time in the same moment then we'll able to
 -- convert any monotonic time to real timestamps. Conversion is not our concern
 -- here though, we just store these monotonic times and let code that reporters
 -- that use these tracingSpans convert the monotonic times into whatever format
 -- they need.
-newtype MonotonicTime = MonotonicTime {inMicroseconds :: GHC.Word.Word64}
+newtype MonotonicTime
+  = MonotonicTime
+      { -- | The number of microseconds that have passed since an arbitrary but
+        -- constant moment in the past.
+        inMicroseconds :: GHC.Word.Word64
+      }
   deriving (Prelude.Show, Prelude.Num, Prelude.Eq, Prelude.Ord)

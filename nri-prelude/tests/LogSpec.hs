@@ -139,31 +139,31 @@ tests =
             |> Text.contains "Mango"
             |> Expect.equal False
             |> Prelude.pure,
-      -- Haskell's default `show` instance prints the shown Haskell value on a
-      -- single line. This isn't great when using `show` to debug larger Haskell
-      -- values. That's why our `Debug.toString` implementation uses the
-      -- `pretty-show` package for rendering a Haskell value as a string, which
-      -- provides the alternative `ppShow` function for printing Haskell values
-      -- with newlines. `ppShow` works for all Haskell types with a `Show`
+      -- Haskell's default @show@ instance prints the shown Haskell value on a
+      -- single line. This isn't great when using @show@ to debug larger Haskell
+      -- values. That's why our @Debug.toString@ implementation uses the
+      -- @pretty-show@ package for rendering a Haskell value as a string, which
+      -- provides the alternative @ppShow@ function for printing Haskell values
+      -- with newlines. @ppShow@ works for all Haskell types with a @Show@
       -- instance.
       --
-      -- `ppShow` works internally by using regular `show`, parsing the
+      -- @ppShow@ works internally by using regular @show@, parsing the
       -- generated string into some type representing an arbitrary Haskell
       -- value, then printing that again in a nicer way. The library relies on
-      -- Haskell's derived `Show` instances looking a particular way. When we
-      -- define a custom `Show` instance for a type we're not bound to the
-      -- conventions Haskell uses for it's automatically generated `Show`
-      -- instances, and `ppShow` might not know how to parse the string we
-      -- produce for a value. Should `ppShow` fail to use its parser it falls
-      -- back to using regular `show` for presenting the value, so without
+      -- Haskell's derived @Show@ instances looking a particular way. When we
+      -- define a custom @Show@ instance for a type we're not bound to the
+      -- conventions Haskell uses for it's automatically generated @Show@
+      -- instances, and @ppShow@ might not know how to parse the string we
+      -- produce for a value. Should @ppShow@ fail to use its parser it falls
+      -- back to using regular @show@ for presenting the value, so without
       -- newlines.
       --
-      -- Generally Haskell recommends you do not write your own `Show`
-      -- instances. We provide one for `Secret` to help us accidentally put
-      -- sensitive values in our logs. This test checks our custom `Secret`
-      -- show instance can be parsed by `ppShow`, ensuring that `Secret` values
-      -- and larger types containing `Secret` values can be pretty printed by
-      -- `Debug.toString`.
+      -- Generally Haskell recommends you do not write your own @Show@
+      -- instances. We provide one for @Secret@ to help us accidentally put
+      -- sensitive values in our logs. This test checks our custom @Secret@
+      -- show instance can be parsed by @ppShow@, ensuring that @Secret@ values
+      -- and larger types containing @Secret@ values can be pretty printed by
+      -- @Debug.toString@.
       test "`Debug.toString` can pretty-print values containing secrets" <| \_ ->
         Log.mkSecret ()
           |> Text.Show.Pretty.reify

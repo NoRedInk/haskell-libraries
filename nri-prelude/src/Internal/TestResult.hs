@@ -12,12 +12,12 @@ module Internal.TestResult
   )
 where
 
-import NriPrelude
 import Control.Exception.Safe (Exception, throwIO)
 import Data.Dynamic (Typeable)
 import qualified Data.Text
 import List (List)
 import qualified List
+import NriPrelude
 import qualified Pretty.Diff as Diff
 import qualified System.Console.Terminal.Size as Terminal
 import qualified Text
@@ -88,6 +88,7 @@ newtype PrettyShow a = PrettyShow a
 instance Show a => Show (PrettyShow a) where
   show (PrettyShow x) = Text.Show.Pretty.ppShow x
 
+-- | Error generated when a test expectation is not met.
 newtype TestFailure = TestFailure Text
   deriving (Typeable, Semigroup, Monoid)
 

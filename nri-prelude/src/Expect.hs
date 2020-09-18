@@ -436,7 +436,7 @@ equalToContentsOf filepath' actual = do
       Internal.Expectation.pass
 
 -- By default we will compare values with each other after they have been
--- passed to `show`. Unfortunately `show` for the `Text` type escapes special
+-- passed to @show@. Unfortunately @show@ for the @Text@ type escapes special
 -- characters, so a string like this:
 --
 --    Hi there,
@@ -448,7 +448,7 @@ equalToContentsOf filepath' actual = do
 --
 -- And then test output looks all garbled.
 --
--- This newtype wrapper for `Text` makes the show instance render it without
+-- This newtype wrapper for @Text@ makes the show instance render it without
 -- escaping any character, resulting in cleaner test output!
 newtype UnescapedShow = UnescapedShow Text deriving (Eq)
 

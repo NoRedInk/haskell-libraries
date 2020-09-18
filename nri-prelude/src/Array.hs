@@ -55,6 +55,9 @@ import qualified Tuple
 import Prelude (otherwise)
 import qualified Prelude
 
+-- | Representation of fast immutable arrays. You can create arrays of integers
+-- (@Array Int@) or strings (@Array String@) or any other type of value you can
+-- dream up.
 newtype Array a = Array (Data.Vector.Vector a)
   deriving (Prelude.Eq, Prelude.Show)
 

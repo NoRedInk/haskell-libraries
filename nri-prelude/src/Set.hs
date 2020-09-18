@@ -1,40 +1,33 @@
 -- | A set of unique values. The values can be any comparable type. This
--- includes `Int`, `Float`, `Time`, `Char`, `String`, and tuples or lists
+-- includes @Int@, @Float@, @Time@, @Char@, @String@, and tuples or lists
 -- of comparable types.
 --
 -- Insert, remove, and query operations all take *O(log n)* time.
---
--- Sets
--- @docs Set
---
--- Build
--- @docs empty, singleton, insert, remove
---
--- Query
--- @docs isEmpty, member, size
---
--- Combine
--- @docs union, intersect, diff
---
--- Lists
--- @docs toList, fromList
---
--- Transform
--- @docs map, foldl, foldr, filter, partition
 module Set
-  ( Set,
+  ( -- * Sets
+    Set,
+
+    -- * Build
     empty,
     singleton,
     insert,
     remove,
+
+    -- * Query
     isEmpty,
     member,
     size,
+
+    -- * Combine
     union,
     intersect,
     diff,
+
+    -- * Lists
     toList,
     fromList,
+
+    -- * Transform
     map,
     foldl,
     foldr,
@@ -48,8 +41,8 @@ import qualified Data.Set
 import List (List)
 import qualified Prelude
 
--- | Represents a set of unique values. So `(Set Int)` is a set of integers and
--- `(Set String)` is a set of strings.
+-- | Represents a set of unique values. So @(Set Int)@ is a set of integers and
+-- @(Set String)@ is a set of strings.
 type Set t =
   Data.Set.Set t
 
@@ -139,17 +132,17 @@ map =
 
 -- | Only keep elements that pass the given test.
 --
---    import Set exposing (Set)
---
---    numbers : Set Int
---    numbers =
---      Set.fromList [-2,-1,0,1,2]
---
---    positives : Set Int
---    positives =
---      Set.filter (\x -> x > 0) numbers
---
---    -- positives == Set.fromList [1,2]
+-- >  import Set exposing (Set)
+-- >
+-- >  numbers : Set Int
+-- >  numbers =
+-- >    Set.fromList [-2,-1,0,1,2]
+-- >
+-- >  positives : Set Int
+-- >  positives =
+-- >    Set.filter (\x -> x > 0) numbers
+-- >
+-- >  -- positives == Set.fromList [1,2]
 filter :: (comparable -> Bool) -> Set comparable -> Set comparable
 filter =
   Data.Set.filter

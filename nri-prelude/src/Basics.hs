@@ -619,7 +619,7 @@ atan2 :: Float -> Float -> Float
 atan2 =
   Prelude.atan2
 
--- Convert Cartesian coordinates (x,y) to polar coordinates (r,&theta;).
+-- | Convert Cartesian coordinates (x,y) to polar coordinates (r,&theta;).
 --
 -- > toPolar (3, 4) == ( 5, 0.9272952180016122)
 -- > toPolar (5,12) == (13, 1.1760052070951352)

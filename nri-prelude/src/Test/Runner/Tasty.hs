@@ -1,6 +1,9 @@
-module Test.Runner.Tasty (main) where
+-- | Run tests.
+module Test.Runner.Tasty
+  ( main,
+  )
+where
 
-import NriPrelude
 import Control.Exception.Safe (throw)
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Text
@@ -8,6 +11,7 @@ import Data.Typeable (Typeable)
 import qualified Internal.Test
 import qualified Internal.TestResult as Result
 import qualified List
+import NriPrelude
 import qualified System.Environment as Env
 import qualified Test
 import qualified Test.Tasty as Tasty
@@ -17,6 +21,7 @@ import qualified Test.Tasty.Runners.Reporter as Reporter
 import qualified Text
 import Prelude (IO, pure, show)
 
+-- | Run tests.
 main :: Test.Test -> IO ()
 main test = do
   -- NOTE: We need to always run AntXML,
@@ -34,7 +39,6 @@ data TestToRun
   deriving (Typeable)
 
 instance Providers.IsTest TestToRun where
-
   testOptions = pure [Options.Option (Proxy :: Proxy FuzzReplay)]
 
   run options (Only (TestToRun testToRun)) _progress = do
@@ -66,7 +70,6 @@ newtype FuzzReplay = FuzzReplay Internal.Test.FuzzReplay
   deriving (Typeable)
 
 instance Options.IsOption FuzzReplay where
-
   defaultValue = FuzzReplay (Internal.Test.FuzzReplay Nothing)
 
   parseValue v = map (FuzzReplay << Internal.Test.FuzzReplay << Just) replay
@@ -88,7 +91,7 @@ setup :: Test.Test -> Providers.TestTree
 setup tests =
   case Internal.Test.hasOnly tests of
     Just sub ->
-      -- only run tests that are wrapped in `only`.
+      -- only run tests that are wrapped in @only@.
       setup_ True sub
     Nothing ->
       setup_ False tests

@@ -1,5 +1,11 @@
+{-# OPTIONS_HADDOCK not-home #-}
+
+-- | These are functions and types that in Elm are in scope by default, without
+-- needing to import anything. In Haskell we refer to such imports as a
+-- "Prelude".
 module NriPrelude
-  ( Platform.Internal.Task,
+  ( -- * Elm Prelude
+    Platform.Internal.Task,
     module Basics,
     module Internal.Shortcut,
     List.List,
@@ -7,7 +13,8 @@ module NriPrelude
     Result.Result (..),
     Text.Text,
     Char.Char,
-    -- The following exports are Non-Elm, but we can't really do without them.
+
+    -- * The following exports are Non-Elm, but we can't really do without them.
     Prelude.Show,
     GHC.Generics.Generic,
 
