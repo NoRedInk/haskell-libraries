@@ -1,5 +1,6 @@
 { pkgs ? import <nixpkgs> { } }:
 
 pkgs.mkShell {
-  buildInputs = [ pkgs.ghc pkgs.cabal-install pkgs.haskellPackages.hpack ];
+  buildInputs =
+    [ pkgs.ghc pkgs.cabal-install pkgs.haskellPackages.hpack pkgs.zlib ];
 }

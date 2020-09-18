@@ -1,0 +1,22 @@
+[ TracingSpan
+    { name = "logging a message!"
+    , started = MonotonicTime { inMicroseconds = 0 }
+    , finished = MonotonicTime { inMicroseconds = 0 }
+    , frame =
+        Just
+          ( "info"
+          , SrcLoc
+              { srcLocPackage = "main"
+              , srcLocModule = "LogSpec"
+              , srcLocFile = "tests/LogSpec.hs"
+              , srcLocStartLine = 28
+              , srcLocStartCol = 16
+              , srcLocEndLine = 28
+              , srcLocEndCol = 74
+              }
+          )
+    , details = Just "{\"a number\":12}"
+    , succeeded = Succeeded
+    , children = []
+    }
+]

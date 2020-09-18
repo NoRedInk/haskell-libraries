@@ -1,0 +1,39 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: d3b21556cd29c9e3961d73008bb68529996b7341b84b15c1dfc3cd22448f23eb
+
+name:           env-parser
+version:        0.1.0.0
+synopsis:       Read environment variables as settings to build 12-factor apps.
+homepage:       https://github.com/NoRedInk/haskell-libraries
+author:         NoRedInk
+maintainer:     eng@noredink.com
+copyright:      2020 NoRedInk Corp.
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    LICENSE
+
+library
+  exposed-modules:
+      Environment
+  other-modules:
+      Paths_env_parser
+  hs-source-dirs:
+      src
+  default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
+  ghc-options: -Werror -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
+  build-depends:
+      base
+    , containers
+    , modern-uri
+    , network-uri
+    , nri-prelude
+    , text
+  default-language: Haskell2010

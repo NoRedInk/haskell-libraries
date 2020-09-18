@@ -1,0 +1,45 @@
+name: env-parser
+synopsis: Read environment variables as settings to build 12-factor apps.
+author: NoRedInk
+version: '0.1.0.0'
+maintainer: eng@noredink.com
+copyright: 2020 NoRedInk Corp.
+homepage: https://github.com/NoRedInk/haskell-libraries
+license-file: LICENSE
+extra-source-files:
+  - README.md
+  - LICENSE
+library:
+  dependencies:
+    - base
+    - nri-prelude
+    - containers
+    - modern-uri
+    - network-uri
+    - text
+  exposed-modules:
+    - Environment
+  source-dirs: src
+default-extensions:
+- DataKinds
+- DeriveGeneric
+- FlexibleContexts
+- FlexibleInstances
+- GeneralizedNewtypeDeriving
+- MultiParamTypeClasses
+- NamedFieldPuns
+- NoImplicitPrelude
+- OverloadedStrings
+- PartialTypeSignatures
+- ScopedTypeVariables
+- Strict
+- TypeOperators
+ghc-options:
+- -Werror
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wpartial-fields
+- -Wredundant-constraints
+- -Wincomplete-uni-patterns

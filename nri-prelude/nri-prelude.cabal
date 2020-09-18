@@ -1,0 +1,158 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 3f44da1e19c064cb1dd6a007f60d705032758b5a4a44a0091b9a222e7dd1eac9
+
+name:           nri-prelude
+version:        0.1.0.0
+synopsis:       A Prelude inspired by the Elm programming language
+author:         NoRedInk
+maintainer:     eng@noredink.com
+copyright:      2020 NoRedInk Corp.
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    LICENSE
+
+library
+  exposed-modules:
+      Array
+      Basics
+      Bitwise
+      Char
+      Debug
+      Dict
+      Expect
+      Expect.Task
+      Fuzz
+      List
+      Log
+      Maybe
+      NriPrelude
+      Platform
+      Process
+      Result
+      Set
+      Task
+      Test
+      Test.Runner.Tasty
+      Text
+      Tuple
+  other-modules:
+      Internal.Expectation
+      Internal.Shortcut
+      Internal.Terminal
+      Internal.Test
+      Internal.TestResult
+      Platform.DoAnything
+      Platform.Internal
+      Test.Console.Color
+      Paths_nri_prelude
+  hs-source-dirs:
+      src
+  default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
+  ghc-options: -Werror -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
+  build-depends:
+      aeson
+    , ansi-terminal
+    , async
+    , auto-update
+    , base
+    , bytestring
+    , concurrent-output
+    , containers
+    , directory
+    , exceptions
+    , filepath
+    , hedgehog
+    , junit-xml
+    , pretty-diff
+    , pretty-show
+    , resourcet
+    , safe-exceptions
+    , tasty
+    , tasty-test-reporter
+    , terminal-size
+    , text
+    , time
+    , vector
+  default-language: Haskell2010
+
+test-suite tests
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      ArraySpec
+      BitwiseSpec
+      DebugSpec
+      DictSpec
+      LogSpec
+      PlatformSpec
+      SetSpec
+      TextSpec
+      Array
+      Basics
+      Bitwise
+      Char
+      Debug
+      Dict
+      Expect
+      Expect.Task
+      Fuzz
+      Internal.Expectation
+      Internal.Shortcut
+      Internal.Terminal
+      Internal.Test
+      Internal.TestResult
+      List
+      Log
+      Maybe
+      NriPrelude
+      Platform
+      Platform.DoAnything
+      Platform.Internal
+      Process
+      Result
+      Set
+      Task
+      Test
+      Test.Console.Color
+      Test.Runner.Tasty
+      Text
+      Tuple
+      Paths_nri_prelude
+  hs-source-dirs:
+      tests
+      src
+  default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
+  ghc-options: -Werror -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T"
+  build-depends:
+      aeson
+    , ansi-terminal
+    , async
+    , auto-update
+    , base
+    , bytestring
+    , concurrent-output
+    , containers
+    , directory
+    , exceptions
+    , filepath
+    , hedgehog
+    , junit-xml
+    , pretty-diff
+    , pretty-show
+    , resourcet
+    , safe-exceptions
+    , tasty
+    , tasty-test-reporter
+    , terminal-size
+    , text
+    , time
+    , vector
+  default-language: Haskell2010

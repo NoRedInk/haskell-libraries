@@ -1,0 +1,24 @@
+[ TracingSpan
+    { name = "user cut themselves on the modal"
+    , started = MonotonicTime { inMicroseconds = 0 }
+    , finished = MonotonicTime { inMicroseconds = 0 }
+    , frame =
+        Just
+          ( "userIsPained"
+          , SrcLoc
+              { srcLocPackage = "main"
+              , srcLocModule = "LogSpec"
+              , srcLocFile = "tests/LogSpec.hs"
+              , srcLocStartLine = 52
+              , srcLocStartCol = 13
+              , srcLocEndLine = 55
+              , srcLocEndCol = 54
+              }
+          )
+    , details =
+        Just
+          "{\"triage\":{\"advisory\":\"file modal's sharp edges\",\"impact\":\"This is causing pain to users and workaround is not obvious.\"},\"modal\":\"SURPRISE!\"}"
+    , succeeded = Failed
+    , children = []
+    }
+]

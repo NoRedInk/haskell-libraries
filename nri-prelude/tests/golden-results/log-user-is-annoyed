@@ -1,0 +1,24 @@
+[ TracingSpan
+    { name = "the button didn't work"
+    , started = MonotonicTime { inMicroseconds = 0 }
+    , finished = MonotonicTime { inMicroseconds = 0 }
+    , frame =
+        Just
+          ( "userIsAnnoyed"
+          , SrcLoc
+              { srcLocPackage = "main"
+              , srcLocModule = "LogSpec"
+              , srcLocFile = "tests/LogSpec.hs"
+              , srcLocStartLine = 38
+              , srcLocStartCol = 13
+              , srcLocEndLine = 41
+              , srcLocEndCol = 51
+              }
+          )
+    , details =
+        Just
+          "{\"triage\":{\"advisory\":\"fix the button\",\"impact\":\"This is causing inconveniences to users but they will be able to achieve want they want.\"},\"button\":\"PRESS\"}"
+    , succeeded = Failed
+    , children = []
+    }
+]

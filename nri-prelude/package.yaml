@@ -1,0 +1,93 @@
+name: nri-prelude
+synopsis: A Prelude inspired by the Elm programming language
+author: NoRedInk
+version: '0.1.0.0'
+maintainer: eng@noredink.com
+copyright: 2020 NoRedInk Corp.
+license-file: LICENSE
+extra-source-files:
+- README.md
+- LICENSE
+library:
+  dependencies: &dependencies
+  - aeson
+  - ansi-terminal
+  - async
+  - auto-update
+  - base
+  - bytestring
+  - concurrent-output
+  - containers
+  - directory
+  - exceptions
+  - filepath
+  - hedgehog
+  - junit-xml
+  - pretty-diff
+  - pretty-show
+  - resourcet
+  - safe-exceptions
+  - tasty
+  - tasty-test-reporter
+  - terminal-size
+  - text
+  - time
+  - vector
+  exposed-modules:
+  - Array
+  - Basics
+  - Bitwise
+  - Char
+  - Debug
+  - Dict
+  - Expect
+  - Expect.Task
+  - Fuzz
+  - List
+  - Log
+  - Maybe
+  - NriPrelude
+  - Platform
+  - Process
+  - Result
+  - Set
+  - Task
+  - Test
+  - Test.Runner.Tasty
+  - Text
+  - Tuple
+  source-dirs:
+  - src
+default-extensions:
+- DataKinds
+- DeriveGeneric
+- FlexibleContexts
+- FlexibleInstances
+- GeneralizedNewtypeDeriving
+- MultiParamTypeClasses
+- NamedFieldPuns
+- NoImplicitPrelude
+- OverloadedStrings
+- PartialTypeSignatures
+- ScopedTypeVariables
+- Strict
+- TypeOperators
+ghc-options:
+- -Werror
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wpartial-fields
+- -Wredundant-constraints
+- -Wincomplete-uni-patterns
+tests:
+  tests:
+    dependencies: *dependencies
+    main: Main.hs
+    source-dirs:
+    - tests
+    - src
+    ghc-options:
+    - -threaded
+    - -rtsopts "-with-rtsopts=-N -T"

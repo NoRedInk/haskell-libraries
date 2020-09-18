@@ -1,0 +1,24 @@
+[ TracingSpan
+    { name = "door is blocked"
+    , started = MonotonicTime { inMicroseconds = 0 }
+    , finished = MonotonicTime { inMicroseconds = 0 }
+    , frame =
+        Just
+          ( "userIsBlocked"
+          , SrcLoc
+              { srcLocPackage = "main"
+              , srcLocModule = "LogSpec"
+              , srcLocFile = "tests/LogSpec.hs"
+              , srcLocStartLine = 66
+              , srcLocStartCol = 13
+              , srcLocEndLine = 69
+              , srcLocEndCol = 50
+              }
+          )
+    , details =
+        Just
+          "{\"triage\":{\"advisory\":\"find key\",\"impact\":\"User is blocked from performing an action.\"},\"house number\":5}"
+    , succeeded = Failed
+    , children = []
+    }
+]
