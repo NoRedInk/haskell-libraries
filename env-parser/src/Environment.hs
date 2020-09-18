@@ -1,14 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
 
--- |
--- A module for reading configuration options from environment variables.
+-- | A module for reading configuration options from environment variables.
 --
 -- Applications have configuration options. [The Twelve-Factor App] recommends
 -- applications read these from environment variables. This requires us to
 -- decode environment variables, which are strings, into the different types the
 -- app's configuration options might have. This module helps with that.
 --
--- There's a couple of similar modules out there (like `envparse` and `envy`),
+-- There's a couple of similar modules out there (like @envparse@ and @envy@),
 -- but we find them overly complicated in some ways and lacking in others.
 -- Here's what sets this package apart from these other approaches:
 --
@@ -58,18 +57,19 @@ module Environment
   )
 where
 
-import NriPrelude
-import Data.Bifunctor (bimap)
-import qualified Data.Map.Strict as Map
 import qualified Data.Text
 import qualified Debug
+import qualified Dict
+import qualified List
 import qualified Log
 import qualified Maybe
 import qualified Network.URI
+import NriPrelude
 import qualified Result
 import qualified System.Environment
 import Text.Read (readMaybe)
 import qualified Text.URI
+import qualified Tuple
 import Prelude
   ( Applicative,
     Either (Left, Right),
@@ -87,24 +87,22 @@ import Prelude
 
 -- |
 -- A function that can read values of a type from text. For example, a
--- `Parser Int` knows how to read a string like "412" and extract from that the
--- number `412`.
+-- @Parser Int@ knows how to read a string like "412" and extract from that the
+-- number @412@.
 --
 -- Parsing functions can fail when they read a text that they do not understand.
--- For example, the `Parser Int` parser will fail if ran against the string
+-- For example, the @Parser Int@ parser will fail if ran against the string
 -- "Not a number in the slightest!".
 newtype Parser a
   = Parser (Text -> Result Text a)
   deriving (Functor)
 
--- |
--- Parse a text from an environment variable.
+-- | Parse a text from an environment variable.
 text :: Parser Text
 text = Parser Ok
 
--- |
--- Parse an integer from an environment variable.
--- Works for any integer type (`Integer`, `Int`, `Int`, ...).
+-- | Parse an integer from an environment variable.
+-- Works for any integer type (@Integer@, @Int@, @Int@, ...).
 int :: (Integral a) => Parser a
 int =
   Parser <| \str ->
@@ -112,8 +110,7 @@ int =
       Nothing -> Err ("Could not parse as integer: " ++ str)
       Just (n :: Integer) -> Ok (fromIntegral n)
 
--- |
--- Parse a floating point number from an environment variable.
+-- | Parse a floating point number from an environment variable.
 float :: Parser Float
 float =
   Parser <| \str ->
@@ -121,8 +118,7 @@ float =
       Nothing -> Err ("Could not parse as float: " ++ str)
       Just n -> Ok n
 
--- |
--- Parse a boolean from an environment variable.
+-- | Parse a boolean from an environment variable.
 boolean :: Parser Bool
 boolean =
   Parser <| \str ->
@@ -130,8 +126,7 @@ boolean =
       Nothing -> Err ("Could not parse as boolean: " ++ str)
       Just x -> Ok x
 
--- |
--- Parse a URI from an environment variable.
+-- | Parse a URI from an environment variable.
 uri :: Parser Text.URI.URI
 uri =
   Parser <| \str ->
@@ -142,23 +137,20 @@ uri =
           |> Err
       Right x -> Ok x
 
--- |
--- Parse a file path from an environment variable.
+-- | Parse a file path from an environment variable.
 filePath :: Parser FilePath
 filePath = Parser (Ok << Data.Text.unpack)
 
--- |
--- Parse a secret value from an environment variable.
+-- | Parse a secret value from an environment variable.
 --
--- Check the documentation for the `Log` module of `nri-prelude` to learn more
+-- Check the documentation for the @Log@ module of @nri-prelude@ to learn more
 -- about secrets.
 secret :: Parser a -> Parser (Log.Secret a)
 secret = map Log.mkSecret
 
--- |
--- There's two `URI` types that are in vogue in the Haskell ecosystem. We would
--- like to standardized on the `Text.URI` package, since it's the more modern
--- `Text` based version (no `Strings` for us!), but most libraries require the
+-- | There's two @URI@ types that are in vogue in the Haskell ecosystem. We would
+-- like to standardized on the @Text.URI@ package, since it's the more modern
+-- @Text@ based version (no @Strings@ for us!), but most libraries require the
 -- other type. This function helps convert.
 networkURI :: Parser Network.URI.URI
 networkURI =
@@ -167,8 +159,7 @@ networkURI =
       Nothing -> Err "Oh no! We have a valid Network.URI.URI but can't seem to parse it as a Network.URI.URI."
       Just uri' -> Ok uri' {Network.URI.uriPath = ""}
 
--- |
--- Create a parser for custom types. Build on the back of one of the primitve
+-- | Create a parser for custom types. Build on the back of one of the primitve
 -- parsers from this module.
 --
 --     data Environment = Development | Production
@@ -183,19 +174,18 @@ networkURI =
 custom :: Parser a -> (a -> Result Text b) -> Parser b
 custom (Parser base) fn = Parser (\val -> base val |> andThen fn)
 
--- |
--- An environment decoder knows how to read an app's configuration from
--- environment variables. Check out the `variable` function to see how you can
+-- | An environment decoder knows how to read an app's configuration from
+-- environment variables. Check out the @variable@ function to see how you can
 -- begin building decoders.
 data Decoder config
   = Decoder
-      { consumes :: [Variable],
-        readFromEnvironment :: Map.Map Text Text -> Result [ParseError] config
+      { -- | The list of @Variable@s that this decoder will read when ran.
+        consumes :: [Variable],
+        readFromEnvironment :: Dict.Dict Text Text -> Result [ParseError] config
       }
   deriving (Functor)
 
 instance Applicative Decoder where
-
   pure x = Decoder [] (\_ -> Ok x)
 
   (Decoder consumes1 f) <*> (Decoder consumes2 x) =
@@ -219,8 +209,7 @@ instance Applicative Decoder where
           (fr, xr) ->
             fr <*> xr
 
--- |
--- An environment variable with a description of what it is used for.
+-- | An environment variable with a description of what it is used for.
 data Variable
   = Variable
       { name :: Text,
@@ -247,9 +236,8 @@ data DecodedVariable
       }
   deriving (Show)
 
--- |
--- Produce a configuration from a single environment veriable. Usually you will
--- combine these with `mapN` functions to build larger configurations.
+-- | Produce a configuration from a single environment veriable. Usually you
+-- will combine these with @mapN@ functions to build larger configurations.
 --
 --     Data Settings = Settings
 --        { amountOfHats :: Int
@@ -266,13 +254,12 @@ variable var (Parser parse) =
     { consumes = [var],
       readFromEnvironment = \env ->
         let value =
-              Map.lookup (name var) env
+              Dict.get (name var) env
                 |> Maybe.withDefault (defaultValue var)
          in parse value |> Result.mapError (pure << ParseError var)
     }
 
--- |
--- If the first decoder fails, try the second.
+-- | If the first decoder fails, try the second.
 either :: Decoder a -> Decoder a -> Decoder a
 either (Decoder consumes1 fa) (Decoder consumes2 fb) =
   Decoder
@@ -285,8 +272,7 @@ either (Decoder consumes1 fa) (Decoder consumes2 fb) =
           Ok r -> Ok r
     }
 
--- |
--- Attempt to decode a configuration by reading environment variables.
+-- | Attempt to decode a configuration by reading environment variables.
 -- This will fail if one or more environment variables fail to parse.
 --
 -- It will not fail if certain environment variables are absent. Defaults will
@@ -298,29 +284,49 @@ decode configuration = do
     Err err -> fail (Data.Text.unpack err)
     Ok x -> pure x
 
-decodePairs :: Decoder a -> Map.Map Text Text -> Result Text a
+-- | Same as 'decode', but takes the environment to decode as a dictionary.
+decodePairs :: Decoder a -> Dict.Dict Text Text -> Result Text a
 decodePairs configuration env =
   case readFromEnvironment configuration env of
     Err err -> Err (errorsToText err)
     Ok x -> Ok x
 
+-- | Run a decoder. Instead of returnin the decoded value return metadata about
+-- each variable that was decoded.
+--
+-- This can be helpful when generating a @--help@ command, for listing all the
+-- variables that the application supports and what they are currently set to.
 decodeVariables :: Decoder a -> IO [DecodedVariable]
 decodeVariables configuration =
   fmap (decodeVariablePairs configuration) getEnv
 
-decodeVariablePairs :: Decoder a -> Map.Map Text Text -> [DecodedVariable]
+-- | Same as 'decodeVariables', but takes the environment to decode as a
+-- dictionary.
+decodeVariablePairs :: Decoder a -> Dict.Dict Text Text -> [DecodedVariable]
 decodeVariablePairs configuration env = do
   var <- consumes configuration
   pure
     ( DecodedVariable
         { decodedVariable = var,
-          decodedCurrent = Map.lookup (name var) env,
-          decodedErrors = Map.findWithDefault [] (name var) errors
+          decodedCurrent = Dict.get (name var) env,
+          decodedErrors =
+            Dict.get (name var) errors
+              |> Maybe.withDefault []
         }
     )
   where
     errors =
-      Map.fromListWith (++) (map errorPair parseErrors)
+      map errorPair parseErrors
+        |> List.foldl insert Dict.empty
+    insert (k, v) dict =
+      Dict.update
+        k
+        ( \prev ->
+            case prev of
+              Nothing -> Just v
+              Just v' -> Just (v' ++ v)
+        )
+        dict
     errorPair err =
       ((failingVariable >> name) err, [failingReason err])
     parseErrors =
@@ -328,14 +334,13 @@ decodeVariablePairs configuration env = do
         Err errs -> errs
         Ok _ -> []
 
-getEnv :: IO (Map.Map Text Text)
+getEnv :: IO (Dict.Dict Text Text)
 getEnv = do
   pairs <- System.Environment.getEnvironment
-  pure <| Map.fromList <| map (bimap Data.Text.pack Data.Text.pack) pairs
+  pure <| Dict.fromList <| map (Tuple.mapBoth Data.Text.pack Data.Text.pack) pairs
 
--- |
--- Build a configuration using only default values of environment variables.
--- Similar to `decode`, except this version doesn't read any environment
+-- | Build a configuration using only default values of environment variables.
+-- Similar to @decode@, except this version doesn't read any environment
 -- variables.
 --
 -- This is sometimes useful for tests, where you might not care about the exact
