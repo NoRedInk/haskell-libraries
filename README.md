@@ -17,7 +17,10 @@ cabal build nri-prelude           # build the library
 cabal test nri-prelude            # run the tests
 hpack nri-prelude                 # generate nri-prelude.cabal from package.yaml
 ghcid -c "cabal repl nri-prelude" # start a code watcher
+ormolu -m inplace <file>          # Format a source file
 ```
+
+We use [Ormolu][ormolu] for code formatting.
 
 ### Tips for adding dependencies
 
@@ -51,3 +54,4 @@ To keep things simple for those familiar with semantic versioning this repositor
 [hackage]: https://hackage.haskell.org/
 [pvp]: https://pvp.haskell.org/faq/
 [stackage]: https://www.stackage.org/
+[ormolu]: https://github.com/tweag/ormolu

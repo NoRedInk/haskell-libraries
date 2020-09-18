@@ -7,5 +7,6 @@ pkgs.mkShell {
     pkgs.haskellPackages.hpack
     pkgs.zlib
     pkgs.haskellPackages.ghcid
+    pkgs.ormolu
   ];
 }
