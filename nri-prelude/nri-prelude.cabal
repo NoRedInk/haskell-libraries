@@ -1,23 +1,32 @@
-cabal-version: 1.12
+cabal-version: 1.18
 
 -- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b5756969d0a8c19b4b0180a7f6625b0e038e9fd7ff7fcfb096fc749428967399
+-- hash: 3877e725a5df206c47041c81fe739e19ddc26031835a136bcbfb103db028141b
 
 name:           nri-prelude
 version:        0.1.0.0
 synopsis:       A Prelude inspired by the Elm programming language
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
+homepage:       https://github.com/NoRedInk/haskell-libraries#readme
+bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com
 copyright:      2020 NoRedInk Corp.
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-extra-source-files:
+extra-doc-files:
     README.md
     LICENSE
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/NoRedInk/haskell-libraries
+  subdir: nri-prelude
 
 library
   exposed-modules:

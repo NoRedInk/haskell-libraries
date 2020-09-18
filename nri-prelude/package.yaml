@@ -1,13 +1,16 @@
 name: nri-prelude
 synopsis: A Prelude inspired by the Elm programming language
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
 author: NoRedInk
 version: '0.1.0.0'
 maintainer: haskell-open-source@noredink.com
 copyright: 2020 NoRedInk Corp.
+github: NoRedInk/haskell-libraries/nri-prelude
 license-file: LICENSE
-extra-source-files:
+extra-doc-files:
 - README.md
 - LICENSE
+- CHANGELOG.md
 library:
   dependencies: &dependencies
   - aeson >= 1.4.6.0 && < 1.6
