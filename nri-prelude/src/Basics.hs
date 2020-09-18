@@ -766,7 +766,7 @@ type Never = Data.Void.Void
 -- messages. You could say:
 --
 -- > import Html exposing (..)
---
+-- >
 -- > embedHtml :: Html Never -> Html msg
 -- > embedHtml staticStuff =
 -- >   div []

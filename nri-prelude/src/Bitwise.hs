@@ -1,8 +1,12 @@
+-- | Library for [bitwise operations](https://en.wikipedia.org/wiki/Bitwise_operation).
 module Bitwise
-  ( and,
+  ( -- * Basic Operations
+    and,
     or,
     xor,
     complement,
+
+    -- * Bit Shifts
     shiftLeftBy,
     shiftRightBy,
     shiftRightZfBy,
@@ -33,8 +37,8 @@ complement = Data.Bits.complement
 -- | Shift bits to the left by a given offset, filling new bits with zeros.
 -- This can be used to multiply numbers by powers of two.
 --
---    shiftLeftBy 1 5 == 10
---    shiftLeftBy 5 1 == 32
+-- > shiftLeftBy 1 5 == 10
+-- > shiftLeftBy 5 1 == 32
 shiftLeftBy :: Int -> Int -> Int
 shiftLeftBy offset value =
   Data.Bits.shift value (Prelude.fromIntegral offset)
@@ -42,28 +46,22 @@ shiftLeftBy offset value =
 -- | Shift bits to the right by a given offset, filling new bits with
 -- whatever is the topmost bit. This can be used to divide numbers by powers of two.
 --
---    shiftRightBy 1  32 == 16
---    shiftRightBy 2  32 == 8
---    shiftRightBy 1 -32 == -16
+-- > shiftRightBy 1  32 == 16
+-- > shiftRightBy 2  32 == 8
+-- > shiftRightBy 1 -32 == -16
 --
--- This is called an [arithmetic right shift][ars], often written `>>`, and
--- sometimes called a sign-propagating right shift because it fills empty spots
--- with copies of the highest bit.
--- [ars]: https://en.wikipedia.org/wiki/Bitwise_operation#Arithmetic_shift
+-- This is called an [arithmetic right shift](https://en.wikipedia.org/wiki/Bitwise_operation#Arithmetic_shift), often written @>>@, and sometimes called a sign-propagating right shift because it fills empty spots with copies of the highest bit.
 shiftRightBy :: Int -> Int -> Int
 shiftRightBy offset value =
   Data.Bits.shiftR value (Prelude.fromIntegral offset)
 
 -- | Shift bits to the right by a given offset, filling new bits with zeros.
 --
---    shiftRightZfBy 1  32 == 16
---    shiftRightZfBy 2  32 == 8
---    shiftRightZfBy 1 -32 == 9223372036854775792
+-- > shiftRightZfBy 1  32 == 16
+-- > shiftRightZfBy 2  32 == 8
+-- > shiftRightZfBy 1 -32 == 9223372036854775792
 --
--- This is called an [logical right shift][lrs], often written `>>>`, and
--- sometimes called a zero-fill right shift because it fills empty spots with
--- zeros.
--- [lrs]: https://en.wikipedia.org/wiki/Bitwise_operation#Logical_shift
+-- This is called an [logical right shift](https://en.wikipedia.org/wiki/Bitwise_operation#Logical_shift), often written @>>>@, and sometimes called a zero-fill right shift because it fills empty spots with zeros.
 shiftRightZfBy :: Int -> Int -> Int
 shiftRightZfBy offset value =
   -- For some reason Data.Bits does not implement this function. The general idea is:

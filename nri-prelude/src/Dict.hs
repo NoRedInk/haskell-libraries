@@ -1,46 +1,39 @@
 -- | A dictionary mapping unique keys to values. The keys can be any comparable
--- type. This includes `Int`, `Float`, `Time`, `Char`, `String`, and tuples or
+-- type. This includes @Int@, @Float@, @Time@, @Char@, @String@, and tuples or
 -- lists of comparable types.
 --
--- Insert, remove, and query operations all take *O(log n)* time.
---
--- Dictionaries
--- @docs Dict
---
--- Build
--- @docs empty, singleton, insert, update, remove
---
--- Query
--- @docs isEmpty, member, get, size
---
--- Lists
--- @docs keys, values, toList, fromList
---
--- Transform
--- @docs map, foldl, foldr, filter, partition
---
--- Combine
--- @docs union, intersect, diff, merge
+-- Insert, remove, and query operations all take _O(log n)_ time.
 module Dict
-  ( Dict,
+  ( -- * Dictionaries
+    Dict,
+
+    -- * Build
     empty,
     singleton,
     insert,
     update,
     remove,
+
+    -- * Query
     isEmpty,
     member,
     get,
     size,
+
+    -- * Lists
     keys,
     values,
     toList,
     fromList,
+
+    -- * Transform
     map,
     foldl,
     foldr,
     filter,
     partition,
+
+    -- * Combine
     union,
     intersect,
     diff,
@@ -57,25 +50,25 @@ import Prelude (Ord, fromIntegral, otherwise)
 
 -- DICTIONARIES
 
--- | A dictionary of keys and values. So a `Dict String User` is a dictionary
--- that lets you look up a `String` (such as user names) and find the associated
--- `User`.
+-- | A dictionary of keys and values. So a @Dict String User@ is a dictionary
+-- that lets you look up a @String@ (such as user names) and find the associated
+-- @User@.
 --
---    import Dict exposing (Dict)
---
---    users : Dict String User
---    users =
---      Dict.fromList
---        [ ("Alice", User "Alice" 28 1.65)
---        , ("Bob"  , User "Bob"   19 1.82)
---        , ("Chuck", User "Chuck" 33 1.75)
---        ]
---
---    type alias User =
---      { name : String
---      , age : Int
---      , height : Float
---      }
+-- > import Dict exposing (Dict)
+-- >
+-- > users : Dict String User
+-- > users =
+-- >   Dict.fromList
+-- >     [ ("Alice", User "Alice" 28 1.65)
+-- >     , ("Bob"  , User "Bob"   19 1.82)
+-- >     , ("Chuck", User "Chuck" 33 1.75)
+-- >     ]
+-- >
+-- > type alias User =
+-- >   { name : String
+-- >   , age : Int
+-- >   , height : Float
+-- >   }
 type Dict k v =
   Data.Map.Strict.Map k v
 
@@ -85,14 +78,14 @@ empty =
   Data.Map.Strict.empty
 
 -- | Get the value associated with a key. If the key is not found, return
--- `Nothing`. This is useful when you are not sure if a key will be in the
+-- @Nothing@. This is useful when you are not sure if a key will be in the
 -- dictionary.
 --
---    animals = fromList [ ("Tom", Cat), ("Jerry", Mouse) ]
---
---    get "Tom"   animals == Just Cat
---    get "Jerry" animals == Just Mouse
---    get "Spike" animals == Nothing
+-- > animals = fromList [ ("Tom", Cat), ("Jerry", Mouse) ]
+-- >
+-- > get "Tom"   animals == Just Cat
+-- > get "Jerry" animals == Just Mouse
+-- > get "Spike" animals == Nothing
 get :: Ord comparable => comparable -> Dict comparable v -> Maybe v
 get =
   Data.Map.Strict.lookup
@@ -109,7 +102,7 @@ size =
 
 -- | Determine if a dictionary is empty.
 --
---    isEmpty empty == True
+-- > isEmpty empty == True
 isEmpty :: Dict k v -> Bool
 isEmpty =
   Data.Map.Strict.null
@@ -200,17 +193,17 @@ map = Data.Map.Strict.mapWithKey
 
 -- | Fold over the key-value pairs in a dictionary from lowest key to highest key.
 --
---    import Dict exposing (Dict)
---
---    getAges : Dict String User -> List String
---    getAges users =
---      Dict.foldl addAge [] users
---
---    addAge : String -> User -> List String -> List String
---    addAge _ user ages =
---      user.age :: ages
---
---    -- getAges users == [33,19,28]
+-- > import Dict exposing (Dict)
+-- >
+-- > getAges : Dict String User -> List String
+-- > getAges users =
+-- >   Dict.foldl addAge [] users
+-- >
+-- > addAge : String -> User -> List String -> List String
+-- > addAge _ user ages =
+-- >   user.age :: ages
+-- >
+-- > -- getAges users == [33,19,28]
 foldl :: (k -> v -> b -> b) -> b -> Dict k v -> b
 foldl fun =
   Data.Map.Strict.foldlWithKey' flippedFun
@@ -219,17 +212,17 @@ foldl fun =
 
 -- | Fold over the key-value pairs in a dictionary from highest key to lowest key.
 --
---    import Dict exposing (Dict)
---
---    getAges : Dict String User -> List String
---    getAges users =
---      Dict.foldr addAge [] users
---
---    addAge : String -> User -> List String -> List String
---    addAge _ user ages =
---      user.age :: ages
---
---    -- getAges users == [28,19,33]
+-- > import Dict exposing (Dict)
+-- >
+-- > getAges : Dict String User -> List String
+-- > getAges users =
+-- >   Dict.foldr addAge [] users
+-- >
+-- > addAge : String -> User -> List String -> List String
+-- > addAge _ user ages =
+-- >   user.age :: ages
+-- >
+-- > -- getAges users == [28,19,33]
 foldr :: (k -> v -> b -> b) -> b -> Dict k v -> b
 foldr = Data.Map.Strict.foldrWithKey
 
@@ -247,13 +240,13 @@ partition = Data.Map.Strict.partitionWithKey
 
 -- | Get all of the keys in a dictionary, sorted from lowest to highest.
 --
---    keys (fromList [(0,"Alice"),(1,"Bob")]) == [0,1]
+-- > keys (fromList [(0,"Alice"),(1,"Bob")]) == [0,1]
 keys :: Dict k v -> List k
 keys = Data.Map.Strict.keys
 
 -- | Get all of the values in a dictionary, in the order of their keys.
 --
---    values (fromList [(0,"Alice"),(1,"Bob")]) == ["Alice", "Bob"]
+-- > values (fromList [(0,"Alice"),(1,"Bob")]) == ["Alice", "Bob"]
 values :: Dict k v -> List v
 values = Data.Map.Strict.elems
 
