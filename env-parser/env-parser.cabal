@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d3b21556cd29c9e3961d73008bb68529996b7341b84b15c1dfc3cd22448f23eb
+-- hash: 06daa54b756d053313833ad0f77b04bc3dbffcd7d82feb08c3432b48a553acd1
 
 name:           env-parser
 version:        0.1.0.0
@@ -30,10 +30,10 @@ library
   default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
   ghc-options: -Werror -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
   build-depends:
-      base
-    , containers
-    , modern-uri
-    , network-uri
-    , nri-prelude
-    , text
+      base >=4.12.0.0 && <4.13
+    , containers >=0.6.0.1 && <0.7
+    , modern-uri >=0.3.1.0 && <0.4
+    , network-uri >=2.6.2.0 && <2.8
+    , nri-prelude >=0.1.0.0 && <0.2
+    , text >=1.2.3.1 && <1.3
   default-language: Haskell2010
