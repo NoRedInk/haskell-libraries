@@ -41,6 +41,7 @@ import qualified Observability.Helpers
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
 import qualified Postgres
+import qualified Tuple
 import qualified Prelude
 
 -- This function takes the root span of a completed request and reports it to
@@ -80,7 +81,12 @@ report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report Handler {http, timer, defaultEvent, apiKey'} requestId span =
   if failed span
     then send http apiKey' (toEvent requestId timer defaultEvent span)
-    else Prelude.pure ()
+    else case durationsCheckOut span of
+      Nothing ->
+        toEvent requestId timer defaultEvent span
+          |> toDurationsDontCheckOutError
+          |> send http apiKey'
+      Just _ -> Prelude.pure ()
 
 data Handler
   = Handler
@@ -490,3 +496,32 @@ getRevision = do
   case eitherRevision of
     Prelude.Left _err -> Prelude.pure (Revision "no revision file found")
     Prelude.Right version -> Prelude.pure (Revision version)
+
+-- | Check that for every span the durations of the children of a span together
+-- are never longer then. This is intended to help debug NewRelic issues. That
+-- is, we expect this check to never fail and would like to confirm that by
+-- logging to Bugsnag if it _does_ fail. Running this in production for a couple
+-- of hours should tell us what we want to know, after which we can delete this
+-- again.
+durationsCheckOut :: Platform.TracingSpan -> Maybe (Platform.MonotonicTime, Platform.MonotonicTime)
+durationsCheckOut span = do
+  let selfStartTime = Platform.started span
+  let selfEndTime = Platform.finished span
+  case Platform.children span of
+    [] ->
+      Just (selfStartTime, selfEndTime)
+    children -> do
+      childTimes <- Prelude.traverse durationsCheckOut children
+      minChildStartTime <- List.minimum (map Tuple.first childTimes)
+      maxChildEndTime <- List.maximum (map Tuple.second childTimes)
+      if minChildStartTime >= selfStartTime && maxChildEndTime <= selfEndTime
+        then Just (selfStartTime, selfEndTime)
+        else Nothing
+
+toDurationsDontCheckOutError :: Bugsnag.Event -> Bugsnag.Event
+toDurationsDontCheckOutError event =
+  event
+    { Bugsnag.event_exceptions =
+        Bugsnag.event_exceptions event
+          |> map (\exception -> exception {Bugsnag.exception_errorClass = "Span durations do not check out"})
+    }

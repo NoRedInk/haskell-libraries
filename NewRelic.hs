@@ -137,43 +137,43 @@ mysqlToDatastore :: MySQL.Info -> NewRelic.DatastoreSegment
 mysqlToDatastore info =
   NewRelic.DatastoreSegment
     { NewRelic.datastoreSegmentProduct = NewRelic.MySQL,
-      NewRelic.datastoreSegmentCollection = Just (MySQL.infoQueriedRelation info),
-      NewRelic.datastoreSegmentOperation = Just (MySQL.infoSqlOperation info),
+      NewRelic.datastoreSegmentCollection = nonEmptyText (MySQL.infoQueriedRelation info),
+      NewRelic.datastoreSegmentOperation = nonEmptyText (MySQL.infoSqlOperation info),
       NewRelic.datastoreSegmentHost = case MySQL.infoConnection info of
-        MySQL.TcpSocket host _ _ -> Just host
+        MySQL.TcpSocket host _ _ -> nonEmptyText host
         MySQL.UnixSocket _ _ -> Nothing,
       NewRelic.datastoreSegmentPortPathOrId = case MySQL.infoConnection info of
-        MySQL.TcpSocket _ port _ -> Just port
-        MySQL.UnixSocket path _ -> Just path,
+        MySQL.TcpSocket _ port _ -> nonEmptyText port
+        MySQL.UnixSocket path _ -> nonEmptyText path,
       NewRelic.datastoreSegmentDatabaseName = case MySQL.infoConnection info of
-        MySQL.TcpSocket _ _ dbname -> Just dbname
-        MySQL.UnixSocket _ dbname -> Just dbname,
-      NewRelic.datastoreSegmentQuery = Just (MySQL.infoQueryTemplate info)
+        MySQL.TcpSocket _ _ dbname -> nonEmptyText dbname
+        MySQL.UnixSocket _ dbname -> nonEmptyText dbname,
+      NewRelic.datastoreSegmentQuery = nonEmptyText (MySQL.infoQueryTemplate info)
     }
 
 postgresToDatastore :: Postgres.Info -> NewRelic.DatastoreSegment
 postgresToDatastore info =
   NewRelic.DatastoreSegment
     { NewRelic.datastoreSegmentProduct = NewRelic.Postgres,
-      NewRelic.datastoreSegmentCollection = Just (Postgres.infoQueriedRelation info),
-      NewRelic.datastoreSegmentOperation = Just (Postgres.infoSqlOperation info),
+      NewRelic.datastoreSegmentCollection = nonEmptyText (Postgres.infoQueriedRelation info),
+      NewRelic.datastoreSegmentOperation = nonEmptyText (Postgres.infoSqlOperation info),
       NewRelic.datastoreSegmentHost = case Postgres.infoConnection info of
-        Postgres.TcpSocket host _ _ -> Just host
+        Postgres.TcpSocket host _ _ -> nonEmptyText host
         Postgres.UnixSocket _ _ -> Nothing,
       NewRelic.datastoreSegmentPortPathOrId = case Postgres.infoConnection info of
-        Postgres.TcpSocket _ port _ -> Just port
-        Postgres.UnixSocket path _ -> Just path,
+        Postgres.TcpSocket _ port _ -> nonEmptyText port
+        Postgres.UnixSocket path _ -> nonEmptyText path,
       NewRelic.datastoreSegmentDatabaseName = case Postgres.infoConnection info of
-        Postgres.TcpSocket _ _ dbname -> Just dbname
-        Postgres.UnixSocket _ dbname -> Just dbname,
-      NewRelic.datastoreSegmentQuery = Just (Postgres.infoQueryTemplate info)
+        Postgres.TcpSocket _ _ dbname -> nonEmptyText dbname
+        Postgres.UnixSocket _ dbname -> nonEmptyText dbname,
+      NewRelic.datastoreSegmentQuery = nonEmptyText (Postgres.infoQueryTemplate info)
     }
 
 httpToExternalSegment :: Http.Info -> NewRelic.ExternalSegment
 httpToExternalSegment info =
   NewRelic.ExternalSegment
     { NewRelic.externalSegmentUri = Http.infoUri info,
-      NewRelic.externalSegmentProcedure = Just (Http.infoRequestMethod info),
+      NewRelic.externalSegmentProcedure = nonEmptyText (Http.infoRequestMethod info),
       NewRelic.externalSegmentLibrary = Nothing
     }
 
@@ -269,6 +269,12 @@ addAttribute tx key value =
         key
         (Data.Text.Encoding.decodeUtf8 (Data.ByteString.Lazy.toStrict (Aeson.encode value)))
 
+nonEmptyText :: Text -> Maybe Text
+nonEmptyText text =
+  case text of
+    "" -> Nothing
+    _ -> Just text
+
 --
 -- NewRelic API
 --
@@ -306,7 +312,7 @@ startSegment ::
   Text ->
   Prelude.IO NewRelic.Segment
 startSegment tx name cat =
-  NewRelic.startSegment tx (Just name) (Just cat)
+  NewRelic.startSegment tx (nonEmptyText name) (nonEmptyText cat)
     |> andThen expectJust
 
 startDatastoreSegment ::
