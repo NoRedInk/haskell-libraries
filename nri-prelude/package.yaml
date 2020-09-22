@@ -7,6 +7,7 @@ maintainer: haskell-open-source@noredink.com
 copyright: 2020 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-prelude
 license-file: LICENSE
+category: Web
 extra-doc-files:
 - README.md
 - LICENSE
