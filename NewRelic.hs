@@ -70,7 +70,9 @@ reportWebTransaction (Handler timer app) span details = do
         -- So instead we group all these requests for unknown routes together.
         case (Monitoring.knownRoute details, Monitoring.responseStatus details) of
           -- Some unknown routes are from middlewares. That's why we also check
-          -- for a 404 response code.
+          -- the response code.
+          (Monitoring.UnknownRoute, 401) -> "401"
+          (Monitoring.UnknownRoute, 403) -> "403"
           (Monitoring.UnknownRoute, 404) -> "404"
           _ -> Monitoring.endpoint details
   Exception.bracketWithError
