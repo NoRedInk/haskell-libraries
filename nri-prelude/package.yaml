@@ -11,6 +11,8 @@ extra-doc-files:
 - README.md
 - LICENSE
 - CHANGELOG.md
+- licenses/ELM_CORE_LICENSE
+- licenses/ELM_TEST_LICENSE
 library:
   dependencies: &dependencies
   - aeson >= 1.4.6.0 && < 1.6
