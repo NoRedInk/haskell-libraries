@@ -4,7 +4,7 @@ cabal-version: 1.18
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3877e725a5df206c47041c81fe739e19ddc26031835a136bcbfb103db028141b
+-- hash: dcd025f2d9ab7c46a4048057b540fb9a87772aa05d01a3c0909c4cc48cfcc614
 
 name:           nri-prelude
 version:        0.1.0.0
@@ -22,6 +22,8 @@ extra-doc-files:
     README.md
     LICENSE
     CHANGELOG.md
+    licenses/ELM_CORE_LICENSE
+    licenses/ELM_TEST_LICENSE
 
 source-repository head
   type: git
@@ -65,7 +67,7 @@ library
   hs-source-dirs:
       src
   default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
-  ghc-options: -Werror -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
   build-depends:
       aeson >=1.4.6.0 && <1.6
     , ansi-terminal >=0.9.1 && <0.12
@@ -139,7 +141,7 @@ test-suite tests
       tests
       src
   default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
-  ghc-options: -Werror -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T"
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T"
   build-depends:
       aeson >=1.4.6.0 && <1.6
     , ansi-terminal >=0.9.1 && <0.12

@@ -1,4 +1,4 @@
-# env-parser
+# nri-env-parser
 
 _Reviewed last on 2019-07-20_
 
