@@ -52,6 +52,12 @@ Once we have the latest version we can make an upper bound of that by keeping th
 
 To keep things simple for those familiar with semantic versioning this repository uses the convention of keeping the first major number zero. When creating a new version change the other version digits as you would using semantic versioning.
 
+To publish the new version run the `release.sh` script for the package you want to publish:
+
+```sh
+./release.sh nri-prelude
+```
+
 [nix]: https://nixos.org/
 [direnv]: https://direnv.net/
 [hackage]: https://hackage.haskell.org/
