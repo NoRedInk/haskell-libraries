@@ -1,4 +1,4 @@
--- | Report request tracing data to NewRelic.
+-- | Report request tracing data to NewRelic APM.
 --
 -- NewRelic helps us get statistics about requests, such as average response
 -- times, error rates, and break downs of how much time is spent doing what
