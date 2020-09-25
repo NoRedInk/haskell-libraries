@@ -20,7 +20,12 @@ handler settings =
 
 acquireHandler :: Settings.Settings -> IO (Internal.Handler, Database.Redis.Connection)
 acquireHandler settings = do
-  connection <- Database.Redis.checkedConnect (Settings.connectionInfo settings)
+  connection <-
+    case Settings.clusterMode settings of
+      Settings.Cluster ->
+        Database.Redis.connectCluster (Settings.connectionInfo settings)
+      Settings.NotCluster ->
+        Database.Redis.checkedConnect (Settings.connectionInfo settings)
   anything <- Platform.doAnythingHandler
   pure
     <| ( Internal.Handler

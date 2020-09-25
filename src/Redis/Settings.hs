@@ -1,18 +1,41 @@
-module Redis.Settings (Settings (..), decoder) where
+module Redis.Settings (Settings (..), ClusterMode (..), decoder) where
 
+import qualified Text
 import Cherry.Prelude
 import qualified Data.Text
 import Database.Redis hiding (Ok)
 import qualified Environment
 import Prelude (Either (Left, Right))
 
-newtype Settings
+data ClusterMode = Cluster | NotCluster
+
+data Settings
   = Settings
       { connectionInfo :: ConnectInfo
+      , clusterMode :: ClusterMode
       }
 
 decoder :: Environment.Decoder Settings
-decoder = map Settings decoderConnectInfo
+decoder = map2 Settings decoderConnectInfo decoderClusterMode
+
+decoderClusterMode :: Environment.Decoder ClusterMode
+decoderClusterMode =
+  Environment.variable
+  Environment.Variable
+    { Environment.name = "REDIS_CLUSTER",
+      Environment.description = "Set to 1 for cluster, everything else is not",
+      Environment.defaultValue = "0"
+    }
+  ( Environment.custom
+      Environment.text
+      ( \str ->
+        if Text.trim str == "1" then
+          Ok Cluster
+        else
+          Ok NotCluster
+      )
+  )
+
 
 decoderConnectInfo :: Environment.Decoder ConnectInfo
 decoderConnectInfo =
