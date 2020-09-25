@@ -94,26 +94,30 @@ _withThirdPartyIO manager log library = do
 -- |
 get :: Handler -> Text -> Expect a -> Task Error a
 get handler' url expect =
-  request handler' Internal.Http.Settings
-    { Internal.Http._method = "GET",
-      Internal.Http._headers = [],
-      Internal.Http._url = url,
-      Internal.Http._body = emptyBody,
-      Internal.Http._timeout = Nothing,
-      Internal.Http._expect = expect
-    }
+  request
+    handler'
+    Internal.Http.Settings
+      { Internal.Http._method = "GET",
+        Internal.Http._headers = [],
+        Internal.Http._url = url,
+        Internal.Http._body = emptyBody,
+        Internal.Http._timeout = Nothing,
+        Internal.Http._expect = expect
+      }
 
 -- |
 post :: Handler -> Text -> Body -> Expect a -> Task Error a
 post handler' url body expect =
-  request handler' Internal.Http.Settings
-    { Internal.Http._method = "POST",
-      Internal.Http._headers = [],
-      Internal.Http._url = url,
-      Internal.Http._body = body,
-      Internal.Http._timeout = Nothing,
-      Internal.Http._expect = expect
-    }
+  request
+    handler'
+    Internal.Http.Settings
+      { Internal.Http._method = "POST",
+        Internal.Http._headers = [],
+        Internal.Http._url = url,
+        Internal.Http._body = body,
+        Internal.Http._timeout = Nothing,
+        Internal.Http._expect = expect
+      }
 
 -- REQUEST
 
@@ -320,7 +324,6 @@ data Info
   deriving (Generic)
 
 instance Aeson.ToJSON Info where
-
   toJSON = Aeson.genericToJSON infoEncodingOptions
 
   toEncoding = Aeson.genericToEncoding infoEncodingOptions
