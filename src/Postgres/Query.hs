@@ -158,7 +158,6 @@ mkInfo query conn =
     }
 
 instance Aeson.ToJSON Info where
-
   toJSON = Aeson.genericToJSON infoEncodingOptions
 
   toEncoding = Aeson.genericToEncoding infoEncodingOptions
@@ -177,7 +176,6 @@ data ConnectionInfo
   deriving (Generic)
 
 instance Aeson.ToJSON ConnectionInfo where
-
   toJSON = Aeson.toJSON << connectionToText
 
   toEncoding = Aeson.toEncoding << connectionToText
