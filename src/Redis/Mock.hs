@@ -79,13 +79,14 @@ handler = do
               )
               |> map Ok
           )
-  pure Internal.Handler
-    { Internal.rawPing = rawPing,
-      Internal.rawGet = rawGet,
-      Internal.rawSet = rawSet,
-      Internal.rawGetSet = rawGetSet,
-      Internal.rawGetMany = rawGetMany,
-      Internal.rawSetMany = rawSetMany,
-      Internal.rawDelete = delete,
-      Internal.rawAtomicModify = atomicModify
-    }
+  pure
+    Internal.Handler
+      { Internal.rawPing = rawPing,
+        Internal.rawGet = rawGet,
+        Internal.rawSet = rawSet,
+        Internal.rawGetSet = rawGetSet,
+        Internal.rawGetMany = rawGetMany,
+        Internal.rawSetMany = rawSetMany,
+        Internal.rawDelete = delete,
+        Internal.rawAtomicModify = atomicModify
+      }
