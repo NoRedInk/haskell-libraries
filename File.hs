@@ -59,22 +59,23 @@ logItemRecursively handler' namespace requestId span = do
 
 logItem :: Handler -> Katip.Namespace -> Text -> Platform.TracingSpan -> Katip.KatipT Prelude.IO ()
 logItem (Handler env timer _) namespace requestId span =
-  Katip.logKatipItem Katip.Item
-    { Katip._itemApp = Katip._logEnvApp env,
-      Katip._itemEnv = Katip._logEnvEnv env,
-      Katip._itemSeverity = case Platform.succeeded span of
-        Platform.Succeeded -> Katip.InfoS
-        Platform.Failed -> Katip.ErrorS
-        Platform.FailedWith _ -> Katip.AlertS,
-      Katip._itemThread = Katip.ThreadIdText requestId,
-      Katip._itemHost = Katip._logEnvHost env,
-      Katip._itemProcess = Katip._logEnvPid env,
-      Katip._itemPayload = LogItem span,
-      Katip._itemMessage = Katip.logStr (Platform.name span),
-      Katip._itemTime = toUTC timer (Platform.started span),
-      Katip._itemNamespace = Katip._logEnvApp env ++ namespace,
-      Katip._itemLoc = map srcLocToLoc (Platform.frame span)
-    }
+  Katip.logKatipItem
+    Katip.Item
+      { Katip._itemApp = Katip._logEnvApp env,
+        Katip._itemEnv = Katip._logEnvEnv env,
+        Katip._itemSeverity = case Platform.succeeded span of
+          Platform.Succeeded -> Katip.InfoS
+          Platform.Failed -> Katip.ErrorS
+          Platform.FailedWith _ -> Katip.AlertS,
+        Katip._itemThread = Katip.ThreadIdText requestId,
+        Katip._itemHost = Katip._logEnvHost env,
+        Katip._itemProcess = Katip._logEnvPid env,
+        Katip._itemPayload = LogItem span,
+        Katip._itemMessage = Katip.logStr (Platform.name span),
+        Katip._itemTime = toUTC timer (Platform.started span),
+        Katip._itemNamespace = Katip._logEnvApp env ++ namespace,
+        Katip._itemLoc = map srcLocToLoc (Platform.frame span)
+      }
 
 srcLocToLoc :: (Text, Stack.SrcLoc) -> TH.Loc
 srcLocToLoc (_, srcLoc) =
