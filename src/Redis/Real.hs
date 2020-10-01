@@ -3,6 +3,7 @@ module Redis.Real where
 import Cherry.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.Text
 import qualified Data.Text.Encoding
@@ -54,6 +55,20 @@ platformRedis connection anything action =
     |> map toResult
     |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
     |> Platform.doAnything anything
+    |> traceQuery connection
+
+traceQuery :: Database.Redis.Connection -> Task e a -> Task e a
+traceQuery _connection task =
+  let info = Info
+   in Platform.tracingSpan
+        "Redis Query"
+        (Platform.finally task (Platform.setTracingSpanDetails info))
+
+data Info = Info deriving (Generic)
+
+instance Aeson.ToJSON Info
+
+instance Platform.TracingSpanDetails Info
 
 toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
 toResult reply =
