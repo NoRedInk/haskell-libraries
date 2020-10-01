@@ -41,6 +41,7 @@ import qualified Observability.Helpers
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
 import qualified Postgres
+import qualified Redis
 import qualified Prelude
 
 -- This function takes the root span of a completed request and reports it to
@@ -251,6 +252,7 @@ customizeBreadcrumb span details breadcrumb =
       [ Platform.Renderer (outgoingHttpRequestAsBreadcrumb breadcrumb),
         Platform.Renderer (mysqlQueryAsBreadcrumb breadcrumb),
         Platform.Renderer (postgresQueryAsBreadcrumb breadcrumb),
+        Platform.Renderer (redisQueryAsBreadcrumb breadcrumb),
         Platform.Renderer (logAsBreadcrumb span breadcrumb),
         Platform.Renderer (unknownAsBreadcrumb breadcrumb)
       ]
@@ -272,6 +274,13 @@ mysqlQueryAsBreadcrumb breadcrumb details =
 
 postgresQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> Postgres.Info -> Bugsnag.Breadcrumb
 postgresQueryAsBreadcrumb breadcrumb details =
+  breadcrumb
+    { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
+      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
+    }
+
+redisQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> Redis.Info -> Bugsnag.Breadcrumb
+redisQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
       Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
