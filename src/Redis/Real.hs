@@ -52,7 +52,7 @@ platformRedis ::
 platformRedis connection anything action =
   Database.Redis.runRedis connection action
     |> map toResult
-    |> (\r -> Exception.catch r (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost))
+    |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
     |> Platform.doAnything anything
 
 toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
