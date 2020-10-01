@@ -35,26 +35,20 @@ unsafeBulkifyInsertsTests =
     "unsafeBulkifyInserts"
     [ test "works when passed a single insert" <| \_ ->
         [mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)"]
-          |> MySQL.unsafeBulkifyInserts
-          |> map preparedStatement
-          |> Expect.equal
-            (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)"),
+          |> MySQL.unsafeBulkifyInserts preparedStatement ""
+          |> Expect.equal "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)",
       test "works when passed multiple inserts" <| \_ ->
         [ mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3)",
           mockQuery "INSERT INTO foos (id, bars, bazs) VALUES (4,5,6)"
         ]
-          |> MySQL.unsafeBulkifyInserts
-          |> map preparedStatement
-          |> Expect.equal
-            (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3), (4,5,6)"),
+          |> MySQL.unsafeBulkifyInserts preparedStatement ""
+          |> Expect.equal "INSERT INTO foos (id, bars, bazs) VALUES (1,2,3), (4,5,6)",
       test "works with inconsistent casing of the word VALUES" <| \_ ->
         [ mockQuery "INSERT INTO foos (id, bars, bazs) valUES (1,2,3)",
           mockQuery "INSERT INTO foos (id, bars, bazs) vALues (4,5,6)"
         ]
-          |> MySQL.unsafeBulkifyInserts
-          |> map preparedStatement
-          |> Expect.equal
-            (MySQL.BulkifiedInsert "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)")
+          |> MySQL.unsafeBulkifyInserts preparedStatement ""
+          |> Expect.equal "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)"
     ]
 
 queriesWithQuestionMarks :: MySQL.Connection -> Test

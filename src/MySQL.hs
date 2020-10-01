@@ -57,7 +57,6 @@ module MySQL
 
     -- * Helpers for uncommon queries
     unsafeBulkifyInserts,
-    BulkifiedInsert (..),
     onConflictUpdate,
     onDuplicateDoNothing,
     sqlYearly,
@@ -524,15 +523,16 @@ withConnection conn func =
 --
 -- For MySQL there might be other approaches we could take, which might offer
 -- more compile-time guarantees.
-data BulkifiedInsert a
-  = BulkifiedInsert a
-  | UnableToBulkify Text
-  | EmptyInsert
-  deriving (Prelude.Functor, Show, Eq)
-
-unsafeBulkifyInserts :: [Query.Query ()] -> BulkifiedInsert (Query.Query ())
-unsafeBulkifyInserts [] = EmptyInsert
-unsafeBulkifyInserts all@(first : rest) =
+unsafeBulkifyInserts ::
+  (Query.Query () -> a) ->
+  -- ^ If more than one query has been combined its passed to this callback.
+  a ->
+  -- ^ If the list of passed in queries is empty this default value is returned.
+  [Query.Query ()] -> 
+  -- ^ The queries to combine.
+  a
+unsafeBulkifyInserts _runCombined runNone []  = runNone
+unsafeBulkifyInserts runCombined _runNone all@(first : rest) =
   first
     { Query.preparedStatement =
         Data.Text.intercalate
@@ -544,7 +544,7 @@ unsafeBulkifyInserts all@(first : rest) =
         Prelude.traverse Query.params all
           |> map List.concat
     }
-    |> BulkifiedInsert
+    |> runCombined
   where
     splitAt =
       Query.preparedStatement first
