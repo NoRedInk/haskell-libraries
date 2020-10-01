@@ -46,25 +46,33 @@ releaseHandler :: (Internal.Handler, Database.Redis.Connection) -> IO ()
 releaseHandler (_, connection) = Database.Redis.disconnect connection
 
 platformRedis ::
+  Text ->
   Database.Redis.Connection ->
   Platform.DoAnythingHandler ->
   Database.Redis.Redis (Either Database.Redis.Reply a) ->
   Task Internal.Error a
-platformRedis connection anything action =
+platformRedis command connection anything action =
   Database.Redis.runRedis connection action
     |> map toResult
     |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
     |> Platform.doAnything anything
-    |> traceQuery connection
+    |> traceQuery command connection
 
-traceQuery :: Database.Redis.Connection -> Task e a -> Task e a
-traceQuery _connection task =
-  let info = Info
+traceQuery :: Text -> Database.Redis.Connection -> Task e a -> Task e a
+traceQuery command _connection task =
+  let info =
+        Info
+          { infoCommand = command
+          }
    in Platform.tracingSpan
         "Redis Query"
         (Platform.finally task (Platform.setTracingSpanDetails info))
 
-data Info = Info deriving (Generic)
+newtype Info
+  = Info
+      { infoCommand :: Text
+      }
+  deriving (Generic)
 
 instance Aeson.ToJSON Info
 
@@ -82,7 +90,7 @@ rawPing ::
   Platform.DoAnythingHandler ->
   Task Internal.Error Database.Redis.Status
 rawPing connection anything =
-  platformRedis connection anything Database.Redis.ping
+  platformRedis "ping" connection anything Database.Redis.ping
 
 rawGet ::
   Database.Redis.Connection ->
@@ -90,7 +98,7 @@ rawGet ::
   Data.ByteString.ByteString ->
   Task Internal.Error (Maybe Data.ByteString.ByteString)
 rawGet connection anything key =
-  platformRedis connection anything (Database.Redis.get key)
+  platformRedis "get" connection anything (Database.Redis.get key)
 
 rawSet ::
   Database.Redis.Connection ->
@@ -99,7 +107,7 @@ rawSet ::
   Data.ByteString.ByteString ->
   Task Internal.Error ()
 rawSet connection anything key value =
-  platformRedis connection anything (Database.Redis.set key value)
+  platformRedis "set" connection anything (Database.Redis.set key value)
     |> map (\_ -> ())
 
 rawGetSet ::
@@ -109,7 +117,7 @@ rawGetSet ::
   Data.ByteString.ByteString ->
   Task Internal.Error (Maybe Data.ByteString.ByteString)
 rawGetSet connection anything key value =
-  platformRedis connection anything (Database.Redis.getset key value)
+  platformRedis "getset" connection anything (Database.Redis.getset key value)
 
 rawGetMany ::
   Database.Redis.Connection ->
@@ -117,7 +125,7 @@ rawGetMany ::
   [Data.ByteString.ByteString] ->
   Task Internal.Error [Maybe Data.ByteString.ByteString]
 rawGetMany connection anything keys =
-  platformRedis connection anything (Database.Redis.mget keys)
+  platformRedis "mget" connection anything (Database.Redis.mget keys)
 
 rawSetMany ::
   Database.Redis.Connection ->
@@ -125,7 +133,7 @@ rawSetMany ::
   [(Data.ByteString.ByteString, Data.ByteString.ByteString)] ->
   Task Internal.Error ()
 rawSetMany connection anything assocs =
-  platformRedis connection anything (Database.Redis.mset assocs)
+  platformRedis "mset" connection anything (Database.Redis.mset assocs)
     |> map (\_ -> ())
 
 rawDelete ::
@@ -134,7 +142,7 @@ rawDelete ::
   [Data.ByteString.ByteString] ->
   Task Internal.Error Int
 rawDelete connection anything keys =
-  platformRedis connection anything (Database.Redis.del keys)
+  platformRedis "del" connection anything (Database.Redis.del keys)
     |> map fromIntegral
 
 rawAtomicModify ::
@@ -148,6 +156,7 @@ rawAtomicModify connection anything key f =
   where
     inner count =
       platformRedis
+        "watch get multi set exec"
         connection
         anything
         action
