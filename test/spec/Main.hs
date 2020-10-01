@@ -3,7 +3,7 @@ module Main (main) where
 import Cherry.Prelude
 import qualified Conduit
 import qualified Control.Concurrent.Async
-import qualified Control.Monad.Catch
+import qualified Control.Exception.Safe as Exception
 import qualified Database.Redis
 import qualified Dict
 import Dict (Dict)
@@ -208,10 +208,10 @@ getRedisHandlers settings =
   Conduit.mkAcquire acquire release
     |> map fst
   where
-    release (_, Just conn) = Database.Redis.disconnect conn
+    release (_, Just connection) = Database.Redis.disconnect (Real.connectionHedis connection)
     release (_, Nothing) = pure ()
     acquire =
-      Control.Monad.Catch.catchAll
+      Exception.catchAny
         ( Real.acquireHandler settings
             |> map (Tuple.mapSecond Just)
             |> andThen
