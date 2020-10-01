@@ -35,6 +35,7 @@ import qualified MySQL
 import Observability.Timer (Timer, toPosixMicroseconds)
 import qualified Platform
 import qualified Postgres
+import qualified Redis
 import qualified Text
 import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
@@ -129,6 +130,7 @@ chooseAndStartSegment tx span =
       ( Platform.renderTracingSpanDetails
           [ Platform.Renderer (startDatastoreSegment tx << mysqlToDatastore),
             Platform.Renderer (startDatastoreSegment tx << postgresToDatastore),
+            Platform.Renderer (startDatastoreSegment tx << redisToDatastore),
             Platform.Renderer (startExternalSegment tx << httpToExternalSegment)
           ]
       )
@@ -169,6 +171,18 @@ postgresToDatastore info =
         Postgres.TcpSocket _ _ dbname -> nonEmptyText dbname
         Postgres.UnixSocket _ dbname -> nonEmptyText dbname,
       NewRelic.datastoreSegmentQuery = nonEmptyText (Postgres.infoQueryTemplate info)
+    }
+
+redisToDatastore :: Redis.Info -> NewRelic.DatastoreSegment
+redisToDatastore info =
+  NewRelic.DatastoreSegment
+    { NewRelic.datastoreSegmentProduct = NewRelic.Redis,
+      NewRelic.datastoreSegmentCollection = Nothing,
+      NewRelic.datastoreSegmentOperation = Just (Redis.infoCommand info),
+      NewRelic.datastoreSegmentHost = Just (Redis.infoHost info),
+      NewRelic.datastoreSegmentPortPathOrId = Just (Redis.infoPort info),
+      NewRelic.datastoreSegmentDatabaseName = Nothing,
+      NewRelic.datastoreSegmentQuery = Nothing
     }
 
 httpToExternalSegment :: Http.Info -> NewRelic.ExternalSegment
