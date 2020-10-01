@@ -19,14 +19,15 @@ handler settings =
   Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
     |> map fst
 
-acquireHandler :: Settings.Settings -> IO (Internal.Handler, Database.Redis.Connection)
+acquireHandler :: Settings.Settings -> IO (Internal.Handler, Connection)
 acquireHandler settings = do
   connection <-
-    case Settings.clusterMode settings of
-      Settings.Cluster ->
-        Database.Redis.connectCluster (Settings.connectionInfo settings)
-      Settings.NotCluster ->
-        Database.Redis.checkedConnect (Settings.connectionInfo settings)
+    map Connection
+      <| case Settings.clusterMode settings of
+        Settings.Cluster ->
+          Database.Redis.connectCluster (Settings.connectionInfo settings)
+        Settings.NotCluster ->
+          Database.Redis.checkedConnect (Settings.connectionInfo settings)
   anything <- Platform.doAnythingHandler
   pure
     <| ( Internal.Handler
@@ -42,23 +43,28 @@ acquireHandler settings = do
          connection
        )
 
-releaseHandler :: (Internal.Handler, Database.Redis.Connection) -> IO ()
-releaseHandler (_, connection) = Database.Redis.disconnect connection
+releaseHandler :: (Internal.Handler, Connection) -> IO ()
+releaseHandler (_, Connection connection) = Database.Redis.disconnect connection
+
+newtype Connection
+  = Connection
+      { connectionHedis :: Database.Redis.Connection
+      }
 
 platformRedis ::
   Text ->
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   Database.Redis.Redis (Either Database.Redis.Reply a) ->
   Task Internal.Error a
-platformRedis command connection anything action =
+platformRedis command (Connection connection) anything action =
   Database.Redis.runRedis connection action
     |> map toResult
     |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
     |> Platform.doAnything anything
-    |> traceQuery command connection
+    |> traceQuery command (Connection connection)
 
-traceQuery :: Text -> Database.Redis.Connection -> Task e a -> Task e a
+traceQuery :: Text -> Connection -> Task e a -> Task e a
 traceQuery command _connection task =
   let info =
         Info
@@ -86,14 +92,14 @@ toResult reply =
     Right r -> Ok r
 
 rawPing ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   Task Internal.Error Database.Redis.Status
 rawPing connection anything =
   platformRedis "ping" connection anything Database.Redis.ping
 
 rawGet ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   Data.ByteString.ByteString ->
   Task Internal.Error (Maybe Data.ByteString.ByteString)
@@ -101,7 +107,7 @@ rawGet connection anything key =
   platformRedis "get" connection anything (Database.Redis.get key)
 
 rawSet ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   Data.ByteString.ByteString ->
   Data.ByteString.ByteString ->
@@ -111,7 +117,7 @@ rawSet connection anything key value =
     |> map (\_ -> ())
 
 rawGetSet ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   Data.ByteString.ByteString ->
   Data.ByteString.ByteString ->
@@ -120,7 +126,7 @@ rawGetSet connection anything key value =
   platformRedis "getset" connection anything (Database.Redis.getset key value)
 
 rawGetMany ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   [Data.ByteString.ByteString] ->
   Task Internal.Error [Maybe Data.ByteString.ByteString]
@@ -128,7 +134,7 @@ rawGetMany connection anything keys =
   platformRedis "mget" connection anything (Database.Redis.mget keys)
 
 rawSetMany ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   [(Data.ByteString.ByteString, Data.ByteString.ByteString)] ->
   Task Internal.Error ()
@@ -137,7 +143,7 @@ rawSetMany connection anything assocs =
     |> map (\_ -> ())
 
 rawDelete ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   [Data.ByteString.ByteString] ->
   Task Internal.Error Int
@@ -146,7 +152,7 @@ rawDelete connection anything keys =
     |> map fromIntegral
 
 rawAtomicModify ::
-  Database.Redis.Connection ->
+  Connection ->
   Platform.DoAnythingHandler ->
   Data.ByteString.ByteString ->
   (Maybe Data.ByteString.ByteString -> (Data.ByteString.ByteString, a)) ->
