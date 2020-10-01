@@ -36,6 +36,7 @@ module Redis
     Internal.NamespacedHandler,
     Internal.namespacedHandler,
     -- Real
+    Real.Info (..),
     Real.handler,
     readiness,
   )
