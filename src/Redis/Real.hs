@@ -1,7 +1,7 @@
 module Redis.Real where
 
 import Cherry.Prelude
-import qualified Control.Monad.Catch
+import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.ByteString
 import qualified Data.Text
@@ -52,7 +52,7 @@ platformRedis ::
 platformRedis connection anything action =
   Database.Redis.runRedis connection action
     |> map toResult
-    |> (\r -> Control.Monad.Catch.catch r (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost))
+    |> (\r -> Exception.catch r (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost))
     |> Platform.doAnything anything
 
 toResult :: Either Database.Redis.Reply a -> Result Internal.Error a

@@ -10,7 +10,7 @@ library:
   - cherry-core
   - conduit
   - env-parser
-  - exceptions
+  - safe-exceptions
   - health
   - hedis
   - resourcet
