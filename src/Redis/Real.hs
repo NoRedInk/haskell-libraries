@@ -12,7 +12,8 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Task
-import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure)
+import qualified Text
+import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
 
 handler :: Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler settings =
@@ -21,13 +22,24 @@ handler settings =
 
 acquireHandler :: Settings.Settings -> IO (Internal.Handler, Connection)
 acquireHandler settings = do
-  connection <-
-    map Connection
-      <| case Settings.clusterMode settings of
+  connection <- do
+    let connectionInfo = Settings.connectionInfo settings
+    connectionHedis <-
+      case Settings.clusterMode settings of
         Settings.Cluster ->
-          Database.Redis.connectCluster (Settings.connectionInfo settings)
+          Database.Redis.connectCluster connectionInfo
         Settings.NotCluster ->
-          Database.Redis.checkedConnect (Settings.connectionInfo settings)
+          Database.Redis.checkedConnect connectionInfo
+    let connectionString =
+          Text.concat
+            [ "redis://",
+              Data.Text.pack (Database.Redis.connectHost connectionInfo),
+              ":",
+              case Database.Redis.connectPort connectionInfo of
+                Database.Redis.PortNumber port -> Data.Text.pack (show port)
+                Database.Redis.UnixSocket socket -> Data.Text.pack socket
+            ]
+    pure Connection {connectionHedis, connectionString}
   anything <- Platform.doAnythingHandler
   pure
     <| ( Internal.Handler
@@ -44,11 +56,12 @@ acquireHandler settings = do
        )
 
 releaseHandler :: (Internal.Handler, Connection) -> IO ()
-releaseHandler (_, Connection connection) = Database.Redis.disconnect connection
+releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis
 
-newtype Connection
+data Connection
   = Connection
-      { connectionHedis :: Database.Redis.Connection
+      { connectionHedis :: Database.Redis.Connection,
+        connectionString :: Text
       }
 
 platformRedis ::
@@ -57,26 +70,28 @@ platformRedis ::
   Platform.DoAnythingHandler ->
   Database.Redis.Redis (Either Database.Redis.Reply a) ->
   Task Internal.Error a
-platformRedis command (Connection connection) anything action =
-  Database.Redis.runRedis connection action
+platformRedis command connection anything action =
+  Database.Redis.runRedis (connectionHedis connection) action
     |> map toResult
     |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
     |> Platform.doAnything anything
-    |> traceQuery command (Connection connection)
+    |> traceQuery command connection
 
 traceQuery :: Text -> Connection -> Task e a -> Task e a
-traceQuery command _connection task =
+traceQuery command connection task =
   let info =
         Info
-          { infoCommand = command
+          { infoCommand = command,
+            infoConnectionString = connectionString connection
           }
    in Platform.tracingSpan
         "Redis Query"
         (Platform.finally task (Platform.setTracingSpanDetails info))
 
-newtype Info
+data Info
   = Info
-      { infoCommand :: Text
+      { infoCommand :: Text,
+        infoConnectionString :: Text
       }
   deriving (Generic)
 
