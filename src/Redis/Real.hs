@@ -50,12 +50,10 @@ platformRedis ::
   Database.Redis.Redis (Either Database.Redis.Reply a) ->
   Task Internal.Error a
 platformRedis connection anything action =
-  Platform.doAnything
-    anything
-    ( Database.Redis.runRedis connection action
-        |> map toResult
-        |> (\r -> Control.Monad.Catch.catch r (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost))
-    )
+  Database.Redis.runRedis connection action
+    |> map toResult
+    |> (\r -> Control.Monad.Catch.catch r (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost))
+    |> Platform.doAnything anything
 
 toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
 toResult reply =
