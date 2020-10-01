@@ -12,7 +12,6 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Task
-import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
 
 handler :: Settings.Settings -> Data.Acquire.Acquire Internal.Handler
@@ -30,16 +29,12 @@ acquireHandler settings = do
           Database.Redis.connectCluster connectionInfo
         Settings.NotCluster ->
           Database.Redis.checkedConnect connectionInfo
-    let connectionString =
-          Text.concat
-            [ "redis://",
-              Data.Text.pack (Database.Redis.connectHost connectionInfo),
-              ":",
-              case Database.Redis.connectPort connectionInfo of
-                Database.Redis.PortNumber port -> Data.Text.pack (show port)
-                Database.Redis.UnixSocket socket -> Data.Text.pack socket
-            ]
-    pure Connection {connectionHedis, connectionString}
+    let connectionHost = Data.Text.pack (Database.Redis.connectHost connectionInfo)
+    let connectionPort =
+          case Database.Redis.connectPort connectionInfo of
+            Database.Redis.PortNumber port -> Data.Text.pack (show port)
+            Database.Redis.UnixSocket socket -> Data.Text.pack socket
+    pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
     <| ( Internal.Handler
@@ -61,7 +56,8 @@ releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect con
 data Connection
   = Connection
       { connectionHedis :: Database.Redis.Connection,
-        connectionString :: Text
+        connectionHost :: Text,
+        connectionPort :: Text
       }
 
 platformRedis ::
@@ -82,7 +78,8 @@ traceQuery command connection task =
   let info =
         Info
           { infoCommand = command,
-            infoConnectionString = connectionString connection
+            infoHost = connectionHost connection,
+            infoPort = connectionPort connection
           }
    in Platform.tracingSpan
         "Redis Query"
@@ -91,7 +88,8 @@ traceQuery command connection task =
 data Info
   = Info
       { infoCommand :: Text,
-        infoConnectionString :: Text
+        infoHost :: Text,
+        infoPort :: Text
       }
   deriving (Generic)
 
