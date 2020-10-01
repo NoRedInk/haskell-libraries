@@ -525,13 +525,10 @@ withConnection conn func =
 -- more compile-time guarantees.
 unsafeBulkifyInserts ::
   (Query.Query () -> a) ->
-  -- ^ If more than one query has been combined its passed to this callback.
   a ->
-  -- ^ If the list of passed in queries is empty this default value is returned.
-  [Query.Query ()] -> 
-  -- ^ The queries to combine.
+  [Query.Query ()] ->
   a
-unsafeBulkifyInserts _runCombined runNone []  = runNone
+unsafeBulkifyInserts _runCombined runNone [] = runNone
 unsafeBulkifyInserts runCombined _runNone all@(first : rest) =
   first
     { Query.preparedStatement =
