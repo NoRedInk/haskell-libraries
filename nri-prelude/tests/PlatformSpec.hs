@@ -1,8 +1,8 @@
 module PlatformSpec (tests) where
 
-import NriPrelude
 import Data.Aeson as Aeson
 import qualified Expect
+import NriPrelude
 import qualified Platform
 import Test (Test, describe, test)
 

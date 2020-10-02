@@ -11,10 +11,10 @@ module Internal.Expectation
   )
 where
 
-import NriPrelude
 import Control.Monad.IO.Class (liftIO)
 import qualified Internal.TestResult as TestResult
 import Internal.TestResult (TestResult)
+import NriPrelude
 import Prelude (Applicative, Functor, IO, Monad, Show, pure)
 
 newtype Expectation a = Expectation (IO a)

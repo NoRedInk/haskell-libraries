@@ -1,10 +1,10 @@
 module ArraySpec (tests) where
 
 import Array
-import NriPrelude hiding (map)
 import qualified Expect
 import qualified Fuzz
 import qualified List
+import NriPrelude hiding (map)
 import Test (Test, describe, fuzz, fuzz2, test)
 
 tests :: Test
