@@ -11,9 +11,9 @@ module Test.Console.Color
   )
 where
 
-import NriPrelude
 import qualified Data.Text
 import List (List)
+import NriPrelude
 import qualified System.Console.ANSI as Console
 import Text (Text)
 
