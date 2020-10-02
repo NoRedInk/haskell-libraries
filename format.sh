@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ormolu -m inplace nri-*/**/*.hs
+LC_ALL=C.UTF-8 ormolu -m inplace nri-*/**/*.hs
 
 if git status --porcelain | grep . ; then
   echo "Not all files were formatted with ormolu."
