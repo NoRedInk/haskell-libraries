@@ -11,7 +11,6 @@ module Internal.Test
   )
 where
 
-import NriPrelude
 import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Text
@@ -27,6 +26,7 @@ import qualified Internal.TestResult
 import Internal.TestResult (TestResult)
 import List (List)
 import qualified List
+import NriPrelude
 import Test.Tasty (TestTree)
 import qualified Text
 import Prelude (IO, Monad, Show, pure, show, traverse)

@@ -1,5 +1,8 @@
 language: nix
 
+cache:
+  directories:
+    - $HOME/.cabal
+
 script:
-  - ./lint.sh
-  - sudo nix-shell --run "cabal test"
+  - nix-shell --run "./test.sh"
