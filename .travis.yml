@@ -1,5 +1,4 @@
 language: nix
 
 script:
-  - ./lint.sh
-  - sudo nix-shell --run "cabal test"
+  - nix-shell --run "./lint.sh && cabal test"
