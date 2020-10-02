@@ -1,6 +1,5 @@
 module LogSpec (tests) where
 
-import NriPrelude
 import qualified Control.Concurrent
 import qualified Control.Exception.Safe as Exception
 import qualified Data.IORef as IORef
@@ -8,6 +7,7 @@ import qualified Debug
 import qualified Expect
 import qualified GHC.Stack as Stack
 import Log
+import NriPrelude
 import qualified Platform.Internal as Internal
 import qualified Task
 import Test (Test, describe, test)
@@ -174,7 +174,7 @@ data TestException = TestException deriving (Show)
 
 instance Exception.Exception TestException
 
-newHandler :: Stack.HasCallStack => Prelude.IO (Prelude.IO [Internal.TracingSpan], Internal.Handler)
+newHandler :: Stack.HasCallStack => Prelude.IO (Prelude.IO [Internal.TracingSpan], Internal.LogHandler)
 newHandler = do
   recordedTracingSpans <- IORef.newIORef []
   handler <-

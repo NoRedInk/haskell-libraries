@@ -2,26 +2,22 @@
 
 -- | A module for reading configuration options from environment variables.
 --
--- Applications have configuration options. [The Twelve-Factor App] recommends
--- applications read these from environment variables. This requires us to
--- decode environment variables, which are strings, into the different types the
--- app's configuration options might have. This module helps with that.
+-- Applications have configuration options. [The Twelve-Factor
+-- App](https://12factor.net/import) recommends applications read these from
+-- environment variables. This requires us to decode environment variables,
+-- which are strings, into the different types the app's configuration options
+-- might have. This module helps with that.
 --
--- There's a couple of similar modules out there (like @envparse@ and @envy@),
--- but we find them overly complicated in some ways and lacking in others.
--- Here's what sets this package apart from these other approaches:
+-- Here's what sets this package apart from other environment parsers:
 --
 -- - Very small API, supporting just one way to do environment parsing.
--- - Comes with parsers for common configuration option types, such as uris.
+-- - Comes with parsers for common configuration option types, such as URIs.
 --   Not using type classes for these parsers means we don't have to write a
 --   bunch of orphan instances.
 -- - Mandatory documentation of each environment variable we want to decode.
 -- - The decoders keep track of all the environment variables they depend on.
 --   That way the decoder for an application can tell us all the environment
---   variables an application depends on and (because of the mandatory
---   documentation) what those environment variables are used for.
---
--- [The Twelve-Factor App]: https://12factor.net/import NriPrelude
+--   variables an application depends on and what they are used for.
 module Environment
   ( -- * Parsers
     Parser,
@@ -162,15 +158,15 @@ networkURI =
 -- | Create a parser for custom types. Build on the back of one of the primitve
 -- parsers from this module.
 --
---     data Environment = Development | Production
---
---     environment :: Parser Environment
---     environment =
---         custom text <| \str ->
---             case str of
---                 "development" -> Ok Development
---                 "production" -> Ok Production
---                 _ -> Err ("Unknown environment: " ++ str)
+-- > data Environment = Development | Production
+-- >
+-- > environment :: Parser Environment
+-- > environment =
+-- >     custom text <| \str ->
+-- >         case str of
+-- >             "development" -> Ok Development
+-- >             "production" -> Ok Production
+-- >             _ -> Err ("Unknown environment: " ++ str)
 custom :: Parser a -> (a -> Result Text b) -> Parser b
 custom (Parser base) fn = Parser (\val -> base val |> andThen fn)
 
@@ -239,15 +235,15 @@ data DecodedVariable
 -- | Produce a configuration from a single environment veriable. Usually you
 -- will combine these with @mapN@ functions to build larger configurations.
 --
---     Data Settings = Settings
---        { amountOfHats :: Int
---        , furLined :: Bool
---        }
---
---     map2
---      Settings
---      (variable (Variable "HATS" "Amount of hats" "2") int)
---      (variable (Variable "FUR_LINED" "Do hats have fur lining?" "False") boolean)
+-- > Data Settings = Settings
+-- >    { amountOfHats :: Int
+-- >    , furLined :: Bool
+-- >    }
+-- >
+-- > map2
+-- >  Settings
+-- >  (variable (Variable "HATS" "Amount of hats" "2") int)
+-- >  (variable (Variable "FUR_LINED" "Do hats have fur lining?" "False") boolean)
 variable :: Variable -> Parser a -> Decoder a
 variable var (Parser parse) =
   Decoder

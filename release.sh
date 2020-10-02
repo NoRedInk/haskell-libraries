@@ -2,9 +2,13 @@
 
 set -euo pipefail
 
-if [ $# -eq 0 ]; then
-  echo "usage: release.sh <project>"
+function fail {
+  echo "$1"
   exit 1
+}
+
+if [ $# -eq 0 ]; then
+  fail "usage: release.sh <project>"
 fi
 
 pushd "$1"
@@ -12,6 +16,20 @@ pushd "$1"
 name=$(cat package.yaml | grep name: | awk '{print $2}')
 version=$(cat package.yaml | grep version: | awk '{print $2}')
 bundle="$name-$version.tar.gz"
+
+# check changelog contains an entry for this version
+grep "^# $version$" < CHANGELOG.md > /dev/null || fail "CHANGELOG.md is missing an entry for the current version."
+
+# check copyright year is current year
+grep "^copyright: $(date +'%Y')" < package.yaml > /dev/null \
+  || fail "The copyright line in package.yaml does not match the current year."
+grep "Copyright (c) $(date +'%Y')" < LICENSE > /dev/null \
+  || fail "The copyright line in the LICENSE file does not match the current year."
+
+# check github release tag exists
+git fetch --tags
+git tag -l --points-at HEAD | grep "^$name-$version$" > /dev/null \
+  || fail "No git tag for current version exists. Please create tag with name: $name-$version"
 
 hpack
 cabal sdist -o - > "$bundle"

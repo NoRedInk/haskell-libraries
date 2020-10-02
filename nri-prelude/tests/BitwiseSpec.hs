@@ -1,8 +1,8 @@
 module BitwiseSpec (tests) where
 
 import Bitwise
-import NriPrelude
 import qualified Expect
+import NriPrelude
 import Test (Test, describe, test)
 
 tests :: Test

@@ -1,0 +1,5 @@
+language: nix
+
+script:
+  - ./lint.sh
+  - sudo nix-shell --run "cabal test"

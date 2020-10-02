@@ -2,18 +2,19 @@ name: nri-env-parser
 synopsis: Read environment variables as settings to build 12-factor apps.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/env-parser>.
 author: NoRedInk
-version: 0.1.0.0
+version: 0.1.0.1
 maintainer: haskell-open-source@noredink.com
 copyright: 2020 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/env-parser
 license-file: LICENSE
+category: Web
 extra-doc-files:
   - README.md
   - LICENSE
   - CHANGELOG.md
 library:
   dependencies:
-    - base >= 4.12.0.0 && < 4.13
+    - base >= 4.12.0.0 && < 4.15
     - nri-prelude >= 0.1.0.0 && < 0.2
     - modern-uri >= 0.3.1.0 && < 0.4
     - network-uri >= 2.6.2.0 && < 2.8

@@ -1,7 +1,7 @@
 module TextSpec (tests) where
 
-import NriPrelude
 import qualified Expect
+import NriPrelude
 import Test (Test, describe, test)
 import Text
 
@@ -33,7 +33,7 @@ tests =
         [ test "uncons non-empty" <| \() ->
             Expect.equal (Just ('a', "bc")) (Text.uncons "abc"),
           test "uncons empty" <| \() ->
-            Expect.nothing (Text.uncons ""),
+            Expect.equal Nothing (Text.uncons ""),
           test "append 1" <| \() ->
             Expect.equal "butterfly" (Text.append "butter" "fly"),
           test "append 2" <| \() ->

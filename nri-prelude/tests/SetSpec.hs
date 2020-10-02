@@ -1,9 +1,9 @@
 module SetSpec (tests) where
 
-import NriPrelude
 import qualified Expect
 import List (List)
 import qualified List
+import NriPrelude
 import Set (Set)
 import qualified Set
 import Test (Test, describe, test)
