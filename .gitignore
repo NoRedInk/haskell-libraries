@@ -2,3 +2,4 @@ dist-newstyle
 dist
 _build
 *.tar.gz
+*.cabal
