@@ -32,6 +32,8 @@ data Handler
         rawGetMany :: [ByteString] -> Task Error [Maybe ByteString],
         rawSetMany :: [(ByteString, ByteString)] -> Task Error (),
         rawDelete :: [ByteString] -> Task Error Int,
+        rawHGetAll :: ByteString -> Task Error [(ByteString, ByteString)],
+        rawHSet :: ByteString -> ByteString -> ByteString -> Task Error (),
         rawAtomicModify ::
           forall a.
           ByteString ->
@@ -48,6 +50,8 @@ data NamespacedHandler
         getMany :: [ByteString] -> Task Error [Maybe ByteString],
         setMany :: [(ByteString, ByteString)] -> Task Error (),
         delete :: [ByteString] -> Task Error Int,
+        hGetAll :: ByteString -> Task Error [(ByteString, ByteString)],
+        hSet :: ByteString -> ByteString -> ByteString -> Task Error (),
         atomicModify ::
           forall a.
           ByteString ->
@@ -66,6 +70,8 @@ namespacedHandler h namespace =
           getMany = \keys -> rawGetMany h (map (\k -> byteNamespace ++ k) keys),
           setMany = \assocs -> rawSetMany h (map (\(k, v) -> (byteNamespace ++ k, v)) assocs),
           delete = \keys -> rawDelete h (map (byteNamespace ++) keys),
+          hGetAll = \key -> rawHGetAll h (byteNamespace ++ key),
+          hSet = \key field val -> rawHSet h (byteNamespace ++ key) field val,
           atomicModify = \key f -> rawAtomicModify h (byteNamespace ++ key) f
         }
 

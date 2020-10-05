@@ -8,7 +8,7 @@ import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Task
-import Prelude (IO, pure, uncurry)
+import Prelude (IO, error, pure, uncurry)
 
 handler :: IO Internal.Handler
 handler = do
@@ -88,5 +88,7 @@ handler = do
         Internal.rawGetMany = rawGetMany,
         Internal.rawSetMany = rawSetMany,
         Internal.rawDelete = delete,
+        Internal.rawHGetAll = \_ -> error "No mock implementation implemented yet for hGetAll",
+        Internal.rawHSet = \_ -> error "No mock implementation implemented yet for hSet",
         Internal.rawAtomicModify = atomicModify
       }

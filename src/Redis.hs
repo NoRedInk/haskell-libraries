@@ -23,6 +23,8 @@ module Redis
     setMany,
     setManyJSON,
     delete,
+    hSet,
+    hGetAll,
     atomicModify,
     atomicModifyJSON,
     atomicModifyWithContext,
@@ -44,7 +46,7 @@ where
 
 import Cherry.Prelude
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as Lazy
 import Data.List (zip)
 import qualified Data.Text.Encoding
@@ -82,6 +84,18 @@ get :: Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe Text)
 get handler key =
   Internal.get handler (toB key)
     |> map (andThen toT)
+
+-- | Get a value from a namespaced Redis key, assuming it is valid UTF8 data.
+-- Returns `Nothing` if no value is set.
+hGetAll :: Internal.NamespacedHandler -> Text -> Task Internal.Error [(ByteString, ByteString)]
+hGetAll handler key =
+  Internal.hGetAll handler (toB key)
+
+-- | Get a value from a namespaced Redis key, assuming it is valid UTF8 data.
+-- Returns `Nothing` if no value is set.
+hSet :: Internal.NamespacedHandler -> Text -> ByteString -> ByteString -> Task Internal.Error ()
+hSet handler key field val =
+  Internal.hSet handler (toB key) field val
 
 -- | Get a value from a namespaced Redis key, assuming it is valid JSON data of
 -- the expected type.
