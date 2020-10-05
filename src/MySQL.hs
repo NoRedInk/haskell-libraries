@@ -525,11 +525,10 @@ withConnection conn func =
 -- more compile-time guarantees.
 unsafeBulkifyInserts ::
   (Query.Query () -> a) ->
-  a ->
+  Query.Query () ->
   [Query.Query ()] ->
   a
-unsafeBulkifyInserts _runCombined runNone [] = runNone
-unsafeBulkifyInserts runCombined _runNone all@(first : rest) =
+unsafeBulkifyInserts runCombined first rest =
   first
     { Query.preparedStatement =
         Data.Text.intercalate
@@ -538,7 +537,7 @@ unsafeBulkifyInserts runCombined _runNone all@(first : rest) =
               : map (Text.dropLeft splitAt << Query.preparedStatement) rest
           ),
       Query.params =
-        Prelude.traverse Query.params all
+        Prelude.traverse Query.params (first : rest)
           |> map List.concat
     }
     |> runCombined
