@@ -85,8 +85,7 @@ toBatchEvents handler' requestId parentSpanId span = do
   let duration = (Platform.finished span) - (Platform.started span) |> Platform.inMicroseconds
   let timestamp' = toISO8601 (handler_timer handler') (Platform.started span)
   let hcSpan = Span
-        { timestamp = timestamp',
-          name = Platform.name span,
+        { name = Platform.name span,
           spanId = thisSpansId,
           parentId = parentSpanId,
           traceId = requestId,
@@ -119,8 +118,7 @@ instance Aeson.ToJSON BatchEvent where
 
 data Span
   = Span
-      { timestamp :: Text,
-        name :: Text,
+      { name :: Text,
         spanId :: SpanId,
         parentId :: Maybe SpanId,
         traceId :: Text,
