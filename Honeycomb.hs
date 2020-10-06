@@ -91,7 +91,8 @@ toBatchEvents handler' requestId parentSpanId span = do
           traceId = requestId,
           serviceName = handler_serviceName handler',
           environment = handler_environment handler',
-          durationMs = (Prelude.fromIntegral duration) / 1000
+          durationMs = (Prelude.fromIntegral duration) / 1000,
+          details = Platform.details span
         }
   Prelude.pure <| BatchEvent
     { batchevent_time = timestamp,
@@ -124,7 +125,8 @@ data Span
         traceId :: Text,
         serviceName :: Text,
         environment :: Text,
-        durationMs :: Float
+        durationMs :: Float,
+        details :: Maybe Platform.SomeTracingSpanDetails
       }
   deriving (Generic)
 
@@ -133,15 +135,21 @@ instance Aeson.ToJSON Span where
     -- Use honeycomb's field names, srcs:
     -- https://docs.honeycomb.io/getting-data-in/tracing/send-trace-data/#manual-tracing
     -- https://docs.honeycomb.io/working-with-your-data/managing-your-data/definitions/
-    Aeson.object
-      [ "name" .= name span,
-        "trace.span_id" .= spanId span,
-        "trace.parent_id" .= parentId span,
-        "trace.trace_id" .= traceId span,
-        "service_name" .= serviceName span,
-        "duration_ms" .= durationMs span
-        -- TODO: put other fields here
-      ]
+    let basePairs =
+          [ "name" .= name span,
+            "trace.span_id" .= spanId span,
+            "trace.parent_id" .= parentId span,
+            "trace.trace_id" .= traceId span,
+            "service_name" .= serviceName span,
+            "duration_ms" .= durationMs span
+          ]
+        detailsPairs =
+          span
+            |> details
+            |> toHashMap
+            |> HashMap.mapWithKey (\key value -> ("details." ++ key) .= value)
+            |> HashMap.elems
+     in Aeson.object (basePairs ++ detailsPairs)
 
 newtype SpanId = SpanId UUID.UUID
   deriving (Aeson.ToJSON)
