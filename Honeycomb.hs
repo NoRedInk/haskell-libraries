@@ -177,13 +177,37 @@ data Settings
 
 decoder :: Environment.Decoder Settings
 decoder =
-  Debug.todo "hihi"
--- Prelude.pure Settings
---   |> andMap logFileDecoder
---   |> andMap namespaceDecoder
---   |> andMap environmentDecoder
---   |> andMap fractionOfSuccessRequestsLoggedDecoder
---   -- We don't define decoders for the mock* fields used by tests. Tests can
---   -- construct a Settings object directly without decoding it from env vars.
---   |> andMap (Prelude.pure Nothing)
---   |> andMap (Prelude.pure Nothing)
+  Prelude.pure Settings
+    |> andMap appNameDecoder
+    |> andMap appEnvironmentDecoder
+    |> andMap honeycombApiKeyDecoder
+
+honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret Text)
+honeycombApiKeyDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "HONEYCOMB_API_KEY",
+        Environment.description = "The API key for Honeycomb",
+        Environment.defaultValue = "*****"
+      }
+    (Environment.text |> Environment.secret)
+
+appEnvironmentDecoder :: Environment.Decoder (Text)
+appEnvironmentDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "ENVIRONMENT",
+        Environment.description = "Environment to display in logs.",
+        Environment.defaultValue = "development"
+      }
+    (Environment.text)
+
+appNameDecoder :: Environment.Decoder Text
+appNameDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "LOG_ROOT_NAMESPACE",
+        Environment.description = "Root of the log namespace. This should be the name of the application.",
+        Environment.defaultValue = "your-application-name-here"
+      }
+    (Environment.text)
