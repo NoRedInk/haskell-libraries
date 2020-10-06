@@ -83,7 +83,7 @@ toBatchEvents handler' requestId parentSpanId span = do
   thisSpansId <- map SpanId nextRandom
   children <- Prelude.traverse (toBatchEvents handler' requestId (Just thisSpansId)) (Platform.children span)
   let duration = (Platform.finished span) - (Platform.started span) |> Platform.inMicroseconds
-  let timestamp' = toISO8601 (handler_timer handler') (Platform.started span)
+  let timestamp = toISO8601 (handler_timer handler') (Platform.started span)
   let hcSpan = Span
         { name = Platform.name span,
           spanId = thisSpansId,
@@ -94,7 +94,7 @@ toBatchEvents handler' requestId parentSpanId span = do
           durationMs = (Prelude.fromIntegral duration) / 1000
         }
   Prelude.pure <| BatchEvent
-    { batchevent_time = timestamp',
+    { batchevent_time = timestamp,
       batchevent_data = hcSpan
     }
     : (List.concat children)
