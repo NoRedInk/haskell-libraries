@@ -14,10 +14,11 @@ import qualified Redis.Settings as Settings
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
 
-handler :: Settings.Settings -> Data.Acquire.Acquire Internal.Handler
-handler settings =
+handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.NamespacedHandler
+handler namespace settings =
   Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
     |> map fst
+    |> map (Internal.namespacedHandler namespace)
 
 acquireHandler :: Settings.Settings -> IO (Internal.Handler, Connection)
 acquireHandler settings = do

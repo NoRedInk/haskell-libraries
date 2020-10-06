@@ -34,9 +34,8 @@ module Redis
     Settings.decoder,
     -- Internal
     Internal.Error (..),
-    Internal.Handler,
     Internal.NamespacedHandler,
-    Internal.namespacedHandler,
+    Internal.changeNamespace,
     -- Real
     Real.Info (..),
     Real.handler,

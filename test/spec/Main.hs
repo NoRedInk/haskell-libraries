@@ -12,6 +12,7 @@ import qualified Expect
 import qualified List
 import qualified Platform
 import Redis
+import qualified Redis.Internal as Internal
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -27,7 +28,7 @@ buildSpecs TestHandlers {logHandler, redisHandlers} =
     |> map (uncurry (specs logHandler))
     |> describe "Redis Library"
 
-specs :: Platform.LogHandler -> Text -> Handler -> Test
+specs :: Platform.LogHandler -> Text -> NamespacedHandler -> Test
 specs logHandler whichHandler redisHandler =
   describe
     (whichHandler ++ " Redis")
@@ -36,8 +37,8 @@ specs logHandler whichHandler redisHandler =
         result <- get testNS "bob"
         pure <| Expect.equal result (Just "hello!"),
       redisTest "namespaces namespace" <| do
-        let nsHandler1 = namespacedHandler redisHandler "NS1"
-        let nsHandler2 = namespacedHandler redisHandler "NS2"
+        let nsHandler1 = changeNamespace "NS1" redisHandler
+        let nsHandler2 = changeNamespace "NS2" redisHandler
         set nsHandler1 "bob" "hello!"
         set nsHandler2 "bob" "goodbye"
         result1 <- get nsHandler1 "bob"
@@ -186,7 +187,7 @@ specs logHandler whichHandler redisHandler =
         pure <| Expect.equal (10, Nothing) result
     ]
   where
-    testNS = namespacedHandler redisHandler "TestNamespace"
+    testNS = changeNamespace "testNamespace" redisHandler
     redisTest name test' =
       test name <| \() ->
         Task.attempt logHandler test'
@@ -200,10 +201,10 @@ main =
 data TestHandlers
   = TestHandlers
       { logHandler :: Platform.LogHandler,
-        redisHandlers :: [(Text, Handler)]
+        redisHandlers :: [(Text, NamespacedHandler)]
       }
 
-getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, Handler)]
+getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, NamespacedHandler)]
 getRedisHandlers settings =
   Conduit.mkAcquire acquire release
     |> map fst
@@ -216,12 +217,12 @@ getRedisHandlers settings =
             |> map (Tuple.mapSecond Just)
             |> andThen
               ( \(h, c) -> do
-                  h' <- Mock.handler
-                  pure ([("Real", h), ("Mock", h')], c)
+                  h' <- Mock.handler "tests"
+                  pure ([("Real", Internal.namespacedHandler "test" h), ("Mock", h')], c)
               )
         )
         ( \_ -> do
-            h <- Mock.handler
+            h <- Mock.handler "tests"
             pure ([("Mock", h)], Nothing)
         )
 

@@ -56,11 +56,16 @@ data NamespacedHandler
           forall a.
           ByteString ->
           (Maybe ByteString -> (ByteString, a)) ->
-          Task Error (ByteString, a)
+          Task Error (ByteString, a),
+        unNamespacedHandler :: Handler
       }
 
-namespacedHandler :: Handler -> Text -> NamespacedHandler
-namespacedHandler h namespace =
+changeNamespace :: Text -> NamespacedHandler -> NamespacedHandler
+changeNamespace namespace NamespacedHandler {unNamespacedHandler} =
+  namespacedHandler namespace unNamespacedHandler
+
+namespacedHandler :: Text -> Handler -> NamespacedHandler
+namespacedHandler namespace h =
   let byteNamespace = namespace ++ ":" |> toB
    in NamespacedHandler
         { ping = rawPing h,
@@ -72,7 +77,8 @@ namespacedHandler h namespace =
           delete = \keys -> rawDelete h (map (byteNamespace ++) keys),
           hGetAll = \key -> rawHGetAll h (byteNamespace ++ key),
           hSet = \key field val -> rawHSet h (byteNamespace ++ key) field val,
-          atomicModify = \key f -> rawAtomicModify h (byteNamespace ++ key) f
+          atomicModify = \key f -> rawAtomicModify h (byteNamespace ++ key) f,
+          unNamespacedHandler = h
         }
 
 toB :: Text -> ByteString

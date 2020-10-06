@@ -10,8 +10,8 @@ import qualified Redis.Internal as Internal
 import qualified Task
 import Prelude (IO, error, pure, uncurry)
 
-handler :: IO Internal.Handler
-handler = do
+handler :: Text -> IO Internal.NamespacedHandler
+handler namespace = do
   hm <- newIORef HM.empty
   anything <- Platform.doAnythingHandler
   let rawPing =
@@ -80,15 +80,17 @@ handler = do
               |> map Ok
           )
   pure
-    Internal.Handler
-      { Internal.rawPing = rawPing,
-        Internal.rawGet = rawGet,
-        Internal.rawSet = rawSet,
-        Internal.rawGetSet = rawGetSet,
-        Internal.rawGetMany = rawGetMany,
-        Internal.rawSetMany = rawSetMany,
-        Internal.rawDelete = delete,
-        Internal.rawHGetAll = \_ -> error "No mock implementation implemented yet for hGetAll",
-        Internal.rawHSet = \_ -> error "No mock implementation implemented yet for hSet",
-        Internal.rawAtomicModify = atomicModify
-      }
+    <| ( Internal.Handler
+           { Internal.rawPing = rawPing,
+             Internal.rawGet = rawGet,
+             Internal.rawSet = rawSet,
+             Internal.rawGetSet = rawGetSet,
+             Internal.rawGetMany = rawGetMany,
+             Internal.rawSetMany = rawSetMany,
+             Internal.rawDelete = delete,
+             Internal.rawHGetAll = \_ -> error "No mock implementation implemented yet for hGetAll",
+             Internal.rawHSet = \_ -> error "No mock implementation implemented yet for hSet",
+             Internal.rawAtomicModify = atomicModify
+           }
+           |> Internal.namespacedHandler namespace
+       )
