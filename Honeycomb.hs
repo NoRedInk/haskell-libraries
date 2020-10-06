@@ -23,25 +23,18 @@ where
 
 import Cherry.Prelude
 import qualified Conduit
--- import qualified Data.Text
-
--- import qualified GHC.Stack as Stack
-
--- import qualified Language.Haskell.TH as TH
--- import qualified Maybe
-
-import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.UUID as UUID
 import Data.UUID.V4 (nextRandom)
-import qualified Debug
 import qualified Environment
 import qualified Http
 import qualified List
 import qualified Log
+import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
 import qualified Task
@@ -57,14 +50,15 @@ report handler' requestId span = do
   silentHandler' <- Platform.silentHandler
   let datasetName = (handler_serviceName handler') ++ "-" ++ (handler_environment handler')
   let url = batchApiEndpoint datasetName
-  let requestSettings = Http.Settings
-        { Http._method = "POST",
-          Http._headers = [("X-Honeycomb-Team", Encoding.encodeUtf8 <| Log.unSecret <| handler_honeycombApiKey handler')],
-          Http._url = url,
-          Http._body = body,
-          Http._timeout = Nothing,
-          Http._expect = Http.expectText
-        }
+  let requestSettings =
+        Http.Settings
+          { Http._method = "POST",
+            Http._headers = [("X-Honeycomb-Team", Encoding.encodeUtf8 <| Log.unSecret <| handler_honeycombApiKey handler')],
+            Http._url = url,
+            Http._body = body,
+            Http._timeout = Nothing,
+            Http._expect = Http.expectText
+          }
   result <-
     Http.request (handler_http handler') requestSettings
       |> Task.attempt (silentHandler')
@@ -84,20 +78,22 @@ toBatchEvents handler' requestId parentSpanId span = do
   children <- Prelude.traverse (toBatchEvents handler' requestId (Just thisSpansId)) (Platform.children span)
   let duration = (Platform.finished span) - (Platform.started span) |> Platform.inMicroseconds
   let timestamp = toISO8601 (handler_timer handler') (Platform.started span)
-  let hcSpan = Span
-        { name = Platform.name span,
-          spanId = thisSpansId,
-          parentId = parentSpanId,
-          traceId = requestId,
-          serviceName = handler_serviceName handler',
-          environment = handler_environment handler',
-          durationMs = (Prelude.fromIntegral duration) / 1000,
-          details = Platform.details span
-        }
-  Prelude.pure <| BatchEvent
-    { batchevent_time = timestamp,
-      batchevent_data = hcSpan
-    }
+  let hcSpan =
+        Span
+          { name = Platform.name span,
+            spanId = thisSpansId,
+            parentId = parentSpanId,
+            traceId = requestId,
+            serviceName = handler_serviceName handler',
+            environment = handler_environment handler',
+            durationMs = (Prelude.fromIntegral duration) / 1000,
+            details = Platform.details span
+          }
+  Prelude.pure
+    <| BatchEvent
+      { batchevent_time = timestamp,
+        batchevent_data = hcSpan
+      }
     : (List.concat children)
 
 data BatchEvent
@@ -168,13 +164,14 @@ data Handler
 handler :: Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
   http <- Http.handler
-  Prelude.pure Handler
-    { handler_timer = timer,
-      handler_http = http,
-      handler_serviceName = appName settings,
-      handler_environment = appEnvironment settings,
-      handler_honeycombApiKey = honeycombApiKey settings
-    }
+  Prelude.pure
+    Handler
+      { handler_timer = timer,
+        handler_http = http,
+        handler_serviceName = appName settings,
+        handler_environment = appEnvironment settings,
+        handler_honeycombApiKey = honeycombApiKey settings
+      }
 
 data Settings
   = Settings
