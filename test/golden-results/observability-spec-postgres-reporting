@@ -37,7 +37,7 @@ TracingSpan
                 )
           , details =
               Just
-                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"queried relation\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"connection\":\"/mock/db/path.sock:mock-db-name\"}"
+                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"queried relation\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"connection\":\"/mock/db/path.sock:mock-db-name\",\"rows returned\":1}"
           , succeeded = Succeeded
           , children =
               [ TracingSpan
@@ -51,9 +51,9 @@ TracingSpan
                             { srcLocPackage = "database-1.0.0.0-inplace"
                             , srcLocModule = "Postgres"
                             , srcLocFile = "src/Postgres.hs"
-                            , srcLocStartLine = 349
+                            , srcLocStartLine = 353
                             , srcLocStartCol = 9
-                            , srcLocEndLine = 349
+                            , srcLocEndLine = 353
                             , srcLocEndCol = 69
                             }
                         )

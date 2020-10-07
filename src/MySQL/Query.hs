@@ -230,7 +230,9 @@ data Info
         -- | Our best guess of the relation we're querying.
         infoQueriedRelation :: Text,
         -- | Connection information of the database we're sending the query to.
-        infoConnection :: ConnectionInfo
+        infoConnection :: ConnectionInfo,
+        -- | The amount of rows this query returned.
+        infoRowsReturned :: Int
       }
   deriving (Generic)
 
@@ -254,7 +256,8 @@ mkInfo query conn =
       infoQueryTemplate = quasiQuotedString query,
       infoSqlOperation = sqlOperation query,
       infoQueriedRelation = queriedRelation query,
-      infoConnection = conn
+      infoConnection = conn,
+      infoRowsReturned = 0 -- Overwrite this after the query ran.
     }
 
 data ConnectionInfo

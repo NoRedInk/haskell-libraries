@@ -64,6 +64,7 @@ import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified Health
 import qualified Internal.Time as Time
+import qualified List
 import qualified Log
 import Network.Socket (SockAddr (..))
 import qualified Oops
@@ -216,15 +217,18 @@ doQuery conn query handleResponse =
     -- Handle the response before wrapping the operation in a context. This way,
     -- if the response handling logic creates errors, those errors can inherit
     -- context values like the query string.
+    |> ( \task ->
+           withFrozenCallStack Platform.tracingSpan "Postgresql Query" <| do
+             res <- Platform.finally task (Platform.setTracingSpanDetails queryInfo)
+             -- If we end up here it means the query succeeded. Overwrite the tracing
+             -- details to contain the amount of selected rows. This information can be
+             -- useful when debugging slow queries.
+             Platform.setTracingSpanDetails queryInfo {Query.infoRowsReturned = List.length res}
+             Prelude.pure res
+       )
     |> map Ok
     |> Task.onError (Task.succeed << Err)
     |> andThen handleResponse
-    |> ( \task ->
-           withFrozenCallStack
-             Platform.tracingSpan
-             "Postgresql Query"
-             (Platform.finally task (Platform.setTracingSpanDetails queryInfo))
-       )
   where
     queryInfo = Query.mkInfo query (logContext conn)
 

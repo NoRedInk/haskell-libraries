@@ -300,7 +300,7 @@ executeQuery conn query =
           |> andThen (toRows << Tuple.second)
           |> handleMySqlException
           |> Platform.doAnything (doAnything conn)
-          |> Stack.withFrozenCallStack traceQuery conn query
+          |> Stack.withFrozenCallStack traceQuery conn List.length query
           |> withTimeout conn
 
 executeCommand_ :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error ()
@@ -317,16 +317,19 @@ executeCommand conn query =
           |> map (Prelude.fromIntegral << Base.okLastInsertID)
           |> handleMySqlException
           |> Platform.doAnything (doAnything conn)
-          |> Stack.withFrozenCallStack traceQuery conn query
+          |> Stack.withFrozenCallStack traceQuery conn (\_ -> 0) query
           |> withTimeout conn
 
-traceQuery :: Stack.HasCallStack => Connection -> Query.Query q -> Task e a -> Task e a
-traceQuery conn query task =
+traceQuery :: Stack.HasCallStack => Connection -> (a -> Int) -> Query.Query q -> Task e a -> Task e a
+traceQuery conn countRows query task =
   let infoForContext = Query.mkInfo query (logContext conn)
-   in Stack.withFrozenCallStack
-        Platform.tracingSpan
-        "MySQL Query"
-        (Platform.finally task (Platform.setTracingSpanDetails infoForContext))
+   in Stack.withFrozenCallStack Platform.tracingSpan "MySQL Query" <| do
+        res <- Platform.finally task (Platform.setTracingSpanDetails infoForContext)
+        -- If we end up here it means the query succeeded. Overwrite the tracing
+        -- details to contain the amount of selected rows. This information can be
+        -- useful when debugging slow queries.
+        Platform.setTracingSpanDetails infoForContext {Query.infoRowsReturned = countRows res}
+        Prelude.pure res
 
 toBaseQuery :: Query.Query row -> Base.Query
 toBaseQuery query =
