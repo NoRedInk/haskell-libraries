@@ -5,7 +5,7 @@ module MySQLTransactionSpec
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Acquire as Acquire
 import qualified Data.Text
 import qualified Debug

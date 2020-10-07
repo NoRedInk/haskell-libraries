@@ -1,6 +1,6 @@
 module MySQL.MySQLColumn (MySQLColumn (..)) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString as BS
 import qualified Data.Int

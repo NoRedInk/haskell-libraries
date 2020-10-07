@@ -4,7 +4,7 @@ module Internal.Error
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Text
 import qualified Internal.Time as Time

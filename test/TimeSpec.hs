@@ -1,6 +1,6 @@
 module TimeSpec (tests) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Expect
 import qualified Internal.Time as Time
 import Test (Test, describe, test)

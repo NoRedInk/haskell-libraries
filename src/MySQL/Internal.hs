@@ -6,7 +6,7 @@ module MySQL.Internal
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Control.Lens as Lens
 import qualified Internal.CaselessRegex as R
 import qualified Text

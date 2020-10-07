@@ -33,7 +33,7 @@ module Postgres.Settings
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.ByteString.Char8
 import qualified Data.Text
 import qualified Data.Text.Encoding

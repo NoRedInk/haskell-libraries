@@ -1,6 +1,6 @@
 module PostgresSettingsSpec (tests) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Environment (decodeDefaults)
 import qualified Expect
 import qualified Postgres.Settings

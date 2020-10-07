@@ -5,7 +5,7 @@ module ObservabilitySpec
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Control.Concurrent.MVar as MVar
 import qualified Debug
 import qualified Expect

@@ -5,7 +5,7 @@ module MySQLSpec
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Debug
 import qualified Expect

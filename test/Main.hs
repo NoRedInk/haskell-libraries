@@ -3,7 +3,7 @@ module Main
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Acquire as Acquire
 import qualified Environment
 import qualified MySQL

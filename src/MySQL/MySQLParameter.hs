@@ -1,6 +1,6 @@
 module MySQL.MySQLParameter (MySQLParameter (..)) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Int
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.LocalTime as LocalTime

@@ -10,7 +10,7 @@ module Internal.QueryParser
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import Control.Applicative
 import Control.Monad (void)
 import Data.Attoparsec.Text (Parser, anyChar, asciiCI, char, inClass, manyTill, skipSpace, space, takeWhile)

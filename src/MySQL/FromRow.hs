@@ -6,7 +6,7 @@ module MySQL.FromRow
   )
 where
 
-import Cherry.Prelude hiding (e)
+import Nri.Prelude hiding (e)
 import qualified Control.Exception.Safe as Exception
 import Data.Kind (Type)
 import Data.Proxy (Proxy)

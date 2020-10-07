@@ -8,7 +8,7 @@ dependencies:
 - attoparsec
 - base
 - bytestring
-- cherry-core
+- nri-prelude
 - env-parser
 - exceptions
 - filepath

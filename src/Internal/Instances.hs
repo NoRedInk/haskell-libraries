@@ -2,7 +2,7 @@
 
 module Internal.Instances where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Int
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import Prelude (fromIntegral)

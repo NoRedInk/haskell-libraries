@@ -64,7 +64,7 @@ module MySQL
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R

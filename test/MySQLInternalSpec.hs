@@ -1,6 +1,6 @@
 module MySQLInternalSpec (tests) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Expect
 import qualified MySQL.Internal
 import Test (Test, describe, test)

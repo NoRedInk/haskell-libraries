@@ -19,7 +19,7 @@ module Postgres.Query
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import Control.Monad (fail, void)
 import qualified Data.Aeson as Aeson
 import Data.String (String)

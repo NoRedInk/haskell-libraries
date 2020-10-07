@@ -5,7 +5,7 @@ module MySQLQuerySpec
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Database.MySQL.Base as Base
 import qualified Expect
 import qualified Log

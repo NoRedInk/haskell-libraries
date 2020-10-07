@@ -19,7 +19,7 @@ module MySQL.Settings
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Text
 import qualified Data.Time
 import qualified Environment
