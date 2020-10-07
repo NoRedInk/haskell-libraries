@@ -2,7 +2,7 @@
 
 module Redis.Internal where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.Text.Encoding

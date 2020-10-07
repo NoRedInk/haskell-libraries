@@ -1,6 +1,6 @@
 module Redis.Settings (Settings (..), ClusterMode (..), decoder) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Text
 import Database.Redis hiding (Ok)
 import qualified Environment

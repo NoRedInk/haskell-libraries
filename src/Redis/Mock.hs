@@ -1,6 +1,6 @@
 module Redis.Mock where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.HashMap.Strict as HM
 import Data.IORef
 import qualified Database.Redis

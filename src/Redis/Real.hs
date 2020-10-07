@@ -1,6 +1,6 @@
 module Redis.Real where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Aeson as Aeson

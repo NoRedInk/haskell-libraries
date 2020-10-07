@@ -7,7 +7,7 @@ library:
   - async
   - bytestring
   - base
-  - cherry-core
+  - nri-prelude
   - conduit
   - env-parser
   - safe-exceptions

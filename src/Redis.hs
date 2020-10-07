@@ -43,7 +43,7 @@ module Redis
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as Lazy
