@@ -14,7 +14,7 @@ module Observability.NewRelic
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson

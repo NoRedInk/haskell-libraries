@@ -1,6 +1,6 @@
 module Observability.Helpers (toHashMap) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap

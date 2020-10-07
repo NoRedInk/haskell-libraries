@@ -12,7 +12,7 @@ module Observability.Dev
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Conduit
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.MVar as MVar

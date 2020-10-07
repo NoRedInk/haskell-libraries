@@ -21,7 +21,7 @@ module Observability.File
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
@@ -98,7 +98,7 @@ duration span = Platform.finished span - Platform.started span
 
 -- We need this wrapper around `TracingSpan` so we can define some type class instances
 -- for it that `Katip` needs, without having to define them as orphan instances
--- or defining them in `cherry-core` (which would require it to take a
+-- or defining them in `nri-prelude` (which would require it to take a
 -- dependency on `katip` too).
 newtype LogItem = LogItem Platform.TracingSpan
 

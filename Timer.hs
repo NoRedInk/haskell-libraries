@@ -11,7 +11,7 @@ module Observability.Timer
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Text
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Clock.POSIX as Clock.POSIX
