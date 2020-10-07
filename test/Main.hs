@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Conduit
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception

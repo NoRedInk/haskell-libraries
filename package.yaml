@@ -8,7 +8,7 @@ library:
   - aeson
   - base
   - bytestring
-  - cherry-core
+  - nri-prelude
   - conduit
   - http-client
   - http-client-tls
@@ -26,7 +26,7 @@ tests:
     dependencies:
     - base
     - bytestring
-    - cherry-core
+    - nri-prelude
     - conduit
     - http
     - http-types

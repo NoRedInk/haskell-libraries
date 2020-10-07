@@ -25,7 +25,7 @@ module Http
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (liftIO)

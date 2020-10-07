@@ -8,7 +8,7 @@ module Http.Mock
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Data.Aeson as Aeson
 import Data.IORef
 import qualified Debug
