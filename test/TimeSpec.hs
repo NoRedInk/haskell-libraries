@@ -1,8 +1,8 @@
 module TimeSpec (tests) where
 
-import Nri.Prelude
 import qualified Expect
 import qualified Internal.Time as Time
+import Nri.Prelude
 import Test (Test, describe, test)
 
 tests :: Test

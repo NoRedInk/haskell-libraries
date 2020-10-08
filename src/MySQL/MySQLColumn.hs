@@ -1,6 +1,5 @@
 module MySQL.MySQLColumn (MySQLColumn (..)) where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString as BS
 import qualified Data.Int
@@ -10,6 +9,7 @@ import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Format as Format
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Database.MySQL.Base as Base
+import Nri.Prelude
 import qualified Prelude
 
 data UnexpectedMySQLValue = UnexpectedMySQLValue Prelude.String Base.MySQLValue

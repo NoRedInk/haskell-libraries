@@ -5,12 +5,12 @@ module ObservabilitySpec
   )
 where
 
-import Nri.Prelude
 import qualified Control.Concurrent.MVar as MVar
 import qualified Debug
 import qualified Expect
 import qualified Maybe
 import qualified MySQL
+import Nri.Prelude
 import qualified Platform
 import qualified Postgres
 import qualified Task

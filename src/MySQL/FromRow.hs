@@ -6,12 +6,12 @@ module MySQL.FromRow
   )
 where
 
-import Nri.Prelude hiding (e)
 import qualified Control.Exception.Safe as Exception
 import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import qualified Database.MySQL.Base as Base
 import MySQL.MySQLColumn (MySQLColumn (decodeParam))
+import Nri.Prelude hiding (e)
 
 data UnexpectedAmountOfResultColumns = UnexpectedAmountOfResultColumns
   deriving (Show)

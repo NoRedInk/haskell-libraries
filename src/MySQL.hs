@@ -64,7 +64,6 @@ module MySQL
   )
 where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
@@ -94,6 +93,7 @@ import qualified MySQL.MySQLColumn
 import qualified MySQL.MySQLParameter
 import qualified MySQL.Query as Query
 import qualified MySQL.Settings as Settings
+import Nri.Prelude
 import qualified Platform
 import qualified System.IO.Streams as Streams
 import qualified Task

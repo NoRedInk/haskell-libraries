@@ -19,12 +19,12 @@ module MySQL.Settings
   )
 where
 
-import Nri.Prelude
 import qualified Data.Text
 import qualified Data.Time
 import qualified Environment
 import qualified Internal.Time as Time
 import qualified Log
+import Nri.Prelude
 import Prelude (FilePath, pure, show)
 import qualified Prelude
 

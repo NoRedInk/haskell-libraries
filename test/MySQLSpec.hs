@@ -5,7 +5,6 @@ module MySQLSpec
   )
 where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Debug
 import qualified Expect
@@ -13,6 +12,7 @@ import qualified Expect.Task
 import qualified Log
 import qualified MySQL
 import MySQL.Query (Query (..))
+import Nri.Prelude
 import qualified Task
 import Test (Test, describe, test)
 import qualified Test

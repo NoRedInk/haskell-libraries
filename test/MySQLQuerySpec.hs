@@ -5,11 +5,11 @@ module MySQLQuerySpec
   )
 where
 
-import Nri.Prelude
 import qualified Database.MySQL.Base as Base
 import qualified Expect
 import qualified Log
 import MySQL.Query
+import Nri.Prelude
 import Test (Test, describe, test)
 
 tests :: Test

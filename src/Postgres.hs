@@ -36,7 +36,6 @@ module Postgres
   )
 where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Pool
@@ -67,6 +66,7 @@ import qualified Internal.Time as Time
 import qualified List
 import qualified Log
 import Network.Socket (SockAddr (..))
+import Nri.Prelude
 import qualified Oops
 import qualified Platform
 import qualified Postgres.Query as Query

@@ -13,7 +13,6 @@ module MySQL.Query
   )
 where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
 import qualified Data.Proxy as Proxy
@@ -34,6 +33,7 @@ import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.MySQLParameter as MySQLParameter
+import Nri.Prelude
 import qualified Platform
 import qualified Postgres.Settings
 import qualified Text

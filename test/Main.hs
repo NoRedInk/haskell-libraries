@@ -3,13 +3,13 @@ module Main
   )
 where
 
-import Nri.Prelude
 import qualified Data.Acquire as Acquire
 import qualified Environment
 import qualified MySQL
 import qualified MySQLInternalSpec
 import qualified MySQLQuerySpec
 import qualified MySQLSpec
+import Nri.Prelude
 import qualified ObservabilitySpec
 import qualified Postgres
 import qualified PostgresSettingsSpec

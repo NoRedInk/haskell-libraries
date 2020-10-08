@@ -19,7 +19,6 @@ module Postgres.Query
   )
 where
 
-import Nri.Prelude
 import Control.Monad (fail, void)
 import qualified Data.Aeson as Aeson
 import Data.String (String)
@@ -41,6 +40,7 @@ import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import qualified Log
 import MySQL.Internal (inToAny)
+import Nri.Prelude
 import qualified Platform
 import qualified Postgres.Settings
 import qualified Text

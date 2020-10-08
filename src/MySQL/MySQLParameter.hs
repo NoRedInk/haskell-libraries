@@ -1,11 +1,11 @@
 module MySQL.MySQLParameter (MySQLParameter (..)) where
 
-import Nri.Prelude
 import qualified Data.Int
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Data.Word
 import qualified Database.MySQL.Base as Base
+import Nri.Prelude
 import qualified Prelude
 
 -- | A type class describing how to encode values for MySQL. The `MySQLValue`

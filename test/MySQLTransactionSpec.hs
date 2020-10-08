@@ -5,7 +5,6 @@ module MySQLTransactionSpec
   )
 where
 
-import Nri.Prelude
 import qualified Data.Acquire as Acquire
 import qualified Data.Text
 import qualified Debug
@@ -15,6 +14,7 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified List
 import qualified MySQL
+import Nri.Prelude
 import qualified Platform
 import qualified Task
 import qualified Prelude

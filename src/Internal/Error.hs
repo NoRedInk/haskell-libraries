@@ -4,11 +4,11 @@ module Internal.Error
   )
 where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Text
 import qualified Internal.Time as Time
 import qualified Log
+import Nri.Prelude
 import qualified Text
 import Prelude (Show (show))
 

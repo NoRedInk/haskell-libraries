@@ -33,7 +33,6 @@ module Postgres.Settings
   )
 where
 
-import Nri.Prelude
 import qualified Data.ByteString.Char8
 import qualified Data.Text
 import qualified Data.Text.Encoding
@@ -51,6 +50,7 @@ import qualified Environment
 import qualified Internal.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
+import Nri.Prelude
 import System.FilePath ((</>))
 import Prelude (Either (Left, Right), pure, realToFrac, round, show)
 
