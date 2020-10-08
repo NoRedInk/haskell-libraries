@@ -11,7 +11,6 @@ module Observability.Timer
   )
 where
 
-import Nri.Prelude
 import qualified Data.Text
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Clock.POSIX as Clock.POSIX
@@ -19,6 +18,7 @@ import qualified Data.Time.Format as Format
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Data.Word as Word
 import qualified GHC.Clock
+import Nri.Prelude
 import qualified Platform
 import qualified Prelude
 

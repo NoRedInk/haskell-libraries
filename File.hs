@@ -21,7 +21,6 @@ module Observability.File
   )
 where
 
-import Nri.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
@@ -33,6 +32,7 @@ import qualified GHC.Stack as Stack
 import qualified Katip
 import qualified Language.Haskell.TH as TH
 import qualified Maybe
+import Nri.Prelude
 import Observability.Timer (Timer, toUTC)
 import qualified Path
 import qualified Path.IO

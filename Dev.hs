@@ -12,7 +12,6 @@ module Observability.Dev
   )
 where
 
-import Nri.Prelude
 import qualified Conduit
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.MVar as MVar
@@ -29,6 +28,7 @@ import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
+import Nri.Prelude
 import qualified Observability.Helpers
 import qualified Observability.Timer as Timer
 import qualified Platform

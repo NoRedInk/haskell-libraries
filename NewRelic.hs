@@ -14,7 +14,6 @@ module Observability.NewRelic
   )
 where
 
-import Nri.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
@@ -32,6 +31,7 @@ import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
+import Nri.Prelude
 import Observability.Timer (Timer, toPosixMicroseconds)
 import qualified Platform
 import qualified Postgres

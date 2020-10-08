@@ -12,7 +12,6 @@ module Observability.Bugsnag
   )
 where
 
-import Nri.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
@@ -37,6 +36,7 @@ import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
+import Nri.Prelude
 import qualified Observability.Helpers
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
