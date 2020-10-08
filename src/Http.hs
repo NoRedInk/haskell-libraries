@@ -25,7 +25,6 @@ module Http
   )
 where
 
-import Nri.Prelude
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (liftIO)
@@ -44,6 +43,7 @@ import qualified Network.HTTP.Client.Internal as HTTP.Internal
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Status as Status
 import qualified Network.URI
+import Nri.Prelude
 import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)

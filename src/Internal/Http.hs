@@ -3,13 +3,13 @@
 
 module Internal.Http where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.Mime as Mime
+import Nri.Prelude
 import qualified Platform
 import Prelude (IO)
 

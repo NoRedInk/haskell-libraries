@@ -8,11 +8,11 @@ module Http.Mock
   )
 where
 
-import Nri.Prelude
 import qualified Data.Aeson as Aeson
 import Data.IORef
 import qualified Debug
 import Internal.Http
+import Nri.Prelude
 import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, pure)
