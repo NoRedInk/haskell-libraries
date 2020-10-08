@@ -1,10 +1,10 @@
 module Redis.Mock where
 
-import Nri.Prelude
 import qualified Data.HashMap.Strict as HM
 import Data.IORef
 import qualified Database.Redis
 import qualified List
+import Nri.Prelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Task

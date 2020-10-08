@@ -2,11 +2,11 @@
 
 module Redis.Internal where
 
-import Nri.Prelude
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.Text.Encoding
 import qualified Database.Redis
+import Nri.Prelude
 
 data Error
   = RedisError Text

@@ -1,6 +1,5 @@
 module Main (main) where
 
-import Nri.Prelude
 import qualified Conduit
 import qualified Control.Concurrent.Async
 import qualified Control.Exception.Safe as Exception
@@ -10,6 +9,7 @@ import Dict (Dict)
 import qualified Environment
 import qualified Expect
 import qualified List
+import Nri.Prelude
 import qualified Platform
 import Redis
 import qualified Redis.Internal as Internal

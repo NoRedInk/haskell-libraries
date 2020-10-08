@@ -43,7 +43,6 @@ module Redis
   )
 where
 
-import Nri.Prelude
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as Lazy
@@ -54,6 +53,7 @@ import Dict (Dict)
 import qualified Health
 import qualified List
 import List (List)
+import Nri.Prelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real

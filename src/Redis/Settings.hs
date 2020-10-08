@@ -1,9 +1,9 @@
 module Redis.Settings (Settings (..), ClusterMode (..), decoder) where
 
-import Nri.Prelude
 import qualified Data.Text
 import Database.Redis hiding (Ok)
 import qualified Environment
+import Nri.Prelude
 import qualified Text
 import Prelude (Either (Left, Right))
 

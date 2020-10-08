@@ -1,6 +1,5 @@
 module Redis.Real where
 
-import Nri.Prelude
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Aeson as Aeson
@@ -8,6 +7,7 @@ import qualified Data.ByteString
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
+import Nri.Prelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
