@@ -11,7 +11,7 @@ import qualified Expect
 import qualified List
 import Nri.Prelude
 import qualified Platform
-import Redis (Error, NamespacedHandler, changeNamespace)
+import Redis (Error, Handler, changeNamespace)
 import qualified Redis.Internal as Internal
 import qualified Redis.Json as Json
 import qualified Redis.Mock as Mock
@@ -30,7 +30,7 @@ buildSpecs TestHandlers {logHandler, redisHandlers} =
     |> map (uncurry (specs logHandler))
     |> describe "Redis Library"
 
-specs :: Platform.LogHandler -> Text -> NamespacedHandler -> Test
+specs :: Platform.LogHandler -> Text -> Handler -> Test
 specs logHandler whichHandler redisHandler =
   describe
     (whichHandler ++ " Redis")
@@ -203,10 +203,10 @@ main =
 data TestHandlers
   = TestHandlers
       { logHandler :: Platform.LogHandler,
-        redisHandlers :: [(Text, NamespacedHandler)]
+        redisHandlers :: [(Text, Handler)]
       }
 
-getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, NamespacedHandler)]
+getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, Handler)]
 getRedisHandlers settings =
   Conduit.mkAcquire acquire release
     |> map fst

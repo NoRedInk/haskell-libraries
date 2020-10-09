@@ -14,13 +14,13 @@ import qualified Redis.Settings as Settings
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
 
-handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.NamespacedHandler
+handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings =
   Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
     |> map fst
     |> map (Internal.namespacedHandler namespace)
 
-acquireHandler :: Settings.Settings -> IO (Internal.Handler, Connection)
+acquireHandler :: Settings.Settings -> IO (Internal.InternalHandler, Connection)
 acquireHandler settings = do
   connection <- do
     let connectionInfo = Settings.connectionInfo settings
@@ -38,7 +38,7 @@ acquireHandler settings = do
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
-    <| ( Internal.Handler
+    <| ( Internal.InternalHandler
            { Internal.rawPing = rawPing connection anything,
              Internal.rawGet = rawGet connection anything,
              Internal.rawSet = rawSet connection anything,
@@ -53,7 +53,7 @@ acquireHandler settings = do
          connection
        )
 
-releaseHandler :: (Internal.Handler, Connection) -> IO ()
+releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis
 
 data Connection

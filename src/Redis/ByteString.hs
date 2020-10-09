@@ -17,7 +17,7 @@ module Redis.ByteString
     atomicModifyWithContext,
 
     -- * Helper types
-    Internal.NamespacedHandler,
+    Internal.Handler,
     Internal.Error,
   )
 where
@@ -36,7 +36,7 @@ import qualified Tuple
 -- string, because GET only handles string values.
 --
 -- https://redis.io/commands/get
-get :: Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe ByteString)
+get :: Internal.Handler -> Text -> Task Internal.Error (Maybe ByteString)
 get handler key =
   Internal.get handler (toB key)
 
@@ -45,7 +45,7 @@ get handler key =
 -- with the key is discarded on successful SET operation.
 --
 -- https://redis.io/commands/set
-set :: Internal.NamespacedHandler -> Text -> ByteString -> Task Internal.Error ()
+set :: Internal.Handler -> Text -> ByteString -> Task Internal.Error ()
 set handler key value =
   Internal.set handler (toB key) value
 
@@ -58,7 +58,7 @@ set handler key value =
 -- unchanged.
 --
 -- https://redis.io/commands/mset
-mset :: Internal.NamespacedHandler -> Dict.Dict Text ByteString -> Task Internal.Error ()
+mset :: Internal.Handler -> Dict.Dict Text ByteString -> Task Internal.Error ()
 mset handler values =
   Internal.mset
     handler
@@ -71,14 +71,14 @@ mset handler values =
 -- Returns an error when key exists but does not hold a string value.
 --
 -- https://redis.io/commands/getset
-getset :: Internal.NamespacedHandler -> Text -> ByteString -> Task Internal.Error (Maybe ByteString)
+getset :: Internal.Handler -> Text -> ByteString -> Task Internal.Error (Maybe ByteString)
 getset handler key value =
   Internal.getset handler (toB key) value
 
 -- | Removes the specified keys. A key is ignored if it does not exist.
 --
 -- https://redis.io/commands/del
-del :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
+del :: Internal.Handler -> [Text] -> Task Internal.Error Int
 del handler keys =
   Internal.del handler (map toB keys)
 
@@ -87,7 +87,7 @@ del handler keys =
 -- operation never fails.
 --
 -- https://redis.io/commands/mget
-mget :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text ByteString)
+mget :: Internal.Handler -> List Text -> Task Internal.Error (Dict.Dict Text ByteString)
 mget handler keys =
   keys
     |> List.map toB
@@ -118,28 +118,28 @@ mget handler keys =
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: Internal.NamespacedHandler -> Text -> (Maybe ByteString -> ByteString) -> Task Internal.Error ByteString
+atomicModify :: Internal.Handler -> Text -> (Maybe ByteString -> ByteString) -> Task Internal.Error ByteString
 atomicModify handler key f =
   atomicModifyWithContext handler key (\x -> (f x, ()))
     |> map Tuple.first
 
 -- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: Internal.NamespacedHandler -> Text -> (Maybe ByteString -> (ByteString, a)) -> Task Internal.Error (ByteString, a)
+atomicModifyWithContext :: Internal.Handler -> Text -> (Maybe ByteString -> (ByteString, a)) -> Task Internal.Error (ByteString, a)
 atomicModifyWithContext handler key f =
   Internal.atomicModify handler (toB key) f
 
 -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
 --
 -- https://redis.io/commands/hgetall
-hgetall :: Internal.NamespacedHandler -> Text -> Task Internal.Error [(ByteString, ByteString)]
+hgetall :: Internal.Handler -> Text -> Task Internal.Error [(ByteString, ByteString)]
 hgetall handler key =
   Internal.hgetall handler (toB key)
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
 --
 -- https://redis.io/commands/hset
-hset :: Internal.NamespacedHandler -> Text -> ByteString -> ByteString -> Task Internal.Error ()
+hset :: Internal.Handler -> Text -> ByteString -> ByteString -> Task Internal.Error ()
 hset handler key field val =
   Internal.hset handler (toB key) field val
 

@@ -18,7 +18,7 @@ module Redis.Text
     atomicModifyWithContext,
 
     -- * Helper types
-    Internal.NamespacedHandler,
+    Internal.Handler,
     Internal.Error,
   )
 where
@@ -38,7 +38,7 @@ import qualified Prelude
 -- string, because GET only handles string values.
 --
 -- https://redis.io/commands/get
-get :: Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe Text)
+get :: Internal.Handler -> Text -> Task Internal.Error (Maybe Text)
 get handler key =
   Redis.ByteString.get handler key
     |> map (andThen toT)
@@ -48,7 +48,7 @@ get handler key =
 -- with the key is discarded on successful SET operation.
 --
 -- https://redis.io/commands/set
-set :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error ()
+set :: Internal.Handler -> Text -> Text -> Task Internal.Error ()
 set handler key value =
   Redis.ByteString.set handler key (toB value)
 
@@ -61,7 +61,7 @@ set handler key value =
 -- unchanged.
 --
 -- https://redis.io/commands/mset
-mset :: Internal.NamespacedHandler -> Dict.Dict Text Text -> Task Internal.Error ()
+mset :: Internal.Handler -> Dict.Dict Text Text -> Task Internal.Error ()
 mset handler values =
   Redis.ByteString.mset
     handler
@@ -71,7 +71,7 @@ mset handler values =
 -- Returns an error when key exists but does not hold a string value.
 --
 -- https://redis.io/commands/getset
-getset :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)
+getset :: Internal.Handler -> Text -> Text -> Task Internal.Error (Maybe Text)
 getset handler key value =
   Redis.ByteString.getset handler key (toB value)
     |> map (andThen toT)
@@ -79,7 +79,7 @@ getset handler key value =
 -- | Removes the specified keys. A key is ignored if it does not exist.
 --
 -- https://redis.io/commands/del
-del :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
+del :: Internal.Handler -> [Text] -> Task Internal.Error Int
 del = Redis.ByteString.del
 
 -- | Returns the values of all specified keys. For every key that does not hold
@@ -87,7 +87,7 @@ del = Redis.ByteString.del
 -- operation never fails.
 --
 -- https://redis.io/commands/mget
-mget :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text Text)
+mget :: Internal.Handler -> List Text -> Task Internal.Error (Dict.Dict Text Text)
 mget handler keys =
   Redis.ByteString.mget handler keys
     |> Task.map
@@ -103,7 +103,7 @@ mget handler keys =
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: Internal.NamespacedHandler -> Text -> (Maybe Text -> Text) -> Task Internal.Error Text
+atomicModify :: Internal.Handler -> Text -> (Maybe Text -> Text) -> Task Internal.Error Text
 atomicModify handler key f =
   Redis.ByteString.atomicModifyWithContext
     handler
@@ -118,7 +118,7 @@ atomicModify handler key f =
 
 -- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: Internal.NamespacedHandler -> Text -> (Maybe Text -> (Text, a)) -> Task Internal.Error (Text, a)
+atomicModifyWithContext :: Internal.Handler -> Text -> (Maybe Text -> (Text, a)) -> Task Internal.Error (Text, a)
 atomicModifyWithContext handler key f =
   Redis.ByteString.atomicModifyWithContext
     handler

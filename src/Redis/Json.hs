@@ -20,7 +20,7 @@ module Redis.Json
     atomicModifyWithContext,
 
     -- * Helper types
-    Internal.NamespacedHandler,
+    Internal.Handler,
     Internal.Error,
   )
 where
@@ -40,7 +40,7 @@ import qualified Tuple
 -- string, because GET only handles string values.
 --
 -- https://redis.io/commands/get
-get :: Aeson.FromJSON a => Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe a)
+get :: Aeson.FromJSON a => Internal.Handler -> Text -> Task Internal.Error (Maybe a)
 get handler key =
   Redis.ByteString.get handler key
     |> Task.map (andThen Aeson.decodeStrict')
@@ -50,7 +50,7 @@ get handler key =
 -- operation never fails.
 --
 -- https://redis.io/commands/mget
-mget :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text a)
+mget :: Aeson.FromJSON a => Internal.Handler -> List Text -> Task Internal.Error (Dict.Dict Text a)
 mget handler keys =
   Redis.ByteString.mget handler keys
     |> Task.map
@@ -68,7 +68,7 @@ mget handler keys =
 -- with the key is discarded on successful SET operation.
 --
 -- https://redis.io/commands/set
-set :: Aeson.ToJSON a => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error ()
+set :: Aeson.ToJSON a => Internal.Handler -> Text -> a -> Task Internal.Error ()
 set handler key value =
   Redis.ByteString.set handler key (encodeStrict value)
 
@@ -81,7 +81,7 @@ set handler key value =
 -- unchanged.
 --
 -- https://redis.io/commands/mset
-mset :: Aeson.ToJSON a => Internal.NamespacedHandler -> Dict.Dict Text a -> Task Internal.Error ()
+mset :: Aeson.ToJSON a => Internal.Handler -> Dict.Dict Text a -> Task Internal.Error ()
 mset handler values =
   Redis.ByteString.mset
     handler
@@ -90,14 +90,14 @@ mset handler values =
 -- | Removes the specified keys. A key is ignored if it does not exist.
 --
 -- https://redis.io/commands/del
-del :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
+del :: Internal.Handler -> [Text] -> Task Internal.Error Int
 del = Redis.ByteString.del
 
 -- | Atomically sets key to value and returns the old value stored at key.
 -- Returns an error when key exists but does not hold a string value.
 --
 -- https://redis.io/commands/getset
-getset :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error (Maybe a)
+getset :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.Handler -> Text -> a -> Task Internal.Error (Maybe a)
 getset handler key value =
   Redis.ByteString.getset handler key (encodeStrict value)
     |> map (andThen Aeson.decodeStrict')
@@ -105,7 +105,7 @@ getset handler key value =
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> (Maybe a -> a) -> Task Internal.Error a
+atomicModify :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.Handler -> Text -> (Maybe a -> a) -> Task Internal.Error a
 atomicModify handler key f =
   Redis.ByteString.atomicModifyWithContext
     handler
@@ -120,7 +120,7 @@ atomicModify handler key f =
 
 -- | As `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
+atomicModifyWithContext :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.Handler -> Text -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
 atomicModifyWithContext handler key f =
   Redis.ByteString.atomicModifyWithContext
     handler

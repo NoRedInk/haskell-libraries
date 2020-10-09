@@ -10,7 +10,7 @@ import qualified Redis.Internal as Internal
 import qualified Task
 import Prelude (IO, error, pure, uncurry)
 
-handler :: Text -> IO Internal.NamespacedHandler
+handler :: Text -> IO Internal.Handler
 handler namespace = do
   hm <- newIORef HM.empty
   anything <- Platform.doAnythingHandler
@@ -80,7 +80,7 @@ handler namespace = do
               |> map Ok
           )
   pure
-    <| ( Internal.Handler
+    <| ( Internal.InternalHandler
            { Internal.rawPing = rawPing,
              Internal.rawGet = rawGet,
              Internal.rawSet = rawSet,

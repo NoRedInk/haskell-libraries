@@ -1,16 +1,14 @@
 -- | A simple Redis library providing high level access to Redis features we
 -- use here at NoRedInk
 --
--- We make some assumptions in this module that are worth bearing in mind:
--- - As with our Ruby Redis access, we enforce working within a "namespace",
---   so most functions take a "NamespacedHandler".
+-- As with our Ruby Redis access, we enforce working within a "namespace".
 module Redis
   ( -- Settings
     Settings.Settings (..),
     Settings.decoder,
     -- Internal
     Internal.Error (..),
-    Internal.NamespacedHandler,
+    Internal.Handler,
     Internal.changeNamespace,
     -- Real
     Real.Info (..),
@@ -29,7 +27,7 @@ import qualified Task
 
 -- |
 -- Check that we are ready to be take traffic.
-readiness :: Internal.NamespacedHandler -> Health.Check
+readiness :: Internal.Handler -> Health.Check
 readiness handler =
   Health.mkCheck "redis" <| do
     log <- Platform.silentHandler

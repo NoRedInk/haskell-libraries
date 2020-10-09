@@ -23,8 +23,8 @@ errorForHumans topError =
     ConnectionLost -> "Connection Lost"
     LibraryError err -> "Library error: " ++ err
 
-data Handler
-  = Handler
+data InternalHandler
+  = InternalHandler
       { rawPing :: Task Error Database.Redis.Status,
         rawGet :: ByteString -> Task Error (Maybe ByteString),
         rawSet :: ByteString -> ByteString -> Task Error (),
@@ -41,8 +41,8 @@ data Handler
           Task Error (ByteString, a)
       }
 
-data NamespacedHandler
-  = NamespacedHandler
+data Handler
+  = Handler
       { ping :: Task Error Database.Redis.Status,
         get :: ByteString -> Task Error (Maybe ByteString),
         set :: ByteString -> ByteString -> Task Error (),
@@ -57,17 +57,17 @@ data NamespacedHandler
           ByteString ->
           (Maybe ByteString -> (ByteString, a)) ->
           Task Error (ByteString, a),
-        unNamespacedHandler :: Handler
+        unNamespacedHandler :: InternalHandler
       }
 
-changeNamespace :: Text -> NamespacedHandler -> NamespacedHandler
-changeNamespace namespace NamespacedHandler {unNamespacedHandler} =
+changeNamespace :: Text -> Handler -> Handler
+changeNamespace namespace Handler {unNamespacedHandler} =
   namespacedHandler namespace unNamespacedHandler
 
-namespacedHandler :: Text -> Handler -> NamespacedHandler
+namespacedHandler :: Text -> InternalHandler -> Handler
 namespacedHandler namespace h =
   let byteNamespace = namespace ++ ":" |> toB
-   in NamespacedHandler
+   in Handler
         { ping = rawPing h,
           get = \key -> rawGet h (byteNamespace ++ key),
           set = \key value -> rawSet h (byteNamespace ++ key) value,
