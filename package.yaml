@@ -18,8 +18,10 @@ library:
   - unordered-containers
   exposed-modules:
   - Redis
+  - Redis.Text
+  - Redis.Json
+  - Redis.ByteString
   - Redis.Mock
-  - Redis.Settings
   source-dirs:
   - src
 tests:
