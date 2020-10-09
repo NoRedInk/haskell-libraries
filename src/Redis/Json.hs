@@ -14,6 +14,8 @@ module Redis.Json
     setMany,
     atomicModify,
     atomicModifyWithContext,
+    Internal.NamespacedHandler,
+    Internal.Error,
   )
 where
 

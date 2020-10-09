@@ -9,6 +9,8 @@ module Redis.ByteString
     hGetAll,
     atomicModify,
     atomicModifyWithContext,
+    Internal.NamespacedHandler,
+    Internal.Error,
   )
 where
 

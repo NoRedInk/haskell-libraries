@@ -7,6 +7,8 @@ module Redis.Text
     delete,
     atomicModify,
     atomicModifyWithContext,
+    Internal.NamespacedHandler,
+    Internal.Error,
   )
 where
 
