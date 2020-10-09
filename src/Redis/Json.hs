@@ -12,6 +12,7 @@ module Redis.Json
     getSet,
     getMany,
     setMany,
+    delete,
     atomicModify,
     atomicModifyWithContext,
     Internal.NamespacedHandler,
@@ -63,6 +64,11 @@ setMany handler values =
   Redis.ByteString.setMany
     handler
     (Dict.map (\_key val -> encodeStrict val) values)
+
+-- | Delete the values at all of the provided keys. Return how many of those keys existed
+-- (and hence were deleted)
+delete :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
+delete = Redis.ByteString.delete
 
 -- | Set the namespaced Redis key with JSON representing the provided value,
 -- returning the previous value (if any and if it can be decoded to the same type).
