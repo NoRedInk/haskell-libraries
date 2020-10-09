@@ -11,11 +11,13 @@ import qualified Expect
 import qualified List
 import Nri.Prelude
 import qualified Platform
-import Redis
+import Redis (Error, NamespacedHandler, changeNamespace)
 import qualified Redis.Internal as Internal
+import qualified Redis.Json as Json
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
+import Redis.Text
 import qualified Task
 import Test
 import qualified Test.Runner.Tasty
@@ -71,8 +73,8 @@ specs logHandler whichHandler redisHandler =
         pure <| Expect.equal 1 result,
       redisTest "json roundtrip" <| do
         let testData :: [Text] = ["one", "two", "three"]
-        setJSON testNS "JSON list" testData
-        result <- getJSON testNS "JSON list"
+        Json.set testNS "JSON list" testData
+        result <- Json.get testNS "JSON list"
         pure <| Expect.just (Expect.equal testData) result,
       redisTest "atomic modify with no value" <| do
         _ <- delete testNS ["Empty Atom"]
@@ -95,14 +97,14 @@ specs logHandler whichHandler redisHandler =
               [("getManyTest::key1", "value 1"), ("getManyTest::key3", "value 3")]
           ),
       redisTest "getMany json roundtrip" <| do
-        setJSON testNS "getManyJSONTest::key1" ([1, 2] :: [Int])
-        setJSON testNS "getManyJSONTest::key2" ([3, 4] :: [Int])
-        result <- getManyJSON testNS ["getManyJSONTest::key1", "getManyJSONTest::key2"] :: Task Error (Dict Text [Int])
+        Json.set testNS "Json.getManyTest::key1" ([1, 2] :: [Int])
+        Json.set testNS "Json.getManyTest::key2" ([3, 4] :: [Int])
+        result <- Json.getMany testNS ["Json.getManyTest::key1", "Json.getManyTest::key2"] :: Task Error (Dict Text [Int])
         pure
           ( Expect.equal
               (Dict.toList result)
-              [ ("getManyJSONTest::key1", [1, 2]),
-                ("getManyJSONTest::key2", [3, 4])
+              [ ("Json.getManyTest::key1", [1, 2]),
+                ("Json.getManyTest::key2", [3, 4])
               ]
           ),
       redisTest "setMany allows setting multiple values at once" <| do
@@ -114,14 +116,14 @@ specs logHandler whichHandler redisHandler =
         setMany testNS dict
         result <- getMany testNS (Dict.keys dict)
         pure (Expect.equal result dict),
-      redisTest "setManyJSON allows setting multiple JSON values at once" <| do
+      redisTest "Json.setMany allows setting multiple JSON values at once" <| do
         let dict =
               Dict.fromList
-                [ ("setManyTestJSON::key1", [1, 2] :: [Int]),
-                  ("setManyTestJSON::key2", [3, 4] :: [Int])
+                [ ("Json.setManyTest::key1", [1, 2] :: [Int]),
+                  ("Json.setManyTest::key2", [3, 4] :: [Int])
                 ]
-        setManyJSON testNS dict
-        result <- getManyJSON testNS (Dict.keys dict)
+        Json.setMany testNS dict
+        result <- Json.getMany testNS (Dict.keys dict)
         pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do
         _ <- delete testNS ["Full Atom"]
@@ -141,7 +143,7 @@ specs logHandler whichHandler redisHandler =
               let ops =
                     List.repeat
                       1000
-                      ( atomicModifyJSON
+                      ( Json.atomicModify
                           testNS
                           "Concurrent Atom"
                           ( \i -> case i of
@@ -150,7 +152,7 @@ specs logHandler whichHandler redisHandler =
                           )
                       )
               _ <- Control.Concurrent.Async.mapConcurrently (Task.attempt logHandler) ops
-              getJSON testNS "Concurrent Atom" |> Task.attempt logHandler
+              Json.get testNS "Concurrent Atom" |> Task.attempt logHandler
          in Expect.withIO (Expect.ok <| Expect.just <| Expect.equal (1000 :: Int)) ioTest,
       redisTest "atomicModifyWithContext works empty" <| do
         _ <- delete testNS ["Atom With Context"]
@@ -174,10 +176,10 @@ specs logHandler whichHandler redisHandler =
                 Nothing -> ("after", "Nothing")
             )
         pure <| Expect.equal ("after", "Just") result,
-      redisTest "atomicModifyWithContextJSON works" <| do
+      redisTest "Json.atomicModifyWithContext works" <| do
         _ <- delete testNS ["JSON Atom With Context"]
         result <-
-          atomicModifyWithContextJSON
+          Json.atomicModifyWithContext
             testNS
             "JSON Atom With Context"
             ( \(v :: Maybe Int) -> case v of
