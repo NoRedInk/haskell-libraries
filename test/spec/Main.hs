@@ -54,7 +54,7 @@ specs logHandler whichHandler redisHandler =
             (),
       redisTest "getset" <| do
         set testNS "getset" "1"
-        result1 <- getSet testNS "getset" "2"
+        result1 <- getset testNS "getset" "2"
         result2 <- get testNS "getset"
         pure
           <| Expect.all
@@ -62,14 +62,14 @@ specs logHandler whichHandler redisHandler =
               \() -> Expect.just (Expect.equal "2") result2
             ]
             (),
-      redisTest "delete deletes" <| do
-        set testNS "delete" "mistake..."
-        _ <- delete testNS ["delete"]
-        result <- get testNS "delete"
+      redisTest "del dels" <| do
+        set testNS "del" "mistake..."
+        _ <- del testNS ["del"]
+        result <- get testNS "del"
         pure <| Expect.nothing result,
-      redisTest "delete counts" <| do
-        set testNS "deleteCount" "A thing"
-        result <- delete testNS ["deleteCount", "key that doesn't exist"]
+      redisTest "del counts" <| do
+        set testNS "delCount" "A thing"
+        result <- del testNS ["delCount", "key that doesn't exist"]
         pure <| Expect.equal 1 result,
       redisTest "json roundtrip" <| do
         let testData :: [Text] = ["one", "two", "three"]
@@ -77,7 +77,7 @@ specs logHandler whichHandler redisHandler =
         result <- Json.get testNS "JSON list"
         pure <| Expect.just (Expect.equal testData) result,
       redisTest "atomic modify with no value" <| do
-        _ <- delete testNS ["Empty Atom"]
+        _ <- del testNS ["Empty Atom"]
         result <-
           atomicModify
             testNS
@@ -87,46 +87,46 @@ specs logHandler whichHandler redisHandler =
                 Nothing -> "Nothing"
             )
         pure <| Expect.equal "Nothing" result,
-      redisTest "getMany retrieves a mapping of the requested keys and their corresponding values" <| do
-        set testNS "getManyTest::key1" "value 1"
-        set testNS "getManyTest::key3" "value 3"
-        result <- getMany testNS ["getManyTest::key1", "getManyTest::key2", "getManyTest::key3"]
+      redisTest "mget retrieves a mapping of the requested keys and their corresponding values" <| do
+        set testNS "mgetTest::key1" "value 1"
+        set testNS "mgetTest::key3" "value 3"
+        result <- mget testNS ["mgetTest::key1", "mgetTest::key2", "mgetTest::key3"]
         pure
           ( Expect.equal
               (Dict.toList result)
-              [("getManyTest::key1", "value 1"), ("getManyTest::key3", "value 3")]
+              [("mgetTest::key1", "value 1"), ("mgetTest::key3", "value 3")]
           ),
-      redisTest "getMany json roundtrip" <| do
-        Json.set testNS "Json.getManyTest::key1" ([1, 2] :: [Int])
-        Json.set testNS "Json.getManyTest::key2" ([3, 4] :: [Int])
-        result <- Json.getMany testNS ["Json.getManyTest::key1", "Json.getManyTest::key2"] :: Task Error (Dict Text [Int])
+      redisTest "mget json roundtrip" <| do
+        Json.set testNS "Json.mgetTest::key1" ([1, 2] :: [Int])
+        Json.set testNS "Json.mgetTest::key2" ([3, 4] :: [Int])
+        result <- Json.mget testNS ["Json.mgetTest::key1", "Json.mgetTest::key2"] :: Task Error (Dict Text [Int])
         pure
           ( Expect.equal
               (Dict.toList result)
-              [ ("Json.getManyTest::key1", [1, 2]),
-                ("Json.getManyTest::key2", [3, 4])
+              [ ("Json.mgetTest::key1", [1, 2]),
+                ("Json.mgetTest::key2", [3, 4])
               ]
           ),
-      redisTest "setMany allows setting multiple values at once" <| do
+      redisTest "mset allows setting multiple values at once" <| do
         let dict =
               Dict.fromList
-                [ ("setManyTest::key1", "value 1"),
-                  ("setManyTest::key2", "value 2")
+                [ ("msetTest::key1", "value 1"),
+                  ("msetTest::key2", "value 2")
                 ]
-        setMany testNS dict
-        result <- getMany testNS (Dict.keys dict)
+        mset testNS dict
+        result <- mget testNS (Dict.keys dict)
         pure (Expect.equal result dict),
-      redisTest "Json.setMany allows setting multiple JSON values at once" <| do
+      redisTest "Json.mset allows setting multiple JSON values at once" <| do
         let dict =
               Dict.fromList
-                [ ("Json.setManyTest::key1", [1, 2] :: [Int]),
-                  ("Json.setManyTest::key2", [3, 4] :: [Int])
+                [ ("Json.msetTest::key1", [1, 2] :: [Int]),
+                  ("Json.msetTest::key2", [3, 4] :: [Int])
                 ]
-        Json.setMany testNS dict
-        result <- Json.getMany testNS (Dict.keys dict)
+        Json.mset testNS dict
+        result <- Json.mget testNS (Dict.keys dict)
         pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do
-        _ <- delete testNS ["Full Atom"]
+        _ <- del testNS ["Full Atom"]
         set testNS "Full Atom" "Something"
         result <-
           atomicModify
@@ -139,7 +139,7 @@ specs logHandler whichHandler redisHandler =
         pure <| Expect.equal "Prefix:Something" result,
       test "Concurrent atomicModify works" <| \() ->
         let ioTest = do
-              _ <- delete testNS ["Concurrent Atom"] |> Task.attempt logHandler
+              _ <- del testNS ["Concurrent Atom"] |> Task.attempt logHandler
               let ops =
                     List.repeat
                       1000
@@ -155,7 +155,7 @@ specs logHandler whichHandler redisHandler =
               Json.get testNS "Concurrent Atom" |> Task.attempt logHandler
          in Expect.withIO (Expect.ok <| Expect.just <| Expect.equal (1000 :: Int)) ioTest,
       redisTest "atomicModifyWithContext works empty" <| do
-        _ <- delete testNS ["Atom With Context"]
+        _ <- del testNS ["Atom With Context"]
         result <-
           atomicModifyWithContext
             testNS
@@ -177,7 +177,7 @@ specs logHandler whichHandler redisHandler =
             )
         pure <| Expect.equal ("after", "Just") result,
       redisTest "Json.atomicModifyWithContext works" <| do
-        _ <- delete testNS ["JSON Atom With Context"]
+        _ <- del testNS ["JSON Atom With Context"]
         result <-
           Json.atomicModifyWithContext
             testNS

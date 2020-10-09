@@ -46,12 +46,12 @@ data NamespacedHandler
       { ping :: Task Error Database.Redis.Status,
         get :: ByteString -> Task Error (Maybe ByteString),
         set :: ByteString -> ByteString -> Task Error (),
-        getSet :: ByteString -> ByteString -> Task Error (Maybe ByteString),
-        getMany :: [ByteString] -> Task Error [Maybe ByteString],
-        setMany :: [(ByteString, ByteString)] -> Task Error (),
-        delete :: [ByteString] -> Task Error Int,
-        hGetAll :: ByteString -> Task Error [(ByteString, ByteString)],
-        hSet :: ByteString -> ByteString -> ByteString -> Task Error (),
+        getset :: ByteString -> ByteString -> Task Error (Maybe ByteString),
+        mget :: [ByteString] -> Task Error [Maybe ByteString],
+        mset :: [(ByteString, ByteString)] -> Task Error (),
+        del :: [ByteString] -> Task Error Int,
+        hgetall :: ByteString -> Task Error [(ByteString, ByteString)],
+        hset :: ByteString -> ByteString -> ByteString -> Task Error (),
         atomicModify ::
           forall a.
           ByteString ->
@@ -71,12 +71,12 @@ namespacedHandler namespace h =
         { ping = rawPing h,
           get = \key -> rawGet h (byteNamespace ++ key),
           set = \key value -> rawSet h (byteNamespace ++ key) value,
-          getSet = \key value -> rawGetSet h (byteNamespace ++ key) value,
-          getMany = \keys -> rawGetMany h (map (\k -> byteNamespace ++ k) keys),
-          setMany = \assocs -> rawSetMany h (map (\(k, v) -> (byteNamespace ++ k, v)) assocs),
-          delete = \keys -> rawDelete h (map (byteNamespace ++) keys),
-          hGetAll = \key -> rawHGetAll h (byteNamespace ++ key),
-          hSet = \key field val -> rawHSet h (byteNamespace ++ key) field val,
+          getset = \key value -> rawGetSet h (byteNamespace ++ key) value,
+          mget = \keys -> rawGetMany h (map (\k -> byteNamespace ++ k) keys),
+          mset = \assocs -> rawSetMany h (map (\(k, v) -> (byteNamespace ++ k, v)) assocs),
+          del = \keys -> rawDelete h (map (byteNamespace ++) keys),
+          hgetall = \key -> rawHGetAll h (byteNamespace ++ key),
+          hset = \key field val -> rawHSet h (byteNamespace ++ key) field val,
           atomicModify = \key f -> rawAtomicModify h (byteNamespace ++ key) f,
           unNamespacedHandler = h
         }

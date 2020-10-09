@@ -7,14 +7,19 @@
 -- same as if the key is empty. This avoids issues with things like changes
 -- of JSON representations of data - we just throw the old data away!
 module Redis.Json
-  ( get,
+  ( -- * Redis commands
+    get,
     set,
-    getSet,
-    getMany,
-    setMany,
-    delete,
+    getset,
+    mget,
+    mset,
+    del,
+
+    -- * helper functions
     atomicModify,
     atomicModifyWithContext,
+
+    -- * Helper types
     Internal.NamespacedHandler,
     Internal.Error,
   )
@@ -40,9 +45,9 @@ get handler key =
 
 -- | Get multiple values from a namespaced Redis key, assuming it is valid JSON
 -- data of the expected type.
-getMany :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text a)
-getMany handler keys =
-  Redis.ByteString.getMany handler keys
+mget :: Aeson.FromJSON a => Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text a)
+mget handler keys =
+  Redis.ByteString.mget handler keys
     |> Task.map
       ( Dict.foldr
           ( \key val dict ->
@@ -59,22 +64,22 @@ set handler key value =
   Redis.ByteString.set handler key (encodeStrict value)
 
 -- | Set the multiple JSON values with namespaced keys.
-setMany :: Aeson.ToJSON a => Internal.NamespacedHandler -> Dict.Dict Text a -> Task Internal.Error ()
-setMany handler values =
-  Redis.ByteString.setMany
+mset :: Aeson.ToJSON a => Internal.NamespacedHandler -> Dict.Dict Text a -> Task Internal.Error ()
+mset handler values =
+  Redis.ByteString.mset
     handler
     (Dict.map (\_key val -> encodeStrict val) values)
 
 -- | Delete the values at all of the provided keys. Return how many of those keys existed
--- (and hence were deleted)
-delete :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
-delete = Redis.ByteString.delete
+-- (and hence were deld)
+del :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
+del = Redis.ByteString.del
 
 -- | Set the namespaced Redis key with JSON representing the provided value,
 -- returning the previous value (if any and if it can be decoded to the same type).
-getSet :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error (Maybe a)
-getSet handler key value =
-  Redis.ByteString.getSet handler key (encodeStrict value)
+getset :: (Aeson.FromJSON a, Aeson.ToJSON a) => Internal.NamespacedHandler -> Text -> a -> Task Internal.Error (Maybe a)
+getset handler key value =
+  Redis.ByteString.getset handler key (encodeStrict value)
     |> map (andThen Aeson.decodeStrict')
 
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.

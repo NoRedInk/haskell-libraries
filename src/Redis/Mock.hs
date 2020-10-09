@@ -51,7 +51,7 @@ handler namespace = do
           |> List.map (uncurry rawSet)
           |> Task.sequence
           |> map (\_ -> ())
-  let delete keys =
+  let del keys =
         Platform.doAnything
           anything
           ( atomicModifyIORef
@@ -87,9 +87,9 @@ handler namespace = do
              Internal.rawGetSet = rawGetSet,
              Internal.rawGetMany = rawGetMany,
              Internal.rawSetMany = rawSetMany,
-             Internal.rawDelete = delete,
-             Internal.rawHGetAll = \_ -> error "No mock implementation implemented yet for hGetAll",
-             Internal.rawHSet = \_ -> error "No mock implementation implemented yet for hSet",
+             Internal.rawDelete = del,
+             Internal.rawHGetAll = \_ -> error "No mock implementation implemented yet for hgetall",
+             Internal.rawHSet = \_ -> error "No mock implementation implemented yet for hset",
              Internal.rawAtomicModify = atomicModify
            }
            |> Internal.namespacedHandler namespace

@@ -1,12 +1,17 @@
 module Redis.Text
-  ( get,
+  ( -- * Redis commands
+    get,
     set,
-    getSet,
-    getMany,
-    setMany,
-    delete,
+    getset,
+    mget,
+    mset,
+    del,
+
+    -- * helper functions
     atomicModify,
     atomicModifyWithContext,
+
+    -- * Helper types
     Internal.NamespacedHandler,
     Internal.Error,
   )
@@ -35,27 +40,27 @@ set handler key value =
   Redis.ByteString.set handler key (toB value)
 
 -- | Set the multiple values with namespaced keys.
-setMany :: Internal.NamespacedHandler -> Dict.Dict Text Text -> Task Internal.Error ()
-setMany handler values =
-  Redis.ByteString.setMany
+mset :: Internal.NamespacedHandler -> Dict.Dict Text Text -> Task Internal.Error ()
+mset handler values =
+  Redis.ByteString.mset
     handler
     (Dict.map (\_key val -> toB val) values)
 
 -- | Set the value at a namespaced Redis key, returning the previous value (if any)
-getSet :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)
-getSet handler key value =
-  Redis.ByteString.getSet handler key (toB value)
+getset :: Internal.NamespacedHandler -> Text -> Text -> Task Internal.Error (Maybe Text)
+getset handler key value =
+  Redis.ByteString.getset handler key (toB value)
     |> map (andThen toT)
 
 -- | Delete the values at all of the provided keys. Return how many of those keys existed
--- (and hence were deleted)
-delete :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
-delete = Redis.ByteString.delete
+-- (and hence were deld)
+del :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
+del = Redis.ByteString.del
 
 -- | Get multiple values from  a namespaced Redis key, assuming it is valid UTF8 data.
-getMany :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text Text)
-getMany handler keys =
-  Redis.ByteString.getMany handler keys
+mget :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text Text)
+mget handler keys =
+  Redis.ByteString.mget handler keys
     |> Task.map
       ( Dict.foldl
           ( \key val dict ->
