@@ -1,3 +1,6 @@
+-- | This module exports low-level bindings to Redis that read and write
+-- `ByteString` values. We need this to integrate Redis with some libraries. In
+-- most cases you'll likely want to use either `Redis.Json` or `Redis.Text`.
 module Redis.ByteString
   ( -- * Redis commands
     get,
@@ -28,18 +31,33 @@ import qualified Redis.Internal as Internal
 import qualified Task
 import qualified Tuple
 
--- | Get a value from a namespaced Redis key, assuming it is valid UTF8 data.
--- Returns `Nothing` if no value is set.
+-- | Get the value of key. If the key does not exist the special value Nothing
+-- is returned. An error is returned if the value stored at key is not a
+-- string, because GET only handles string values.
+--
+-- https://redis.io/commands/get
 get :: Internal.NamespacedHandler -> Text -> Task Internal.Error (Maybe ByteString)
 get handler key =
   Internal.get handler (toB key)
 
--- | Set the value at a namespaced Redis key.
+-- | Set key to hold the string value. If key already holds a value, it is
+-- overwritten, regardless of its type. Any previous time to live associated
+-- with the key is discarded on successful SET operation.
+--
+-- https://redis.io/commands/set
 set :: Internal.NamespacedHandler -> Text -> ByteString -> Task Internal.Error ()
 set handler key value =
   Internal.set handler (toB key) value
 
--- | Set the multiple values with namespaced keys.
+-- | Sets the given keys to their respective values. MSET replaces existing
+-- values with new values, just as regular SET. See MSETNX if you don't want to
+-- overwrite existing values.
+--
+-- MSET is atomic, so all given keys are set at once. It is not possible for
+-- clients to see that some of the keys were updated while others are
+-- unchanged.
+--
+-- https://redis.io/commands/mset
 mset :: Internal.NamespacedHandler -> Dict.Dict Text ByteString -> Task Internal.Error ()
 mset handler values =
   Internal.mset
@@ -49,18 +67,26 @@ mset handler values =
         |> List.map (\(k, v) -> (toB k, v))
     )
 
--- | Set the value at a namespaced Redis key, returning the previous value (if any)
+-- | Atomically sets key to value and returns the old value stored at key.
+-- Returns an error when key exists but does not hold a string value.
+--
+-- https://redis.io/commands/getset
 getset :: Internal.NamespacedHandler -> Text -> ByteString -> Task Internal.Error (Maybe ByteString)
 getset handler key value =
   Internal.getset handler (toB key) value
 
--- | Delete the values at all of the provided keys. Return how many of those keys existed
--- (and hence were deld)
+-- | Removes the specified keys. A key is ignored if it does not exist.
+--
+-- https://redis.io/commands/del
 del :: Internal.NamespacedHandler -> [Text] -> Task Internal.Error Int
 del handler keys =
   Internal.del handler (map toB keys)
 
--- | Get multiple values from  a namespaced Redis key, assuming it is valid UTF8 data.
+-- | Returns the values of all specified keys. For every key that does not hold
+-- a string value or does not exist, no value is returned. Because of this, the
+-- operation never fails.
+--
+-- https://redis.io/commands/mget
 mget :: Internal.NamespacedHandler -> List Text -> Task Internal.Error (Dict.Dict Text ByteString)
 mget handler keys =
   keys
@@ -103,14 +129,16 @@ atomicModifyWithContext :: Internal.NamespacedHandler -> Text -> (Maybe ByteStri
 atomicModifyWithContext handler key f =
   Internal.atomicModify handler (toB key) f
 
--- | Get a value from a namespaced Redis key, assuming it is valid UTF8 data.
--- Returns `Nothing` if no value is set.
+-- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
+--
+-- https://redis.io/commands/hgetall
 hgetall :: Internal.NamespacedHandler -> Text -> Task Internal.Error [(ByteString, ByteString)]
 hgetall handler key =
   Internal.hgetall handler (toB key)
 
--- | Get a value from a namespaced Redis key, assuming it is valid UTF8 data.
--- Returns `Nothing` if no value is set.
+-- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
+--
+-- https://redis.io/commands/hset
 hset :: Internal.NamespacedHandler -> Text -> ByteString -> ByteString -> Task Internal.Error ()
 hset handler key field val =
   Internal.hset handler (toB key) field val
