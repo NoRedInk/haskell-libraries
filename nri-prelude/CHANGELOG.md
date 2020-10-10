@@ -1,3 +1,7 @@
+# 0.1.0.3
+
+- Fix tests to allow inclusion in stackage.
+
 # 0.1.0.2
 
 - Relax version bounds to encompass `pretty-diff-0.2.0.0` and `base-4.14.0.0`.
