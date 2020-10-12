@@ -90,6 +90,7 @@ handler namespace = do
              Internal.rawDelete = del,
              Internal.rawHGetAll = \_ -> error "No mock implementation implemented yet for hgetall",
              Internal.rawHSet = \_ -> error "No mock implementation implemented yet for hset",
+             Internal.rawHMSet = \_ -> error "No mock implementation implemented yet for hset",
              Internal.rawAtomicModify = atomicModify
            }
            |> Internal.namespacedHandler namespace

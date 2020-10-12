@@ -48,6 +48,7 @@ acquireHandler settings = do
              Internal.rawDelete = rawDelete connection anything,
              Internal.rawHGetAll = rawHGetAll connection anything,
              Internal.rawHSet = rawHSet connection anything,
+             Internal.rawHMSet = rawHMSet connection anything,
              Internal.rawAtomicModify = rawAtomicModify connection anything
            },
          connection
@@ -184,6 +185,16 @@ rawHSet ::
   Task Internal.Error ()
 rawHSet connection anything key value field =
   platformRedis "hset" connection anything (Database.Redis.hset key value field)
+    |> map (\_ -> ())
+
+rawHMSet ::
+  Connection ->
+  Platform.DoAnythingHandler ->
+  Data.ByteString.ByteString ->
+  [(Data.ByteString.ByteString, Data.ByteString.ByteString)] ->
+  Task Internal.Error ()
+rawHMSet connection anything key values =
+  platformRedis "hmset" connection anything (Database.Redis.hmset key values)
     |> map (\_ -> ())
 
 rawAtomicModify ::

@@ -34,6 +34,7 @@ data InternalHandler
         rawDelete :: [ByteString] -> Task Error Int,
         rawHGetAll :: ByteString -> Task Error [(ByteString, ByteString)],
         rawHSet :: ByteString -> ByteString -> ByteString -> Task Error (),
+        rawHMSet :: ByteString -> [(ByteString, ByteString)] -> Task Error (),
         rawAtomicModify ::
           forall a.
           ByteString ->
