@@ -60,3 +60,8 @@ doQuery query hm =
       let (newValue, context) = HM.lookup key hm |> f
        in (HM.insert key newValue hm, (newValue, context))
     Internal.Fmap f q -> doQuery q hm |> Tuple.mapSecond f
+    Internal.Pure x -> (hm, x)
+    Internal.Apply fQuery xQuery ->
+      let (hm1, f) = doQuery fQuery hm
+          (hm2, x) = doQuery xQuery hm1
+       in (hm2, f x)

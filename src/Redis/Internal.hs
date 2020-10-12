@@ -35,11 +35,21 @@ data Query a where
   Del :: [ByteString] -> Query Int
   Hgetall :: ByteString -> Query [(ByteString, ByteString)]
   Hset :: ByteString -> ByteString -> ByteString -> Query ()
+  -- AtomicModify is not a Redis command but a higher-level function supporting
+  -- the common use case of reading a value and then writing it atomically.
   AtomicModify :: ByteString -> (Maybe ByteString -> (ByteString, a)) -> Query (ByteString, a)
+  -- The constructors below are not Redis-related, but support using functions
+  -- like `map` and `map2` on queries.
   Fmap :: (a -> b) -> Query a -> Query b
+  Pure :: a -> Query a
+  Apply :: Query (a -> b) -> Query a -> Query b
 
 instance Prelude.Functor Query where
   fmap = Fmap
+
+instance Prelude.Applicative Query where
+  pure = Pure
+  (<*>) = Apply
 
 newtype InternalHandler
   = InternalHandler
@@ -81,6 +91,8 @@ namespaceQuery namespace query' =
         Hset key field val -> Hset (byteNamespace ++ key) field val
         AtomicModify key f -> AtomicModify (byteNamespace ++ key) f
         Fmap f q -> Fmap f q
+        Pure x -> Pure x
+        Apply f x -> Apply f x
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8
