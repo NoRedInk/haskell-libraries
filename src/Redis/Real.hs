@@ -15,6 +15,7 @@ import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
+import qualified Prelude
 
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings =
@@ -47,17 +48,32 @@ acquireHandler settings = do
 doQuery :: Connection -> Platform.DoAnythingHandler -> Internal.Query a -> Task Internal.Error a
 doQuery connection anything query =
   case query of
-    Internal.Ping -> rawPing connection anything
-    Internal.Get key -> rawGet connection anything key
-    Internal.Set key val -> rawSet connection anything key val
-    Internal.Getset key val -> rawGetSet connection anything key val
-    Internal.Mget keys -> rawGetMany connection anything keys
-    Internal.Mset vals -> rawSetMany connection anything vals
-    Internal.Del keys -> rawDelete connection anything keys
-    Internal.Hgetall key -> rawHGetAll connection anything key
-    Internal.Hset key field val -> rawHSet connection anything key field val
+    Internal.Ping -> platformRedis "ping" connection anything (doRawQuery query)
+    Internal.Get _ -> platformRedis "get" connection anything (doRawQuery query)
+    Internal.Set _ _ -> platformRedis "set" connection anything (doRawQuery query)
+    Internal.Getset _ _ -> platformRedis "getset" connection anything (doRawQuery query)
+    Internal.Mget _ -> platformRedis "mget" connection anything (doRawQuery query)
+    Internal.Mset _ -> platformRedis "mset" connection anything (doRawQuery query)
+    Internal.Del _ -> platformRedis "del" connection anything (doRawQuery query)
+    Internal.Hgetall _ -> platformRedis "hgetall" connection anything (doRawQuery query)
+    Internal.Hset _ _ _ -> platformRedis "hset" connection anything (doRawQuery query)
+    Internal.Fmap f q -> doQuery connection anything q |> map f
     Internal.AtomicModify key f -> rawAtomicModify connection anything key f
-    Internal.Fmap f q -> doQuery connection anything q |> Task.map f
+
+doRawQuery :: (Prelude.Functor f, Database.Redis.RedisCtx m f) => Internal.Query a -> m (f a)
+doRawQuery query =
+  case query of
+    Internal.Ping -> Database.Redis.ping
+    Internal.Get key -> Database.Redis.get key
+    Internal.Set key val -> Database.Redis.set key val |> map (map (\_ -> ()))
+    Internal.Getset key val -> Database.Redis.getset key val
+    Internal.Mget keys -> Database.Redis.mget keys
+    Internal.Mset vals -> Database.Redis.mset vals |> map (map (\_ -> ()))
+    Internal.Del keys -> Database.Redis.del keys |> map (map Prelude.fromIntegral)
+    Internal.Hgetall key -> Database.Redis.hgetall key
+    Internal.Hset key field val -> Database.Redis.hset key field val |> map (map (\_ -> ()))
+    Internal.Fmap f q -> doRawQuery q |> map (map f)
+    Internal.AtomicModify key f -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."
 
 releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis
@@ -112,85 +128,6 @@ toResult reply =
     Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
     Left _ -> Err (Internal.RedisError "The Redis library said this was an error but returned no error message.")
     Right r -> Ok r
-
-rawPing ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  Task Internal.Error Database.Redis.Status
-rawPing connection anything =
-  platformRedis "ping" connection anything Database.Redis.ping
-
-rawGet ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  Data.ByteString.ByteString ->
-  Task Internal.Error (Maybe Data.ByteString.ByteString)
-rawGet connection anything key =
-  platformRedis "get" connection anything (Database.Redis.get key)
-
-rawSet ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  Data.ByteString.ByteString ->
-  Data.ByteString.ByteString ->
-  Task Internal.Error ()
-rawSet connection anything key value =
-  platformRedis "set" connection anything (Database.Redis.set key value)
-    |> map (\_ -> ())
-
-rawGetSet ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  Data.ByteString.ByteString ->
-  Data.ByteString.ByteString ->
-  Task Internal.Error (Maybe Data.ByteString.ByteString)
-rawGetSet connection anything key value =
-  platformRedis "getset" connection anything (Database.Redis.getset key value)
-
-rawGetMany ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  [Data.ByteString.ByteString] ->
-  Task Internal.Error [Maybe Data.ByteString.ByteString]
-rawGetMany connection anything keys =
-  platformRedis "mget" connection anything (Database.Redis.mget keys)
-
-rawSetMany ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  [(Data.ByteString.ByteString, Data.ByteString.ByteString)] ->
-  Task Internal.Error ()
-rawSetMany connection anything assocs =
-  platformRedis "mset" connection anything (Database.Redis.mset assocs)
-    |> map (\_ -> ())
-
-rawDelete ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  [Data.ByteString.ByteString] ->
-  Task Internal.Error Int
-rawDelete connection anything keys =
-  platformRedis "del" connection anything (Database.Redis.del keys)
-    |> map fromIntegral
-
-rawHGetAll ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  Data.ByteString.ByteString ->
-  Task Internal.Error [(Data.ByteString.ByteString, Data.ByteString.ByteString)]
-rawHGetAll connection anything key =
-  platformRedis "hgetall" connection anything (Database.Redis.hgetall key)
-
-rawHSet ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  Data.ByteString.ByteString ->
-  Data.ByteString.ByteString ->
-  Data.ByteString.ByteString ->
-  Task Internal.Error ()
-rawHSet connection anything key value field =
-  platformRedis "hset" connection anything (Database.Redis.hset key value field)
-    |> map (\_ -> ())
 
 rawAtomicModify ::
   Connection ->
