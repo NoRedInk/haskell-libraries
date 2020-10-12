@@ -11,6 +11,7 @@ module Redis.ByteString
     del,
     hset,
     hgetall,
+    hmset,
 
     -- * helper functions
     atomicModify,
@@ -139,9 +140,19 @@ hgetall handler key =
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
 --
 -- https://redis.io/commands/hset
-hset :: Internal.Handler -> Text -> ByteString -> ByteString -> Task Internal.Error ()
+hset :: Internal.Handler -> Text -> Text -> ByteString -> Task Internal.Error ()
 hset handler key field val =
-  Internal.hset handler (toB key) field val
+  Internal.hset handler (toB key) (toB field) val
+
+-- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
+--
+-- equivalent to modern hset
+-- https://redis.io/commands/hmset
+hmset :: Internal.Handler -> Text -> [(Text, ByteString)] -> Task Internal.Error ()
+hmset handler key vals =
+  vals
+    |> map (\(k, v) -> (toB k, v))
+    |> Internal.hmset handler (toB key)
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8

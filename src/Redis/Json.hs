@@ -14,6 +14,9 @@ module Redis.Json
     mget,
     mset,
     del,
+    hset,
+    hgetall,
+    hmset,
 
     -- * helper functions
     atomicModify,
@@ -28,12 +31,15 @@ where
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.ByteString.Lazy
+import qualified Data.Text.Encoding
 import qualified Dict
+import qualified List
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Task
 import qualified Tuple
+import qualified Prelude
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
@@ -102,6 +108,39 @@ getset handler key value =
   Redis.ByteString.getset handler key (encodeStrict value)
     |> map (andThen Aeson.decodeStrict')
 
+-- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
+--
+-- https://redis.io/commands/hset
+hset :: (Aeson.ToJSON a) => Internal.Handler -> Text -> Text -> a -> Task Internal.Error ()
+hset handler key field val =
+  Redis.ByteString.hset handler key field (encodeStrict val)
+
+-- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
+-- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist
+--
+-- https://redis.io/commands/hgetall
+hgetall :: (Aeson.FromJSON a) => Internal.Handler -> Text -> Task Internal.Error [(Text, a)]
+hgetall handler key =
+  Redis.ByteString.hgetall handler key
+    |> map
+      ( List.filterMap
+          ( \(k, v) ->
+              case (toT k, Aeson.decodeStrict' v) of
+                (Just k', Just v') -> Just (k', v')
+                _ -> Nothing
+          )
+      )
+
+-- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
+--
+-- equivalent to modern hset
+-- https://redis.io/commands/hmset
+hmset :: (Aeson.ToJSON a) => Internal.Handler -> Text -> [(Text, a)] -> Task Internal.Error ()
+hmset handler key vals =
+  vals
+    |> List.map (\(k, v) -> (k, encodeStrict v))
+    |> Redis.ByteString.hmset handler key
+
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
@@ -137,3 +176,9 @@ encodeStrict :: Aeson.ToJSON a => a -> Data.ByteString.ByteString
 encodeStrict x =
   Aeson.encode x
     |> Data.ByteString.Lazy.toStrict
+
+toT :: Data.ByteString.ByteString -> Maybe Text
+toT bs =
+  case Data.Text.Encoding.decodeUtf8' bs of
+    Prelude.Right t -> Just t
+    Prelude.Left _ -> Nothing

@@ -53,6 +53,7 @@ data Handler
         del :: [ByteString] -> Task Error Int,
         hgetall :: ByteString -> Task Error [(ByteString, ByteString)],
         hset :: ByteString -> ByteString -> ByteString -> Task Error (),
+        hmset :: ByteString -> [(ByteString, ByteString)] -> Task Error (),
         atomicModify ::
           forall a.
           ByteString ->
@@ -78,6 +79,7 @@ namespacedHandler namespace h =
           del = \keys -> rawDelete h (map (byteNamespace ++) keys),
           hgetall = \key -> rawHGetAll h (byteNamespace ++ key),
           hset = \key field val -> rawHSet h (byteNamespace ++ key) field val,
+          hmset = \key vals -> rawHMSet h (byteNamespace ++ key) vals,
           atomicModify = \key f -> rawAtomicModify h (byteNamespace ++ key) f,
           unNamespacedHandler = h
         }
