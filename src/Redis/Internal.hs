@@ -8,6 +8,7 @@ import Data.ByteString (ByteString)
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import Nri.Prelude
+import qualified Prelude
 
 data Error
   = RedisError Text
@@ -35,6 +36,10 @@ data Query a where
   Hgetall :: ByteString -> Query [(ByteString, ByteString)]
   Hset :: ByteString -> ByteString -> ByteString -> Query ()
   AtomicModify :: ByteString -> (Maybe ByteString -> (ByteString, a)) -> Query (ByteString, a)
+  Fmap :: (a -> b) -> Query a -> Query b
+
+instance Prelude.Functor Query where
+  fmap = Fmap
 
 newtype InternalHandler
   = InternalHandler
@@ -75,6 +80,7 @@ namespaceQuery namespace query' =
         Hgetall key -> Hgetall (byteNamespace ++ key)
         Hset key field val -> Hset (byteNamespace ++ key) field val
         AtomicModify key f -> AtomicModify (byteNamespace ++ key) f
+        Fmap f q -> Fmap f q
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8

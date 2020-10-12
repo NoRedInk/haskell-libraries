@@ -13,13 +13,15 @@ module Redis.Text
     mset,
     del,
 
+    -- * Running queries
+    Internal.Query,
+    Internal.query,
+    Internal.Handler,
+    Internal.Error,
+
     -- * helper functions
     atomicModify,
     atomicModifyWithContext,
-
-    -- * Helper types
-    Internal.Handler,
-    Internal.Error,
   )
 where
 
@@ -29,7 +31,6 @@ import qualified Dict
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
-import qualified Task
 import qualified Tuple
 import qualified Prelude
 
@@ -38,9 +39,9 @@ import qualified Prelude
 -- string, because GET only handles string values.
 --
 -- https://redis.io/commands/get
-get :: Internal.Handler -> Text -> Task Internal.Error (Maybe Text)
-get handler key =
-  Redis.ByteString.get handler key
+get :: Text -> Internal.Query (Maybe Text)
+get key =
+  Redis.ByteString.get key
     |> map (andThen toT)
 
 -- | Set key to hold the string value. If key already holds a value, it is
@@ -48,9 +49,9 @@ get handler key =
 -- with the key is discarded on successful SET operation.
 --
 -- https://redis.io/commands/set
-set :: Internal.Handler -> Text -> Text -> Task Internal.Error ()
-set handler key value =
-  Redis.ByteString.set handler key (toB value)
+set :: Text -> Text -> Internal.Query ()
+set key value =
+  Redis.ByteString.set key (toB value)
 
 -- | Sets the given keys to their respective values. MSET replaces existing
 -- values with new values, just as regular SET. See MSETNX if you don't want to
@@ -61,25 +62,24 @@ set handler key value =
 -- unchanged.
 --
 -- https://redis.io/commands/mset
-mset :: Internal.Handler -> Dict.Dict Text Text -> Task Internal.Error ()
-mset handler values =
+mset :: Dict.Dict Text Text -> Internal.Query ()
+mset values =
   Redis.ByteString.mset
-    handler
     (Dict.map (\_key val -> toB val) values)
 
 -- | Atomically sets key to value and returns the old value stored at key.
 -- Returns an error when key exists but does not hold a string value.
 --
 -- https://redis.io/commands/getset
-getset :: Internal.Handler -> Text -> Text -> Task Internal.Error (Maybe Text)
-getset handler key value =
-  Redis.ByteString.getset handler key (toB value)
+getset :: Text -> Text -> Internal.Query (Maybe Text)
+getset key value =
+  Redis.ByteString.getset key (toB value)
     |> map (andThen toT)
 
 -- | Removes the specified keys. A key is ignored if it does not exist.
 --
 -- https://redis.io/commands/del
-del :: Internal.Handler -> [Text] -> Task Internal.Error Int
+del :: [Text] -> Internal.Query Int
 del = Redis.ByteString.del
 
 -- | Returns the values of all specified keys. For every key that does not hold
@@ -87,10 +87,10 @@ del = Redis.ByteString.del
 -- operation never fails.
 --
 -- https://redis.io/commands/mget
-mget :: Internal.Handler -> List Text -> Task Internal.Error (Dict.Dict Text Text)
-mget handler keys =
-  Redis.ByteString.mget handler keys
-    |> Task.map
+mget :: List Text -> Internal.Query (Dict.Dict Text Text)
+mget keys =
+  Redis.ByteString.mget keys
+    |> map
       ( Dict.foldl
           ( \key val dict ->
               case toT val of
@@ -103,10 +103,9 @@ mget handler keys =
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: Internal.Handler -> Text -> (Maybe Text -> Text) -> Task Internal.Error Text
-atomicModify handler key f =
+atomicModify :: Text -> (Maybe Text -> Text) -> Internal.Query Text
+atomicModify key f =
   Redis.ByteString.atomicModifyWithContext
-    handler
     key
     ( \maybeByteString ->
         maybeByteString
@@ -114,14 +113,13 @@ atomicModify handler key f =
           |> f
           |> (\res -> (toB res, res))
     )
-    |> Task.map Tuple.second
+    |> map Tuple.second
 
 -- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: Internal.Handler -> Text -> (Maybe Text -> (Text, a)) -> Task Internal.Error (Text, a)
-atomicModifyWithContext handler key f =
+atomicModifyWithContext :: Text -> (Maybe Text -> (Text, a)) -> Internal.Query (Text, a)
+atomicModifyWithContext key f =
   Redis.ByteString.atomicModifyWithContext
-    handler
     key
     ( \maybeByteString ->
         maybeByteString
@@ -129,7 +127,7 @@ atomicModifyWithContext handler key f =
           |> f
           |> (\res -> (toB (Tuple.first res), res))
     )
-    |> Task.map Tuple.second
+    |> map Tuple.second
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8

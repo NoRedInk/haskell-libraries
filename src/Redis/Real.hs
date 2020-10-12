@@ -57,6 +57,7 @@ doQuery connection anything query =
     Internal.Hgetall key -> rawHGetAll connection anything key
     Internal.Hset key field val -> rawHSet connection anything key field val
     Internal.AtomicModify key f -> rawAtomicModify connection anything key f
+    Internal.Fmap f q -> doQuery connection anything q |> Task.map f
 
 releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis

@@ -90,6 +90,7 @@ doQuery hm anything query =
             )
             |> map Ok
         )
+    Internal.Fmap f q -> doQuery hm anything q |> Task.map f
 
 set ::
   IORef (HM.HashMap ByteString ByteString) ->

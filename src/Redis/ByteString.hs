@@ -12,13 +12,15 @@ module Redis.ByteString
     hset,
     hgetall,
 
+    -- * Running queries
+    Internal.Query,
+    Internal.query,
+    Internal.Handler,
+    Internal.Error,
+
     -- * helper functions
     atomicModify,
     atomicModifyWithContext,
-
-    -- * Helper types
-    Internal.Handler,
-    Internal.Error,
   )
 where
 
@@ -28,7 +30,6 @@ import qualified Dict
 import qualified List
 import Nri.Prelude
 import qualified Redis.Internal as Internal
-import qualified Task
 import qualified Tuple
 
 -- | Get the value of key. If the key does not exist the special value Nothing
@@ -36,18 +37,18 @@ import qualified Tuple
 -- string, because GET only handles string values.
 --
 -- https://redis.io/commands/get
-get :: Internal.Handler -> Text -> Task Internal.Error (Maybe ByteString)
-get handler key =
-  Internal.query handler (Internal.Get (toB key))
+get :: Text -> Internal.Query (Maybe ByteString)
+get key =
+  Internal.Get (toB key)
 
 -- | Set key to hold the string value. If key already holds a value, it is
 -- overwritten, regardless of its type. Any previous time to live associated
 -- with the key is discarded on successful SET operation.
 --
 -- https://redis.io/commands/set
-set :: Internal.Handler -> Text -> ByteString -> Task Internal.Error ()
-set handler key value =
-  Internal.query handler (Internal.Set (toB key) value)
+set :: Text -> ByteString -> Internal.Query ()
+set key value =
+  Internal.Set (toB key) value
 
 -- | Sets the given keys to their respective values. MSET replaces existing
 -- values with new values, just as regular SET. See MSETNX if you don't want to
@@ -58,91 +59,77 @@ set handler key value =
 -- unchanged.
 --
 -- https://redis.io/commands/mset
-mset :: Internal.Handler -> Dict.Dict Text ByteString -> Task Internal.Error ()
-mset handler values =
+mset :: Dict.Dict Text ByteString -> Internal.Query ()
+mset values =
   values
     |> Dict.toList
     |> List.map (\(k, v) -> (toB k, v))
     |> Internal.Mset
-    |> Internal.query handler
 
 -- | Atomically sets key to value and returns the old value stored at key.
 -- Returns an error when key exists but does not hold a string value.
 --
 -- https://redis.io/commands/getset
-getset :: Internal.Handler -> Text -> ByteString -> Task Internal.Error (Maybe ByteString)
-getset handler key value =
-  Internal.query handler (Internal.Getset (toB key) value)
+getset :: Text -> ByteString -> Internal.Query (Maybe ByteString)
+getset key value =
+  Internal.Getset (toB key) value
 
 -- | Removes the specified keys. A key is ignored if it does not exist.
 --
 -- https://redis.io/commands/del
-del :: Internal.Handler -> [Text] -> Task Internal.Error Int
-del handler keys =
-  Internal.query handler (Internal.Del (map toB keys))
+del :: [Text] -> Internal.Query Int
+del keys =
+  Internal.Del (map toB keys)
 
 -- | Returns the values of all specified keys. For every key that does not hold
 -- a string value or does not exist, no value is returned. Because of this, the
 -- operation never fails.
 --
 -- https://redis.io/commands/mget
-mget :: Internal.Handler -> List Text -> Task Internal.Error (Dict.Dict Text ByteString)
-mget handler keys =
+mget :: List Text -> Internal.Query (Dict.Dict Text ByteString)
+mget keys =
   keys
     |> List.map toB
     |> Internal.Mget
-    |> Internal.query handler
-    |> andThen
+    |> map
       ( \values ->
-          if List.length keys == List.length values
-            then
-              List.map2 (,) keys values
-                |> List.filterMap
-                  ( \(key, value) ->
-                      case value of
-                        Nothing -> Nothing
-                        Just v -> Just (key, v)
-                  )
-                |> Dict.fromList
-                |> Task.succeed
-            else
-              Task.fail
-                ( Internal.LibraryError
-                    "We got a mismatch in the size of keys and values when post-processing the \
-                    \results of an mget command. Redis guarantees this shouldn't happen, so a \
-                    \mismatch here means that we did something wrong and continuing could mean \
-                    \building an incorrect mapping."
-                )
+          List.map2 (,) keys values
+            |> List.filterMap
+              ( \(key, value) ->
+                  case value of
+                    Nothing -> Nothing
+                    Just v -> Just (key, v)
+              )
+            |> Dict.fromList
       )
 
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: Internal.Handler -> Text -> (Maybe ByteString -> ByteString) -> Task Internal.Error ByteString
-atomicModify handler key f =
-  atomicModifyWithContext handler key (\x -> (f x, ()))
+atomicModify :: Text -> (Maybe ByteString -> ByteString) -> Internal.Query ByteString
+atomicModify key f =
+  atomicModifyWithContext key (\x -> (f x, ()))
     |> map Tuple.first
 
 -- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: Internal.Handler -> Text -> (Maybe ByteString -> (ByteString, a)) -> Task Internal.Error (ByteString, a)
-atomicModifyWithContext handler key f =
+atomicModifyWithContext :: Text -> (Maybe ByteString -> (ByteString, a)) -> Internal.Query (ByteString, a)
+atomicModifyWithContext key f =
   Internal.AtomicModify (toB key) f
-    |> Internal.query handler
 
 -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
 --
 -- https://redis.io/commands/hgetall
-hgetall :: Internal.Handler -> Text -> Task Internal.Error [(ByteString, ByteString)]
-hgetall handler key =
-  Internal.query handler (Internal.Hgetall (toB key))
+hgetall :: Text -> Internal.Query [(ByteString, ByteString)]
+hgetall key =
+  Internal.Hgetall (toB key)
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
 --
 -- https://redis.io/commands/hset
-hset :: Internal.Handler -> Text -> ByteString -> ByteString -> Task Internal.Error ()
-hset handler key field val =
-  Internal.query handler (Internal.Hset (toB key) field val)
+hset :: Text -> ByteString -> ByteString -> Internal.Query ()
+hset key field val =
+  Internal.Hset (toB key) field val
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
