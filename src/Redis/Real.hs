@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 module Redis.Real where
 
 import qualified Control.Exception.Safe as Exception
@@ -38,20 +40,23 @@ acquireHandler settings = do
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
-    <| ( Internal.InternalHandler
-           { Internal.rawPing = rawPing connection anything,
-             Internal.rawGet = rawGet connection anything,
-             Internal.rawSet = rawSet connection anything,
-             Internal.rawGetSet = rawGetSet connection anything,
-             Internal.rawGetMany = rawGetMany connection anything,
-             Internal.rawSetMany = rawSetMany connection anything,
-             Internal.rawDelete = rawDelete connection anything,
-             Internal.rawHGetAll = rawHGetAll connection anything,
-             Internal.rawHSet = rawHSet connection anything,
-             Internal.rawAtomicModify = rawAtomicModify connection anything
-           },
-         connection
-       )
+    ( Internal.InternalHandler (doQuery connection anything),
+      connection
+    )
+
+doQuery :: Connection -> Platform.DoAnythingHandler -> Internal.Query a -> Task Internal.Error a
+doQuery connection anything query =
+  case query of
+    Internal.Ping -> rawPing connection anything
+    Internal.Get key -> rawGet connection anything key
+    Internal.Set key val -> rawSet connection anything key val
+    Internal.Getset key val -> rawGetSet connection anything key val
+    Internal.Mget keys -> rawGetMany connection anything keys
+    Internal.Mset vals -> rawSetMany connection anything vals
+    Internal.Del keys -> rawDelete connection anything keys
+    Internal.Hgetall key -> rawHGetAll connection anything key
+    Internal.Hset key field val -> rawHSet connection anything key field val
+    Internal.AtomicModify key f -> rawAtomicModify connection anything key f
 
 releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis

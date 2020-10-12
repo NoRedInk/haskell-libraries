@@ -31,7 +31,8 @@ readiness :: Internal.Handler -> Health.Check
 readiness handler =
   Health.mkCheck "redis" <| do
     log <- Platform.silentHandler
-    Internal.ping handler
+    Internal.Ping
+      |> Internal.query handler
       |> Task.map (\_ -> Health.Good)
       |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
       |> Task.perform log

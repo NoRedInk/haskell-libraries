@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Redis.Internal where
@@ -23,42 +24,31 @@ errorForHumans topError =
     ConnectionLost -> "Connection Lost"
     LibraryError err -> "Library error: " ++ err
 
-data InternalHandler
+data Query a where
+  Ping :: Query Database.Redis.Status
+  Get :: ByteString -> Query (Maybe ByteString)
+  Set :: ByteString -> ByteString -> Query ()
+  Getset :: ByteString -> ByteString -> Query (Maybe ByteString)
+  Mget :: [ByteString] -> Query [Maybe ByteString]
+  Mset :: [(ByteString, ByteString)] -> Query ()
+  Del :: [ByteString] -> Query Int
+  Hgetall :: ByteString -> Query [(ByteString, ByteString)]
+  Hset :: ByteString -> ByteString -> ByteString -> Query ()
+  AtomicModify :: ByteString -> (Maybe ByteString -> (ByteString, a)) -> Query (ByteString, a)
+
+newtype InternalHandler
   = InternalHandler
-      { rawPing :: Task Error Database.Redis.Status,
-        rawGet :: ByteString -> Task Error (Maybe ByteString),
-        rawSet :: ByteString -> ByteString -> Task Error (),
-        rawGetSet :: ByteString -> ByteString -> Task Error (Maybe ByteString),
-        rawGetMany :: [ByteString] -> Task Error [Maybe ByteString],
-        rawSetMany :: [(ByteString, ByteString)] -> Task Error (),
-        rawDelete :: [ByteString] -> Task Error Int,
-        rawHGetAll :: ByteString -> Task Error [(ByteString, ByteString)],
-        rawHSet :: ByteString -> ByteString -> ByteString -> Task Error (),
-        rawAtomicModify ::
-          forall a.
-          ByteString ->
-          (Maybe ByteString -> (ByteString, a)) ->
-          Task Error (ByteString, a)
+      { doQuery :: forall a. Query a -> Task Error a
       }
 
 data Handler
   = Handler
-      { ping :: Task Error Database.Redis.Status,
-        get :: ByteString -> Task Error (Maybe ByteString),
-        set :: ByteString -> ByteString -> Task Error (),
-        getset :: ByteString -> ByteString -> Task Error (Maybe ByteString),
-        mget :: [ByteString] -> Task Error [Maybe ByteString],
-        mset :: [(ByteString, ByteString)] -> Task Error (),
-        del :: [ByteString] -> Task Error Int,
-        hgetall :: ByteString -> Task Error [(ByteString, ByteString)],
-        hset :: ByteString -> ByteString -> ByteString -> Task Error (),
-        atomicModify ::
-          forall a.
-          ByteString ->
-          (Maybe ByteString -> (ByteString, a)) ->
-          Task Error (ByteString, a),
+      { handlerWithNamespace :: InternalHandler,
         unNamespacedHandler :: InternalHandler
       }
+
+query :: Handler -> Query a -> Task Error a
+query handler query' = doQuery (handlerWithNamespace handler) query'
 
 changeNamespace :: Text -> Handler -> Handler
 changeNamespace namespace Handler {unNamespacedHandler} =
@@ -66,20 +56,25 @@ changeNamespace namespace Handler {unNamespacedHandler} =
 
 namespacedHandler :: Text -> InternalHandler -> Handler
 namespacedHandler namespace h =
+  Handler
+    { unNamespacedHandler = h,
+      handlerWithNamespace = InternalHandler (doQuery h << namespaceQuery namespace)
+    }
+
+namespaceQuery :: Text -> Query a -> Query a
+namespaceQuery namespace query' =
   let byteNamespace = namespace ++ ":" |> toB
-   in Handler
-        { ping = rawPing h,
-          get = \key -> rawGet h (byteNamespace ++ key),
-          set = \key value -> rawSet h (byteNamespace ++ key) value,
-          getset = \key value -> rawGetSet h (byteNamespace ++ key) value,
-          mget = \keys -> rawGetMany h (map (\k -> byteNamespace ++ k) keys),
-          mset = \assocs -> rawSetMany h (map (\(k, v) -> (byteNamespace ++ k, v)) assocs),
-          del = \keys -> rawDelete h (map (byteNamespace ++) keys),
-          hgetall = \key -> rawHGetAll h (byteNamespace ++ key),
-          hset = \key field val -> rawHSet h (byteNamespace ++ key) field val,
-          atomicModify = \key f -> rawAtomicModify h (byteNamespace ++ key) f,
-          unNamespacedHandler = h
-        }
+   in case query' of
+        Ping -> Ping
+        Get key -> Get (byteNamespace ++ key)
+        Set key value -> Set (byteNamespace ++ key) value
+        Getset key value -> Getset (byteNamespace ++ key) value
+        Mget keys -> Mget (map (\k -> byteNamespace ++ k) keys)
+        Mset assocs -> Mset (map (\(k, v) -> (byteNamespace ++ k, v)) assocs)
+        Del keys -> Del (map (byteNamespace ++) keys)
+        Hgetall key -> Hgetall (byteNamespace ++ key)
+        Hset key field val -> Hset (byteNamespace ++ key) field val
+        AtomicModify key f -> AtomicModify (byteNamespace ++ key) f
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8
