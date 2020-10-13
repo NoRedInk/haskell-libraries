@@ -57,7 +57,7 @@ report handler' requestId span = do
   let requestSettings =
         Http.Settings
           { Http._method = "POST",
-            Http._headers = ["X-Honeycomb-Team", Encoding.encodeUtf8 <| Log.unSecret <| handler_honeycombApiKey handler'],
+            Http._headers = [("X-Honeycomb-Team", Encoding.encodeUtf8 <| Log.unSecret <| handler_honeycombApiKey handler')],
             Http._url = url,
             Http._body = body,
             Http._timeout = Nothing,
