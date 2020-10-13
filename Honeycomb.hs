@@ -48,12 +48,12 @@ report handler' requestId span = do
   spans <- toBatchEvents handler' requestId Nothing span
   let body = Http.jsonBody spans
   silentHandler' <- Platform.silentHandler
-  let datasetName = (handler_serviceName handler') ++ "-" ++ (handler_environment handler')
+  let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
   let url = batchApiEndpoint datasetName
   let requestSettings =
         Http.Settings
           { Http._method = "POST",
-            Http._headers = [("X-Honeycomb-Team", Encoding.encodeUtf8 <| Log.unSecret <| handler_honeycombApiKey handler')],
+            Http._headers = ["X-Honeycomb-Team", Encoding.encodeUtf8 <| Log.unSecret <| handler_honeycombApiKey handler'],
             Http._url = url,
             Http._body = body,
             Http._timeout = Nothing,
@@ -61,7 +61,7 @@ report handler' requestId span = do
           }
   result <-
     Http.request (handler_http handler') requestSettings
-      |> Task.attempt (silentHandler')
+      |> Task.attempt silentHandler'
   case result of
     Ok body' -> do
       Prelude.putStrLn "OK"
@@ -76,7 +76,7 @@ toBatchEvents :: Handler -> Text -> Maybe SpanId -> Platform.TracingSpan -> Prel
 toBatchEvents handler' requestId parentSpanId span = do
   thisSpansId <- map SpanId nextRandom
   children <- Prelude.traverse (toBatchEvents handler' requestId (Just thisSpansId)) (Platform.children span)
-  let duration = (Platform.finished span) - (Platform.started span) |> Platform.inMicroseconds
+  let duration = Platform.finished span - Platform.started span |> Platform.inMicroseconds
   let timestamp = toISO8601 (handler_timer handler') (Platform.started span)
   let hcSpan =
         Span
@@ -86,7 +86,7 @@ toBatchEvents handler' requestId parentSpanId span = do
             traceId = requestId,
             serviceName = handler_serviceName handler',
             environment = handler_environment handler',
-            durationMs = (Prelude.fromIntegral duration) / 1000,
+            durationMs = Prelude.fromIntegral duration / 1000,
             details = Platform.details span
           }
   Prelude.pure
@@ -94,7 +94,7 @@ toBatchEvents handler' requestId parentSpanId span = do
       { batchevent_time = timestamp,
         batchevent_data = hcSpan
       }
-    : (List.concat children)
+    : List.concat children
 
 data BatchEvent
   = BatchEvent
@@ -197,7 +197,7 @@ honeycombApiKeyDecoder =
       }
     (Environment.text |> Environment.secret)
 
-appEnvironmentDecoder :: Environment.Decoder (Text)
+appEnvironmentDecoder :: Environment.Decoder Text
 appEnvironmentDecoder =
   Environment.variable
     Environment.Variable
@@ -205,7 +205,7 @@ appEnvironmentDecoder =
         Environment.description = "Environment to display in logs.",
         Environment.defaultValue = "development"
       }
-    (Environment.text)
+    Environment.text
 
 appNameDecoder :: Environment.Decoder Text
 appNameDecoder =
@@ -215,4 +215,4 @@ appNameDecoder =
         Environment.description = "Root of the log namespace. This should be the name of the application.",
         Environment.defaultValue = "your-application-name-here"
       }
-    (Environment.text)
+    Environment.text
