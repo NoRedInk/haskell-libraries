@@ -32,6 +32,7 @@ import qualified List
 import Nri.Prelude
 import qualified Redis.Internal as Internal
 import qualified Tuple
+import qualified Prelude
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
@@ -121,9 +122,23 @@ atomicModifyWithContext key f =
 -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
 --
 -- https://redis.io/commands/hgetall
-hgetall :: Text -> Internal.Query [(ByteString, ByteString)]
+hgetall :: Text -> Internal.Query [(Text, ByteString)]
 hgetall key =
   Internal.Hgetall (toB key)
+    |> Internal.WithResult
+      ( \results ->
+          let textResults =
+                results
+                  |> List.filterMap
+                    ( \(byteKey, v) ->
+                        case Data.Text.Encoding.decodeUtf8' byteKey of
+                          Prelude.Right textKey -> Just (textKey, v)
+                          Prelude.Left _ -> Nothing
+                    )
+           in if List.length results /= List.length textResults
+                then unparsableKeyError
+                else Ok textResults
+      )
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
 --
@@ -144,3 +159,6 @@ hmset key vals =
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
+
+unparsableKeyError :: Result Internal.Error a
+unparsableKeyError = Err <| Internal.LibraryError "key exists but not parsable text"

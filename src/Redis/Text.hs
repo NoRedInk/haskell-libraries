@@ -130,11 +130,10 @@ hgetall key =
           let textResults =
                 results
                   |> List.filterMap
-                    ( \(k, v) ->
-                        case (toT k, toT v) of
-                          (Err _, _) -> Nothing
-                          (_, Err _) -> Nothing
-                          (Ok a, Ok b) -> Just (a, b)
+                    ( \(k, byteV) ->
+                        case toT byteV of
+                          Err _ -> Nothing
+                          Ok textV -> Just (k, textV)
                     )
            in if List.length results /= List.length textResults
                 then unparsableKeyError

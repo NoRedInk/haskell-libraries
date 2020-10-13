@@ -33,14 +33,12 @@ where
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.ByteString.Lazy
-import qualified Data.Text.Encoding
 import qualified Dict
 import qualified List
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Tuple
-import qualified Prelude
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
@@ -125,9 +123,9 @@ hgetall key =
     |> map
       ( List.filterMap
           ( \(k, v) ->
-              case (toT k, Aeson.decodeStrict' v) of
-                (Just k', Just v') -> Just (k', v')
-                _ -> Nothing
+              case Aeson.decodeStrict' v of
+                Just v' -> Just (k, v')
+                Nothing -> Nothing
           )
       )
 
@@ -174,9 +172,3 @@ encodeStrict :: Aeson.ToJSON a => a -> Data.ByteString.ByteString
 encodeStrict x =
   Aeson.encode x
     |> Data.ByteString.Lazy.toStrict
-
-toT :: Data.ByteString.ByteString -> Maybe Text
-toT bs =
-  case Data.Text.Encoding.decodeUtf8' bs of
-    Prelude.Right t -> Just t
-    Prelude.Left _ -> Nothing
