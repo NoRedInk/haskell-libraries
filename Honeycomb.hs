@@ -77,8 +77,7 @@ report handler' requestId span = do
       Prelude.pure ()
 
 toBatchEvents :: CommonFields -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
-toBatchEvents commonFields parentSpanId 
-spanIndex span = do
+toBatchEvents commonFields parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
   let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration = Platform.finished span - Platform.started span |> Platform.inMicroseconds
