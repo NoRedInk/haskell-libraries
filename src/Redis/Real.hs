@@ -19,6 +19,7 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Task
+import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
 import qualified Prelude
 
@@ -53,16 +54,6 @@ acquireHandler settings = do
 doQuery :: Connection -> Platform.DoAnythingHandler -> Internal.Query a -> Task Internal.Error a
 doQuery connection anything query =
   case query of
-    -- Single-query commands we run directly
-    Internal.Ping -> platformRedis "ping" connection anything (doRawQuery query)
-    Internal.Get _ -> platformRedis "get" connection anything (doRawQuery query)
-    Internal.Set _ _ -> platformRedis "set" connection anything (doRawQuery query)
-    Internal.Getset _ _ -> platformRedis "getset" connection anything (doRawQuery query)
-    Internal.Mget _ -> platformRedis "mget" connection anything (doRawQuery query)
-    Internal.Mset _ -> platformRedis "mset" connection anything (doRawQuery query)
-    Internal.Del _ -> platformRedis "del" connection anything (doRawQuery query)
-    Internal.Hgetall _ -> platformRedis "hgetall" connection anything (doRawQuery query)
-    Internal.Hset _ _ _ -> platformRedis "hset" connection anything (doRawQuery query)
     -- Special treatment for constructors that don't represent
     Internal.Fmap f q -> doQuery connection anything q |> map f
     Internal.Pure x -> Task.succeed x
@@ -70,39 +61,43 @@ doQuery connection anything query =
     -- If we see an `Apply` it means we're stringing multiple commands together.
     -- We run these inside a Redis transaction to ensure atomicity.
     Internal.Apply f x ->
-      map2 (map2 (\f' x' -> f' x')) (doRawQuery f) (doRawQuery x)
-        |> Database.Redis.multiExec
-        |> map
-          ( \txResult ->
-              case txResult of
-                Database.Redis.TxSuccess y -> Right y
-                Database.Redis.TxAborted ->
-                  -- We haven't exposed `watch` from this package's API yet, and
-                  -- as long as we don't this error shouldn't happen.
-                  Left (Database.Redis.Error "Aborted due to WATCH failing")
-                Database.Redis.TxError err -> Left (Database.Redis.Error (Data.ByteString.Char8.pack err))
-          )
-        |> platformRedis "multi" connection anything
+      let (cmds, redisCtx) = map2 (map2 (Prelude.<*>)) (doRawQuery f) (doRawQuery x)
+       in redisCtx
+            |> Database.Redis.multiExec
+            |> map
+              ( \txResult ->
+                  case txResult of
+                    Database.Redis.TxSuccess y -> Right y
+                    Database.Redis.TxAborted ->
+                      -- We haven't exposed `watch` from this package's API yet, and
+                      -- as long as we don't this error shouldn't happen.
+                      Left (Database.Redis.Error "Aborted due to WATCH failing")
+                    Database.Redis.TxError err -> Left (Database.Redis.Error (Data.ByteString.Char8.pack err))
+              )
+            |> platformRedis (Text.join " " cmds) connection anything
+    _ ->
+      let (cmds, redisCtx) = doRawQuery query
+       in platformRedis (Text.join " " cmds) connection anything redisCtx
 
 -- Construct a query in the underlying `hedis` library we depend on. It has a
 -- polymorphic type signature that allows the returning query to be passed to
 -- `Database.Redis.run` for direct execution, or `Database.Redis.multiExec` for
 -- executation as part of a transaction.
-doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query a -> m (f a)
+doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query a -> ([Text], m (f a))
 doRawQuery query =
   case query of
-    Internal.Ping -> Database.Redis.ping
-    Internal.Get key -> Database.Redis.get key
-    Internal.Set key val -> Database.Redis.set key val |> map (map (\_ -> ()))
-    Internal.Getset key val -> Database.Redis.getset key val
-    Internal.Mget keys -> Database.Redis.mget keys
-    Internal.Mset vals -> Database.Redis.mset vals |> map (map (\_ -> ()))
-    Internal.Del keys -> Database.Redis.del keys |> map (map Prelude.fromIntegral)
-    Internal.Hgetall key -> Database.Redis.hgetall key
-    Internal.Hset key field val -> Database.Redis.hset key field val |> map (map (\_ -> ()))
-    Internal.Fmap f q -> doRawQuery q |> map (map f)
-    Internal.Pure x -> pure (pure x)
-    Internal.Apply f x -> map2 (map2 (\f' x' -> f' x')) (doRawQuery f) (doRawQuery x)
+    Internal.Ping -> (["ping"], Database.Redis.ping)
+    Internal.Get key -> (["get"], Database.Redis.get key)
+    Internal.Set key val -> (["set"], Database.Redis.set key val |> map (map (\_ -> ())))
+    Internal.Getset key val -> (["getset"], Database.Redis.getset key val)
+    Internal.Mget keys -> (["mget"], Database.Redis.mget keys)
+    Internal.Mset vals -> (["mset"], Database.Redis.mset vals |> map (map (\_ -> ())))
+    Internal.Del keys -> (["keys"], Database.Redis.del keys |> map (map Prelude.fromIntegral))
+    Internal.Hgetall key -> (["hgetall"], Database.Redis.hgetall key)
+    Internal.Hset key field val -> (["hset"], Database.Redis.hset key field val |> map (map (\_ -> ())))
+    Internal.Fmap f q -> doRawQuery q |> map (map (map f))
+    Internal.Pure x -> ([], pure (pure x))
+    Internal.Apply f x -> map2 (map2 (Prelude.<*>)) (doRawQuery f) (doRawQuery x)
     Internal.AtomicModify _ _ -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."
 
 releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
