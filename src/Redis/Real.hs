@@ -61,7 +61,7 @@ doQuery connection anything query =
     -- If we see an `Apply` it means we're stringing multiple commands together.
     -- We run these inside a Redis transaction to ensure atomicity.
     Internal.Apply f x ->
-      let (cmds, redisCtx) = map2 (map2 (Prelude.<*>)) (doRawQuery f) (doRawQuery x)
+      let (cmds, redisCtx) = map2 (map2 (map2 (Prelude.<*>))) (doRawQuery f) (doRawQuery x)
        in redisCtx
             |> Database.Redis.multiExec
             |> map
@@ -83,23 +83,34 @@ doQuery connection anything query =
 -- polymorphic type signature that allows the returning query to be passed to
 -- `Database.Redis.run` for direct execution, or `Database.Redis.multiExec` for
 -- executation as part of a transaction.
-doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query a -> ([Text], m (f a))
+doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> ([Text], m (f (Result Internal.Error result)))
 doRawQuery query =
   case query of
-    Internal.Ping -> (["ping"], Database.Redis.ping)
-    Internal.Get key -> (["get"], Database.Redis.get key)
-    Internal.Set key val -> (["set"], Database.Redis.set key val |> map (map (\_ -> ())))
-    Internal.Getset key val -> (["getset"], Database.Redis.getset key val)
-    Internal.Mget keys -> (["mget"], Database.Redis.mget keys)
-    Internal.Mset vals -> (["mset"], Database.Redis.mset vals |> map (map (\_ -> ())))
-    Internal.Del keys -> (["keys"], Database.Redis.del keys |> map (map Prelude.fromIntegral))
-    Internal.Hgetall key -> (["hgetall"], Database.Redis.hgetall key)
-    Internal.Hset key field val -> (["hset"], Database.Redis.hset key field val |> map (map (\_ -> ())))
-    Internal.Hmset key vals -> (["hset"], Database.Redis.hmset key vals |> map (map (\_ -> ())))
-    Internal.Fmap f q -> doRawQuery q |> map (map (map f))
-    Internal.Pure x -> ([], pure (pure x))
-    Internal.Apply f x -> map2 (map2 (Prelude.<*>)) (doRawQuery f) (doRawQuery x)
+    Internal.Ping -> (["ping"], Database.Redis.ping |> map (map Ok))
+    Internal.Get key -> (["get"], Database.Redis.get key |> map (map Ok))
+    Internal.Set key val -> (["set"], Database.Redis.set key val |> map (map (\_ -> Ok ())))
+    Internal.Getset key val -> (["getset"], Database.Redis.getset key val |> map (map Ok))
+    Internal.Mget keys -> (["mget"], Database.Redis.mget keys |> map (map Ok))
+    Internal.Mset vals -> (["mset"], Database.Redis.mset vals |> map (map (\_ -> Ok ())))
+    Internal.Del keys -> (["keys"], Database.Redis.del keys |> map (map (Ok << Prelude.fromIntegral)))
+    Internal.Hgetall key -> (["hgetall"], Database.Redis.hgetall key |> map (map Ok))
+    Internal.Hset key field val -> (["hset"], Database.Redis.hset key field val |> map (map (\_ -> Ok ())))
+    Internal.Hmset key vals -> (["hset"], Database.Redis.hmset key vals |> map (map (\_ -> Ok ())))
+    Internal.Fmap f q -> doRawQuery q |> map (map (map (map f)))
+    Internal.Pure x -> ([], pure (pure (Ok x)))
+    Internal.Apply f x -> map2 (map2 (map2 (Prelude.<*>))) (doRawQuery f) (doRawQuery x)
     Internal.AtomicModify _ _ -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."
+    Internal.WithResult f q ->
+      doRawQuery q
+        |> map
+          ( map
+              ( map
+                  ( \result -> case result of
+                      Err a -> Err a
+                      Ok res -> f res
+                  )
+              )
+          )
 
 releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis
@@ -115,11 +126,17 @@ platformRedis ::
   Text ->
   Connection ->
   Platform.DoAnythingHandler ->
-  Database.Redis.Redis (Either Database.Redis.Reply a) ->
+  Database.Redis.Redis (Either Database.Redis.Reply (Result Internal.Error a)) ->
   Task Internal.Error a
 platformRedis command connection anything action =
   Database.Redis.runRedis (connectionHedis connection) action
     |> map toResult
+    |> map
+      ( \result -> -- Result Internal.Error (Result Internal.Error a) -> Result Internal.Error a
+          case result of
+            Ok a -> a
+            Err err -> Err err
+      )
     |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
     |> Platform.doAnything anything
     |> traceQuery command connection
@@ -169,7 +186,7 @@ rawAtomicModify connection anything key f =
         "watch get multi set exec"
         connection
         anything
-        action
+        (map (map Ok) action)
         |> andThen (processTxResult count)
     processTxResult count (txResult, newValue) =
       case txResult of

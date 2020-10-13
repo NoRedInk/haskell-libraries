@@ -44,6 +44,7 @@ data Query a where
   Fmap :: (a -> b) -> Query a -> Query b
   Pure :: a -> Query a
   Apply :: Query (a -> b) -> Query a -> Query b
+  WithResult :: (a -> Result Error b) -> Query a -> Query b
 
 instance Prelude.Functor Query where
   fmap = Fmap
@@ -95,6 +96,7 @@ namespaceQuery namespace query' =
         Fmap f q -> Fmap f (namespaceQuery namespace q)
         Pure x -> Pure x
         Apply f x -> Apply (namespaceQuery namespace f) (namespaceQuery namespace x)
+        WithResult f q -> WithResult f (namespaceQuery namespace q)
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8

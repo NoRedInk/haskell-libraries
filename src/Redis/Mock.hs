@@ -23,7 +23,6 @@ handler namespace = do
   Internal.InternalHandler
     ( \query ->
         atomicModifyIORef' hm (doQuery query)
-          |> map Ok
           |> Platform.doAnything anything
     )
     |> Internal.namespacedHandler namespace
@@ -32,20 +31,20 @@ handler namespace = do
 doQuery ::
   Internal.Query a ->
   HM.HashMap ByteString ByteString ->
-  (HM.HashMap ByteString ByteString, a)
+  (HM.HashMap ByteString ByteString, Result Internal.Error a)
 doQuery query hm =
   case query of
-    Internal.Ping -> (hm, Database.Redis.Pong)
-    Internal.Get key -> (hm, HM.lookup key hm)
-    Internal.Set key value -> (HM.insert key value hm, ())
-    Internal.Getset key value -> (HM.insert key value hm, HM.lookup key hm)
-    Internal.Mget keys -> (hm, List.map (\key -> HM.lookup key hm) keys)
+    Internal.Ping -> (hm, Ok Database.Redis.Pong)
+    Internal.Get key -> (hm, Ok <| HM.lookup key hm)
+    Internal.Set key value -> (HM.insert key value hm, Ok ())
+    Internal.Getset key value -> (HM.insert key value hm, Ok <| HM.lookup key hm)
+    Internal.Mget keys -> (hm, Ok <| List.map (\key -> HM.lookup key hm) keys)
     Internal.Mset assocs ->
       ( List.foldl
           (\(key, val) hm' -> HM.insert key val hm')
           hm
           assocs,
-        ()
+        Ok ()
       )
     Internal.Del keys ->
       List.foldl
@@ -56,15 +55,24 @@ doQuery query hm =
         )
         (hm, 0 :: Int)
         keys
+        |> Tuple.mapSecond Ok
     Internal.Hgetall _key -> error "No mock implementation implemented yet for hgetall"
     Internal.Hset _key _field _val -> error "No mock implementation implemented yet for hset"
     Internal.Hmset _key _vals -> error "No mock implementation implemented yet for hset"
     Internal.AtomicModify key f ->
       let (newValue, context) = HM.lookup key hm |> f
-       in (HM.insert key newValue hm, (newValue, context))
-    Internal.Fmap f q -> doQuery q hm |> Tuple.mapSecond f
-    Internal.Pure x -> (hm, x)
+       in (HM.insert key newValue hm, Ok (newValue, context))
+    Internal.Fmap f q -> doQuery q hm |> Tuple.mapSecond (map f)
+    Internal.Pure x -> (hm, Ok x)
     Internal.Apply fQuery xQuery ->
       let (hm1, f) = doQuery fQuery hm
           (hm2, x) = doQuery xQuery hm1
-       in (hm2, f x)
+       in (hm2, map2 (\f' x' -> f' x') f x)
+    Internal.WithResult f q ->
+      doQuery q hm
+        |> map
+          ( \result ->
+              case result of
+                Err a -> Err a
+                Ok res -> f res
+          )

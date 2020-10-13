@@ -46,7 +46,15 @@ import qualified Prelude
 get :: Text -> Internal.Query (Maybe Text)
 get key =
   Redis.ByteString.get key
-    |> map (andThen toT)
+    |> Internal.WithResult
+      ( \maybeBytestring ->
+          case maybeBytestring of
+            Nothing -> Ok Nothing
+            Just bytestring ->
+              case toT bytestring of
+                Nothing -> Err <| Internal.LibraryError "get failed, key exists but not parseable text"
+                Just t -> Ok <| Just t
+      )
 
 -- | Set key to hold the string value. If key already holds a value, it is
 -- overwritten, regardless of its type. Any previous time to live associated
