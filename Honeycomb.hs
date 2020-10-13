@@ -21,7 +21,7 @@ module Observability.Honeycomb
   )
 where
 
-import Cherry.Prelude
+import Nri.Prelude
 import qualified Conduit
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
