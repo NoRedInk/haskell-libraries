@@ -12,6 +12,9 @@ module Redis.Text
     mget,
     mset,
     del,
+    hset,
+    hgetall,
+    hmset,
 
     -- * Running queries
     Internal.Query,
@@ -28,6 +31,7 @@ where
 import qualified Data.ByteString
 import qualified Data.Text.Encoding
 import qualified Dict
+import qualified List
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
@@ -100,6 +104,32 @@ mget keys =
           Dict.empty
       )
 
+-- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
+--
+-- https://redis.io/commands/hset
+hset :: Text -> Text -> Text -> Internal.Query ()
+hset key field val =
+  Redis.ByteString.hset key field (toB val)
+
+-- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
+-- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist
+--
+-- https://redis.io/commands/hgetall
+hgetall :: Text -> Internal.Query [(Maybe Text, Maybe Text)]
+hgetall key =
+  Redis.ByteString.hgetall key
+    |> map (map (\(k, v) -> (toT k, toT v)))
+
+-- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
+--
+-- equivalent to modern hset
+-- https://redis.io/commands/hmset
+hmset :: Text -> [(Text, Text)] -> Internal.Query ()
+hmset key vals =
+  vals
+    |> List.map (\(k, v) -> (k, toB v))
+    |> Redis.ByteString.hmset key
+
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
@@ -134,7 +164,6 @@ toB = Data.Text.Encoding.encodeUtf8
 
 toT :: Data.ByteString.ByteString -> Maybe Text
 toT bs =
-  Data.Text.Encoding.decodeUtf8' bs
-    |> \r -> case r of
-      Prelude.Right t -> Just t
-      Prelude.Left _ -> Nothing
+  case Data.Text.Encoding.decodeUtf8' bs of
+    Prelude.Right t -> Just t
+    Prelude.Left _ -> Nothing

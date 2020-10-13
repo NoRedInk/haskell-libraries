@@ -95,6 +95,7 @@ doRawQuery query =
     Internal.Del keys -> (["keys"], Database.Redis.del keys |> map (map Prelude.fromIntegral))
     Internal.Hgetall key -> (["hgetall"], Database.Redis.hgetall key)
     Internal.Hset key field val -> (["hset"], Database.Redis.hset key field val |> map (map (\_ -> ())))
+    Internal.Hmset key vals -> (["hset"], Database.Redis.hmset key vals |> map (map (\_ -> ())))
     Internal.Fmap f q -> doRawQuery q |> map (map (map f))
     Internal.Pure x -> ([], pure (pure x))
     Internal.Apply f x -> map2 (map2 (Prelude.<*>)) (doRawQuery f) (doRawQuery x)

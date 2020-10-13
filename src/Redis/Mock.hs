@@ -58,6 +58,7 @@ doQuery query hm =
         keys
     Internal.Hgetall _key -> error "No mock implementation implemented yet for hgetall"
     Internal.Hset _key _field _val -> error "No mock implementation implemented yet for hset"
+    Internal.Hmset _key _vals -> error "No mock implementation implemented yet for hset"
     Internal.AtomicModify key f ->
       let (newValue, context) = HM.lookup key hm |> f
        in (HM.insert key newValue hm, (newValue, context))
