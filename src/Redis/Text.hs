@@ -111,16 +111,7 @@ hset key field val =
 hgetall :: Text -> Internal.Query (List (Text, Text))
 hgetall key =
   Redis.ByteString.hgetall key
-    |> Internal.WithResult
-      ( \results ->
-          results
-            |> Prelude.traverse
-              ( \(k, byteV) ->
-                  case toT byteV of
-                    Err err -> Err err
-                    Ok textV -> Ok (k, textV)
-              )
-      )
+    |> Internal.WithResult (Prelude.traverse (Prelude.traverse toT))
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
 --
