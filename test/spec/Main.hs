@@ -3,7 +3,6 @@ module Main (main) where
 import qualified Conduit
 import qualified Control.Concurrent.Async
 import qualified Control.Exception.Safe as Exception
-import qualified Database.Redis
 import qualified Dict
 import Dict (Dict)
 import qualified Environment
@@ -12,7 +11,6 @@ import qualified List
 import Nri.Prelude
 import qualified Platform
 import Redis (Error, Handler, changeNamespace)
-import qualified Redis.Internal as Internal
 import qualified Redis.Json as Json
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
@@ -21,8 +19,7 @@ import Redis.Text
 import qualified Task
 import Test
 import qualified Test.Runner.Tasty
-import qualified Tuple
-import Prelude (IO, fst, pure, uncurry)
+import Prelude (IO, pure, uncurry)
 
 buildSpecs :: TestHandlers -> Test
 buildSpecs TestHandlers {logHandler, redisHandlers} =
@@ -35,16 +32,16 @@ specs logHandler whichHandler redisHandler =
   describe
     (whichHandler ++ " Redis")
     [ redisTest "get and set" <| do
-        set testNS "bob" "hello!"
-        result <- get testNS "bob"
+        set "bob" "hello!" |> query testNS
+        result <- get "bob" |> query testNS
         pure <| Expect.equal result (Just "hello!"),
       redisTest "namespaces namespace" <| do
         let nsHandler1 = changeNamespace "NS1" redisHandler
         let nsHandler2 = changeNamespace "NS2" redisHandler
-        set nsHandler1 "bob" "hello!"
-        set nsHandler2 "bob" "goodbye"
-        result1 <- get nsHandler1 "bob"
-        result2 <- get nsHandler2 "bob"
+        set "bob" "hello!" |> query nsHandler1
+        set "bob" "goodbye" |> query nsHandler2
+        result1 <- get "bob" |> query nsHandler1
+        result2 <- get "bob" |> query nsHandler2
         pure
           <| Expect.all
             [ \() -> Expect.notEqual result1 result2,
@@ -53,9 +50,9 @@ specs logHandler whichHandler redisHandler =
             ]
             (),
       redisTest "getset" <| do
-        set testNS "getset" "1"
-        result1 <- getset testNS "getset" "2"
-        result2 <- get testNS "getset"
+        set "getset" "1" |> query testNS
+        result1 <- getset "getset" "2" |> query testNS
+        result2 <- get "getset" |> query testNS
         pure
           <| Expect.all
             [ \() -> Expect.just (Expect.equal "1") result1,
@@ -63,43 +60,45 @@ specs logHandler whichHandler redisHandler =
             ]
             (),
       redisTest "del dels" <| do
-        set testNS "del" "mistake..."
-        _ <- del testNS ["del"]
-        result <- get testNS "del"
+        set "del" "mistake..." |> query testNS
+        _ <- del ["del"] |> query testNS
+        result <- get "del" |> query testNS
         pure <| Expect.nothing result,
       redisTest "del counts" <| do
-        set testNS "delCount" "A thing"
-        result <- del testNS ["delCount", "key that doesn't exist"]
+        set "delCount" "A thing" |> query testNS
+        result <- del ["delCount", "key that doesn't exist"] |> query testNS
         pure <| Expect.equal 1 result,
       redisTest "json roundtrip" <| do
         let testData :: [Text] = ["one", "two", "three"]
-        Json.set testNS "JSON list" testData
-        result <- Json.get testNS "JSON list"
+        Json.set "JSON list" testData |> query testNS
+        result <- Json.get "JSON list" |> query testNS
         pure <| Expect.just (Expect.equal testData) result,
       redisTest "atomic modify with no value" <| do
-        _ <- del testNS ["Empty Atom"]
+        _ <- del ["Empty Atom"] |> query testNS
         result <-
           atomicModify
-            testNS
             "Empty Atom"
             ( \v -> case v of
                 Just v' -> "Prefix:" ++ v'
                 Nothing -> "Nothing"
             )
+            |> query testNS
         pure <| Expect.equal "Nothing" result,
       redisTest "mget retrieves a mapping of the requested keys and their corresponding values" <| do
-        set testNS "mgetTest::key1" "value 1"
-        set testNS "mgetTest::key3" "value 3"
-        result <- mget testNS ["mgetTest::key1", "mgetTest::key2", "mgetTest::key3"]
+        set "mgetTest::key1" "value 1" |> query testNS
+        set "mgetTest::key3" "value 3" |> query testNS
+        result <- mget ["mgetTest::key1", "mgetTest::key2", "mgetTest::key3"] |> query testNS
         pure
           ( Expect.equal
               (Dict.toList result)
               [("mgetTest::key1", "value 1"), ("mgetTest::key3", "value 3")]
           ),
       redisTest "mget json roundtrip" <| do
-        Json.set testNS "Json.mgetTest::key1" ([1, 2] :: [Int])
-        Json.set testNS "Json.mgetTest::key2" ([3, 4] :: [Int])
-        result <- Json.mget testNS ["Json.mgetTest::key1", "Json.mgetTest::key2"] :: Task Error (Dict Text [Int])
+        Json.set "Json.mgetTest::key1" ([1, 2] :: [Int]) |> query testNS
+        Json.set "Json.mgetTest::key2" ([3, 4] :: [Int]) |> query testNS
+        result <-
+          Json.mget ["Json.mgetTest::key1", "Json.mgetTest::key2"] |> query testNS ::
+            Task Error (Dict Text [Int])
         pure
           ( Expect.equal
               (Dict.toList result)
@@ -113,8 +112,8 @@ specs logHandler whichHandler redisHandler =
                 [ ("msetTest::key1", "value 1"),
                   ("msetTest::key2", "value 2")
                 ]
-        mset testNS dict
-        result <- mget testNS (Dict.keys dict)
+        mset dict |> query testNS
+        result <- mget (Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
       redisTest "Json.mset allows setting multiple JSON values at once" <| do
         let dict =
@@ -122,70 +121,70 @@ specs logHandler whichHandler redisHandler =
                 [ ("Json.msetTest::key1", [1, 2] :: [Int]),
                   ("Json.msetTest::key2", [3, 4] :: [Int])
                 ]
-        Json.mset testNS dict
-        result <- Json.mget testNS (Dict.keys dict)
+        Json.mset dict |> query testNS
+        result <- Json.mget (Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do
-        _ <- del testNS ["Full Atom"]
-        set testNS "Full Atom" "Something"
+        _ <- del ["Full Atom"] |> query testNS
+        set "Full Atom" "Something" |> query testNS
         result <-
           atomicModify
-            testNS
             "Full Atom"
             ( \v -> case v of
                 Just v' -> "Prefix:" ++ v'
                 Nothing -> "Nothing"
             )
+            |> query testNS
         pure <| Expect.equal "Prefix:Something" result,
       test "Concurrent atomicModify works" <| \() ->
         let ioTest = do
-              _ <- del testNS ["Concurrent Atom"] |> Task.attempt logHandler
+              _ <- del ["Concurrent Atom"] |> query testNS |> Task.attempt logHandler
               let ops =
                     List.repeat
                       1000
                       ( Json.atomicModify
-                          testNS
                           "Concurrent Atom"
                           ( \i -> case i of
                               Just i' -> i' + 1
                               Nothing -> 1 :: Int
                           )
+                          |> query testNS
                       )
               _ <- Control.Concurrent.Async.mapConcurrently (Task.attempt logHandler) ops
-              Json.get testNS "Concurrent Atom" |> Task.attempt logHandler
+              Json.get "Concurrent Atom" |> query testNS |> Task.attempt logHandler
          in Expect.withIO (Expect.ok <| Expect.just <| Expect.equal (1000 :: Int)) ioTest,
       redisTest "atomicModifyWithContext works empty" <| do
-        _ <- del testNS ["Atom With Context"]
+        _ <- del ["Atom With Context"] |> query testNS
         result <-
           atomicModifyWithContext
-            testNS
             "Atom With Context"
             ( \v -> case v of
                 Just _ -> ("after", "Just" :: Text)
                 Nothing -> ("after", "Nothing")
             )
+            |> query testNS
         pure <| Expect.equal ("after", "Nothing") result,
       redisTest "atomicModifyWithContext works full" <| do
-        set testNS "Atom With Context (full)" "A piece of text"
+        set "Atom With Context (full)" "A piece of text" |> query testNS
         result <-
           atomicModifyWithContext
-            testNS
             "Atom With Context (full)"
             ( \v -> case v of
                 Just _ -> ("after", "Just" :: Text)
                 Nothing -> ("after", "Nothing")
             )
+            |> query testNS
         pure <| Expect.equal ("after", "Just") result,
       redisTest "Json.atomicModifyWithContext works" <| do
-        _ <- del testNS ["JSON Atom With Context"]
+        _ <- del ["JSON Atom With Context"] |> query testNS
         result <-
           Json.atomicModifyWithContext
-            testNS
             "JSON Atom With Context"
             ( \(v :: Maybe Int) -> case v of
                 Just _ -> (10, Just ())
                 Nothing -> (10, Nothing)
             )
+            |> query testNS
         pure <| Expect.equal (10, Nothing) result
     ]
   where
@@ -207,26 +206,18 @@ data TestHandlers
       }
 
 getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, Handler)]
-getRedisHandlers settings =
-  Conduit.mkAcquire acquire release
-    |> map fst
-  where
-    release (_, Just connection) = Database.Redis.disconnect (Real.connectionHedis connection)
-    release (_, Nothing) = pure ()
-    acquire =
-      Exception.catchAny
-        ( Real.acquireHandler settings
-            |> map (Tuple.mapSecond Just)
-            |> andThen
-              ( \(h, c) -> do
-                  h' <- Mock.handler "tests"
-                  pure ([("Real", Internal.namespacedHandler "test" h), ("Mock", h')], c)
-              )
-        )
-        ( \_ -> do
-            h <- Mock.handler "tests"
-            pure ([("Mock", h)], Nothing)
-        )
+getRedisHandlers settings = do
+  let realHandler = Real.handler "tests" settings
+  let mockHandler = Conduit.liftIO <| Mock.handler "tests"
+  log <- Conduit.liftIO Platform.silentHandler
+  redisAvailable <-
+    Conduit.withAcquire realHandler (\h -> query h (get "foo") |> Task.attempt log)
+      |> map (\_ -> True)
+      |> Exception.handleAny (\_ -> pure False)
+      |> Conduit.liftIO
+  if redisAvailable
+    then map2 (\real mock -> [("Real", real), ("Mock", mock)]) realHandler mockHandler
+    else map (\mock -> [("Mock", mock)]) mockHandler
 
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do

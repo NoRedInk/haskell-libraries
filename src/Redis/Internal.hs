@@ -90,9 +90,9 @@ namespaceQuery namespace query' =
         Hgetall key -> Hgetall (byteNamespace ++ key)
         Hset key field val -> Hset (byteNamespace ++ key) field val
         AtomicModify key f -> AtomicModify (byteNamespace ++ key) f
-        Fmap f q -> Fmap f q
+        Fmap f q -> Fmap f (namespaceQuery namespace q)
         Pure x -> Pure x
-        Apply f x -> Apply f x
+        Apply f x -> Apply (namespaceQuery namespace f) (namespaceQuery namespace x)
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8

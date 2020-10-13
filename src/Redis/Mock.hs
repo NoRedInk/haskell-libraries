@@ -1,6 +1,9 @@
 {-# LANGUAGE GADTs #-}
 
-module Redis.Mock where
+module Redis.Mock
+  ( handler,
+  )
+where
 
 import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
@@ -45,15 +48,14 @@ doQuery query hm =
         ()
       )
     Internal.Del keys ->
-      ( List.foldl
-          ( \key (hm', count) ->
-              if HM.member key hm'
-                then (HM.delete key hm', count + 1)
-                else (hm', count)
-          )
-          (hm, 0 :: Int)
-          keys
-      )
+      List.foldl
+        ( \key (hm', count) ->
+            if HM.member key hm'
+              then (HM.delete key hm', count + 1)
+              else (hm', count)
+        )
+        (hm, 0 :: Int)
+        keys
     Internal.Hgetall _key -> error "No mock implementation implemented yet for hgetall"
     Internal.Hset _key _field _val -> error "No mock implementation implemented yet for hset"
     Internal.AtomicModify key f ->

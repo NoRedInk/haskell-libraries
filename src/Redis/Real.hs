@@ -1,6 +1,10 @@
 {-# LANGUAGE GADTs #-}
 
-module Redis.Real where
+module Redis.Real
+  ( handler,
+    Info (..),
+  )
+where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
