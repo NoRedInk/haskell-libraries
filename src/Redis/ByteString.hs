@@ -127,17 +127,13 @@ hgetall key =
   Internal.Hgetall (toB key)
     |> Internal.WithResult
       ( \results ->
-          let textResults =
-                results
-                  |> List.filterMap
-                    ( \(byteKey, v) ->
-                        case Data.Text.Encoding.decodeUtf8' byteKey of
-                          Prelude.Right textKey -> Just (textKey, v)
-                          Prelude.Left _ -> Nothing
-                    )
-           in if List.length results /= List.length textResults
-                then Err <| Internal.LibraryError "key exists but not parsable text"
-                else Ok textResults
+          results
+            |> Prelude.traverse
+              ( \(byteKey, v) ->
+                  case Data.Text.Encoding.decodeUtf8' byteKey of
+                    Prelude.Right textKey -> Ok (textKey, v)
+                    Prelude.Left _ -> Err <| Internal.LibraryError "key exists but not parsable text"
+              )
       )
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.

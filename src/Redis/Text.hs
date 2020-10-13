@@ -127,17 +127,13 @@ hgetall key =
   Redis.ByteString.hgetall key
     |> Internal.WithResult
       ( \results ->
-          let textResults =
-                results
-                  |> List.filterMap
-                    ( \(k, byteV) ->
-                        case toT byteV of
-                          Err _ -> Nothing
-                          Ok textV -> Just (k, textV)
-                    )
-           in if List.length results /= List.length textResults
-                then unparsableKeyError
-                else Ok textResults
+          results
+            |> Prelude.traverse
+              ( \(k, byteV) ->
+                  case toT byteV of
+                    Err err -> Err err
+                    Ok textV -> Ok (k, textV)
+              )
       )
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
