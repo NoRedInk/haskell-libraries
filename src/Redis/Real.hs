@@ -74,6 +74,11 @@ doQuery connection anything query =
                     Database.Redis.TxError err -> Left (Database.Redis.Error (Data.ByteString.Char8.pack err))
               )
             |> platformRedis (Text.join " " cmds) connection anything
+    Internal.WithResult f q -> do
+      result <- doQuery connection anything q
+      case f result of
+        Ok a -> Task.succeed a
+        Err err -> Task.fail err
     _ ->
       let (cmds, redisCtx) = doRawQuery query
        in platformRedis (Text.join " " cmds) connection anything redisCtx
@@ -100,14 +105,10 @@ doRawQuery query =
     Internal.AtomicModify _ _ -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."
     Internal.WithResult f q ->
       doRawQuery q
-        |> map
-          ( map
-              ( map
-                  ( \result -> case result of
-                      Err a -> Err a
-                      Ok res -> f res
-                  )
-              )
+        |> (map >> map >> map)
+          ( \result -> case result of
+              Err a -> Err a
+              Ok res -> f res
           )
 
 releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
