@@ -136,7 +136,7 @@ hgetall key =
                           Prelude.Left _ -> Nothing
                     )
            in if List.length results /= List.length textResults
-                then unparsableKeyError
+                then Err <| Internal.LibraryError "key exists but not parsable text"
                 else Ok textResults
       )
 
@@ -159,6 +159,3 @@ hmset key vals =
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
-
-unparsableKeyError :: Result Internal.Error a
-unparsableKeyError = Err <| Internal.LibraryError "key exists but not parsable text"
