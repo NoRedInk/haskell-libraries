@@ -95,21 +95,7 @@ del = Redis.ByteString.del
 mget :: List Text -> Internal.Query (Dict.Dict Text Text)
 mget keys =
   Redis.ByteString.mget keys
-    |> Internal.WithResult
-      ( \results ->
-          let textResults =
-                Dict.foldl
-                  ( \key val dict ->
-                      case toT val of
-                        Err _ -> dict
-                        Ok textVal -> Dict.insert key textVal dict
-                  )
-                  Dict.empty
-                  results
-           in if Dict.size textResults /= Dict.size results
-                then unparsableKeyError
-                else Ok textResults
-      )
+    |> Internal.WithResult (Prelude.traverse toT)
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
 --
