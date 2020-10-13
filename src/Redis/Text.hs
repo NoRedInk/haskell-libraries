@@ -35,6 +35,7 @@ import qualified List
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
+import qualified Result
 import qualified Tuple
 import qualified Prelude
 
@@ -46,15 +47,7 @@ import qualified Prelude
 get :: Text -> Internal.Query (Maybe Text)
 get key =
   Redis.ByteString.get key
-    |> Internal.WithResult
-      ( \maybeBytestring ->
-          case maybeBytestring of
-            Nothing -> Ok Nothing
-            Just bytestring ->
-              case toT bytestring of
-                Nothing -> Err <| Internal.LibraryError "get failed, key exists but not parseable text"
-                Just t -> Ok <| Just t
-      )
+    |> Internal.WithResult toTIfFound
 
 -- | Set key to hold the string value. If key already holds a value, it is
 -- overwritten, regardless of its type. Any previous time to live associated
@@ -86,7 +79,7 @@ mset values =
 getset :: Text -> Text -> Internal.Query (Maybe Text)
 getset key value =
   Redis.ByteString.getset key (toB value)
-    |> map (andThen toT)
+    |> Internal.WithResult toTIfFound
 
 -- | Removes the specified keys. A key is ignored if it does not exist.
 --
@@ -102,14 +95,20 @@ del = Redis.ByteString.del
 mget :: List Text -> Internal.Query (Dict.Dict Text Text)
 mget keys =
   Redis.ByteString.mget keys
-    |> map
-      ( Dict.foldl
-          ( \key val dict ->
-              case toT val of
-                Nothing -> dict
-                Just textVal -> Dict.insert key textVal dict
-          )
-          Dict.empty
+    |> Internal.WithResult
+      ( \results ->
+          let textResults =
+                Dict.foldl
+                  ( \key val dict ->
+                      case toT val of
+                        Err _ -> dict
+                        Ok textVal -> Dict.insert key textVal dict
+                  )
+                  Dict.empty
+                  results
+           in if Dict.size textResults /= Dict.size results
+                then unparsableKeyError
+                else Ok textResults
       )
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
@@ -123,10 +122,24 @@ hset key field val =
 -- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist
 --
 -- https://redis.io/commands/hgetall
-hgetall :: Text -> Internal.Query [(Maybe Text, Maybe Text)]
+hgetall :: Text -> Internal.Query (List (Text, Text))
 hgetall key =
   Redis.ByteString.hgetall key
-    |> map (map (\(k, v) -> (toT k, toT v)))
+    |> Internal.WithResult
+      ( \results ->
+          let textResults =
+                results
+                  |> List.filterMap
+                    ( \(k, v) ->
+                        case (toT k, toT v) of
+                          (Err _, _) -> Nothing
+                          (_, Err _) -> Nothing
+                          (Ok a, Ok b) -> Just (a, b)
+                    )
+           in if List.length results /= List.length textResults
+                then unparsableKeyError
+                else Ok textResults
+      )
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
 --
@@ -143,15 +156,8 @@ hmset key vals =
 -- The returned value is the value that was set.
 atomicModify :: Text -> (Maybe Text -> Text) -> Internal.Query Text
 atomicModify key f =
-  Redis.ByteString.atomicModifyWithContext
-    key
-    ( \maybeByteString ->
-        maybeByteString
-          |> andThen toT
-          |> f
-          |> (\res -> (toB res, res))
-    )
-    |> map Tuple.second
+  atomicModifyWithContext key (\x -> (f x, ()))
+    |> map Tuple.first
 
 -- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
 -- that was set.
@@ -160,18 +166,35 @@ atomicModifyWithContext key f =
   Redis.ByteString.atomicModifyWithContext
     key
     ( \maybeByteString ->
-        maybeByteString
-          |> andThen toT
-          |> f
-          |> (\res -> (toB (Tuple.first res), res))
+        let context = toTIfFound maybeByteString
+         in ( case context of
+                Ok maybeText -> maybeText
+                Err _ -> Nothing
+            )
+              |> f
+              |> (\r@(res, _ctx) -> (toB res, (r, context)))
     )
-    |> map Tuple.second
+    |> Internal.WithResult
+      ( \(_, (res, context)) ->
+          case context of
+            Err _ -> unparsableKeyError
+            Ok _ -> Ok res
+      )
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
 
-toT :: Data.ByteString.ByteString -> Maybe Text
+toTIfFound :: Maybe Data.ByteString.ByteString -> Result Internal.Error (Maybe Text)
+toTIfFound maybeBytestring =
+  case maybeBytestring of
+    Nothing -> Ok Nothing
+    Just bytestring -> Result.map Just (toT bytestring)
+
+toT :: Data.ByteString.ByteString -> Result Internal.Error Text
 toT bs =
   case Data.Text.Encoding.decodeUtf8' bs of
-    Prelude.Right t -> Just t
-    Prelude.Left _ -> Nothing
+    Prelude.Right t -> Ok t
+    Prelude.Left _ -> unparsableKeyError
+
+unparsableKeyError :: Result Internal.Error a
+unparsableKeyError = Err <| Internal.LibraryError "key exists but not parsable text"
