@@ -60,9 +60,8 @@ doQuery connection anything query =
     -- If we see an `Apply` it means we're stringing multiple commands together.
     -- We run these inside a Redis transaction to ensure atomicity.
     Internal.Apply f x ->
-      case map2 (\f' x' -> f' x') (doRawQuery f) (doRawQuery x) of
-        HedisCtx (cmds, redisCtx) ->
-          redisCtx
+      let (cmds, redisCtx) = map2 (map2 (map2 (Prelude.<*>))) (doRawQuery f) (doRawQuery x)
+       in redisCtx
             |> Database.Redis.multiExec
             |> map
               ( \txResult ->
@@ -76,29 +75,17 @@ doQuery connection anything query =
               )
             |> platformRedis (Text.join " " cmds) connection anything
     _ ->
-      let HedisCtx (cmds, redisCtx) = doRawQuery query
+      let (cmds, redisCtx) = doRawQuery query
        in platformRedis (Text.join " " cmds) connection anything redisCtx
 
 -- Construct a query in the underlying `hedis` library we depend on. It has a
 -- polymorphic type signature that allows the returning query to be passed to
 -- `Database.Redis.run` for direct execution, or `Database.Redis.multiExec` for
 -- executation as part of a transaction.
-data HedisCtx m f result where
-  HedisCtx ::
-    (Prelude.Applicative f, Database.Redis.RedisCtx m f) =>
-    ([Text], m (f (Result Internal.Error result))) ->
-    HedisCtx m f result
-
-instance Prelude.Functor (HedisCtx m f) where
-  fmap f = map (f)
-
-instance Prelude.Applicative ((Database.Redis.RedisCtx m f) => HedisCtx m f) where
-  pure result = HedisCtx ([], pure (pure (Ok result)))
-
-doRawQuery :: Internal.Query result -> HedisCtx m f result
+doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> ([Text], m (f (Result Internal.Error result)))
 doRawQuery query =
   case query of
-    Internal.Ping -> (["ping"], Database.Redis.ping |> map (map Ok)) |> HedisCtx
+    Internal.Ping -> (["ping"], Database.Redis.ping |> map (map Ok))
     Internal.Get key -> (["get"], Database.Redis.get key |> map (map Ok))
     Internal.Set key val -> (["set"], Database.Redis.set key val |> map (map (\_ -> Ok ())))
     Internal.Getset key val -> (["getset"], Database.Redis.getset key val |> map (map Ok))
