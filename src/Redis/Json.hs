@@ -39,6 +39,7 @@ import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Tuple
+import qualified Prelude
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
@@ -48,7 +49,7 @@ import qualified Tuple
 get :: Aeson.FromJSON a => Text -> Internal.Query (Maybe a)
 get key =
   Redis.ByteString.get key
-    |> map (andThen Aeson.decodeStrict')
+    |> Internal.WithResult decodeIfFound
 
 -- | Returns the values of all specified keys. For every key that does not hold
 -- a string value or does not exist, no value is returned. Because of this, the
@@ -58,15 +59,7 @@ get key =
 mget :: Aeson.FromJSON a => List Text -> Internal.Query (Dict.Dict Text a)
 mget keys =
   Redis.ByteString.mget keys
-    |> map
-      ( Dict.foldr
-          ( \key val dict ->
-              case Aeson.decodeStrict' val of
-                Nothing -> dict
-                Just decodedVal -> Dict.insert key decodedVal dict
-          )
-          Dict.empty
-      )
+    |> Internal.WithResult (Prelude.traverse decodeResult)
 
 -- | Set key to hold the string value. If key already holds a value, it is
 -- overwritten, regardless of its type. Any previous time to live associated
@@ -104,7 +97,7 @@ del = Redis.ByteString.del
 getset :: (Aeson.FromJSON a, Aeson.ToJSON a) => Text -> a -> Internal.Query (Maybe a)
 getset key value =
   Redis.ByteString.getset key (encodeStrict value)
-    |> map (andThen Aeson.decodeStrict')
+    |> Internal.WithResult decodeIfFound
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
 --
@@ -120,14 +113,7 @@ hset key field val =
 hgetall :: (Aeson.FromJSON a) => Text -> Internal.Query [(Text, a)]
 hgetall key =
   Redis.ByteString.hgetall key
-    |> map
-      ( List.filterMap
-          ( \(k, v) ->
-              case Aeson.decodeStrict' v of
-                Just v' -> Just (k, v')
-                Nothing -> Nothing
-          )
-      )
+    |> Internal.WithResult (Prelude.traverse (Prelude.traverse decodeResult))
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
 --
@@ -144,15 +130,8 @@ hmset key vals =
 -- The returned value is the value that was set.
 atomicModify :: (Aeson.FromJSON a, Aeson.ToJSON a) => Text -> (Maybe a -> a) -> Internal.Query a
 atomicModify key f =
-  Redis.ByteString.atomicModifyWithContext
-    key
-    ( \maybeByteString ->
-        maybeByteString
-          |> andThen Aeson.decodeStrict'
-          |> f
-          |> (\res -> (encodeStrict res, res))
-    )
-    |> map Tuple.second
+  atomicModifyWithContext key (\x -> (f x, ()))
+    |> map Tuple.first
 
 -- | As `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
 -- that was set.
@@ -161,14 +140,37 @@ atomicModifyWithContext key f =
   Redis.ByteString.atomicModifyWithContext
     key
     ( \maybeByteString ->
-        maybeByteString
-          |> andThen Aeson.decodeStrict'
-          |> f
-          |> (\res -> (encodeStrict (Tuple.first res), res))
+        let context = decodeIfFound maybeByteString
+         in ( case context of
+                Ok maybeText -> maybeText
+                Err _ -> Nothing
+            )
+              |> f
+              |> (\r@(res, _ctx) -> (encodeStrict res, (r, context)))
     )
-    |> map Tuple.second
+    |> Internal.WithResult
+      ( \(_, (res, context)) ->
+          case context of
+            Err _ -> unparsableKeyError
+            Ok _ -> Ok res
+      )
 
 encodeStrict :: Aeson.ToJSON a => a -> Data.ByteString.ByteString
 encodeStrict x =
   Aeson.encode x
     |> Data.ByteString.Lazy.toStrict
+
+decodeIfFound :: Aeson.FromJSON a => Maybe Data.ByteString.ByteString -> Result Internal.Error (Maybe a)
+decodeIfFound maybeByteString =
+  case maybeByteString of
+    Nothing -> Ok Nothing
+    Just byteString -> decodeResult byteString
+
+decodeResult :: Aeson.FromJSON a => Data.ByteString.ByteString -> Result Internal.Error a
+decodeResult byteString =
+  case Aeson.decodeStrict' byteString of
+    Just decoded -> Ok decoded
+    Nothing -> unparsableKeyError
+
+unparsableKeyError :: Result Internal.Error a
+unparsableKeyError = Err <| Internal.LibraryError "key exists but not parsable json"
