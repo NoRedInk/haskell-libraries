@@ -18,26 +18,29 @@ module Observability.Honeycomb
     Handler,
     Settings (..),
     decoder,
+    -- for tests
+    toBatchEvents,
+    CommonFields (..),
   )
 where
 
-import Nri.Prelude
 import qualified Conduit
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.List
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import qualified Data.UUID as UUID
-import Data.UUID.V4 (nextRandom)
 import qualified Environment
 import qualified Http
 import qualified List
 import qualified Log
+import Nri.Prelude
 import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
 import qualified Task
+import qualified Text as NriText
 import qualified Prelude
 
 batchApiEndpoint :: Text -> Text
@@ -45,7 +48,8 @@ batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetNam
 
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' requestId span = do
-  spans <- toBatchEvents handler' requestId Nothing span
+  let commonFields = CommonFields (handler_timer handler') (handler_serviceName handler') (handler_environment handler') requestId
+  let (_, spans) = toBatchEvents commonFields Nothing 0 span
   let body = Http.jsonBody spans
   silentHandler' <- Platform.silentHandler
   let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
@@ -72,29 +76,31 @@ report handler' requestId span = do
       Prelude.putStrLn "ERROR"
       Prelude.pure ()
 
-toBatchEvents :: Handler -> Text -> Maybe SpanId -> Platform.TracingSpan -> Prelude.IO [BatchEvent]
-toBatchEvents handler' requestId parentSpanId span = do
-  thisSpansId <- map SpanId nextRandom
-  children <- Prelude.traverse (toBatchEvents handler' requestId (Just thisSpansId)) (Platform.children span)
+toBatchEvents :: CommonFields -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
+toBatchEvents commonFields parentSpanId 
+spanIndex span = do
+  let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
+  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration = Platform.finished span - Platform.started span |> Platform.inMicroseconds
-  let timestamp = toISO8601 (handler_timer handler') (Platform.started span)
+  let timestamp = toISO8601 (common_timer commonFields) (Platform.started span)
   let hcSpan =
         Span
           { name = Platform.name span,
             spanId = thisSpansId,
             parentId = parentSpanId,
-            traceId = requestId,
-            serviceName = handler_serviceName handler',
-            environment = handler_environment handler',
+            traceId = common_requestId commonFields,
+            serviceName = common_serviceName commonFields,
+            environment = common_environment commonFields,
             durationMs = Prelude.fromIntegral duration / 1000,
             details = Platform.details span
           }
-  Prelude.pure
-    <| BatchEvent
+  ( lastSpanIndex,
+    BatchEvent
       { batchevent_time = timestamp,
         batchevent_data = hcSpan
       }
-    : List.concat children
+      : List.concat children
+    )
 
 data BatchEvent
   = BatchEvent
@@ -112,6 +118,14 @@ options =
 
 instance Aeson.ToJSON BatchEvent where
   toJSON = Aeson.genericToJSON options
+
+data CommonFields
+  = CommonFields
+      { common_timer :: Timer,
+        common_serviceName :: Text,
+        common_environment :: Text,
+        common_requestId :: Text
+      }
 
 data Span
   = Span
@@ -147,7 +161,7 @@ instance Aeson.ToJSON Span where
             |> HashMap.elems
      in Aeson.object (basePairs ++ detailsPairs)
 
-newtype SpanId = SpanId UUID.UUID
+newtype SpanId = SpanId Text
   deriving (Aeson.ToJSON)
 
 data Handler
