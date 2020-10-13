@@ -55,7 +55,6 @@ doQuery :: Connection -> Platform.DoAnythingHandler -> Internal.Query a -> Task 
 doQuery connection anything query =
   case query of
     -- Special treatment for constructors that don't represent
-    Internal.Fmap f q -> doQuery connection anything q |> map f
     Internal.Pure x -> Task.succeed x
     Internal.AtomicModify key f -> rawAtomicModify connection anything key f
     -- If we see an `Apply` it means we're stringing multiple commands together.
@@ -96,7 +95,6 @@ doRawQuery query =
     Internal.Hgetall key -> (["hgetall"], Database.Redis.hgetall key |> map (map Ok))
     Internal.Hset key field val -> (["hset"], Database.Redis.hset key field val |> map (map (\_ -> Ok ())))
     Internal.Hmset key vals -> (["hset"], Database.Redis.hmset key vals |> map (map (\_ -> Ok ())))
-    Internal.Fmap f q -> doRawQuery q |> map (map (map (map f)))
     Internal.Pure x -> ([], pure (pure (Ok x)))
     Internal.Apply f x -> map2 (map2 (map2 (Prelude.<*>))) (doRawQuery f) (doRawQuery x)
     Internal.AtomicModify _ _ -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."

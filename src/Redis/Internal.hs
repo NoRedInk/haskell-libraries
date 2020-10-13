@@ -41,13 +41,13 @@ data Query a where
   AtomicModify :: ByteString -> (Maybe ByteString -> (ByteString, a)) -> Query (ByteString, a)
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
-  Fmap :: (a -> b) -> Query a -> Query b
   Pure :: a -> Query a
   Apply :: Query (a -> b) -> Query a -> Query b
   WithResult :: (a -> Result Error b) -> Query a -> Query b
 
 instance Prelude.Functor Query where
-  fmap = Fmap
+  fmap a =
+    WithResult (a >> Ok)
 
 instance Prelude.Applicative Query where
   pure = Pure
@@ -93,7 +93,6 @@ namespaceQuery namespace query' =
         Hset key field val -> Hset (byteNamespace ++ key) field val
         Hmset key vals -> Hmset (byteNamespace ++ key) vals
         AtomicModify key f -> AtomicModify (byteNamespace ++ key) f
-        Fmap f q -> Fmap f (namespaceQuery namespace q)
         Pure x -> Pure x
         Apply f x -> Apply (namespaceQuery namespace f) (namespaceQuery namespace x)
         WithResult f q -> WithResult f (namespaceQuery namespace q)

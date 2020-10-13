@@ -62,7 +62,6 @@ doQuery query hm =
     Internal.AtomicModify key f ->
       let (newValue, context) = HM.lookup key hm |> f
        in (HM.insert key newValue hm, Ok (newValue, context))
-    Internal.Fmap f q -> doQuery q hm |> Tuple.mapSecond (map f)
     Internal.Pure x -> (hm, Ok x)
     Internal.Apply fQuery xQuery ->
       let (hm1, f) = doQuery fQuery hm
