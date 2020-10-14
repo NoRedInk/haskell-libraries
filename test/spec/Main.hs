@@ -1,13 +1,11 @@
 module Main (main) where
 
 import qualified Conduit
-import qualified Control.Concurrent.Async
 import qualified Control.Exception.Safe as Exception
 import qualified Dict
 import Dict (Dict)
 import qualified Environment
 import qualified Expect
-import qualified List
 import Nri.Prelude
 import qualified Platform
 import Redis (Error, Handler, changeNamespace)
@@ -77,12 +75,12 @@ specs logHandler whichHandler redisHandler =
         _ <- del ["Empty Atom"] |> query testNS
         result <-
           atomicModify
+            testNS
             "Empty Atom"
             ( \v -> case v of
                 Just v' -> "Prefix:" ++ v'
                 Nothing -> "Nothing"
             )
-            |> query testNS
         pure <| Expect.equal "Nothing" result,
       redisTest "mget retrieves a mapping of the requested keys and their corresponding values" <| do
         set "mgetTest::key1" "value 1" |> query testNS
@@ -129,62 +127,45 @@ specs logHandler whichHandler redisHandler =
         set "Full Atom" "Something" |> query testNS
         result <-
           atomicModify
+            testNS
             "Full Atom"
             ( \v -> case v of
                 Just v' -> "Prefix:" ++ v'
                 Nothing -> "Nothing"
             )
-            |> query testNS
         pure <| Expect.equal "Prefix:Something" result,
-      test "Concurrent atomicModify works" <| \() ->
-        let ioTest = do
-              _ <- del ["Concurrent Atom"] |> query testNS |> Task.attempt logHandler
-              let ops =
-                    List.repeat
-                      1000
-                      ( Json.atomicModify
-                          "Concurrent Atom"
-                          ( \i -> case i of
-                              Just i' -> i' + 1
-                              Nothing -> 1 :: Int
-                          )
-                          |> query testNS
-                      )
-              _ <- Control.Concurrent.Async.mapConcurrently (Task.attempt logHandler) ops
-              Json.get "Concurrent Atom" |> query testNS |> Task.attempt logHandler
-         in Expect.withIO (Expect.ok <| Expect.just <| Expect.equal (1000 :: Int)) ioTest,
       redisTest "atomicModifyWithContext works empty" <| do
         _ <- del ["Atom With Context"] |> query testNS
         result <-
           atomicModifyWithContext
+            testNS
             "Atom With Context"
             ( \v -> case v of
                 Just _ -> ("after", "Just" :: Text)
                 Nothing -> ("after", "Nothing")
             )
-            |> query testNS
         pure <| Expect.equal ("after", "Nothing") result,
       redisTest "atomicModifyWithContext works full" <| do
         set "Atom With Context (full)" "A piece of text" |> query testNS
         result <-
           atomicModifyWithContext
+            testNS
             "Atom With Context (full)"
             ( \v -> case v of
                 Just _ -> ("after", "Just" :: Text)
                 Nothing -> ("after", "Nothing")
             )
-            |> query testNS
         pure <| Expect.equal ("after", "Just") result,
       redisTest "Json.atomicModifyWithContext works" <| do
         _ <- del ["JSON Atom With Context"] |> query testNS
         result <-
           Json.atomicModifyWithContext
+            testNS
             "JSON Atom With Context"
             ( \(v :: Maybe Int) -> case v of
                 Just _ -> (10, Just ())
                 Nothing -> (10, Nothing)
             )
-            |> query testNS
         pure <| Expect.equal (10, Nothing) result
     ]
   where
