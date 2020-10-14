@@ -18,23 +18,20 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Text
-import qualified Tuple
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 import qualified Prelude
 
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings = do
-  namespacedHandler <-
-    Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
-      |> map (Internal.addNamespace namespace << Tuple.first)
+  (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
   Prelude.pure
     <| case Settings.defaultExpiry settings of
       Settings.NoDefaultExpiry -> namespacedHandler
       Settings.ExpireKeysAfterSeconds secs ->
         Internal.defaultExpiryKeysAfterSeconds secs namespacedHandler
 
-acquireHandler :: Settings.Settings -> IO (Internal.Handler, Connection)
-acquireHandler settings = do
+acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler, Connection)
+acquireHandler namespace settings = do
   connection <- do
     let connectionInfo = Settings.connectionInfo settings
     connectionHedis <-
@@ -67,11 +64,11 @@ acquireHandler settings = do
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
                     )
                   |> platformRedis (Text.join " " cmds) connection anything,
-          Internal.watch = \keys ->
+          Internal.doWatch = \keys ->
             Database.Redis.watch keys
               |> map (map (\_ -> Ok ()))
               |> platformRedis "watch" connection anything,
-          Internal.namespace = ""
+          Internal.namespace = Data.Text.Encoding.encodeUtf8 namespace
         },
       connection
     )

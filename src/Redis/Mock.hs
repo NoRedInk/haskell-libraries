@@ -8,6 +8,7 @@ where
 import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
+import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified List
 import Nri.Prelude
@@ -45,7 +46,7 @@ handler namespace = do
                   )
           )
           |> Platform.doAnything anything,
-      Internal.watch = \keys ->
+      Internal.doWatch = \keys ->
         atomicModifyIORef'
           modelRef
           ( \model ->
@@ -54,9 +55,8 @@ handler namespace = do
               )
           )
           |> Platform.doAnything anything,
-      Internal.namespace = ""
+      Internal.namespace = Data.Text.Encoding.encodeUtf8 namespace
     }
-    |> Internal.addNamespace namespace
     |> Prelude.pure
 
 -- | This is our mock implementation of the Redis state. Our mock implementation

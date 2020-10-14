@@ -2,13 +2,15 @@ module Main (main) where
 
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
+import qualified Data.Text.Encoding
 import qualified Dict
 import Dict (Dict)
 import qualified Environment
 import qualified Expect
 import Nri.Prelude
 import qualified Platform
-import Redis (Error, Handler, addNamespace)
+import Redis (Error, Handler)
+import qualified Redis.Internal as Internal
 import qualified Redis.Json as Json
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
@@ -206,3 +208,7 @@ getHandlers = do
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
   rh <- getRedisHandlers settings
   pure (TestHandlers lh rh)
+
+addNamespace :: Text -> Handler -> Handler
+addNamespace namespace handler =
+  handler {Internal.namespace = Internal.namespace handler ++ ":" ++ Data.Text.Encoding.encodeUtf8 namespace}

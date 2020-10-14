@@ -58,32 +58,31 @@ data Handler
   = Handler
       { doQuery :: forall a. Query a -> Task Error a,
         doTransaction :: forall a. Query a -> Task Error a,
-        -- Runs the redis `WATCH` command. This isn't one of the `Query`
-        -- constructors because we're not able to run `WATCH` in a transaction,
-        -- only as a separate command.
-        watch :: [ByteString] -> Task Error (),
+        doWatch :: [ByteString] -> Task Error (),
         namespace :: ByteString
       }
 
 -- | Run a redis Query.
 query :: Handler -> Query a -> Task Error a
-query handler query' = doQuery handler query'
+query handler query' =
+  namespaceQuery (namespace handler ++ ":") query'
+    |> doQuery handler
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
 -- requests won't be able change values in between.
 transaction :: Handler -> Query a -> Task Error a
-transaction handler transaction' = doTransaction handler transaction'
+transaction handler query' =
+  namespaceQuery (namespace handler ++ ":") query'
+    |> doTransaction handler
 
-addNamespace :: Text -> Handler -> Handler
-addNamespace namespace' h =
-  let prefix = namespace' ++ ":" |> toB
-   in Handler
-        { doQuery = doQuery h << namespaceQuery prefix,
-          doTransaction = doTransaction h << namespaceQuery prefix,
-          watch = watch h << map (\key -> prefix ++ key),
-          namespace = prefix ++ namespace h
-        }
+-- Runs the redis `WATCH` command. This isn't one of the `Query`
+-- constructors because we're not able to run `WATCH` in a transaction,
+-- only as a separate command.
+watch :: Handler -> [ByteString] -> Task Error ()
+watch handler keys =
+  map (\key -> namespace handler ++ ":" ++ key) keys
+    |> doWatch handler
 
 namespaceQuery :: ByteString -> Query a -> Query a
 namespaceQuery prefix query' =
