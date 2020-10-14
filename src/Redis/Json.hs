@@ -36,7 +36,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.ByteString.Lazy
 import qualified Dict
-import qualified List
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
@@ -113,19 +112,19 @@ hset key field val =
 -- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist
 --
 -- https://redis.io/commands/hgetall
-hgetall :: (Aeson.FromJSON a) => Text -> Internal.Query [(Text, a)]
+hgetall :: (Aeson.FromJSON a) => Text -> Internal.Query (Dict.Dict Text a)
 hgetall key =
   Redis.ByteString.hgetall key
-    |> Internal.WithResult (Prelude.traverse (Prelude.traverse decodeResult))
+    |> Internal.WithResult (Prelude.traverse decodeResult)
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
 --
 -- equivalent to modern hset
 -- https://redis.io/commands/hmset
-hmset :: (Aeson.ToJSON a) => Text -> [(Text, a)] -> Internal.Query ()
+hmset :: (Aeson.ToJSON a) => Text -> Dict.Dict Text a -> Internal.Query ()
 hmset key vals =
   vals
-    |> List.map (\(k, v) -> (k, encodeStrict v))
+    |> Dict.map (\_k v -> encodeStrict v)
     |> Redis.ByteString.hmset key
 
 -- | Set a timeout on key. After the timeout has expired, the key will

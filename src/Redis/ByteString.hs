@@ -151,7 +151,7 @@ atomicModifyWithContext handler key f =
 -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
 --
 -- https://redis.io/commands/hgetall
-hgetall :: Text -> Internal.Query [(Text, ByteString)]
+hgetall :: Text -> Internal.Query (Dict.Dict Text ByteString)
 hgetall key =
   Internal.Hgetall (toB key)
     |> Internal.WithResult
@@ -163,6 +163,7 @@ hgetall key =
                     Prelude.Right textKey -> Ok (textKey, v)
                     Prelude.Left _ -> Err <| Internal.LibraryError "key exists but not parsable text"
               )
+            |> map Dict.fromList
       )
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
@@ -176,9 +177,10 @@ hset key field val =
 --
 -- equivalent to modern hset
 -- https://redis.io/commands/hmset
-hmset :: Text -> [(Text, ByteString)] -> Internal.Query ()
+hmset :: Text -> Dict.Dict Text ByteString -> Internal.Query ()
 hmset key vals =
   vals
+    |> Dict.toList
     |> map (\(k, v) -> (toB k, v))
     |> Internal.Hmset (toB key)
 

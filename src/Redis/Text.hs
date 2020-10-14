@@ -36,7 +36,6 @@ where
 import qualified Data.ByteString
 import qualified Data.Text.Encoding
 import qualified Dict
-import qualified List
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
@@ -114,19 +113,19 @@ hset key field val =
 -- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist
 --
 -- https://redis.io/commands/hgetall
-hgetall :: Text -> Internal.Query (List (Text, Text))
+hgetall :: Text -> Internal.Query (Dict.Dict Text Text)
 hgetall key =
   Redis.ByteString.hgetall key
-    |> Internal.WithResult (Prelude.traverse (Prelude.traverse toT))
+    |> Internal.WithResult (Prelude.traverse toT)
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
 --
 -- equivalent to modern hset
 -- https://redis.io/commands/hmset
-hmset :: Text -> [(Text, Text)] -> Internal.Query ()
+hmset :: Text -> Dict.Dict Text Text -> Internal.Query ()
 hmset key vals =
   vals
-    |> List.map (\(k, v) -> (k, toB v))
+    |> Dict.map (\_k v -> toB v)
     |> Redis.ByteString.hmset key
 
 -- | Set a timeout on key. After the timeout has expired, the key will
