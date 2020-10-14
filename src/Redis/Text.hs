@@ -1,9 +1,9 @@
 -- | Functions for storing `Text` values in Redis and reading them back.
 --
 -- When any of the functions in this module read a value from Redis that aren't
--- UTF8 encoded they will act as if the value did not exist. This should never
--- happen for values written by the functions in this module, but only when
--- reading data inserted into Redis by someone else.
+-- UTF8 encoded they they will return an error. This should never happen for
+-- values written by the functions in this module, but only when reading data
+-- inserted into Redis by someone else.
 module Redis.Text
   ( -- * Redis commands
     get,

@@ -1,11 +1,8 @@
 -- | A module that automatically converts types to JSON prior to storing them in
 -- Redis, and parses them back from JSON when reading.
 --
--- Data stored in Redis should be, by definition, transient and disposable.
--- Because of that, we are very lenient in how we handle decoding of data:
--- if we find invalid or out of date data stored in a key, we treat that the
--- same as if the key is empty. This avoids issues with things like changes
--- of JSON representations of data - we just throw the old data away!
+-- When data is found in Redis but cannot be decoded these functions will return
+-- an error.
 module Redis.Json
   ( -- * Redis commands
     get,

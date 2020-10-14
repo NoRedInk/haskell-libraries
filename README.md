@@ -1,6 +1,6 @@
 # Redis
 
-_Reviewed last on 2020-10-09_
+_Reviewed last on 2020-10-14_
 
 This library provides functions for working with [Redis][redis].
 
