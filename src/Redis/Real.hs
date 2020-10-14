@@ -61,7 +61,7 @@ doQuery connection anything query =
     -- If we see an `Apply` it means we're stringing multiple commands together.
     -- We run these inside a Redis transaction to ensure atomicity.
     Internal.Apply f x ->
-      let PreparedQuery {cmds, redisCtx} = map2 (<|) (doRawQuery f) (doRawQuery x)
+      let PreparedQuery {cmds, redisCtx} = map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
        in redisCtx
             |> Database.Redis.multiExec
             |> map
@@ -87,7 +87,7 @@ doQuery connection anything query =
 data PreparedQuery m f result
   = PreparedQuery
       { cmds :: [Text],
-        redisCtx :: m (f (Result Internal.Error result))
+        redisCtx :: m (f result)
       }
   deriving (Prelude.Functor)
 
@@ -95,33 +95,33 @@ instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (
   pure x =
     PreparedQuery
       { cmds = [],
-        redisCtx = pure (pure (Ok x))
+        redisCtx = pure (pure x)
       }
   f <*> x =
     PreparedQuery
       { cmds = cmds f ++ cmds x,
-        redisCtx = map2 (map2 (map2 (<|))) (redisCtx f) (redisCtx x)
+        redisCtx = map2 (map2 (<|)) (redisCtx f) (redisCtx x)
       }
 
 -- Construct a query in the underlying `hedis` library we depend on. It has a
 -- polymorphic type signature that allows the returning query to be passed to
 -- `Database.Redis.run` for direct execution, or `Database.Redis.multiExec` for
 -- executation as part of a transaction.
-doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> PreparedQuery m f result
+doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> PreparedQuery m f (Result Internal.Error result)
 doRawQuery query =
   case query of
-    Internal.Ping -> PreparedQuery ["ping"] (Database.Redis.ping |> map (map Ok))
-    Internal.Get key -> PreparedQuery ["get"] (Database.Redis.get key |> map (map Ok))
-    Internal.Set key val -> PreparedQuery ["set"] (Database.Redis.set key val |> map (map (\_ -> Ok ())))
-    Internal.Getset key val -> PreparedQuery ["getset"] (Database.Redis.getset key val |> map (map Ok))
-    Internal.Mget keys -> PreparedQuery ["mget"] (Database.Redis.mget keys |> map (map Ok))
-    Internal.Mset vals -> PreparedQuery ["mset"] (Database.Redis.mset vals |> map (map (\_ -> Ok ())))
-    Internal.Del keys -> PreparedQuery ["keys"] (Database.Redis.del keys |> map (map (Ok << Prelude.fromIntegral)))
-    Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key |> map (map Ok))
-    Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val |> map (map (\_ -> Ok ())))
-    Internal.Hmset key vals -> PreparedQuery ["hset"] (Database.Redis.hmset key vals |> map (map (\_ -> Ok ())))
-    Internal.Pure x -> pure x
-    Internal.Apply f x -> map2 (<|) (doRawQuery f) (doRawQuery x)
+    Internal.Ping -> PreparedQuery ["ping"] Database.Redis.ping |> map Ok
+    Internal.Get key -> PreparedQuery ["get"] (Database.Redis.get key) |> map Ok
+    Internal.Set key val -> PreparedQuery ["set"] (Database.Redis.set key val) |> map (\_ -> Ok ())
+    Internal.Getset key val -> PreparedQuery ["getset"] (Database.Redis.getset key val) |> map Ok
+    Internal.Mget keys -> PreparedQuery ["mget"] (Database.Redis.mget keys) |> map Ok
+    Internal.Mset vals -> PreparedQuery ["mset"] (Database.Redis.mset vals) |> map (\_ -> Ok ())
+    Internal.Del keys -> PreparedQuery ["keys"] (Database.Redis.del keys) |> map (Ok << Prelude.fromIntegral)
+    Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key) |> map Ok
+    Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val) |> map (\_ -> Ok ())
+    Internal.Hmset key vals -> PreparedQuery ["hset"] (Database.Redis.hmset key vals) |> map (\_ -> Ok ())
+    Internal.Pure x -> pure (Ok x)
+    Internal.Apply f x -> map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
     Internal.AtomicModify _ _ -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."
     Internal.WithResult f q ->
       let PreparedQuery cmds redisCtx = doRawQuery q
