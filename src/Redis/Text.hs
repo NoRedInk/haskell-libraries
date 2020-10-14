@@ -37,6 +37,7 @@ import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Result
+import qualified Task
 import qualified Tuple
 import qualified Prelude
 
@@ -136,16 +137,17 @@ watch = Redis.ByteString.watch
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: Text -> (Maybe Text -> Text) -> Internal.Query Text
-atomicModify key f =
-  atomicModifyWithContext key (\x -> (f x, ()))
+atomicModify :: Internal.Handler -> Text -> (Maybe Text -> Text) -> Task Internal.Error Text
+atomicModify handler key f =
+  atomicModifyWithContext handler key (\x -> (f x, ()))
     |> map Tuple.first
 
 -- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: Text -> (Maybe Text -> (Text, a)) -> Internal.Query (Text, a)
-atomicModifyWithContext key f =
+atomicModifyWithContext :: Internal.Handler -> Text -> (Maybe Text -> (Text, a)) -> Task Internal.Error (Text, a)
+atomicModifyWithContext handler key f =
   Redis.ByteString.atomicModifyWithContext
+    handler
     key
     ( \maybeByteString ->
         let context = toTIfFound maybeByteString
@@ -156,11 +158,11 @@ atomicModifyWithContext key f =
               |> f
               |> (\r@(res, _ctx) -> (toB res, (r, context)))
     )
-    |> Internal.WithResult
+    |> andThen
       ( \(_, (res, context)) ->
           case context of
-            Err _ -> unparsableKeyError
-            Ok _ -> Ok res
+            Err _ -> Task.fail unparsableKeyError
+            Ok _ -> Task.succeed res
       )
 
 toB :: Text -> Data.ByteString.ByteString
@@ -176,7 +178,7 @@ toT :: Data.ByteString.ByteString -> Result Internal.Error Text
 toT bs =
   case Data.Text.Encoding.decodeUtf8' bs of
     Prelude.Right t -> Ok t
-    Prelude.Left _ -> unparsableKeyError
+    Prelude.Left _ -> Err unparsableKeyError
 
-unparsableKeyError :: Result Internal.Error a
-unparsableKeyError = Err <| Internal.LibraryError "key exists but not parsable text"
+unparsableKeyError :: Internal.Error
+unparsableKeyError = Internal.LibraryError "key exists but not parsable text"

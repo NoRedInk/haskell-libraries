@@ -10,7 +10,6 @@ where
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
@@ -62,9 +61,6 @@ doQuery connection anything query =
   case query of
     -- Special treatment for constructors that don't represent
     Internal.Pure x -> Task.succeed x
-    Internal.AtomicModify key f -> rawAtomicModify connection anything key f
-    -- If we see an `Apply` it means we're stringing multiple commands together.
-    -- We run these inside a Redis transaction to ensure atomicity.
     Internal.Apply f x ->
       let PreparedQuery {cmds, redisCtx} = map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
        in redisCtx
@@ -124,7 +120,6 @@ doRawQuery query =
     Internal.Hmset key vals -> PreparedQuery ["hset"] (Database.Redis.hmset key vals) |> map (\_ -> Ok ())
     Internal.Pure x -> pure (Ok x)
     Internal.Apply f x -> map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
-    Internal.AtomicModify _ _ -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."
     Internal.WithResult f q ->
       let PreparedQuery cmds redisCtx = doRawQuery q
        in PreparedQuery
@@ -196,37 +191,3 @@ toResult reply =
     Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
     Left _ -> Err (Internal.RedisError "The Redis library said this was an error but returned no error message.")
     Right r -> Ok r
-
-rawAtomicModify ::
-  Connection ->
-  Platform.DoAnythingHandler ->
-  Data.ByteString.ByteString ->
-  (Maybe Data.ByteString.ByteString -> (Data.ByteString.ByteString, a)) ->
-  Task Internal.Error (Data.ByteString.ByteString, a)
-rawAtomicModify connection anything key f =
-  inner (100 :: Int)
-  where
-    inner count =
-      platformRedis
-        "watch get multi set exec"
-        connection
-        anything
-        (map (map Ok) action)
-        |> andThen (processTxResult count)
-    processTxResult count (txResult, newValue) =
-      case txResult of
-        Database.Redis.TxSuccess _ -> pure newValue
-        Database.Redis.TxAborted ->
-          if count > 0
-            then inner (count - 1)
-            else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
-        Database.Redis.TxError err -> Task.fail <| Internal.RedisError (Data.Text.pack err)
-    action = do
-      _ <- Database.Redis.watch [key]
-      resp <- Database.Redis.get key
-      case resp of
-        Right r -> do
-          let (newValue, context) = f r
-          txResult <- Database.Redis.multiExec (Database.Redis.set key newValue)
-          pure <| Right (txResult, (newValue, context))
-        Left e' -> pure <| Left e'

@@ -38,9 +38,6 @@ data Query a where
   Hgetall :: ByteString -> Query [(ByteString, ByteString)]
   Hset :: ByteString -> ByteString -> ByteString -> Query ()
   Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
-  -- AtomicModify is not a Redis command but a higher-level function supporting
-  -- the common use case of reading a value and then writing it atomically.
-  AtomicModify :: ByteString -> (Maybe ByteString -> (ByteString, a)) -> Query (ByteString, a)
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a
@@ -102,7 +99,6 @@ namespaceQuery prefix query' =
     Hgetall key -> Hgetall (prefix ++ key)
     Hset key field val -> Hset (prefix ++ key) field val
     Hmset key vals -> Hmset (prefix ++ key) vals
-    AtomicModify key f -> AtomicModify (prefix ++ key) f
     Pure x -> Pure x
     Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
     WithResult f q -> WithResult f (namespaceQuery prefix q)

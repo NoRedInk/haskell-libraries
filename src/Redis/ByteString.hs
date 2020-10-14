@@ -32,6 +32,7 @@ import qualified Dict
 import qualified List
 import Nri.Prelude
 import qualified Redis.Internal as Internal
+import qualified Task
 import qualified Tuple
 import qualified Prelude
 
@@ -109,16 +110,39 @@ mget keys =
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: Text -> (Maybe ByteString -> ByteString) -> Internal.Query ByteString
-atomicModify key f =
-  atomicModifyWithContext key (\x -> (f x, ()))
+atomicModify :: Internal.Handler -> Text -> (Maybe ByteString -> ByteString) -> Task Internal.Error ByteString
+atomicModify handler key f =
+  atomicModifyWithContext handler key (\x -> (f x, ()))
     |> map Tuple.first
 
 -- | As `atomicModify`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: Text -> (Maybe ByteString -> (ByteString, a)) -> Internal.Query (ByteString, a)
-atomicModifyWithContext key f =
-  Internal.AtomicModify (toB key) f
+atomicModifyWithContext ::
+  Internal.Handler ->
+  Text ->
+  (Maybe ByteString -> (ByteString, a)) ->
+  Task Internal.Error (ByteString, a)
+atomicModifyWithContext handler key f =
+  loop (100 :: Int)
+  where
+    loop count =
+      action
+        |> Task.onError (handleError count)
+    handleError count err =
+      case err of
+        Internal.TransactionAborted ->
+          if count > 0
+            then loop (count - 1)
+            else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
+        Internal.ConnectionLost -> Task.fail err
+        Internal.RedisError _ -> Task.fail err
+        Internal.LibraryError _ -> Task.fail err
+    action = do
+      watch handler [key]
+      oldValue <- Internal.query handler (get key)
+      let (setValue, returnValue) = f oldValue
+      Internal.query handler (set key setValue)
+      Task.succeed (setValue, returnValue)
 
 -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
 --

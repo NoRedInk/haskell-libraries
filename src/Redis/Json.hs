@@ -36,6 +36,7 @@ import qualified List
 import Nri.Prelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
+import qualified Task
 import qualified Tuple
 import qualified Prelude
 
@@ -135,16 +136,27 @@ watch = Redis.ByteString.watch
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
 -- The returned value is the value that was set.
-atomicModify :: (Aeson.FromJSON a, Aeson.ToJSON a) => Text -> (Maybe a -> a) -> Internal.Query a
-atomicModify key f =
-  atomicModifyWithContext key (\x -> (f x, ()))
+atomicModify ::
+  (Aeson.FromJSON a, Aeson.ToJSON a) =>
+  Internal.Handler ->
+  Text ->
+  (Maybe a -> a) ->
+  Task Internal.Error a
+atomicModify handler key f =
+  atomicModifyWithContext handler key (\x -> (f x, ()))
     |> map Tuple.first
 
 -- | As `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
 -- that was set.
-atomicModifyWithContext :: (Aeson.FromJSON a, Aeson.ToJSON a) => Text -> (Maybe a -> (a, b)) -> Internal.Query (a, b)
-atomicModifyWithContext key f =
+atomicModifyWithContext ::
+  (Aeson.FromJSON a, Aeson.ToJSON a) =>
+  Internal.Handler ->
+  Text ->
+  (Maybe a -> (a, b)) ->
+  Task Internal.Error (a, b)
+atomicModifyWithContext handler key f =
   Redis.ByteString.atomicModifyWithContext
+    handler
     key
     ( \maybeByteString ->
         let context = decodeIfFound maybeByteString
@@ -155,11 +167,11 @@ atomicModifyWithContext key f =
               |> f
               |> (\r@(res, _ctx) -> (encodeStrict res, (r, context)))
     )
-    |> Internal.WithResult
+    |> Task.andThen
       ( \(_, (res, context)) ->
           case context of
-            Err _ -> unparsableKeyError
-            Ok _ -> Ok res
+            Err _ -> Task.fail unparsableKeyError
+            Ok _ -> Task.succeed res
       )
 
 encodeStrict :: Aeson.ToJSON a => a -> Data.ByteString.ByteString
@@ -177,7 +189,7 @@ decodeResult :: Aeson.FromJSON a => Data.ByteString.ByteString -> Result Interna
 decodeResult byteString =
   case Aeson.decodeStrict' byteString of
     Just decoded -> Ok decoded
-    Nothing -> unparsableKeyError
+    Nothing -> Err unparsableKeyError
 
-unparsableKeyError :: Result Internal.Error a
-unparsableKeyError = Err <| Internal.LibraryError "key exists but not parsable json"
+unparsableKeyError :: Internal.Error
+unparsableKeyError = Internal.LibraryError "key exists but not parsable json"
