@@ -14,6 +14,7 @@ data Error
   = RedisError Text
   | ConnectionLost
   | LibraryError Text
+  | TransactionAborted
   deriving (Show, Generic)
 
 instance Aeson.ToJSON Error
@@ -24,6 +25,7 @@ errorForHumans topError =
     RedisError err -> "Redis error: " ++ err
     ConnectionLost -> "Connection Lost"
     LibraryError err -> "Library error: " ++ err
+    TransactionAborted -> "Transaction aborted. Wached key has changed"
 
 data Query a where
   Ping :: Query Database.Redis.Status

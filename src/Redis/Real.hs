@@ -11,7 +11,6 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
-import qualified Data.ByteString.Char8
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
@@ -68,11 +67,8 @@ doQuery connection anything query =
               ( \txResult ->
                   case txResult of
                     Database.Redis.TxSuccess y -> Right y
-                    Database.Redis.TxAborted ->
-                      -- We haven't exposed `watch` from this package's API yet, and
-                      -- as long as we don't this error shouldn't happen.
-                      Left (Database.Redis.Error "Aborted due to WATCH failing")
-                    Database.Redis.TxError err -> Left (Database.Redis.Error (Data.ByteString.Char8.pack err))
+                    Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
+                    Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
               )
             |> platformRedis (Text.join " " cmds) connection anything
     Internal.WithResult f q -> do
