@@ -12,11 +12,19 @@ data ClusterMode = Cluster | NotCluster
 data Settings
   = Settings
       { connectionInfo :: ConnectInfo,
-        clusterMode :: ClusterMode
+        clusterMode :: ClusterMode,
+        defaultExpiry :: DefaultExpiry
       }
 
+data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
+
 decoder :: Environment.Decoder Settings
-decoder = map2 Settings decoderConnectInfo decoderClusterMode
+decoder =
+  map3
+    Settings
+    decoderConnectInfo
+    decoderClusterMode
+    decoderDefaultExpiry
 
 decoderClusterMode :: Environment.Decoder ClusterMode
 decoderClusterMode =
@@ -51,3 +59,19 @@ decoderConnectInfo =
               Left parseError -> Err ("Invalid Redis connection string: " ++ Data.Text.pack parseError)
         )
     )
+
+decoderDefaultExpiry :: Environment.Decoder DefaultExpiry
+decoderDefaultExpiry =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "REDIS_DEFAULT_EXPIRY_SECONDS",
+        Environment.description = "Set a default amount of seconds after which all keys touched by this handler will expire. The expire time of a key is reset every time it is read or written. A value of 0 means no default expiry.",
+        Environment.defaultValue = "0"
+      }
+    Environment.int
+    |> map
+      ( \secs ->
+          if secs == 0
+            then NoDefaultExpiry
+            else ExpireKeysAfterSeconds secs
+      )
