@@ -14,7 +14,7 @@ import Nri.Prelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Tuple
-import Prelude (IO, error, pure)
+import Prelude (IO, pure)
 import qualified Prelude
 
 handler :: Text -> IO Internal.Handler
@@ -80,7 +80,13 @@ expectByteString :: RedisType -> Result Internal.Error ByteString
 expectByteString val =
   case val of
     RedisByteString bytestring -> Ok bytestring
-    RedisHash _ -> Err (Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value")
+    RedisHash _ -> Err wrongTypeErr
+
+expectHash :: RedisType -> Result Internal.Error (HM.HashMap ByteString ByteString)
+expectHash val =
+  case val of
+    RedisByteString _ -> Err wrongTypeErr
+    RedisHash hash -> Ok hash
 
 watchKeys :: [ByteString] -> Model -> Model
 watchKeys keys model =
@@ -149,9 +155,45 @@ doQuery query hm =
         (hm, 0 :: Int)
         keys
         |> Tuple.mapSecond Ok
-    Internal.Hgetall _key -> error "No mock implementation implemented yet for hgetall"
-    Internal.Hset _key _field _val -> error "No mock implementation implemented yet for hset"
-    Internal.Hmset _key _vals -> error "No mock implementation implemented yet for hset"
+    Internal.Hgetall key ->
+      ( hm,
+        HM.lookup key hm
+          |> Prelude.traverse expectHash
+          |> map
+            ( \res ->
+                case res of
+                  Just hm' -> HM.toList hm'
+                  Nothing -> []
+            )
+      )
+    Internal.Hset key field val ->
+      case HM.lookup key hm of
+        Nothing ->
+          ( HM.insert key (RedisHash (HM.singleton field val)) hm,
+            Ok ()
+          )
+        Just (RedisHash hm') ->
+          ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
+            Ok ()
+          )
+        Just (RedisByteString _) ->
+          ( hm,
+            Err wrongTypeErr
+          )
+    Internal.Hmset key vals ->
+      case HM.lookup key hm of
+        Nothing ->
+          ( HM.insert key (RedisHash (HM.fromList vals)) hm,
+            Ok ()
+          )
+        Just (RedisHash hm') ->
+          ( HM.insert key (RedisHash (hm' ++ HM.fromList vals)) hm,
+            Ok ()
+          )
+        Just (RedisByteString _) ->
+          ( hm,
+            Err wrongTypeErr
+          )
     Internal.Pure x -> (hm, Ok x)
     Internal.Apply fQuery xQuery ->
       let (hm1, f) = doQuery fQuery hm
@@ -165,3 +207,6 @@ doQuery query hm =
                 Err a -> Err a
                 Ok res -> f res
           )
+
+wrongTypeErr :: Internal.Error
+wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"
