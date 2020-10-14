@@ -70,7 +70,8 @@ acquireHandler settings = do
           Internal.watch = \keys ->
             Database.Redis.watch keys
               |> map (map (\_ -> Ok ()))
-              |> platformRedis "watch" connection anything
+              |> platformRedis "watch" connection anything,
+          Internal.namespace = ""
         },
       connection
     )

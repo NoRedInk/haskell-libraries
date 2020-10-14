@@ -61,7 +61,8 @@ data Handler
         -- Runs the redis `WATCH` command. This isn't one of the `Query`
         -- constructors because we're not able to run `WATCH` in a transaction,
         -- only as a separate command.
-        watch :: [ByteString] -> Task Error ()
+        watch :: [ByteString] -> Task Error (),
+        namespace :: ByteString
       }
 
 -- | Run a redis Query.
@@ -75,12 +76,13 @@ transaction :: Handler -> Query a -> Task Error a
 transaction handler transaction' = doTransaction handler transaction'
 
 addNamespace :: Text -> Handler -> Handler
-addNamespace namespace h =
-  let prefix = namespace ++ ":" |> toB
+addNamespace namespace' h =
+  let prefix = namespace' ++ ":" |> toB
    in Handler
         { doQuery = doQuery h << namespaceQuery prefix,
           doTransaction = doTransaction h << namespaceQuery prefix,
-          watch = watch h << map (\key -> prefix ++ key)
+          watch = watch h << map (\key -> prefix ++ key),
+          namespace = prefix ++ namespace h
         }
 
 namespaceQuery :: ByteString -> Query a -> Query a

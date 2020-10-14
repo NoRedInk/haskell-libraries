@@ -53,7 +53,8 @@ handler namespace = do
                 Ok ()
               )
           )
-          |> Platform.doAnything anything
+          |> Platform.doAnything anything,
+      Internal.namespace = ""
     }
     |> Internal.addNamespace namespace
     |> Prelude.pure
