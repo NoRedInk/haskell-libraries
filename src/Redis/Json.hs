@@ -14,6 +14,7 @@ module Redis.Json
     hset,
     hgetall,
     hmset,
+    watch,
 
     -- * Running queries
     Internal.Query,
@@ -121,6 +122,15 @@ hmset key vals =
   vals
     |> List.map (\(k, v) -> (k, encodeStrict v))
     |> Redis.ByteString.hmset key
+
+-- | Marks the given keys to be watched for conditional execution of a
+-- transaction.
+--
+-- This returns a task because it cannot be ran as part of a transaction.
+--
+-- https://redis.io/commands/watch
+watch :: Internal.Handler -> [Text] -> Task Internal.Error ()
+watch = Redis.ByteString.watch
 
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).

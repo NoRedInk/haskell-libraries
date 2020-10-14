@@ -12,6 +12,7 @@ module Redis.ByteString
     hset,
     hgetall,
     hmset,
+    watch,
 
     -- * Running queries
     Internal.Query,
@@ -152,6 +153,17 @@ hmset key vals =
   vals
     |> map (\(k, v) -> (toB k, v))
     |> Internal.Hmset (toB key)
+
+-- | Marks the given keys to be watched for conditional execution of a
+-- transaction.
+--
+-- This returns a task because it cannot be ran as part of a transaction.
+--
+-- https://redis.io/commands/watch
+watch :: Internal.Handler -> [Text] -> Task Internal.Error ()
+watch h keys =
+  List.map Data.Text.Encoding.encodeUtf8 keys
+    |> Internal.watch (Internal.handlerWithNamespace h)
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8

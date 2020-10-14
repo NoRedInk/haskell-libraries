@@ -55,9 +55,13 @@ instance Prelude.Applicative Query where
   pure = Pure
   (<*>) = Apply
 
-newtype InternalHandler
+data InternalHandler
   = InternalHandler
-      { doQuery :: forall a. Query a -> Task Error a
+      { doQuery :: forall a. Query a -> Task Error a,
+        -- Runs the redis `WATCH` command. This isn't one of the `Query`
+        -- constructors because we're not able to run `WATCH` in a transaction,
+        -- only as a separate command.
+        watch :: [ByteString] -> Task Error ()
       }
 
 data Handler
@@ -75,29 +79,33 @@ changeNamespace namespace Handler {unNamespacedHandler} =
 
 namespacedHandler :: Text -> InternalHandler -> Handler
 namespacedHandler namespace h =
-  Handler
-    { unNamespacedHandler = h,
-      handlerWithNamespace = InternalHandler (doQuery h << namespaceQuery namespace)
-    }
+  let prefix = namespace ++ ":" |> toB
+   in Handler
+        { unNamespacedHandler = h,
+          handlerWithNamespace =
+            InternalHandler
+              { doQuery = doQuery h << namespaceQuery prefix,
+                watch = watch h << map (\key -> prefix ++ key)
+              }
+        }
 
-namespaceQuery :: Text -> Query a -> Query a
-namespaceQuery namespace query' =
-  let byteNamespace = namespace ++ ":" |> toB
-   in case query' of
-        Ping -> Ping
-        Get key -> Get (byteNamespace ++ key)
-        Set key value -> Set (byteNamespace ++ key) value
-        Getset key value -> Getset (byteNamespace ++ key) value
-        Mget keys -> Mget (map (\k -> byteNamespace ++ k) keys)
-        Mset assocs -> Mset (map (\(k, v) -> (byteNamespace ++ k, v)) assocs)
-        Del keys -> Del (map (byteNamespace ++) keys)
-        Hgetall key -> Hgetall (byteNamespace ++ key)
-        Hset key field val -> Hset (byteNamespace ++ key) field val
-        Hmset key vals -> Hmset (byteNamespace ++ key) vals
-        AtomicModify key f -> AtomicModify (byteNamespace ++ key) f
-        Pure x -> Pure x
-        Apply f x -> Apply (namespaceQuery namespace f) (namespaceQuery namespace x)
-        WithResult f q -> WithResult f (namespaceQuery namespace q)
+namespaceQuery :: ByteString -> Query a -> Query a
+namespaceQuery prefix query' =
+  case query' of
+    Ping -> Ping
+    Get key -> Get (prefix ++ key)
+    Set key value -> Set (prefix ++ key) value
+    Getset key value -> Getset (prefix ++ key) value
+    Mget keys -> Mget (map (\k -> prefix ++ k) keys)
+    Mset assocs -> Mset (map (\(k, v) -> (prefix ++ k, v)) assocs)
+    Del keys -> Del (map (prefix ++) keys)
+    Hgetall key -> Hgetall (prefix ++ key)
+    Hset key field val -> Hset (prefix ++ key) field val
+    Hmset key vals -> Hmset (prefix ++ key) vals
+    AtomicModify key f -> AtomicModify (prefix ++ key) f
+    Pure x -> Pure x
+    Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
+    WithResult f q -> WithResult f (namespaceQuery prefix q)
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8

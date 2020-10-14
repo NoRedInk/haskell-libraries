@@ -47,7 +47,13 @@ acquireHandler settings = do
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
-    ( Internal.InternalHandler (doQuery connection anything),
+    ( Internal.InternalHandler
+        { Internal.doQuery = doQuery connection anything,
+          Internal.watch = \keys ->
+            Database.Redis.watch keys
+              |> map (map (\_ -> Ok ()))
+              |> platformRedis "watch" connection anything
+        },
       connection
     )
 

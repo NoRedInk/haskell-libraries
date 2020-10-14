@@ -21,10 +21,11 @@ handler namespace = do
   hm <- newIORef HM.empty
   anything <- Platform.doAnythingHandler
   Internal.InternalHandler
-    ( \query ->
+    { Internal.doQuery = \query ->
         atomicModifyIORef' hm (doQuery query)
-          |> Platform.doAnything anything
-    )
+          |> Platform.doAnything anything,
+      Internal.watch = \_ -> pure () -- TODO: implement this
+    }
     |> Internal.namespacedHandler namespace
     |> Prelude.pure
 
