@@ -15,6 +15,7 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Tuple
 import Prelude (IO, error, pure)
+import qualified Prelude
 
 handler :: Text -> IO Internal.Handler
 handler namespace = do
@@ -25,13 +26,23 @@ handler namespace = do
         atomicModifyIORef' modelRef (doQuery query)
           |> Platform.doAnything anything,
       Internal.doTransaction = \query ->
-        atomicModifyIORef' modelRef (doQuery query)
+        atomicModifyIORef'
+          modelRef
+          ( \model ->
+              let watched = watchedKeys model
+               in if snapshotKeys (HM.keys watched) (hash model) == watched
+                    then doQuery query model {watchedKeys = HM.empty}
+                    else
+                      ( model {watchedKeys = HM.empty},
+                        Err Internal.TransactionAborted
+                      )
+          )
           |> Platform.doAnything anything,
       Internal.watch = \keys ->
         atomicModifyIORef'
           modelRef
           ( \model ->
-              ( model {watchedKeys = watchedKeys model ++ keys},
+              ( watchKeys keys model,
                 Ok ()
               )
           )
@@ -45,14 +56,31 @@ handler namespace = do
 data Model
   = Model
       { hash :: HM.HashMap ByteString ByteString,
-        watchedKeys :: [ByteString]
+        watchedKeys :: HM.HashMap ByteString (Maybe ByteString)
       }
+
+watchKeys :: [ByteString] -> Model -> Model
+watchKeys keys model =
+  model
+    { watchedKeys =
+        -- If this command watches a key that already was watched,
+        -- keep the value from the original snapshot: We want to
+        -- ensure transactions don't change keys since they were
+        -- first watched.
+        snapshotKeys keys (hash model) ++ watchedKeys model
+    }
+
+snapshotKeys :: [ByteString] -> HM.HashMap ByteString ByteString -> HM.HashMap ByteString (Maybe ByteString)
+snapshotKeys keys hm =
+  Prelude.foldMap
+    (\key -> HM.singleton key (HM.lookup key hm))
+    keys
 
 withHash :: (HM.HashMap ByteString ByteString -> HM.HashMap ByteString ByteString) -> Model -> Model
 withHash f model = model {hash = f (hash model)}
 
 init :: IO (IORef Model)
-init = newIORef (Model HM.empty [])
+init = newIORef (Model HM.empty HM.empty)
 
 doQuery ::
   Internal.Query a ->
