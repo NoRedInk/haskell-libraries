@@ -62,9 +62,25 @@ handler namespace = do
 -- will store a single value of this type, and redis commands will modify it.
 data Model
   = Model
-      { hash :: HM.HashMap ByteString ByteString,
-        watchedKeys :: HM.HashMap ByteString (Maybe ByteString)
+      { hash :: HM.HashMap ByteString RedisType,
+        watchedKeys :: HM.HashMap ByteString (Maybe RedisType)
       }
+
+-- | Redis supports a small number of types and most of its commands expect a
+-- particular type in the keys the command is used on.
+--
+-- The type below contains a subset of the types supported by Redis, just those
+-- we currently have commands for.
+data RedisType
+  = RedisByteString ByteString
+  | RedisHash (HM.HashMap ByteString ByteString)
+  deriving (Eq)
+
+expectByteString :: RedisType -> Result Internal.Error ByteString
+expectByteString val =
+  case val of
+    RedisByteString bytestring -> Ok bytestring
+    RedisHash _ -> Err (Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value")
 
 watchKeys :: [ByteString] -> Model -> Model
 watchKeys keys model =
@@ -77,7 +93,7 @@ watchKeys keys model =
         snapshotKeys keys (hash model) ++ watchedKeys model
     }
 
-snapshotKeys :: [ByteString] -> HM.HashMap ByteString ByteString -> HM.HashMap ByteString (Maybe ByteString)
+snapshotKeys :: [ByteString] -> HM.HashMap ByteString RedisType -> HM.HashMap ByteString (Maybe RedisType)
 snapshotKeys keys hm =
   Prelude.foldMap
     (\key -> HM.singleton key (HM.lookup key hm))
@@ -88,8 +104,8 @@ init = newIORef (Model HM.empty HM.empty)
 
 doQuery ::
   Internal.Query a ->
-  HM.HashMap ByteString ByteString ->
-  (HM.HashMap ByteString ByteString, Result Internal.Error a)
+  HM.HashMap ByteString RedisType ->
+  (HM.HashMap ByteString RedisType, Result Internal.Error a)
 doQuery query hm =
   case query of
     Internal.Ping ->
@@ -98,25 +114,29 @@ doQuery query hm =
       )
     Internal.Get key ->
       ( hm,
-        Ok <| HM.lookup key hm
+        HM.lookup key hm
+          |> Prelude.traverse expectByteString
       )
     Internal.Set key value ->
-      ( HM.insert key value hm,
+      ( HM.insert key (RedisByteString value) hm,
         Ok ()
       )
     Internal.Getset key value ->
-      ( HM.insert key value hm,
-        Ok <| HM.lookup key hm
+      ( HM.insert key (RedisByteString value) hm,
+        HM.lookup key hm
+          |> Prelude.traverse expectByteString
       )
     Internal.Mget keys ->
       ( hm,
-        Ok <| List.map (\key -> HM.lookup key hm) keys
+        Prelude.traverse
+          (\key -> HM.lookup key hm |> Prelude.traverse expectByteString)
+          keys
       )
     Internal.Mset assocs ->
       ( List.foldl
           (\(key, val) hm' -> HM.insert key val hm')
           hm
-          assocs,
+          (List.map (\(k, v) -> (k, RedisByteString v)) assocs),
         Ok ()
       )
     Internal.Del keys ->
