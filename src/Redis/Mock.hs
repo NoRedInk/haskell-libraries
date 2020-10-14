@@ -21,7 +21,7 @@ handler :: Text -> IO Internal.Handler
 handler namespace = do
   modelRef <- init
   anything <- Platform.doAnythingHandler
-  Internal.InternalHandler
+  Internal.Handler
     { Internal.doQuery = \query ->
         atomicModifyIORef'
           modelRef
@@ -55,7 +55,7 @@ handler namespace = do
           )
           |> Platform.doAnything anything
     }
-    |> Internal.namespacedHandler namespace
+    |> Internal.addNamespace namespace
     |> Prelude.pure
 
 -- | This is our mock implementation of the Redis state. Our mock implementation

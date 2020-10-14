@@ -9,7 +9,7 @@ module Redis
     -- Internal
     Internal.Error (..),
     Internal.Handler,
-    Internal.changeNamespace,
+    Internal.addNamespace,
     -- Real
     Real.Info (..),
     Real.handler,

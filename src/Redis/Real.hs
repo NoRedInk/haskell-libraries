@@ -25,9 +25,9 @@ handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings =
   Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
     |> map fst
-    |> map (Internal.namespacedHandler namespace)
+    |> map (Internal.addNamespace namespace)
 
-acquireHandler :: Settings.Settings -> IO (Internal.InternalHandler, Connection)
+acquireHandler :: Settings.Settings -> IO (Internal.Handler, Connection)
 acquireHandler settings = do
   connection <- do
     let connectionInfo = Settings.connectionInfo settings
@@ -45,7 +45,7 @@ acquireHandler settings = do
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
-    ( Internal.InternalHandler
+    ( Internal.Handler
         { Internal.doQuery = \query ->
             let PreparedQuery {cmds, redisCtx} = doRawQuery query
              in platformRedis (Text.join " " cmds) connection anything redisCtx,
@@ -119,7 +119,7 @@ doRawQuery query =
                 redisCtx
             )
 
-releaseHandler :: (Internal.InternalHandler, Connection) -> IO ()
+releaseHandler :: (Internal.Handler, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis
 
 data Connection

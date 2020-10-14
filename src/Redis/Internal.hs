@@ -52,8 +52,8 @@ instance Prelude.Applicative Query where
   pure = Pure
   (<*>) = Apply
 
-data InternalHandler
-  = InternalHandler
+data Handler
+  = Handler
       { doQuery :: forall a. Query a -> Task Error a,
         doTransaction :: forall a. Query a -> Task Error a,
         -- Runs the redis `WATCH` command. This isn't one of the `Query`
@@ -62,37 +62,23 @@ data InternalHandler
         watch :: [ByteString] -> Task Error ()
       }
 
-data Handler
-  = Handler
-      { handlerWithNamespace :: InternalHandler,
-        unNamespacedHandler :: InternalHandler
-      }
-
 -- | Run a redis Query.
 query :: Handler -> Query a -> Task Error a
-query handler query' = doQuery (handlerWithNamespace handler) query'
+query handler query' = doQuery handler query'
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
 -- requests won't be able change values in between.
 transaction :: Handler -> Query a -> Task Error a
-transaction handler transaction' = doTransaction (handlerWithNamespace handler) transaction'
+transaction handler transaction' = doTransaction handler transaction'
 
-changeNamespace :: Text -> Handler -> Handler
-changeNamespace namespace Handler {unNamespacedHandler} =
-  namespacedHandler namespace unNamespacedHandler
-
-namespacedHandler :: Text -> InternalHandler -> Handler
-namespacedHandler namespace h =
+addNamespace :: Text -> Handler -> Handler
+addNamespace namespace h =
   let prefix = namespace ++ ":" |> toB
    in Handler
-        { unNamespacedHandler = h,
-          handlerWithNamespace =
-            InternalHandler
-              { doQuery = doQuery h << namespaceQuery prefix,
-                doTransaction = doTransaction h << namespaceQuery prefix,
-                watch = watch h << map (\key -> prefix ++ key)
-              }
+        { doQuery = doQuery h << namespaceQuery prefix,
+          doTransaction = doTransaction h << namespaceQuery prefix,
+          watch = watch h << map (\key -> prefix ++ key)
         }
 
 namespaceQuery :: ByteString -> Query a -> Query a

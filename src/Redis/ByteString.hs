@@ -188,7 +188,7 @@ hmset key vals =
 watch :: Internal.Handler -> [Text] -> Task Internal.Error ()
 watch h keys =
   List.map Data.Text.Encoding.encodeUtf8 keys
-    |> Internal.watch (Internal.handlerWithNamespace h)
+    |> Internal.watch h
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
