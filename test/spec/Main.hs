@@ -8,7 +8,7 @@ import qualified Environment
 import qualified Expect
 import Nri.Prelude
 import qualified Platform
-import Redis (Error, Handler, changeNamespace)
+import Redis (Error, Handler, addNamespace)
 import qualified Redis.Json as Json
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
@@ -34,8 +34,8 @@ specs logHandler whichHandler redisHandler =
         result <- get "bob" |> query testNS
         pure <| Expect.equal result (Just "hello!"),
       redisTest "namespaces namespace" <| do
-        let nsHandler1 = changeNamespace "NS1" redisHandler
-        let nsHandler2 = changeNamespace "NS2" redisHandler
+        let nsHandler1 = addNamespace "NS1" redisHandler
+        let nsHandler2 = addNamespace "NS2" redisHandler
         set "bob" "hello!" |> query nsHandler1
         set "bob" "goodbye" |> query nsHandler2
         result1 <- get "bob" |> query nsHandler1
@@ -169,7 +169,7 @@ specs logHandler whichHandler redisHandler =
         pure <| Expect.equal (10, Nothing) result
     ]
   where
-    testNS = changeNamespace "testNamespace" redisHandler
+    testNS = addNamespace "testNamespace" redisHandler
     redisTest name test' =
       test name <| \() ->
         Task.attempt logHandler test'
