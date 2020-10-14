@@ -55,6 +55,7 @@ instance Prelude.Applicative Query where
 data InternalHandler
   = InternalHandler
       { doQuery :: forall a. Query a -> Task Error a,
+        doTransaction :: forall a. Query a -> Task Error a,
         -- Runs the redis `WATCH` command. This isn't one of the `Query`
         -- constructors because we're not able to run `WATCH` in a transaction,
         -- only as a separate command.
@@ -67,8 +68,15 @@ data Handler
         unNamespacedHandler :: InternalHandler
       }
 
+-- | Run a redis Query.
 query :: Handler -> Query a -> Task Error a
 query handler query' = doQuery (handlerWithNamespace handler) query'
+
+-- | Run a redis Query in a transaction. If the query contains several Redis
+-- commands they're all executed together, and Redis will guarantee other
+-- requests won't be able change values in between.
+transaction :: Handler -> Query a -> Task Error a
+transaction handler transaction' = doTransaction (handlerWithNamespace handler) transaction'
 
 changeNamespace :: Text -> Handler -> Handler
 changeNamespace namespace Handler {unNamespacedHandler} =
@@ -82,6 +90,7 @@ namespacedHandler namespace h =
           handlerWithNamespace =
             InternalHandler
               { doQuery = doQuery h << namespaceQuery prefix,
+                doTransaction = doTransaction h << namespaceQuery prefix,
                 watch = watch h << map (\key -> prefix ++ key)
               }
         }

@@ -24,6 +24,9 @@ handler namespace = do
     { Internal.doQuery = \query ->
         atomicModifyIORef' hm (doQuery query)
           |> Platform.doAnything anything,
+      Internal.doTransaction = \query ->
+        atomicModifyIORef' hm (doQuery query)
+          |> Platform.doAnything anything,
       Internal.watch = \_ -> pure () -- TODO: implement this
     }
     |> Internal.namespacedHandler namespace

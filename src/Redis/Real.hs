@@ -46,7 +46,21 @@ acquireHandler settings = do
   anything <- Platform.doAnythingHandler
   pure
     ( Internal.InternalHandler
-        { Internal.doQuery = doQuery connection anything,
+        { Internal.doQuery = \query ->
+            let PreparedQuery {cmds, redisCtx} = doRawQuery query
+             in platformRedis (Text.join " " cmds) connection anything redisCtx,
+          Internal.doTransaction = \query ->
+            let PreparedQuery {cmds, redisCtx} = doRawQuery query
+             in redisCtx
+                  |> Database.Redis.multiExec
+                  |> map
+                    ( \txResult ->
+                        case txResult of
+                          Database.Redis.TxSuccess y -> Right y
+                          Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
+                          Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
+                    )
+                  |> platformRedis (Text.join " " cmds) connection anything,
           Internal.watch = \keys ->
             Database.Redis.watch keys
               |> map (map (\_ -> Ok ()))
@@ -54,25 +68,6 @@ acquireHandler settings = do
         },
       connection
     )
-
-doQuery :: Connection -> Platform.DoAnythingHandler -> Internal.Query a -> Task Internal.Error a
-doQuery connection anything query =
-  case query of
-    Internal.Apply f x ->
-      let PreparedQuery {cmds, redisCtx} = map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
-       in redisCtx
-            |> Database.Redis.multiExec
-            |> map
-              ( \txResult ->
-                  case txResult of
-                    Database.Redis.TxSuccess y -> Right y
-                    Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
-                    Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
-              )
-            |> platformRedis (Text.join " " cmds) connection anything
-    _ ->
-      let PreparedQuery {cmds, redisCtx} = doRawQuery query
-       in platformRedis (Text.join " " cmds) connection anything redisCtx
 
 data PreparedQuery m f result
   = PreparedQuery

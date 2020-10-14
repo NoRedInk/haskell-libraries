@@ -20,6 +20,7 @@ module Redis.Text
     -- * Running queries
     Internal.Query,
     Internal.query,
+    Internal.transaction,
     Internal.Handler,
     Internal.Error,
 

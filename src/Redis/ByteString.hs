@@ -17,6 +17,7 @@ module Redis.ByteString
     -- * Running queries
     Internal.Query,
     Internal.query,
+    Internal.transaction,
     Internal.Handler,
     Internal.Error,
 
@@ -141,7 +142,7 @@ atomicModifyWithContext handler key f =
       watch handler [key]
       oldValue <- Internal.query handler (get key)
       let (setValue, returnValue) = f oldValue
-      Internal.query handler (set key setValue)
+      Internal.transaction handler (set key setValue)
       Task.succeed (setValue, returnValue)
 
 -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.

@@ -19,6 +19,7 @@ module Redis.Json
     -- * Running queries
     Internal.Query,
     Internal.query,
+    Internal.transaction,
     Internal.Handler,
     Internal.Error,
 
