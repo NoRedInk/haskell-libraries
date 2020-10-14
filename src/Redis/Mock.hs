@@ -18,29 +18,41 @@ import Prelude (IO, error, pure)
 
 handler :: Text -> IO Internal.Handler
 handler namespace = do
-  model <- init
+  modelRef <- init
   anything <- Platform.doAnythingHandler
   Internal.InternalHandler
     { Internal.doQuery = \query ->
-        atomicModifyIORef' model (doQuery query)
+        atomicModifyIORef' modelRef (doQuery query)
           |> Platform.doAnything anything,
       Internal.doTransaction = \query ->
-        atomicModifyIORef' model (doQuery query)
+        atomicModifyIORef' modelRef (doQuery query)
           |> Platform.doAnything anything,
-      Internal.watch = \_ -> pure () -- TODO: implement this
+      Internal.watch = \keys ->
+        atomicModifyIORef'
+          modelRef
+          ( \model ->
+              ( model {watchedKeys = watchedKeys model ++ keys},
+                Ok ()
+              )
+          )
+          |> Platform.doAnything anything
     }
     |> Internal.namespacedHandler namespace
     |> Prelude.pure
 
 -- | This is our mock implementation of the Redis state. Our mock implementation
 -- will store a single value of this type, and redis commands will modify it.
-newtype Model = Model {hash :: HM.HashMap ByteString ByteString}
+data Model
+  = Model
+      { hash :: HM.HashMap ByteString ByteString,
+        watchedKeys :: [ByteString]
+      }
 
 withHash :: (HM.HashMap ByteString ByteString -> HM.HashMap ByteString ByteString) -> Model -> Model
-withHash f (Model hm) = Model (f hm)
+withHash f model = model {hash = f (hash model)}
 
 init :: IO (IORef Model)
-init = newIORef (Model HM.empty)
+init = newIORef (Model HM.empty [])
 
 doQuery ::
   Internal.Query a ->
