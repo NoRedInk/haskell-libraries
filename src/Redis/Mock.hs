@@ -23,19 +23,26 @@ handler namespace = do
   anything <- Platform.doAnythingHandler
   Internal.InternalHandler
     { Internal.doQuery = \query ->
-        atomicModifyIORef' modelRef (doQuery query)
+        atomicModifyIORef'
+          modelRef
+          ( \model ->
+              let (newHash, res) = doQuery query (hash model)
+               in ( model {hash = newHash},
+                    res
+                  )
+          )
           |> Platform.doAnything anything,
       Internal.doTransaction = \query ->
         atomicModifyIORef'
           modelRef
-          ( \model ->
-              let watched = watchedKeys model
-               in if snapshotKeys (HM.keys watched) (hash model) == watched
-                    then doQuery query model {watchedKeys = HM.empty}
-                    else
-                      ( model {watchedKeys = HM.empty},
-                        Err Internal.TransactionAborted
-                      )
+          ( \Model {hash, watchedKeys} ->
+              let (newHash, res) =
+                    if snapshotKeys (HM.keys watchedKeys) hash == watchedKeys
+                      then doQuery query hash
+                      else (hash, Err Internal.TransactionAborted)
+               in ( Model {hash = newHash, watchedKeys = HM.empty},
+                    res
+                  )
           )
           |> Platform.doAnything anything,
       Internal.watch = \keys ->
@@ -76,65 +83,62 @@ snapshotKeys keys hm =
     (\key -> HM.singleton key (HM.lookup key hm))
     keys
 
-withHash :: (HM.HashMap ByteString ByteString -> HM.HashMap ByteString ByteString) -> Model -> Model
-withHash f model = model {hash = f (hash model)}
-
 init :: IO (IORef Model)
 init = newIORef (Model HM.empty HM.empty)
 
 doQuery ::
   Internal.Query a ->
-  Model ->
-  (Model, Result Internal.Error a)
-doQuery query model =
+  HM.HashMap ByteString ByteString ->
+  (HM.HashMap ByteString ByteString, Result Internal.Error a)
+doQuery query hm =
   case query of
     Internal.Ping ->
-      ( model,
+      ( hm,
         Ok Database.Redis.Pong
       )
     Internal.Get key ->
-      ( model,
-        Ok <| HM.lookup key (hash model)
+      ( hm,
+        Ok <| HM.lookup key hm
       )
     Internal.Set key value ->
-      ( withHash (HM.insert key value) model,
+      ( HM.insert key value hm,
         Ok ()
       )
     Internal.Getset key value ->
-      ( withHash (HM.insert key value) model,
-        Ok <| HM.lookup key (hash model)
+      ( HM.insert key value hm,
+        Ok <| HM.lookup key hm
       )
     Internal.Mget keys ->
-      ( model,
-        Ok <| List.map (\key -> HM.lookup key (hash model)) keys
+      ( hm,
+        Ok <| List.map (\key -> HM.lookup key hm) keys
       )
     Internal.Mset assocs ->
       ( List.foldl
-          (\(key, val) model' -> withHash (HM.insert key val) model')
-          model
+          (\(key, val) hm' -> HM.insert key val hm')
+          hm
           assocs,
         Ok ()
       )
     Internal.Del keys ->
       List.foldl
-        ( \key (model', count) ->
-            if HM.member key (hash model')
-              then (withHash (HM.delete key) model', count + 1)
-              else (model', count)
+        ( \key (hm', count) ->
+            if HM.member key hm'
+              then (HM.delete key hm', count + 1)
+              else (hm', count)
         )
-        (model, 0 :: Int)
+        (hm, 0 :: Int)
         keys
         |> Tuple.mapSecond Ok
     Internal.Hgetall _key -> error "No mock implementation implemented yet for hgetall"
     Internal.Hset _key _field _val -> error "No mock implementation implemented yet for hset"
     Internal.Hmset _key _vals -> error "No mock implementation implemented yet for hset"
-    Internal.Pure x -> (model, Ok x)
+    Internal.Pure x -> (hm, Ok x)
     Internal.Apply fQuery xQuery ->
-      let (hm1, f) = doQuery fQuery model
+      let (hm1, f) = doQuery fQuery hm
           (hm2, x) = doQuery xQuery hm1
        in (hm2, map2 (\f' x' -> f' x') f x)
     Internal.WithResult f q ->
-      doQuery q model
+      doQuery q hm
         |> map
           ( \result ->
               case result of
