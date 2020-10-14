@@ -194,6 +194,12 @@ doQuery query hm =
           ( hm,
             Err wrongTypeErr
           )
+    Internal.Expire _ _ ->
+      -- Expiring is an intentional no-op in `Redis.Mock`. Implementing it would
+      -- like take a long effort, and only support writing slow tests.
+      ( hm,
+        Ok ()
+      )
     Internal.Pure x -> (hm, Ok x)
     Internal.Apply fQuery xQuery ->
       let (hm1, f) = doQuery fQuery hm

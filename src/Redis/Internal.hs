@@ -8,6 +8,7 @@ import Data.ByteString (ByteString)
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import Nri.Prelude
+import qualified Tuple
 import qualified Prelude
 
 data Error
@@ -38,6 +39,7 @@ data Query a where
   Hgetall :: ByteString -> Query [(ByteString, ByteString)]
   Hset :: ByteString -> ByteString -> ByteString -> Query ()
   Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
+  Expire :: ByteString -> Int -> Query ()
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a
@@ -94,9 +96,42 @@ namespaceQuery prefix query' =
     Hgetall key -> Hgetall (prefix ++ key)
     Hset key field val -> Hset (prefix ++ key) field val
     Hmset key vals -> Hmset (prefix ++ key) vals
+    Expire key secs -> Expire (prefix ++ key) secs
     Pure x -> Pure x
     Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
     WithResult f q -> WithResult f (namespaceQuery prefix q)
+
+defaultExpiryKeysAfterSeconds :: Int -> Handler -> Handler
+defaultExpiryKeysAfterSeconds secs handler =
+  let doQuery :: Query a -> Task Error a
+      doQuery query' =
+        keysTouchedByQuery query'
+          |> Prelude.traverse (\key -> Expire key secs)
+          |> map2 (\res _ -> res) query'
+          |> doTransaction handler
+   in handler {doQuery = doQuery, doTransaction = doQuery}
+
+keysTouchedByQuery :: Query a -> [ByteString]
+keysTouchedByQuery query' =
+  case query' of
+    Ping -> []
+    Get key -> [key]
+    Set key _ -> [key]
+    Getset key _ -> [key]
+    Mget keys -> keys
+    Mset assocs -> map Tuple.first assocs
+    Hgetall key -> [key]
+    Hset key _ _ -> [key]
+    Hmset key _ -> [key]
+    Pure _ -> []
+    Apply f x -> keysTouchedByQuery f ++ keysTouchedByQuery x
+    WithResult _ q -> keysTouchedByQuery q
+    -- Don't report on deleted keys. They're gone after this command so we don't
+    -- want to set expiry times for them.
+    Del keys -> keys
+    -- We use this function to collect keys we need to expire. If the user is
+    -- explicitly setting an expiry we don't want to overwrite that.
+    Expire _key _ -> []
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8

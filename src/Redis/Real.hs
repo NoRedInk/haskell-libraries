@@ -18,14 +18,20 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Text
-import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
+import qualified Tuple
+import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 import qualified Prelude
 
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
-handler namespace settings =
-  Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
-    |> map fst
-    |> map (Internal.addNamespace namespace)
+handler namespace settings = do
+  namespacedHandler <-
+    Data.Acquire.mkAcquire (acquireHandler settings) releaseHandler
+      |> map (Internal.addNamespace namespace << Tuple.first)
+  Prelude.pure
+    <| case Settings.defaultExpiry settings of
+      Settings.NoDefaultExpiry -> namespacedHandler
+      Settings.ExpireKeysAfterSeconds secs ->
+        Internal.defaultExpiryKeysAfterSeconds secs namespacedHandler
 
 acquireHandler :: Settings.Settings -> IO (Internal.Handler, Connection)
 acquireHandler settings = do
@@ -105,6 +111,7 @@ doRawQuery query =
     Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key) |> map Ok
     Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val) |> map (\_ -> Ok ())
     Internal.Hmset key vals -> PreparedQuery ["hset"] (Database.Redis.hmset key vals) |> map (\_ -> Ok ())
+    Internal.Expire key secs -> PreparedQuery ["expire"] (Database.Redis.expire key (fromIntegral secs)) |> map (\_ -> Ok ())
     Internal.Pure x -> pure (Ok x)
     Internal.Apply f x -> map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
     Internal.WithResult f q ->

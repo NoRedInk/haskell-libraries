@@ -1,4 +1,4 @@
-module Redis.Settings (Settings (..), ClusterMode (..), decoder) where
+module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), decoder) where
 
 import qualified Data.Text
 import Database.Redis hiding (Ok)
