@@ -17,7 +17,6 @@ import Nri.Prelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
-import qualified Task
 import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, fst, pure, show)
 import qualified Prelude
@@ -59,8 +58,6 @@ acquireHandler settings = do
 doQuery :: Connection -> Platform.DoAnythingHandler -> Internal.Query a -> Task Internal.Error a
 doQuery connection anything query =
   case query of
-    -- Special treatment for constructors that don't represent
-    Internal.Pure x -> Task.succeed x
     Internal.Apply f x ->
       let PreparedQuery {cmds, redisCtx} = map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
        in redisCtx
@@ -73,11 +70,6 @@ doQuery connection anything query =
                     Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
               )
             |> platformRedis (Text.join " " cmds) connection anything
-    Internal.WithResult f q -> do
-      result <- doQuery connection anything q
-      case f result of
-        Ok a -> Task.succeed a
-        Err err -> Task.fail err
     _ ->
       let PreparedQuery {cmds, redisCtx} = doRawQuery query
        in platformRedis (Text.join " " cmds) connection anything redisCtx
