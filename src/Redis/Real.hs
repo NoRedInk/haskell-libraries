@@ -61,7 +61,7 @@ doQuery connection anything query =
     -- If we see an `Apply` it means we're stringing multiple commands together.
     -- We run these inside a Redis transaction to ensure atomicity.
     Internal.Apply f x ->
-      let PreparedQuery (cmds, redisCtx) = map2 (<|) (doRawQuery f) (doRawQuery x)
+      let PreparedQuery {cmds, redisCtx} = map2 (<|) (doRawQuery f) (doRawQuery x)
        in redisCtx
             |> Database.Redis.multiExec
             |> map
@@ -81,20 +81,27 @@ doQuery connection anything query =
         Ok a -> Task.succeed a
         Err err -> Task.fail err
     _ ->
-      let PreparedQuery (cmds, redisCtx) = doRawQuery query
+      let PreparedQuery {cmds, redisCtx} = doRawQuery query
        in platformRedis (Text.join " " cmds) connection anything redisCtx
 
-newtype PreparedQuery m f result
-  = PreparedQuery ([Text], m (f (Result Internal.Error result)))
+data PreparedQuery m f result
+  = PreparedQuery
+      { cmds :: [Text],
+        redisCtx :: m (f (Result Internal.Error result))
+      }
   deriving (Prelude.Functor)
 
 instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (PreparedQuery m f) where
-  pure x = PreparedQuery ([], pure (pure (Ok x)))
-  PreparedQuery (fCmds, f) <*> PreparedQuery (xCmds, x) =
+  pure x =
     PreparedQuery
-      ( fCmds ++ xCmds,
-        map2 (map2 (map2 (<|))) f x
-      )
+      { cmds = [],
+        redisCtx = pure (pure (Ok x))
+      }
+  f <*> x =
+    PreparedQuery
+      { cmds = cmds f ++ cmds x,
+        redisCtx = map2 (map2 (map2 (<|))) (redisCtx f) (redisCtx x)
+      }
 
 -- Construct a query in the underlying `hedis` library we depend on. It has a
 -- polymorphic type signature that allows the returning query to be passed to
@@ -103,24 +110,24 @@ instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (
 doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> PreparedQuery m f result
 doRawQuery query =
   case query of
-    Internal.Ping -> PreparedQuery (["ping"], Database.Redis.ping |> map (map Ok))
-    Internal.Get key -> PreparedQuery (["get"], Database.Redis.get key |> map (map Ok))
-    Internal.Set key val -> PreparedQuery (["set"], Database.Redis.set key val |> map (map (\_ -> Ok ())))
-    Internal.Getset key val -> PreparedQuery (["getset"], Database.Redis.getset key val |> map (map Ok))
-    Internal.Mget keys -> PreparedQuery (["mget"], Database.Redis.mget keys |> map (map Ok))
-    Internal.Mset vals -> PreparedQuery (["mset"], Database.Redis.mset vals |> map (map (\_ -> Ok ())))
-    Internal.Del keys -> PreparedQuery (["keys"], Database.Redis.del keys |> map (map (Ok << Prelude.fromIntegral)))
-    Internal.Hgetall key -> PreparedQuery (["hgetall"], Database.Redis.hgetall key |> map (map Ok))
-    Internal.Hset key field val -> PreparedQuery (["hset"], Database.Redis.hset key field val |> map (map (\_ -> Ok ())))
-    Internal.Hmset key vals -> PreparedQuery (["hset"], Database.Redis.hmset key vals |> map (map (\_ -> Ok ())))
+    Internal.Ping -> PreparedQuery ["ping"] (Database.Redis.ping |> map (map Ok))
+    Internal.Get key -> PreparedQuery ["get"] (Database.Redis.get key |> map (map Ok))
+    Internal.Set key val -> PreparedQuery ["set"] (Database.Redis.set key val |> map (map (\_ -> Ok ())))
+    Internal.Getset key val -> PreparedQuery ["getset"] (Database.Redis.getset key val |> map (map Ok))
+    Internal.Mget keys -> PreparedQuery ["mget"] (Database.Redis.mget keys |> map (map Ok))
+    Internal.Mset vals -> PreparedQuery ["mset"] (Database.Redis.mset vals |> map (map (\_ -> Ok ())))
+    Internal.Del keys -> PreparedQuery ["keys"] (Database.Redis.del keys |> map (map (Ok << Prelude.fromIntegral)))
+    Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key |> map (map Ok))
+    Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val |> map (map (\_ -> Ok ())))
+    Internal.Hmset key vals -> PreparedQuery ["hset"] (Database.Redis.hmset key vals |> map (map (\_ -> Ok ())))
     Internal.Pure x -> pure x
     Internal.Apply f x -> map2 (<|) (doRawQuery f) (doRawQuery x)
     Internal.AtomicModify _ _ -> Prelude.error "Use of `AtomicModify` within a Redis transaction is not supported."
     Internal.WithResult f q ->
-      let PreparedQuery (cmds, redisCtx) = doRawQuery q
+      let PreparedQuery cmds redisCtx = doRawQuery q
        in PreparedQuery
-            ( cmds,
-              (map << map)
+            cmds
+            ( (map << map)
                 ( \result -> case result of
                     Err a -> Err a
                     Ok res -> f res
