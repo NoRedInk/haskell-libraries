@@ -5,15 +5,15 @@
 -- an error.
 module Redis.Json
   ( -- * Redis commands
-    get,
-    set,
-    getset,
-    mget,
-    mset,
     del,
-    hset,
+    get,
+    getset,
     hgetall,
     hmset,
+    hset,
+    mget,
+    mset,
+    set,
     watch,
 
     -- * Running queries

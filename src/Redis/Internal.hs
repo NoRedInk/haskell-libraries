@@ -29,18 +29,18 @@ errorForHumans topError =
     TransactionAborted -> "Transaction aborted. Watched key has changed."
 
 data Query a where
-  Ping :: Query Database.Redis.Status
+  Del :: [ByteString] -> Query Int
+  Expire :: ByteString -> Int -> Query ()
   Get :: ByteString -> Query (Maybe ByteString)
-  Set :: ByteString -> ByteString -> Query ()
   Getset :: ByteString -> ByteString -> Query (Maybe ByteString)
+  Hdel :: ByteString -> [ByteString] -> Query Int
+  Hgetall :: ByteString -> Query [(ByteString, ByteString)]
+  Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
+  Hset :: ByteString -> ByteString -> ByteString -> Query ()
   Mget :: [ByteString] -> Query [Maybe ByteString]
   Mset :: [(ByteString, ByteString)] -> Query ()
-  Del :: [ByteString] -> Query Int
-  Hgetall :: ByteString -> Query [(ByteString, ByteString)]
-  Hset :: ByteString -> ByteString -> ByteString -> Query ()
-  Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
-  Hdel :: ByteString -> [ByteString] -> Query Int
-  Expire :: ByteString -> Int -> Query ()
+  Ping :: Query Database.Redis.Status
+  Set :: ByteString -> ByteString -> Query ()
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a

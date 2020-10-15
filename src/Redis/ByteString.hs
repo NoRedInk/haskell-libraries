@@ -3,15 +3,15 @@
 -- most cases you'll likely want to use either `Redis.Json` or `Redis.Text`.
 module Redis.ByteString
   ( -- * Redis commands
-    get,
-    set,
-    getset,
-    mget,
-    mset,
     del,
-    hset,
+    get,
+    getset,
     hgetall,
     hmset,
+    hset,
+    mget,
+    mset,
+    set,
     watch,
 
     -- * Running queries
