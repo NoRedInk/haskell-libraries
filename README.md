@@ -46,6 +46,8 @@ Once we have the latest version we can make an upper bound of that by keeping th
 
 ## Publishing
 
+### To [hackage.org][hackage]
+
 [Hackage][hackage] (the Haskell package repository) uses a versioning scheme called [PVP][pvp]. It's like the 'semantic versioning' used by NPM, Elm, and others, but differs in having two major version digits rather than one:
 
     MAJOR.MAJOR.MINOR.PATCH
@@ -58,6 +60,14 @@ To publish the new version run the `release.sh` script for the package you want 
 ./release.sh nri-prelude
 ```
 
+### To [stackage.org][stackage]
+
+[Stackage][stackage] is a repository built on top of hackage. Stackage runs nightly builds checking the latest version of packages are compiling against each other.
+
+We registered the libraries in this repository with Stackage [here][nri-on-stackage]. Stackage will find new versions of these libraries pushed to hackage.
+
+To remain in stackage these libraries need to up-to-date with the latest versions of their dependencies. When a dependency releases a new version not accepted by the version bounds of a package in this library then we need to do a new release to support the new version of the dependency. To get notifications when we need to do an update like that, join the Haskell Open Source Maintainers NRI mailing group.
+
 [nix]: https://nixos.org/
 [direnv]: https://direnv.net/
 [hackage]: https://hackage.haskell.org/
@@ -65,3 +75,4 @@ To publish the new version run the `release.sh` script for the package you want 
 [stackage]: https://www.stackage.org/
 [ormolu]: https://github.com/tweag/ormolu
 [haddock]: https://haskell-haddock.readthedocs.io
+[nri-on-stackage]: https://github.com/commercialhaskell/stackage/blob/b9c0bfa723bd4cba5f964c6fb99b7528c4027692/build-constraints.yaml#L4414-L4416
