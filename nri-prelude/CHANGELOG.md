@@ -1,3 +1,7 @@
+# 0.1.0.4
+
+- Relax version bounds to encompass `time-1.11`.
+
 # 0.1.0.3
 
 - Fix tests to allow inclusion in stackage.
