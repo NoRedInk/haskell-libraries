@@ -195,6 +195,23 @@ doQuery query hm =
           ( hm,
             Err wrongTypeErr
           )
+    Internal.Hdel key fields ->
+      case HM.lookup key hm of
+        Nothing ->
+          ( hm,
+            Ok 0
+          )
+        Just (RedisHash hm') ->
+          let hmAfterDeletions = Prelude.foldr HM.delete hm' fields
+           in ( HM.insert key (RedisHash hmAfterDeletions) hm,
+                HM.size hm' - HM.size hmAfterDeletions
+                  |> Prelude.fromIntegral
+                  |> Ok
+              )
+        Just (RedisByteString _) ->
+          ( hm,
+            Err wrongTypeErr
+          )
     Internal.Expire _ _ ->
       -- Expiring is an intentional no-op in `Redis.Mock`. Implementing it would
       -- like take a long effort, and only support writing slow tests.

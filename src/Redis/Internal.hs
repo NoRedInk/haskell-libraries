@@ -26,7 +26,7 @@ errorForHumans topError =
     RedisError err -> "Redis error: " ++ err
     ConnectionLost -> "Connection Lost"
     LibraryError err -> "Library error: " ++ err
-    TransactionAborted -> "Transaction aborted. Wached key has changed"
+    TransactionAborted -> "Transaction aborted. Watched key has changed."
 
 data Query a where
   Ping :: Query Database.Redis.Status
@@ -39,6 +39,7 @@ data Query a where
   Hgetall :: ByteString -> Query [(ByteString, ByteString)]
   Hset :: ByteString -> ByteString -> ByteString -> Query ()
   Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
+  Hdel :: ByteString -> [ByteString] -> Query Int
   Expire :: ByteString -> Int -> Query ()
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
@@ -97,6 +98,7 @@ namespaceQuery prefix query' =
     Hgetall key -> Hgetall (prefix ++ key)
     Hset key field val -> Hset (prefix ++ key) field val
     Hmset key vals -> Hmset (prefix ++ key) vals
+    Hdel key fields -> Hdel (prefix ++ key) fields
     Expire key secs -> Expire (prefix ++ key) secs
     Pure x -> Pure x
     Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
@@ -129,7 +131,8 @@ keysTouchedByQuery query' =
     WithResult _ q -> keysTouchedByQuery q
     -- Don't report on deleted keys. They're gone after this command so we don't
     -- want to set expiry times for them.
-    Del keys -> keys
+    Del _keys -> []
+    Hdel _key _ -> []
     -- We use this function to collect keys we need to expire. If the user is
     -- explicitly setting an expiry we don't want to overwrite that.
     Expire _key _ -> []

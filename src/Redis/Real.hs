@@ -105,10 +105,11 @@ doRawQuery query =
     Internal.Getset key val -> PreparedQuery ["getset"] (Database.Redis.getset key val) |> map Ok
     Internal.Mget keys -> PreparedQuery ["mget"] (Database.Redis.mget keys) |> map Ok
     Internal.Mset vals -> PreparedQuery ["mset"] (Database.Redis.mset vals) |> map (\_ -> Ok ())
-    Internal.Del keys -> PreparedQuery ["keys"] (Database.Redis.del keys) |> map (Ok << Prelude.fromIntegral)
+    Internal.Del keys -> PreparedQuery ["del"] (Database.Redis.del keys) |> map (Ok << Prelude.fromIntegral)
     Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key) |> map Ok
     Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val) |> map (\_ -> Ok ())
     Internal.Hmset key vals -> PreparedQuery ["hset"] (Database.Redis.hmset key vals) |> map (\_ -> Ok ())
+    Internal.Hdel key fields -> PreparedQuery ["hdel"] (Database.Redis.hdel key fields) |> map (Ok << Prelude.fromIntegral)
     Internal.Expire key secs -> PreparedQuery ["expire"] (Database.Redis.expire key (fromIntegral secs)) |> map (\_ -> Ok ())
     Internal.Pure x -> pure (Ok x)
     Internal.Apply f x -> map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
