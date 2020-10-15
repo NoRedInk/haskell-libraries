@@ -4,13 +4,16 @@
 module Redis.ByteString
   ( -- * Redis commands
     del,
+    expire,
     get,
     getset,
+    hdel,
     hgetall,
     hmset,
     hset,
     mget,
     mset,
+    ping,
     set,
     watch,
 
@@ -178,6 +181,30 @@ hmset key vals =
   vals
     |> map (\(k, v) -> (toB k, v))
     |> Internal.Hmset (toB key)
+
+-- | Set a timeout on key. After the timeout has expired, the key will
+-- automatically be deleted. A key with an associated timeout is often said to
+-- be volatile in Redis terminology.
+--
+-- https://redis.io/commands/expire
+expire :: Text -> Int -> Internal.Query ()
+expire key secs = Internal.Expire (toB key) secs
+
+-- | Removes the specified fields from the hash stored at key. Specified fields
+-- that do not exist within this hash are ignored. If key does not exist, it is
+-- treated as an empty hash and this command returns 0.
+--
+-- https://redis.io/commands/hdel
+hdel :: Text -> [Text] -> Internal.Query Int
+hdel key fields = Internal.Hdel (toB key) (map toB fields)
+
+-- | Returns PONG if no argument is provided, otherwise return a copy of the
+-- argument as a bulk. This command is often used to test if a connection is
+-- still alive, or to measure latency.
+--
+-- https://redis.io/commands/ping
+ping :: Internal.Query ()
+ping = Internal.Ping |> map (\_ -> ())
 
 -- | Marks the given keys to be watched for conditional execution of a
 -- transaction.
