@@ -13,8 +13,8 @@ fi
 
 pushd "$1"
 
-name=$(cat package.yaml | grep name: | awk '{print $2}')
-version=$(cat package.yaml | grep version: | awk '{print $2}')
+name=$(grep name: < package.yaml | awk '{print $2}')
+version=$(grep version: < package.yaml | awk '{print $2}')
 bundle="$name-$version.tar.gz"
 
 # check changelog contains an entry for this version

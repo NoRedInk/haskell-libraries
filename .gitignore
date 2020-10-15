@@ -3,3 +3,4 @@ dist
 _build
 *.tar.gz
 *.cabal
+.direnv
