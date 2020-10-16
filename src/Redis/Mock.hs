@@ -181,6 +181,21 @@ doQuery query hm =
           ( hm,
             Err wrongTypeErr
           )
+    Internal.Hmget key fields ->
+      case HM.lookup key hm of
+        Nothing ->
+          ( hm,
+            Ok []
+          )
+        Just (RedisHash hm') ->
+          ( hm,
+            map (\field -> HM.lookup field hm') fields
+              |> Ok
+          )
+        Just (RedisByteString _) ->
+          ( hm,
+            Err wrongTypeErr
+          )
     Internal.Hmset key vals ->
       case HM.lookup key hm of
         Nothing ->

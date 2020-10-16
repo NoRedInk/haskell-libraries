@@ -35,6 +35,7 @@ data Query a where
   Getset :: ByteString -> ByteString -> Query (Maybe ByteString)
   Hdel :: ByteString -> [ByteString] -> Query Int
   Hgetall :: ByteString -> Query [(ByteString, ByteString)]
+  Hmget :: ByteString -> [ByteString] -> Query [Maybe ByteString]
   Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
   Hset :: ByteString -> ByteString -> ByteString -> Query ()
   Mget :: [ByteString] -> Query [Maybe ByteString]
@@ -96,6 +97,7 @@ namespaceQuery prefix query' =
     Mset assocs -> Mset (map (\(k, v) -> (prefix ++ k, v)) assocs)
     Del keys -> Del (map (prefix ++) keys)
     Hgetall key -> Hgetall (prefix ++ key)
+    Hmget key fields -> Hmget (prefix ++ key) fields
     Hset key field val -> Hset (prefix ++ key) field val
     Hmset key vals -> Hmset (prefix ++ key) vals
     Hdel key fields -> Hdel (prefix ++ key) fields
@@ -124,6 +126,7 @@ keysTouchedByQuery query' =
     Mget keys -> keys
     Mset assocs -> map Tuple.first assocs
     Hgetall key -> [key]
+    Hmget key _ -> [key]
     Hset key _ _ -> [key]
     Hmset key _ -> [key]
     Pure _ -> []
