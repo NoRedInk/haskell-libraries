@@ -17,6 +17,7 @@ TracingSpan
         )
   , details = Nothing
   , succeeded = Succeeded
+  , allocated = 0
   , children =
       [ TracingSpan
           { name = "Outoing HTTP Request"
@@ -38,6 +39,7 @@ TracingSpan
           , details =
               Just "{\"uri\":\"mock-uri\",\"request method\":\"GET\"}"
           , succeeded = Succeeded
+          , allocated = 0
           , children = []
           }
       ]

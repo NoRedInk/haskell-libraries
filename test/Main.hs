@@ -154,5 +154,6 @@ constantValuesForVariableFields span =
                     [ Platform.Renderer (\info -> Platform.toTracingSpanDetails info {Http.infoUri = "mock-uri"})
                     ]
             ),
+      Platform.allocated = 0,
       Platform.children = map constantValuesForVariableFields (Platform.children span)
     }
