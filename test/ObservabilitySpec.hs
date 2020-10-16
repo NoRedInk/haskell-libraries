@@ -91,5 +91,6 @@ constantValuesForVariableFields span =
                   |> Maybe.withDefault details
                   |> Just
             ),
+      Platform.allocated = 0,
       Platform.children = map constantValuesForVariableFields (Platform.children span)
     }

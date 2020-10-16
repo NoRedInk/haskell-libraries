@@ -17,6 +17,7 @@ TracingSpan
         )
   , details = Nothing
   , succeeded = Succeeded
+  , allocated = 0
   , children =
       [ TracingSpan
           { name = "MySQL Query"
@@ -39,6 +40,7 @@ TracingSpan
               Just
                 "{\"query\":\"SELECT 1\",\"query template\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"SELECT 1\",\"connection\":\"127.0.0.1:3306/noredink_development\",\"rows returned\":1}"
           , succeeded = Succeeded
+          , allocated = 0
           , children = []
           }
       , TracingSpan
@@ -60,6 +62,7 @@ TracingSpan
                 )
           , details = Just "{}"
           , succeeded = Succeeded
+          , allocated = 0
           , children = []
           }
       ]
