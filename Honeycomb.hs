@@ -91,6 +91,7 @@ toBatchEvents commonFields parentSpanId spanIndex span = do
             serviceName = common_serviceName commonFields,
             environment = common_environment commonFields,
             durationMs = Prelude.fromIntegral duration / 1000,
+            allocatedBytes = Platform.allocated span,
             details = Platform.details span
           }
   ( lastSpanIndex,
@@ -135,6 +136,7 @@ data Span
         serviceName :: Text,
         environment :: Text,
         durationMs :: Float,
+        allocatedBytes :: Int,
         details :: Maybe Platform.SomeTracingSpanDetails
       }
   deriving (Generic)
@@ -150,7 +152,8 @@ instance Aeson.ToJSON Span where
             "trace.parent_id" .= parentId span,
             "trace.trace_id" .= traceId span,
             "service_name" .= serviceName span,
-            "duration_ms" .= durationMs span
+            "duration_ms" .= durationMs span,
+            "allocated_bytes" .= allocatedBytes span
           ]
         detailsPairs =
           span

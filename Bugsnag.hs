@@ -373,7 +373,8 @@ renderIncomingHttpRequest requestId timer span event request =
           "response time in us"
             .= ( Timer.difference (Platform.started span) (Platform.finished span)
                    |> Timer.toPosixMicroseconds timer
-               )
+               ),
+          "bytes allocated" .= Platform.allocated span
         ]
           |> Aeson.object
           |> HashMap.singleton "request"
