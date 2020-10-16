@@ -38,7 +38,7 @@ import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
 import Nri.Prelude
 import qualified Observability.Helpers
-import Observability.Timer (Timer, toISO8601)
+import qualified Observability.Timer as Timer
 import qualified Platform
 import qualified Postgres
 import qualified Redis
@@ -86,12 +86,12 @@ report Handler {http, timer, defaultEvent, apiKey'} requestId span =
 data Handler
   = Handler
       { http :: HTTP.Manager,
-        timer :: Timer,
+        timer :: Timer.Timer,
         defaultEvent :: Bugsnag.Event,
         apiKey' :: Log.Secret Bugsnag.ApiKey
       }
 
-handler :: Timer -> Settings -> Conduit.Acquire Handler
+handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings =
   Conduit.mkAcquire
     ( do
@@ -108,20 +108,20 @@ send manager key event = do
     Prelude.Left err -> Exception.throwIO err
     Prelude.Right _ -> Prelude.pure ()
 
-toEvent :: Text -> Timer -> Bugsnag.Event -> Platform.TracingSpan -> Bugsnag.Event
+toEvent :: Text -> Timer.Timer -> Bugsnag.Event -> Platform.TracingSpan -> Bugsnag.Event
 toEvent = rootCause [] emptyCrumbs
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
 -- exception we send to Bugsnag. We'll send information about spans that ran
 -- before the root cause span started as breadcrumbs.
-rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Text -> Timer -> Bugsnag.Event -> Platform.TracingSpan -> Bugsnag.Event
+rootCause :: [Bugsnag.StackFrame] -> Crumbs -> Text -> Timer.Timer -> Bugsnag.Event -> Platform.TracingSpan -> Bugsnag.Event
 rootCause frames breadcrumbs requestId timer event span =
   let newFrames =
         case Platform.frame span of
           Nothing -> frames
           Just (name, src) -> toStackFrame name src : frames
-      newEvent = decorateEventWithTracingSpanData requestId span event
+      newEvent = decorateEventWithTracingSpanData requestId timer span event
       childTracingSpans = Platform.children span
    in -- We're not interested in child spans that happened _after_ the root
       -- cause took place. These are not breadcrumbs (leading up to the error)
@@ -178,7 +178,7 @@ rootCause frames breadcrumbs requestId timer event span =
 -- To help us avoid doing appends we create a helper type `Crumbs a`. The only
 -- helper function it exposes for adding a breadcrumb is one that cons that
 -- breadcrumb to the front of the list, ensuring no appends take place.
-addCrumbs :: Timer -> [Platform.TracingSpan] -> Crumbs
+addCrumbs :: Timer.Timer -> [Platform.TracingSpan] -> Crumbs
 addCrumbs timer spans =
   case spans of
     [] -> emptyCrumbs
@@ -186,7 +186,7 @@ addCrumbs timer spans =
       addCrumbs timer after
         |> followedBy (addCrumbsForTracingSpan timer span)
 
-addCrumbsForTracingSpan :: Timer -> Platform.TracingSpan -> Crumbs
+addCrumbsForTracingSpan :: Timer.Timer -> Platform.TracingSpan -> Crumbs
 addCrumbsForTracingSpan timer span =
   case Platform.children span of
     [] ->
@@ -219,27 +219,27 @@ crumbsAsList (Crumbs f) = f []
 addCrumb :: Bugsnag.Breadcrumb -> Crumbs
 addCrumb crumb = Crumbs (crumb :)
 
-endBreadcrumb :: Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
+endBreadcrumb :: Timer.Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
 endBreadcrumb timer span =
   Bugsnag.defaultBreadcrumb
     { Bugsnag.breadcrumb_name = "Finished: " ++ Platform.name span,
       Bugsnag.breadcrumb_type = Bugsnag.logBreadcrumbType,
-      Bugsnag.breadcrumb_timestamp = toISO8601 timer (Platform.finished span)
+      Bugsnag.breadcrumb_timestamp = Timer.toISO8601 timer (Platform.finished span)
     }
 
-startBreadcrumb :: Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
+startBreadcrumb :: Timer.Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
 startBreadcrumb timer span =
   (doBreadcrumb timer span)
     { Bugsnag.breadcrumb_name = "Starting: " ++ Platform.name span
     }
 
-doBreadcrumb :: Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
+doBreadcrumb :: Timer.Timer -> Platform.TracingSpan -> Bugsnag.Breadcrumb
 doBreadcrumb timer span =
   let defaultBreadcrumb =
         Bugsnag.defaultBreadcrumb
           { Bugsnag.breadcrumb_name = Platform.name span,
             Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
-            Bugsnag.breadcrumb_timestamp = toISO8601 timer (Platform.started span)
+            Bugsnag.breadcrumb_timestamp = Timer.toISO8601 timer (Platform.started span)
           }
    in case Platform.details span of
         Nothing -> defaultBreadcrumb
@@ -303,12 +303,12 @@ unknownAsBreadcrumb breadcrumb details =
       Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
-decorateEventWithTracingSpanData :: Text -> Platform.TracingSpan -> Bugsnag.Event -> Bugsnag.Event
-decorateEventWithTracingSpanData requestId span event =
+decorateEventWithTracingSpanData :: Text -> Timer.Timer -> Platform.TracingSpan -> Bugsnag.Event -> Bugsnag.Event
+decorateEventWithTracingSpanData requestId timer span event =
   Platform.details span
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
-          [ Platform.Renderer (renderIncomingHttpRequest requestId event),
+          [ Platform.Renderer (renderIncomingHttpRequest requestId timer span event),
             Platform.Renderer (renderLog event),
             Platform.Renderer (renderRemainingTracingSpanDetails span event)
           ]
@@ -341,8 +341,8 @@ mergeJson :: Aeson.Value -> Aeson.Value -> Aeson.Value
 mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (HashMap.unionWith mergeJson x y)
 mergeJson _ last = last
 
-renderIncomingHttpRequest :: Text -> Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
-renderIncomingHttpRequest requestId event request =
+renderIncomingHttpRequest :: Text -> Timer.Timer -> Platform.TracingSpan -> Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
+renderIncomingHttpRequest requestId timer span event request =
   event
     { Bugsnag.event_context = Just (Monitoring.endpoint request),
       Bugsnag.event_request =
@@ -369,7 +369,11 @@ renderIncomingHttpRequest requestId event request =
           "http version" .= Monitoring.httpVersion request,
           "response status" .= Monitoring.responseStatus request,
           "path" .= Monitoring.path request,
-          "query string" .= Monitoring.queryString request
+          "query string" .= Monitoring.queryString request,
+          "response time in us"
+            .= ( Timer.difference (Platform.started span) (Platform.finished span)
+                   |> Timer.toPosixMicroseconds timer
+               )
         ]
           |> Aeson.object
           |> HashMap.singleton "request"

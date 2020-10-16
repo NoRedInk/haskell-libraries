@@ -8,6 +8,7 @@ module Observability.Timer
     toPosix,
     toPosixMicroseconds,
     toISO8601,
+    difference,
   )
 where
 
@@ -71,3 +72,25 @@ toISO8601 timer clock =
   toUTC timer clock
     |> Format.formatTime Format.defaultTimeLocale "%FT%T%QZ"
     |> Data.Text.pack
+
+-- | We have to be careful when calculating the difference between two times.
+-- Because they are unsigned (don't allow negative numbers), subtracting times
+-- in the wrong order is going to result in very large numbers:
+--
+--     ghci> import GHC.Word
+--     ghci> 5 - 2 :: Word64
+--     3
+--     ghci> 2 - 5 :: Word64
+--     18446744073709551613
+--
+-- The span data we get from Platform should ensure end times always come
+-- before start times. If they're not though one of these extremely long span
+-- durations can have a major effect on request duration statistics.
+--
+-- This function performs some defensive programming to prevent flukes from
+-- doing major damage.
+difference :: Platform.MonotonicTime -> Platform.MonotonicTime -> Platform.MonotonicTime
+difference start end =
+  if end > start
+    then end - start
+    else 0

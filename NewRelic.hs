@@ -32,7 +32,7 @@ import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
 import Nri.Prelude
-import Observability.Timer (Timer, toPosixMicroseconds)
+import qualified Observability.Timer as Timer
 import qualified Platform
 import qualified Postgres
 import qualified Redis
@@ -46,9 +46,9 @@ report handler' _requestId span =
     Nothing -> Prelude.pure ()
     Just details -> reportWebTransaction handler' span details
 
-data Handler = Handler Timer NewRelic.App
+data Handler = Handler Timer.Timer NewRelic.App
 
-handler :: Timer -> Settings -> Conduit.Acquire Handler
+handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings =
   Conduit.mkAcquire
     ( do
@@ -104,7 +104,7 @@ reportError tx msg details =
 
 reportTracingSpan ::
   Platform.MonotonicTime ->
-  Timer ->
+  Timer.Timer ->
   NewRelic.Transaction ->
   Maybe NewRelic.Segment ->
   Platform.TracingSpan ->
@@ -193,21 +193,21 @@ httpToExternalSegment info =
       NewRelic.externalSegmentLibrary = Nothing
     }
 
-startTime :: Timer -> Platform.TracingSpan -> NewRelic.StartTimeUsSinceUnixEpoch
+startTime :: Timer.Timer -> Platform.TracingSpan -> NewRelic.StartTimeUsSinceUnixEpoch
 startTime timer span =
   Platform.started span
-    |> toPosixMicroseconds timer
+    |> Timer.toPosixMicroseconds timer
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
 segmentStartTime :: Platform.MonotonicTime -> Platform.TracingSpan -> NewRelic.StartTimeUsSinceUnixEpoch
 segmentStartTime txStartTime span =
-  timeDiff txStartTime (Platform.started span)
+  Timer.difference txStartTime (Platform.started span)
     |> Platform.inMicroseconds
     |> NewRelic.StartTimeUsSinceUnixEpoch
 
 toDuration :: Platform.TracingSpan -> NewRelic.DurationUs
 toDuration span =
-  timeDiff (Platform.started span) (Platform.finished span)
+  Timer.difference (Platform.started span) (Platform.finished span)
     |> Platform.inMicroseconds
     -- When we tell NewRelic a segment lasted 0 microseconds it seems to ignore
     -- that value and uses other values instead. No idea where it's getting
@@ -215,28 +215,6 @@ toDuration span =
     -- is at least 1 microsecond seems to circumvent this problem.
     |> Prelude.max 1
     |> NewRelic.DurationUs
-
--- | We have to be careful when calculating the difference between two times.
--- Because they are unsigned (don't allow negative numbers), subtracting times
--- in the wrong order is going to result in very large numbers:
---
---     ghci> import GHC.Word
---     ghci> 5 - 2 :: Word64
---     3
---     ghci> 2 - 5 :: Word64
---     18446744073709551613
---
--- The span data we get from Platform should ensure end times always come
--- before start times. If they're not though one of these extremely long span
--- durations can have a major effect on request duration statistics.
---
--- This function performs some defensive programming to prevent flukes from
--- doing major damage.
-timeDiff :: Platform.MonotonicTime -> Platform.MonotonicTime -> Platform.MonotonicTime
-timeDiff start end =
-  if end > start
-    then end - start
-    else 0
 
 category :: Platform.TracingSpan -> Text
 category span =
