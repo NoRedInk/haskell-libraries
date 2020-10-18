@@ -19,6 +19,7 @@
         Just
           "{\"triage\":{\"advisory\":\"fix the button\",\"impact\":\"This is causing inconveniences to users but they will be able to achieve want they want.\"},\"button\":\"PRESS\"}"
     , succeeded = Failed
+    , allocated = 0
     , children = []
     }
 ]

@@ -19,6 +19,7 @@
         Just
           "{\"triage\":{\"advisory\":\"file modal's sharp edges\",\"impact\":\"This is causing pain to users and workaround is not obvious.\"},\"modal\":\"SURPRISE!\"}"
     , succeeded = Failed
+    , allocated = 0
     , children = []
     }
 ]
