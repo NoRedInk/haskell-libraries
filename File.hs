@@ -32,7 +32,7 @@ import qualified GHC.Stack as Stack
 import qualified Katip
 import qualified Language.Haskell.TH as TH
 import qualified Maybe
-import Nri.Prelude
+import NriPrelude
 import Observability.Timer (Timer, toUTC)
 import qualified Path
 import qualified Path.IO
