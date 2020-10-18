@@ -14,7 +14,7 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified List
 import qualified MySQL
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import qualified Task
 import qualified Prelude

@@ -9,7 +9,7 @@ module Internal.Time
   )
 where
 
-import Nri.Prelude
+import NriPrelude
 
 -- | A type representing a time interval.
 newtype Interval

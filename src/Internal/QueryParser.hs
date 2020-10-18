@@ -17,7 +17,7 @@ import qualified Data.Attoparsec.Text as Attoparsec
 import Data.Foldable (asum)
 import qualified List
 import qualified Maybe
-import Nri.Prelude
+import NriPrelude
 import qualified Text
 import Prelude (Either (Left, Right))
 

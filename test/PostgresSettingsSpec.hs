@@ -2,7 +2,7 @@ module PostgresSettingsSpec (tests) where
 
 import qualified Environment (decodeDefaults)
 import qualified Expect
-import Nri.Prelude
+import NriPrelude
 import qualified Postgres.Settings
 import Test (Test, describe, test)
 

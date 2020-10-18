@@ -9,7 +9,7 @@ import qualified MySQL
 import qualified MySQLInternalSpec
 import qualified MySQLQuerySpec
 import qualified MySQLSpec
-import Nri.Prelude
+import NriPrelude
 import qualified ObservabilitySpec
 import qualified Postgres
 import qualified PostgresSettingsSpec

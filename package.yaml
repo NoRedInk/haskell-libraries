@@ -9,7 +9,7 @@ dependencies:
 - base
 - bytestring
 - nri-prelude
-- env-parser
+- nri-env-parser
 - exceptions
 - filepath
 - hashable

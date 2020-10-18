@@ -50,7 +50,7 @@ import qualified Environment
 import qualified Internal.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
-import Nri.Prelude
+import NriPrelude
 import System.FilePath ((</>))
 import Prelude (Either (Left, Right), pure, realToFrac, round, show)
 

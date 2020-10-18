@@ -33,7 +33,7 @@ import qualified List
 import qualified Log
 import qualified MySQL.Internal as Internal
 import qualified MySQL.MySQLParameter as MySQLParameter
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import qualified Postgres.Settings
 import qualified Text

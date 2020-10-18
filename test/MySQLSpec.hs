@@ -12,7 +12,7 @@ import qualified Expect.Task
 import qualified Log
 import qualified MySQL
 import MySQL.Query (Query (..))
-import Nri.Prelude
+import NriPrelude
 import qualified Task
 import Test (Test, describe, test)
 import qualified Test

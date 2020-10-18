@@ -2,7 +2,7 @@ module TimeSpec (tests) where
 
 import qualified Expect
 import qualified Internal.Time as Time
-import Nri.Prelude
+import NriPrelude
 import Test (Test, describe, test)
 
 tests :: Test

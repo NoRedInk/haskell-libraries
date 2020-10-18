@@ -9,7 +9,7 @@ import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Format as Format
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Database.MySQL.Base as Base
-import Nri.Prelude
+import NriPrelude
 import qualified Prelude
 
 data UnexpectedMySQLValue = UnexpectedMySQLValue Prelude.String Base.MySQLValue
