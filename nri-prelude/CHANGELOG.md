@@ -1,3 +1,8 @@
+# Next version (unreleased)
+
+- Breaking change: drop `Platform.TracingSpan` constructor.
+- Add `Platform.emptyTracingSpan` export.
+
 # 0.1.0.4
 
 - Relax version bounds to encompass `time-1.11`.

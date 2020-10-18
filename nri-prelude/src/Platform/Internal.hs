@@ -153,6 +153,23 @@ data TracingSpan
       }
   deriving (Prelude.Show)
 
+-- | A tracing span containing default empty values for all fields. Usually we
+-- don't need this because TracingSpans get created for us when we evaluate
+-- tasks. This can be useful when testing reporting code to see if it produces
+-- the right outputs given a specific tracing span as input.
+emptyTracingSpan :: TracingSpan
+emptyTracingSpan =
+  TracingSpan
+    { name = "",
+      started = 0,
+      finished = 0,
+      frame = Nothing,
+      details = Nothing,
+      succeeded = Succeeded,
+      allocated = 0,
+      children = []
+    }
+
 -- | The @Succeeded@ type is used to indicate whether or not a particular
 -- @TracingSpan@ ran without encountering user-facing problems.
 data Succeeded
