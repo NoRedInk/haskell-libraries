@@ -12,7 +12,7 @@ import qualified Http
 import qualified Network.HTTP.Types.Status as Status
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import qualified Task
 import Test (Test, describe, test)

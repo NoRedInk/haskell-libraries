@@ -9,7 +9,7 @@ import qualified Data.ByteString.Lazy
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.Mime as Mime
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import Prelude (IO)
 
