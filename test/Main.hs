@@ -30,7 +30,7 @@ tests =
         withServer
           (constant "" Status.ok200)
           (\http url -> Http.get http url Http.expectWhatever)
-          |> Expect.withIO (Expect.ok (\_ -> Expect.pass)),
+          |> Expect.withIO Expect.ok,
       test "Given a request made using `get` when the response has a 400 status code the task fails with a BadStatus error" <| \() ->
         withServer
           (constant "" Status.badRequest400)
