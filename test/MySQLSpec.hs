@@ -86,7 +86,7 @@ exceptionTests mysqlConn =
             ( \res ->
                 case res of
                   Err err -> Task.succeed err
-                  Ok (_ :: Int) -> Expect.Task.fail ("Expected an error, but none was returned." :: Text)
+                  Ok (_ :: Int) -> Expect.Task.fails ("Expected an error, but none was returned." :: Text)
             )
             |> Expect.Task.andCheck
               ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Exception.displayException
@@ -97,7 +97,7 @@ resultToTask :: Prelude.Show e => Result e a -> Task Expect.Task.TestFailure a
 resultToTask res =
   case res of
     Ok x -> Task.succeed x
-    Err x -> Expect.Task.fail (Debug.toString x)
+    Err x -> Expect.Task.fails (Debug.toString x)
 
 mockQuery :: Text -> Query a
 mockQuery sqlString =
