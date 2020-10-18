@@ -19,6 +19,7 @@
         Just
           "{\"triage\":{\"advisory\":\"find key\",\"impact\":\"User is blocked from performing an action.\"},\"house number\":5}"
     , succeeded = Failed
+    , allocated = 0
     , children = []
     }
 ]

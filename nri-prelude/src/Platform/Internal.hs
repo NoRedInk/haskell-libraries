@@ -20,6 +20,7 @@ import Internal.Shortcut (andThen, map)
 import qualified List
 import Maybe (Maybe (..))
 import Result (Result (Err, Ok))
+import qualified System.Mem
 import Text (Text)
 import qualified Tuple
 import Prelude
@@ -138,6 +139,12 @@ data TracingSpan
         -- path to the tracingSpan closest to the failure from the root
         -- tracingSpan.
         succeeded :: Succeeded,
+        -- | The amount of bytes were allocated on the current thread while this
+        -- span was running. This is a proxy for the amount of work done. If
+        -- this number is low but the span took a long time to complete this
+        -- indicates the thread was blocked for some time, or that work was done
+        -- on other threads.
+        allocated :: Int,
         -- | Any subtracingSpans nested inside this tracingSpan. These are
         -- ordered in reverse chronological order, so most recent tracingSpan
         -- first, because it's cheaper to append new tracingSpans onto the left
@@ -372,6 +379,7 @@ mkHandler requestId clock onFinish name' = do
   tracingSpanRef <-
     Stack.withFrozenCallStack startTracingSpan clock name'
       |> andThen IORef.newIORef
+  allocationCounterStartVal <- System.Mem.getAllocationCounter
   pure
     LogHandler
       { requestId,
@@ -384,7 +392,7 @@ mkHandler requestId clock onFinish name' = do
           updateIORef
             tracingSpanRef
             (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed}),
-        finishTracingSpan = finalizeTracingSpan clock tracingSpanRef >> andThen onFinish
+        finishTracingSpan = finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef >> andThen onFinish
       }
 
 -- | Set the details for a tracingSpan created using the @tracingSpan@
@@ -467,13 +475,15 @@ startTracingSpan clock name = do
             |> Shortcut.map (Tuple.mapFirst Data.Text.pack),
         details = Nothing,
         succeeded = Succeeded,
+        allocated = 0,
         children = []
       }
 
 -- | Some final properties to set on a tracingSpan before calling it done.
-finalizeTracingSpan :: Clock -> IORef.IORef TracingSpan -> Maybe Exception.SomeException -> IO TracingSpan
-finalizeTracingSpan clock tracingSpanRef maybeException = do
+finalizeTracingSpan :: Clock -> Int -> IORef.IORef TracingSpan -> Maybe Exception.SomeException -> IO TracingSpan
+finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef maybeException = do
   finished <- monotonicTimeInMsec clock
+  allocationCounterEndVal <- System.Mem.getAllocationCounter
   tracingSpan' <- IORef.readIORef tracingSpanRef
   pure
     tracingSpan'
@@ -490,7 +500,10 @@ finalizeTracingSpan clock tracingSpanRef maybeException = do
             Just exception -> FailedWith exception
             Nothing ->
               map Platform.Internal.succeeded (children tracingSpan')
-                |> Prelude.mconcat
+                |> Prelude.mconcat,
+        -- The allocation counter counts down as it allocations bytest. We
+        -- subtract in this order to get a positive number.
+        allocated = allocationCounterStartVal - allocationCounterEndVal
       }
 
 appendTracingSpanToParent :: IORef.IORef TracingSpan -> TracingSpan -> IO ()

@@ -17,6 +17,7 @@
           )
     , details = Just "{\"number\":825}"
     , succeeded = FailedWith TestException
+    , allocated = 0
     , children =
         [ TracingSpan
             { name = "inner span"
@@ -37,6 +38,7 @@
                   )
             , details = Just "{\"word\":\"sabbatical\"}"
             , succeeded = FailedWith TestException
+            , allocated = 0
             , children = []
             }
         ]

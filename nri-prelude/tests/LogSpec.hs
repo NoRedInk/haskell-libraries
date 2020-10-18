@@ -187,6 +187,13 @@ newHandler = do
   Prelude.pure
     ( do
         Internal.finishTracingSpan handler Nothing
-        IORef.readIORef recordedTracingSpans,
+        IORef.readIORef recordedTracingSpans
+          |> map (map (recurse (\span -> span {Internal.allocated = 0}))),
       handler
     )
+
+recurse :: (Internal.TracingSpan -> Internal.TracingSpan) -> Internal.TracingSpan -> Internal.TracingSpan
+recurse f span =
+  (f span)
+    { Internal.children = map (recurse f) (Internal.children span)
+    }

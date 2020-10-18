@@ -17,6 +17,7 @@
           )
     , details = Just "{\"a number\":12}"
     , succeeded = Succeeded
+    , allocated = 0
     , children = []
     }
 ]
