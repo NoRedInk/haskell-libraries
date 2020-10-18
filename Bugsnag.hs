@@ -121,7 +121,7 @@ rootCause frames breadcrumbs requestId timer event span =
         case Platform.frame span of
           Nothing -> frames
           Just (name, src) -> toStackFrame name src : frames
-      newEvent = decorateEventWithTracingSpanData requestId timer span event
+      newEvent = decorateEventWithTracingSpanData requestId span event
       childTracingSpans = Platform.children span
    in -- We're not interested in child spans that happened _after_ the root
       -- cause took place. These are not breadcrumbs (leading up to the error)
@@ -303,12 +303,12 @@ unknownAsBreadcrumb breadcrumb details =
       Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
     }
 
-decorateEventWithTracingSpanData :: Text -> Timer.Timer -> Platform.TracingSpan -> Bugsnag.Event -> Bugsnag.Event
-decorateEventWithTracingSpanData requestId timer span event =
+decorateEventWithTracingSpanData :: Text -> Platform.TracingSpan -> Bugsnag.Event -> Bugsnag.Event
+decorateEventWithTracingSpanData requestId span event =
   Platform.details span
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
-          [ Platform.Renderer (renderIncomingHttpRequest requestId timer span event),
+          [ Platform.Renderer (renderIncomingHttpRequest requestId span event),
             Platform.Renderer (renderLog event),
             Platform.Renderer (renderRemainingTracingSpanDetails span event)
           ]
@@ -341,8 +341,8 @@ mergeJson :: Aeson.Value -> Aeson.Value -> Aeson.Value
 mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (HashMap.unionWith mergeJson x y)
 mergeJson _ last = last
 
-renderIncomingHttpRequest :: Text -> Timer.Timer -> Platform.TracingSpan -> Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
-renderIncomingHttpRequest requestId timer span event request =
+renderIncomingHttpRequest :: Text -> Platform.TracingSpan -> Bugsnag.Event -> Monitoring.RequestDetails -> Bugsnag.Event
+renderIncomingHttpRequest requestId span event request =
   event
     { Bugsnag.event_context = Just (Monitoring.endpoint request),
       Bugsnag.event_request =
@@ -370,11 +370,18 @@ renderIncomingHttpRequest requestId timer span event request =
           "response status" .= Monitoring.responseStatus request,
           "path" .= Monitoring.path request,
           "query string" .= Monitoring.queryString request,
-          "response time in us"
+          "response time in ms"
             .= ( Timer.difference (Platform.started span) (Platform.finished span)
-                   |> Timer.toPosixMicroseconds timer
+                   |> Platform.inMicroseconds
+                   |> Prelude.fromIntegral
+                   |> (*) 1e-6 ::
+                   Float
                ),
-          "bytes allocated" .= Platform.allocated span
+          "megabytes allocated"
+            .= ( Prelude.fromIntegral (Platform.allocated span)
+                   / (1024 * 1024) ::
+                   Float
+               )
         ]
           |> Aeson.object
           |> HashMap.singleton "request"
