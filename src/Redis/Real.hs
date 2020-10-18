@@ -13,7 +13,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings

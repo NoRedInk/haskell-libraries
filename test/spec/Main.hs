@@ -7,7 +7,7 @@ import qualified Dict
 import Dict (Dict)
 import qualified Environment
 import qualified Expect
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import Redis (Error, Handler)
 import qualified Redis.Internal as Internal

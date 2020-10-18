@@ -37,7 +37,7 @@ import qualified Data.ByteString
 import qualified Data.Text.Encoding
 import qualified Dict
 import qualified List
-import Nri.Prelude
+import NriPrelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Result
