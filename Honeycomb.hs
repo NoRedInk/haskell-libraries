@@ -35,7 +35,7 @@ import qualified Environment
 import qualified Http
 import qualified List
 import qualified Log
-import Nri.Prelude
+import NriPrelude
 import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
