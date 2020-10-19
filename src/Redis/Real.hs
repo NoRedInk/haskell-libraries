@@ -13,6 +13,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
+import qualified List
+import qualified Maybe
 import Nri.Prelude
 import qualified Platform
 import qualified Redis.Internal as Internal
@@ -54,8 +56,30 @@ acquireHandler namespace settings = do
              in platformRedis (Text.join " " cmds) connection anything redisCtx,
           Internal.doTransaction = \query ->
             let PreparedQuery {cmds, redisCtx} = doRawQuery query
-             in redisCtx
-                  |> Database.Redis.multiExec
+                redisCmd =
+                  case Settings.clusterMode settings of
+                    Settings.Cluster ->
+                      -- The current implementation of hedis we're using
+                      -- requires us to tell which hashslot a transaction is
+                      -- going to work on by passing one of the keys used in the
+                      -- transaction. This way it knows which node to send the
+                      -- initial MULTI command to.
+                      let firstKey =
+                            Internal.keysTouchedByQuery query
+                              |> List.head
+                              -- If a command is not touching any keys then we
+                              -- can send it to any node in the cluster. We're
+                              -- going to send it to the node that contains the
+                              -- `any-key` key. We can't come up with an example
+                              -- of a real-world transaction that would fall
+                              -- into this case, so we're not going to worry
+                              -- about load-balancing these transactions across
+                              -- nodes just yet.
+                              |> Maybe.withDefault "any-key"
+                       in Database.Redis.multiExecWithHash firstKey redisCtx
+                    Settings.NotCluster ->
+                      Database.Redis.multiExec redisCtx
+             in redisCmd
                   |> map
                     ( \txResult ->
                         case txResult of
