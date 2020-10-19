@@ -51,7 +51,7 @@ import qualified Prelude
 --
 --     info "I added 1 and 1" [context "answer" 2]
 info :: Stack.HasCallStack => Text -> [Context] -> Task e ()
-info message contexts = Stack.withFrozenCallStack log message True contexts
+info message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
 
 -- | A log message when the user is annoyed, but not blocked.
 --
@@ -65,7 +65,7 @@ userIsAnnoyed message advisory contexts =
    in Stack.withFrozenCallStack
         log
         message
-        False
+        ReportAsFailed
         (Context "triage" triage : contexts)
 
 -- | Like @userIsAnnoyed@, but when the user is userIsConfused.
@@ -75,7 +75,7 @@ userIsConfused message advisory contexts =
    in Stack.withFrozenCallStack
         log
         message
-        False
+        ReportAsFailed
         (Context "triage" triage : contexts)
 
 -- | Like @userIsAnnoyed@, but when the user is in pain.
@@ -85,7 +85,7 @@ userIsPained message advisory contexts =
    in Stack.withFrozenCallStack
         log
         message
-        False
+        ReportAsFailed
         (Context "triage" triage : contexts)
 
 -- | Like @userIsAnnoyed@, but when the user is blocked.
@@ -95,7 +95,7 @@ userIsBlocked message advisory contexts =
    in Stack.withFrozenCallStack
         log
         message
-        False
+        ReportAsFailed
         (Context "triage" triage : contexts)
 
 -- | Mark a block of code as a logical unit by giving it a name. This name will
@@ -247,10 +247,13 @@ impactToText kind =
     UserConfused -> "The UI did something unexpected and it's unclear why."
     UserInPain -> "This is causing pain to users and workaround is not obvious."
 
-log :: Stack.HasCallStack => Text -> Bool -> [Context] -> Task e ()
-log msg succeeded contexts =
+-- ReportAsFailed marks the request as a failure in logging, but has no impact on the resulting Task. E.g. will not trigger a 500 error but will report an error to, e.g. BugSnag.
+data ReportStatus = ReportAsFailed | ReportAsSucceeded
+
+log :: Stack.HasCallStack => Text -> ReportStatus -> [Context] -> Task e ()
+log msg reportStatus contexts =
   Internal.tracingSpan msg <| do
     Platform.setTracingSpanDetails (LogContexts contexts)
-    if succeeded
-      then Task.succeed ()
-      else Platform.markTracingSpanFailed
+    case reportStatus of
+      ReportAsSucceeded -> Task.succeed ()
+      ReportAsFailed -> Platform.markTracingSpanFailed
