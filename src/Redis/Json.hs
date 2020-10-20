@@ -122,7 +122,7 @@ hgetall key =
 --
 -- equivalent to modern hset
 -- https://redis.io/commands/hmget
-hmget :: Text -> [Text] -> Internal.Query [Maybe Text]
+hmget :: (Aeson.FromJSON a) => Text -> [Text] -> Internal.Query [Maybe a]
 hmget key fields =
   Redis.ByteString.hmget key fields
     |> Internal.WithResult (Prelude.traverse (Prelude.traverse decodeResult))
