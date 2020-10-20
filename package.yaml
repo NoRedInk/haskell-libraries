@@ -9,7 +9,7 @@ library:
   - base
   - nri-prelude
   - conduit
-  - env-parser
+  - nri-env-parser
   - safe-exceptions
   - health
   - hedis

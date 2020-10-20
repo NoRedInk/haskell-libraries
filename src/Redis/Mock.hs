@@ -11,7 +11,7 @@ import Data.IORef (IORef, atomicModifyIORef', newIORef)
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified List
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Tuple

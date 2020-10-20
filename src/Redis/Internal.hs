@@ -7,7 +7,7 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.Text.Encoding
 import qualified Database.Redis
-import Nri.Prelude
+import NriPrelude
 import qualified Tuple
 import qualified Prelude
 

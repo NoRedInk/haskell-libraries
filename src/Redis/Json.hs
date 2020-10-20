@@ -37,7 +37,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.ByteString.Lazy
 import qualified Dict
-import Nri.Prelude
+import NriPrelude
 import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Task

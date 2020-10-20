@@ -17,7 +17,7 @@ module Redis
 where
 
 import qualified Health
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real

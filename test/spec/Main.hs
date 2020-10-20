@@ -3,11 +3,12 @@ module Main (main) where
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Text.Encoding
+import qualified Debug
 import qualified Dict
 import Dict (Dict)
 import qualified Environment
 import qualified Expect
-import Nri.Prelude
+import NriPrelude
 import qualified Platform
 import Redis (Error, Handler)
 import qualified Redis.Internal as Internal
@@ -45,8 +46,8 @@ specs logHandler whichHandler redisHandler =
         pure
           <| Expect.all
             [ \() -> Expect.notEqual result1 result2,
-              \() -> Expect.just (Expect.equal "hello!") result1,
-              \() -> Expect.just (Expect.equal "goodbye") result2
+              \() -> Expect.equal (Just "hello!") result1,
+              \() -> Expect.equal (Just "goodbye") result2
             ]
             (),
       redisTest "getset" <| do
@@ -55,15 +56,15 @@ specs logHandler whichHandler redisHandler =
         result2 <- get "getset" |> query testNS
         pure
           <| Expect.all
-            [ \() -> Expect.just (Expect.equal "1") result1,
-              \() -> Expect.just (Expect.equal "2") result2
+            [ \() -> Expect.equal (Just "1") result1,
+              \() -> Expect.equal (Just "2") result2
             ]
             (),
       redisTest "del dels" <| do
         set "del" "mistake..." |> query testNS
         _ <- del ["del"] |> query testNS
         result <- get "del" |> query testNS
-        pure <| Expect.nothing result,
+        pure <| Expect.equal Nothing result,
       redisTest "del counts" <| do
         set "delCount" "A thing" |> query testNS
         result <- del ["delCount", "key that doesn't exist"] |> query testNS
@@ -72,7 +73,7 @@ specs logHandler whichHandler redisHandler =
         let testData :: [Text] = ["one", "two", "three"]
         Json.set "JSON list" testData |> query testNS
         result <- Json.get "JSON list" |> query testNS
-        pure <| Expect.just (Expect.equal testData) result,
+        pure <| Expect.equal (Just testData) result,
       redisTest "atomic modify with no value" <| do
         _ <- del ["Empty Atom"] |> query testNS
         result <-
@@ -175,7 +176,12 @@ specs logHandler whichHandler redisHandler =
     redisTest name test' =
       test name <| \() ->
         Task.attempt logHandler test'
-          |> Expect.withIO (Expect.ok identity)
+          |> Expect.withIO
+            ( \res ->
+                case res of
+                  Ok x -> x
+                  Err err -> Expect.fail ("Expected Ok but got Err: " ++ Debug.toString err)
+            )
 
 main :: IO ()
 main =
