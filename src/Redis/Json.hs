@@ -120,7 +120,7 @@ hgetall key =
 
 -- | Returns the values associated with the specified fields in the hash stored at key.--
 --
--- equivalent to modern hset
+-- equivalent to modern hget
 -- https://redis.io/commands/hmget
 hmget :: (Aeson.FromJSON a) => Text -> [Text] -> Internal.Query (Dict.Dict Text a)
 hmget key fields =
