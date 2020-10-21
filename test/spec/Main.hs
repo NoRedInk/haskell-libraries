@@ -8,7 +8,9 @@ import qualified Dict
 import Dict (Dict)
 import qualified Environment
 import qualified Expect
-import NriPrelude
+import qualified List
+import NriPrelude hiding (map)
+import qualified NriPrelude
 import qualified Platform
 import Redis (Error, Handler)
 import qualified Redis.Internal as Internal
@@ -25,7 +27,7 @@ import Prelude (IO, pure, uncurry)
 buildSpecs :: TestHandlers -> Test
 buildSpecs TestHandlers {logHandler, redisHandlers} =
   redisHandlers
-    |> map (uncurry (specs logHandler))
+    |> List.map (uncurry (specs logHandler))
     |> describe "Redis Library"
 
 specs :: Platform.LogHandler -> Text -> Handler -> Test
@@ -201,12 +203,12 @@ getRedisHandlers settings = do
   log <- Conduit.liftIO Platform.silentHandler
   redisAvailable <-
     Conduit.withAcquire realHandler (\h -> query h (get "foo") |> Task.attempt log)
-      |> map (\_ -> True)
+      |> NriPrelude.map (\_ -> True)
       |> Exception.handleAny (\_ -> pure False)
       |> Conduit.liftIO
   if redisAvailable
     then map2 (\real mock -> [("Real", real), ("Mock", mock)]) realHandler mockHandler
-    else map (\mock -> [("Mock", mock)]) mockHandler
+    else NriPrelude.map (\mock -> [("Mock", mock)]) mockHandler
 
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
