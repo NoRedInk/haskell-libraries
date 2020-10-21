@@ -25,6 +25,7 @@ module Redis.ByteString
     Internal.transaction,
     Internal.Handler,
     Internal.Error,
+    Internal.map,
 
     -- * helper functions
     atomicModify,

@@ -7,7 +7,8 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.Text.Encoding
 import qualified Database.Redis
-import NriPrelude
+import qualified List
+import NriPrelude hiding (map)
 import qualified Tuple
 import qualified Prelude
 
@@ -50,8 +51,10 @@ data Query a where
   WithResult :: (a -> Result Error b) -> Query a -> Query b
 
 instance Prelude.Functor Query where
-  fmap a =
-    WithResult (a >> Ok)
+  fmap = map
+
+map :: (a -> b) -> Query a -> Query b
+map a = WithResult (a >> Ok)
 
 instance Prelude.Applicative Query where
   pure = Pure
@@ -82,9 +85,9 @@ transaction handler query' =
 -- Runs the redis `WATCH` command. This isn't one of the `Query`
 -- constructors because we're not able to run `WATCH` in a transaction,
 -- only as a separate command.
-watch :: Handler -> [ByteString] -> Task Error ()
+watch :: Handler -> List ByteString -> Task Error ()
 watch handler keys =
-  map (\key -> namespace handler ++ ":" ++ key) keys
+  List.map (\key -> namespace handler ++ ":" ++ key) keys
     |> doWatch handler
 
 namespaceQuery :: ByteString -> Query a -> Query a
@@ -94,9 +97,9 @@ namespaceQuery prefix query' =
     Get key -> Get (prefix ++ key)
     Set key value -> Set (prefix ++ key) value
     Getset key value -> Getset (prefix ++ key) value
-    Mget keys -> Mget (map (\k -> prefix ++ k) keys)
-    Mset assocs -> Mset (map (\(k, v) -> (prefix ++ k, v)) assocs)
-    Del keys -> Del (map (prefix ++) keys)
+    Mget keys -> Mget (List.map (\k -> prefix ++ k) keys)
+    Mset assocs -> Mset (List.map (\(k, v) -> (prefix ++ k, v)) assocs)
+    Del keys -> Del (List.map (prefix ++) keys)
     Hgetall key -> Hgetall (prefix ++ key)
     Hmget key fields -> Hmget (prefix ++ key) fields
     Hget key field -> Hget (prefix ++ key) field
@@ -126,7 +129,7 @@ keysTouchedByQuery query' =
     Set key _ -> [key]
     Getset key _ -> [key]
     Mget keys -> keys
-    Mset assocs -> map Tuple.first assocs
+    Mset assocs -> List.map Tuple.first assocs
     Hgetall key -> [key]
     Hmget key _ -> [key]
     Hget key _ -> [key]

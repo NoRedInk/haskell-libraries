@@ -27,6 +27,7 @@ module Redis.Json
     Internal.transaction,
     Internal.Handler,
     Internal.Error,
+    Internal.map,
 
     -- * helper functions
     atomicModify,

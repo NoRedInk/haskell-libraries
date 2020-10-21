@@ -28,6 +28,7 @@ module Redis.Text
     Internal.transaction,
     Internal.Handler,
     Internal.Error,
+    Internal.map,
 
     -- * helper functions
     atomicModify,
