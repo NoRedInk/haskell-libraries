@@ -123,10 +123,10 @@ hgetall key =
 --
 -- equivalent to modern hset
 -- https://redis.io/commands/hmget
-hmget :: Text -> [Text] -> Internal.Query [Maybe Text]
+hmget :: Text -> [Text] -> Internal.Query (Dict.Dict Text Text)
 hmget key fields =
   Redis.ByteString.hmget key fields
-    |> Internal.WithResult (Prelude.traverse (Prelude.traverse toT))
+    |> Internal.WithResult (Prelude.traverse toT)
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
 --

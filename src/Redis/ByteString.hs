@@ -100,17 +100,7 @@ mget keys =
   keys
     |> List.map toB
     |> Internal.Mget
-    |> map
-      ( \values ->
-          List.map2 (,) keys values
-            |> List.filterMap
-              ( \(key, value) ->
-                  case value of
-                    Nothing -> Nothing
-                    Just v -> Just (key, v)
-              )
-            |> Dict.fromList
-      )
+    |> map (maybesToDict keys)
 
 -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
 -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
@@ -178,9 +168,23 @@ hset key field val =
 --
 -- equivalent to modern hset
 -- https://redis.io/commands/hmget
-hmget :: Text -> [Text] -> Internal.Query [Maybe ByteString]
+hmget :: Text -> [Text] -> Internal.Query (Dict.Dict Text ByteString)
 hmget key fields =
-  Internal.Hmget (toB key) (map toB fields)
+  fields
+    |> List.map toB
+    |> Internal.Hmget (toB key)
+    |> map (maybesToDict fields)
+
+maybesToDict :: List Text -> List (Maybe a) -> Dict.Dict Text a
+maybesToDict keys values =
+  List.map2 (,) keys values
+    |> List.filterMap
+      ( \(key, value) ->
+          case value of
+            Nothing -> Nothing
+            Just v -> Just (key, v)
+      )
+    |> Dict.fromList
 
 -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
 --
