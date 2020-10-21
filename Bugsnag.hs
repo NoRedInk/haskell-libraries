@@ -374,7 +374,7 @@ renderIncomingHttpRequest requestId span event request =
             .= ( Timer.difference (Platform.started span) (Platform.finished span)
                    |> Platform.inMicroseconds
                    |> Prelude.fromIntegral
-                   |> (*) 1e-6 ::
+                   |> (*) 1e-3 ::
                    Float
                ),
           "megabytes allocated"
