@@ -11,6 +11,7 @@ module Redis.Json
     getset,
     hdel,
     hgetall,
+    hget,
     hmget,
     hmset,
     hset,
@@ -108,6 +109,17 @@ getset key value =
 hset :: (Aeson.ToJSON a) => Text -> Text -> a -> Internal.Query ()
 hset key field val =
   Redis.ByteString.hset key field (encodeStrict val)
+
+-- | Get the value of the field of a hash at key. If the key does not exist,
+-- or the field in the hash does not exis the special value Nothing is returned
+-- An error is returned if the value stored at key is not a
+-- hash, because HGET only handles string values.
+--
+-- https://redis.io/commands/hget
+hget :: Aeson.FromJSON a => Text -> Text -> Internal.Query (Maybe a)
+hget key field =
+  Redis.ByteString.hget key field
+    |> Internal.WithResult decodeIfFound
 
 -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
 -- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist

@@ -132,6 +132,7 @@ doRawQuery query =
     Internal.Del keys -> PreparedQuery ["del"] (Database.Redis.del keys) |> map (Ok << Prelude.fromIntegral)
     Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key) |> map Ok
     Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val) |> map (\_ -> Ok ())
+    Internal.Hget key field -> PreparedQuery ["hget"] (Database.Redis.hget key field) |> map Ok
     Internal.Hmget key fields -> PreparedQuery ["hmget"] (Database.Redis.hmget key fields) |> map Ok
     Internal.Hmset key vals -> PreparedQuery ["hmset"] (Database.Redis.hmset key vals) |> map (\_ -> Ok ())
     Internal.Hdel key fields -> PreparedQuery ["hdel"] (Database.Redis.hdel key fields) |> map (Ok << Prelude.fromIntegral)

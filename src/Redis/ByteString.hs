@@ -9,6 +9,7 @@ module Redis.ByteString
     getset,
     hdel,
     hgetall,
+    hget,
     hmget,
     hmset,
     hset,
@@ -163,6 +164,16 @@ hgetall key =
 hset :: Text -> Text -> ByteString -> Internal.Query ()
 hset key field val =
   Internal.Hset (toB key) (toB field) val
+
+-- | Get the value of the field of a hash at key. If the key does not exist,
+-- or the field in the hash does not exis the special value Nothing is returned
+-- An error is returned if the value stored at key is not a
+-- hash, because HGET only handles string values.
+--
+-- https://redis.io/commands/hget
+hget :: Text -> Text -> Internal.Query (Maybe ByteString)
+hget key field =
+  Internal.Hget (toB key) (toB field)
 
 -- | Returns the values associated with the specified fields in the hash stored at key.--
 --
