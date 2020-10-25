@@ -60,6 +60,13 @@ To publish the new version run the `release.sh` script for the package you want 
 ./release.sh nri-prelude
 ```
 
+Note: this requires an account on [hackage.org][hackage] with rights to publish the library. These are the steps to creating such an account:
+
+1. [Fill the registration form][hackage-registration].
+2. Send an email to hackage-trustees@haskell.org to requesting upload access for your account.
+3. Login to hackage using the shared NoRedInk account (NRI engineers can find the password in the usual place).
+4. Using the NoRedInk account add your new own hackage account to the [maintainer groups][hackage-maintainers] of the NRI libraries.
+
 ### To [stackage.org][stackage]
 
 [Stackage][stackage] is a repository built on top of hackage. Stackage runs nightly builds checking the latest version of packages are compiling against each other.
@@ -76,3 +83,5 @@ To remain in stackage these libraries need to up-to-date with the latest version
 [ormolu]: https://github.com/tweag/ormolu
 [haddock]: https://haskell-haddock.readthedocs.io
 [nri-on-stackage]: https://github.com/commercialhaskell/stackage/blob/b9c0bfa723bd4cba5f964c6fb99b7528c4027692/build-constraints.yaml#L4414-L4416
+[hackage-registration]: https://hackage.haskell.org/users/register-request
+[hackage-maintainers]: https://hackage.haskell.org/user/NoRedInk

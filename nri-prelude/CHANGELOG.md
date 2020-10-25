@@ -1,7 +1,8 @@
-# Next version (unreleased)
+# 0.2.0.0
 
 - Breaking change: drop `Platform.TracingSpan` constructor.
 - Add `Platform.emptyTracingSpan` export.
+- Relax version bounds to encompas `tasty-1.4`.
 
 # 0.1.0.4
 
