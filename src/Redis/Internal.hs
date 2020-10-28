@@ -9,25 +9,62 @@ import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified List
 import NriPrelude hiding (map)
+import qualified Text
 import qualified Tuple
 import qualified Prelude
 
 data Error
   = RedisError Text
   | ConnectionLost
+  | DecodingError FailedQuery Text
   | LibraryError Text
   | TransactionAborted
-  deriving (Show, Generic)
 
-instance Aeson.ToJSON Error
+instance Aeson.ToJSON Error where
+  toJSON err = Aeson.toJSON (errorForHumans err)
+
+data FailedQuery where
+  FailedQuery :: Query a -> FailedQuery
 
 errorForHumans :: Error -> Text
 errorForHumans topError =
   case topError of
     RedisError err -> "Redis error: " ++ err
     ConnectionLost -> "Connection Lost"
-    LibraryError err -> "Library error: " ++ err
+    LibraryError err -> "Library error when executing (probably due to a bug in the library): " ++ err
+    DecodingError (FailedQuery query') err ->
+      Text.join
+        " "
+        [ "Could not decode value in key.",
+          "Cmds:",
+          Text.join "," (cmds query'),
+          "Keys:",
+          Text.join "," (keysTouchedByQuery query' |> List.map Data.Text.Encoding.decodeUtf8),
+          "Decoding error:",
+          err
+        ]
     TransactionAborted -> "Transaction aborted. Watched key has changed."
+
+cmds :: Query b -> [Text]
+cmds query'' =
+  case query'' of
+    Del _ -> ["DEL"]
+    Expire _ _ -> ["EXPIRE"]
+    Get _ -> ["GET"]
+    Getset _ _ -> ["GETSET"]
+    Hdel _ _ -> ["HDEL"]
+    Hgetall _ -> ["HGETALL"]
+    Hget _ _ -> ["HGET"]
+    Hmget _ _ -> ["HMGET"]
+    Hmset _ _ -> ["HMSET"]
+    Hset _ _ _ -> ["HSET"]
+    Mget _ -> ["MGET"]
+    Mset _ -> ["MSET"]
+    Ping -> ["PING"]
+    Set _ _ -> ["SET"]
+    Pure _ -> []
+    Apply f x -> cmds f ++ cmds x
+    WithResult _ x -> cmds x
 
 data Query a where
   Del :: [ByteString] -> Query Int
