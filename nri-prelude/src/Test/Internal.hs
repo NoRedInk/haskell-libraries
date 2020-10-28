@@ -1,21 +1,6 @@
 {-# LANGUAGE NumericUnderscores #-}
 
-module TestNew
-  ( -- * Organizing tests
-    Test,
-    test,
-    describe,
-    skip,
-    only,
-    todo,
-
-    -- * Task testing
-    task,
-
-    -- * Internals
-    run,
-  )
-where
+module Test.Internal where
 
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
