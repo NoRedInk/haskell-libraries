@@ -5,6 +5,7 @@ module Redis.Internal where
 
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
+import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified List
@@ -22,6 +23,9 @@ data Error
 
 instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
+
+instance Show Error where
+  show = errorForHumans >> Data.Text.unpack
 
 data FailedQuery where
   FailedQuery :: Query a -> FailedQuery
