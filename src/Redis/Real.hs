@@ -177,6 +177,14 @@ platformRedis command connection anything action =
             Err err -> Err err
       )
     |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
+    |> Exception.handleAny
+      ( \err ->
+          Exception.displayException err
+            |> Data.Text.pack
+            |> Internal.LibraryError
+            |> Err
+            |> pure
+      )
     |> Platform.doAnything anything
     |> traceQuery command connection
 
