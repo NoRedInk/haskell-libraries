@@ -165,11 +165,13 @@ defaultExpiryKeysAfterSeconds secs handler =
 keysTouchedByQuery :: Query a -> [ByteString]
 keysTouchedByQuery query' =
   case query' of
+    Del keys -> keys
     Ping -> []
     Get key -> [key]
     Set key _ -> [key]
     Getset key _ -> [key]
     Mget keys -> keys
+    Hdel key _ -> [key]
     Mset assocs -> List.map Tuple.first assocs
     Hgetall key -> [key]
     Hmget key _ -> [key]
@@ -179,10 +181,6 @@ keysTouchedByQuery query' =
     Pure _ -> []
     Apply f x -> keysTouchedByQuery f ++ keysTouchedByQuery x
     WithResult _ q -> keysTouchedByQuery q
-    -- Don't report on deleted keys. They're gone after this command so we don't
-    -- want to set expiry times for them.
-    Del _keys -> []
-    Hdel _key _ -> []
     -- We use this function to collect keys we need to expire. If the user is
     -- explicitly setting an expiry we don't want to overwrite that.
     Expire _key _ -> []
