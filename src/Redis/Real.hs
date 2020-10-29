@@ -14,7 +14,6 @@ import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified List
-import qualified Maybe
 import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
@@ -64,19 +63,18 @@ acquireHandler namespace settings = do
                       -- going to work on by passing one of the keys used in the
                       -- transaction. This way it knows which node to send the
                       -- initial MULTI command to.
-                      let firstKey =
-                            Internal.keysTouchedByQuery query
-                              |> List.head
-                              -- If a command is not touching any keys then we
-                              -- can send it to any node in the cluster. We're
-                              -- going to send it to the node that contains the
-                              -- `any-key` key. We can't come up with an example
-                              -- of a real-world transaction that would fall
-                              -- into this case, so we're not going to worry
-                              -- about load-balancing these transactions across
-                              -- nodes just yet.
-                              |> Maybe.withDefault "any-key"
-                       in Database.Redis.multiExecWithHash firstKey redisCtx
+                      case Internal.keysTouchedByQuery query |> List.head of
+                        Just firstKey ->
+                          Database.Redis.multiExecWithHash firstKey redisCtx
+                        Nothing ->
+                          pure
+                            ( Database.Redis.TxSuccess
+                                ( Err
+                                    ( Internal.LibraryError
+                                        "Transaction does not touch any keys. We do now know which hashslot this transaction is for."
+                                    )
+                                )
+                            )
                     Settings.NotCluster ->
                       Database.Redis.multiExec redisCtx
              in redisCmd
