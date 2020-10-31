@@ -59,7 +59,6 @@ library:
   - Set
   - Task
   - Test
-  - Test.Runner.Tasty
   - Text
   - Tuple
   source-dirs:

@@ -2,17 +2,12 @@
 
 module Test.Internal where
 
-import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
 import qualified Dict
-import qualified Expect
 import qualified GHC.Stack as Stack
-import qualified Internal.Expectation as Expectation
-import qualified Internal.TestResult as TestResult
 import qualified List
 import qualified Maybe
 import NriPrelude
-import qualified Platform
 import qualified Platform.Internal
 import qualified Task
 import qualified Tuple
@@ -46,7 +41,9 @@ data SuiteResult
   | TestsFailed [SingleTest Failure]
   | NoTestsInSuite
 
-newtype Test = Test {unTest :: [SingleTest (Prelude.IO TestResult)]}
+newtype Test = Test {unTest :: [SingleTest Expectation]}
+
+newtype Expectation = Expectation {unExpectation :: Task Never TestResult}
 
 describe :: Text -> [Test] -> Test
 describe description tests =
@@ -63,39 +60,21 @@ todo name =
           name = name,
           loc = Stack.withFrozenCallStack getFrame,
           label = Todo,
-          body = Prelude.pure Succeeded
+          body = Expectation (Task.succeed Succeeded)
         }
     ]
 
-test :: Stack.HasCallStack => Text -> (() -> Expect.Expectation) -> Test
+test :: Stack.HasCallStack => Text -> (() -> Expectation) -> Test
 test name expectation =
-  let body :: Prelude.IO TestResult
-      body = do
-        log <- Platform.silentHandler
-        Expectation.toResult (expectation ())
-          |> ioToTask
-          |> Task.mapError ThrewException
-          |> Task.timeout 10_000 TookTooLong
-          |> Task.attempt log
-          |> map
-            ( \res ->
-                -- TODO: remove duplicate TestResult type.
-                case res of
-                  Ok (TestResult.Passed) -> Succeeded
-                  Ok (TestResult.Skipped) -> Succeeded
-                  Ok (TestResult.Failed (TestResult.TestFailure message)) ->
-                    Failed (FailedAssertion message)
-                  Err failure -> Failed failure
-            )
-   in Test
-        [ SingleTest
-            { describes = [],
-              name = name,
-              loc = Stack.withFrozenCallStack getFrame,
-              label = None,
-              body = body
-            }
-        ]
+  Test
+    [ SingleTest
+        { describes = [],
+          name = name,
+          loc = Stack.withFrozenCallStack getFrame,
+          label = None,
+          body = handleUnexpectedErrors (expectation ())
+        }
+    ]
 
 skip :: Test -> Test
 skip (Test tests) =
@@ -107,30 +86,22 @@ only (Test tests) =
 
 task :: Stack.HasCallStack => Text -> Task Failure a -> Test
 task name expectation =
-  let body :: Prelude.IO TestResult
-      body = do
-        log <- Platform.silentHandler
-        expectation
-          |> Task.timeout 10_000 TookTooLong
-          |> Task.attempt log
-          |> map
-            ( \res ->
-                case res of
-                  Ok _ -> Succeeded
-                  Err failure -> Failed failure
-            )
-          |> Exception.handle (Prelude.pure << Failed << ThrewException)
-   in Test
-        [ SingleTest
-            { describes = [],
-              name = name,
-              loc = Stack.withFrozenCallStack getFrame,
-              label = None,
-              body = body
-            }
-        ]
+  Test
+    [ SingleTest
+        { describes = [],
+          name = name,
+          loc = Stack.withFrozenCallStack getFrame,
+          label = None,
+          body =
+            expectation
+              |> Task.map (\_ -> Succeeded)
+              |> Task.onError (Task.succeed << Failed)
+              |> Expectation
+              |> handleUnexpectedErrors
+        }
+    ]
 
-run :: Test -> Prelude.IO SuiteResult
+run :: Test -> Task e SuiteResult
 run (Test all) = do
   let grouped = groupBy label all
   let onlys = Dict.get Only grouped |> Maybe.withDefault []
@@ -139,7 +110,7 @@ run (Test all) = do
   let todos = Dict.get Todo grouped |> Maybe.withDefault []
   let skippedAndTodos = List.map (\test' -> test' {body = ()}) (skipped ++ todos)
   let toRun = if List.isEmpty onlys then regulars else onlys
-  results <- Async.mapConcurrently runSingle toRun
+  results <- Task.parallel (List.map runSingle toRun)
   let failed = List.filterMap justFailure results
   let summary =
         Summary
@@ -148,7 +119,7 @@ run (Test all) = do
             noOnlys = List.isEmpty onlys,
             noneSkipped = List.isEmpty skippedAndTodos
           }
-  Prelude.pure <| case summary of
+  Task.succeed <| case summary of
     Summary {noTests = True} -> NoTestsInSuite
     Summary {allPassed = False} -> TestsFailed failed
     Summary {noOnlys = False} -> OnlysPassed
@@ -169,15 +140,34 @@ justFailure test' =
     Succeeded -> Nothing
     Failed failure -> Just test' {body = failure}
 
-runSingle :: SingleTest (Prelude.IO TestResult) -> Prelude.IO (SingleTest TestResult)
+handleUnexpectedErrors :: Expectation -> Expectation
+handleUnexpectedErrors (Expectation task') =
+  task'
+    |> Task.mapError never
+    |> onException (Task.succeed << Failed << ThrewException)
+    |> Task.timeout 10_000 TookTooLong
+    |> Task.onError (Task.succeed << Failed)
+    |> Expectation
+
+runSingle :: SingleTest Expectation -> Task e (SingleTest TestResult)
 runSingle test' = do
   body test'
+    |> unExpectation
+    |> Task.mapError never
     |> map (\res -> test' {body = res})
 
 ioToTask :: Prelude.IO a -> Task Exception.SomeException a
 ioToTask io =
   Platform.Internal.Task <| \_ ->
     Exception.handleAny (Prelude.pure << Err) (map Ok io)
+
+onException :: (Exception.SomeException -> Task e a) -> Task e a -> Task e a
+onException f (Platform.Internal.Task run') =
+  Platform.Internal.Task
+    ( \log ->
+        run' log
+          |> Exception.handleAny (Task.attempt log << f)
+    )
 
 getFrame :: Stack.HasCallStack => Maybe Stack.SrcLoc
 getFrame =
@@ -202,3 +192,14 @@ groupBy key xs =
     )
     Dict.empty
     xs
+
+append :: Expectation -> Expectation -> Expectation
+append (Expectation task1) (Expectation task2) =
+  task1
+    |> andThen
+      ( \result1 ->
+          case result1 of
+            Succeeded -> task2
+            Failed _ -> task1
+      )
+    |> Expectation

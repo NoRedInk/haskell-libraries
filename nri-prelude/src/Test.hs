@@ -4,38 +4,23 @@ module Test
     Test,
     test,
     describe,
-    concat,
     skip,
     only,
     todo,
-
-    -- * Fuzz Testing
-    fuzz,
-    fuzz2,
-    fuzz3,
-    fromTestTree,
 
     -- * Task Testing
     task,
   )
 where
 
-import qualified Data.Text
 import qualified Expect
-import Fuzz (Fuzzer)
-import qualified Internal.Expectation
-import qualified Internal.Test
-import Internal.TestResult (TestFailure)
 import NriPrelude
-import qualified Platform
-import qualified Task
-import Test.Tasty (TestName, TestTree)
-import Prelude (Show)
+import qualified Test.Internal as Internal
 
 -- | A test which has yet to be evaluated. When evaluated, it produces one
 -- or more 'Expect.Expectation's.
 -- See 'test' and 'fuzz' for some ways to create a @Test@.
-type Test = Internal.Test.Test
+type Test = Internal.Test
 
 -- | Apply a description to a list of tests.
 --
@@ -60,14 +45,7 @@ type Test = Internal.Test.Test
 -- mistake or are creating a placeholder.
 describe :: Text -> List Test -> Test
 describe =
-  Internal.Test.Describe
-
--- | Run each of the given tests.
---
--- > concat [ testDecoder, testSorting ]
-concat :: List Test -> Test
-concat =
-  Internal.Test.Describe ""
+  Test.describe
 
 -- | Return a 'Test' that evaluates a single
 -- 'Expect.Expectation'
@@ -80,7 +58,7 @@ concat =
 -- >             |> Expect.equal 0
 test :: Text -> (() -> Expect.Expectation) -> Test
 test =
-  Internal.Test.Test
+  Test.test
 
 -- | Returns a 'Test' that gets skipped.
 --
@@ -112,7 +90,7 @@ test =
 -- >                 |> Expect.equal 0
 -- >     ]
 skip :: Test -> Test
-skip = Internal.Test.Skip
+skip = Test.skip
 
 -- | Returns a 'Test' that causes other tests to be skipped, and only runs the given one.
 --
@@ -146,7 +124,7 @@ skip = Internal.Test.Skip
 -- >                 |> Expect.equal 0
 -- >     ]
 only :: Test -> Test
-only = Internal.Test.Only
+only = Test.only
 
 -- | Returns a 'Test' that is "todo" (not yet implemented). These tests always
 -- fail.
@@ -166,66 +144,9 @@ only = Internal.Test.Only
 -- This functionality is similar to "pending" tests in other frameworks, except
 -- that a todo test is considered failing but a pending test often is not.
 todo :: Text -> Test
-todo = Internal.Test.Todo
-
--- | Take a function that produces a test, and calls it several times, using a
--- randomly-generated input from a 'Fuzz.Fuzzer' each time. This allows you to
--- test that a property that should always be true is indeed true under a wide
--- variety of conditions. The function also takes a string describing the test.
---
--- These are called "[fuzz tests](https://en.wikipedia.org/wiki/Fuzz_testing)" because of the randomness. You may find them elsewhere called [property-based tests](http://blog.jessitron.com/2013/04/property-based-testing-what-is-it.html), [generative tests](http://www.pivotaltracker.com/community/tracker-blog/generative-testing), or [QuickCheck-style tests](https://en.wikipedia.org/wiki/QuickCheck).
---
--- > import Test (fuzz)
--- > import Fuzz (list, int)
--- > import Expect
--- >
--- > fuzz (list int) "List.length should always be positive" <|
--- >     -- This anonymous function will be run 100 times, each time with a
--- >     -- randomly-generated fuzzList value.
--- >     \fuzzList ->
--- >         fuzzList
--- >             |> List.length
--- >             |> Expect.atLeast 0
---
--- NOTE: You can use any Hedgehog.Gen for Fuzzer.
-fuzz :: Show a => Fuzzer a -> Text -> (a -> Expect.Expectation) -> Test
-fuzz a name cb = Internal.Test.Fuzz (Internal.Test.Fuzzer1 a cb) name
-
--- | Run a fuzz test using two random inputs.
---
--- > import Test (fuzz2)
--- > import Fuzz (list, int)
--- >
--- > fuzz2 (list int) int "List.reverse never influences List.member" <|
--- >     \nums target ->
--- >         List.member target (List.reverse nums)
--- >             |> Expect.equal (List.member target nums)
-fuzz2 :: (Show a, Show b) => Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expect.Expectation) -> Test
-fuzz2 a b name cb = Internal.Test.Fuzz (Internal.Test.Fuzzer2 a b cb) name
-
--- | Run a fuzz test using three random inputs.
-fuzz3 :: (Show a, Show b, Show c) => Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expect.Expectation) -> Test
-fuzz3 a b c name cb = Internal.Test.Fuzz (Internal.Test.Fuzzer3 a b c cb) name
-
--- | Embed arbitrary Tasty @TestTree@ among your other tests.
-fromTestTree :: Text -> (TestName -> TestTree) -> Test
-fromTestTree n f =
-  Internal.Test.FromTestTree n (f (Data.Text.unpack n))
+todo = Test.todo
 
 -- | Run a test that executes a task. The test passes if the task returns a
 -- success value.
-task :: Text -> Task TestFailure a -> Test
-task n expectation =
-  Internal.Test.Test n (\() -> runTask expectation)
-
-runTask :: Task TestFailure a -> Expect.Expectation
-runTask t =
-  Expect.withIO
-    ( \res ->
-        case res of
-          Ok _ -> Expect.pass
-          Err message -> Internal.Expectation.fromResult message
-    )
-    <| do
-      noLogger <- Platform.silentHandler
-      Task.attempt noLogger t
+task :: Text -> Task Internal.Failure a -> Test
+task = Internal.task

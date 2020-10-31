@@ -48,25 +48,30 @@ where
 import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Debug
-import qualified Internal.Expectation
-import qualified Internal.TestResult
 import qualified List
 import List (List)
 import NriPrelude
+import qualified Platform.Internal
+import qualified Pretty.Diff as Diff
+import qualified System.Console.Terminal.Size as Terminal
 import qualified System.Directory as Directory
 import qualified System.FilePath as FilePath
+import qualified Task
+import qualified Test.Internal as Internal
+import qualified Text.Show.Pretty
 import Prelude (Eq, IO, Ord, Show, show)
 
 -- |  The result of a single test run: either a 'pass' or a 'fail'.
-type Expectation =
-  Internal.Expectation.Expectation Internal.TestResult.TestResult
+type Expectation = Internal.Expectation
 
 -- | Run some IO and assert the value it produces.
 --
 -- If the IO throws an exception the test will fail.
 withIO :: (a -> Expectation) -> IO a -> Expectation
 withIO fn io =
-  Internal.Expectation.fromIO io |> andThen fn
+  fromIO io
+    |> andThen (Internal.unExpectation << fn)
+    |> Internal.Expectation
 
 -- | Always passes.
 --
@@ -84,7 +89,7 @@ withIO fn io =
 -- >             Err err ->
 -- >                 Expect.fail err
 pass :: Expectation
-pass = Internal.Expectation.pass
+pass = Internal.Expectation (Task.succeed Internal.Succeeded)
 
 -- | Fails with the given message.
 --
@@ -102,7 +107,12 @@ pass = Internal.Expectation.pass
 -- >             Err err ->
 -- >                 Expect.fail err
 fail :: Text -> Expectation
-fail = Internal.Expectation.fail
+fail msg =
+  msg
+    |> Internal.FailedAssertion
+    |> Internal.Failed
+    |> Task.succeed
+    |> Internal.Expectation
 
 -- | If the given expectation fails, replace its failure message with a custom one.
 --
@@ -110,7 +120,15 @@ fail = Internal.Expectation.fail
 -- >     |> Expect.equal "something else"
 -- >     |> Expect.onFail "thought those two strings would be the same"
 onFail :: Text -> Expectation -> Expectation
-onFail = Internal.Expectation.onFail
+onFail msg (Internal.Expectation task) =
+  task
+    |> Task.map
+      ( \res ->
+          case res of
+            Internal.Succeeded -> Internal.Succeeded
+            Internal.Failed _ -> Internal.Failed (Internal.FailedAssertion msg)
+      )
+    |> Internal.Expectation
 
 -- | Passes if the arguments are equal.
 --
@@ -134,7 +152,7 @@ onFail = Internal.Expectation.onFail
 -- >
 -- > -}
 equal :: (Show a, Eq a) => a -> a -> Expectation
-equal = Internal.Expectation.build (==) "Expect.equal"
+equal = assert (==) "Expect.equal"
 
 -- | Passes if the arguments are not equal.
 --
@@ -157,7 +175,7 @@ equal = Internal.Expectation.build (==) "Expect.equal"
 -- >
 -- > -}
 notEqual :: (Show a, Eq a) => a -> a -> Expectation
-notEqual = Internal.Expectation.build (/=) "Expect.notEqual"
+notEqual = assert (/=) "Expect.notEqual"
 
 -- | Passes if the second argument is less than the first.
 --
@@ -182,7 +200,7 @@ notEqual = Internal.Expectation.build (/=) "Expect.notEqual"
 -- >
 -- > -}
 lessThan :: (Show a, Ord a) => a -> a -> Expectation
-lessThan = Internal.Expectation.build (>) "Expect.lessThan"
+lessThan = assert (>) "Expect.lessThan"
 
 -- | Passes if the second argument is less than or equal to the first.
 --
@@ -206,7 +224,7 @@ lessThan = Internal.Expectation.build (>) "Expect.lessThan"
 -- >
 -- > -}
 atMost :: (Show a, Ord a) => a -> a -> Expectation
-atMost = Internal.Expectation.build (>=) "Expect.atMost"
+atMost = assert (>=) "Expect.atMost"
 
 -- | Passes if the second argument is greater than the first.
 --
@@ -230,7 +248,7 @@ atMost = Internal.Expectation.build (>=) "Expect.atMost"
 -- >
 -- > -}
 greaterThan :: (Show a, Ord a) => a -> a -> Expectation
-greaterThan = Internal.Expectation.build (<) "Expect.greaterThan"
+greaterThan = assert (<) "Expect.greaterThan"
 
 -- | Passes if the second argument is greater than or equal to the first.
 --
@@ -254,7 +272,7 @@ greaterThan = Internal.Expectation.build (<) "Expect.greaterThan"
 -- >
 -- > -}
 atLeast :: (Show a, Ord a) => a -> a -> Expectation
-atLeast = Internal.Expectation.build (<=) "Expect.atLeast"
+atLeast = assert (<=) "Expect.atLeast"
 
 -- | Passes if the argument is 'True', and otherwise fails with the given message.
 --
@@ -274,7 +292,7 @@ atLeast = Internal.Expectation.build (<=) "Expect.atLeast"
 -- >
 -- > -}
 true :: Bool -> Expectation
-true x = Internal.Expectation.build (&&) "Expect.true" x True
+true x = assert (&&) "Expect.true" x True
 
 -- | Passes if the argument is 'False', and otherwise fails with the given message.
 --
@@ -294,7 +312,7 @@ true x = Internal.Expectation.build (&&) "Expect.true" x True
 -- >
 -- > -}
 false :: Bool -> Expectation
-false x = Internal.Expectation.build xor "Expect.false" x True
+false x = assert xor "Expect.false" x True
 
 -- | Passes if each of the given functions passes when applied to the subject.
 --
@@ -327,11 +345,11 @@ all :: List (subject -> Expectation) -> subject -> Expectation
 all expectations subject =
   List.foldl
     ( \expectation acc ->
-        Internal.Expectation.join
+        Internal.append
           acc
           (expectation subject)
     )
-    Internal.Expectation.pass
+    pass
     expectations
 
 -- | Combine multiple expectations into one. The resulting expectation is a
@@ -340,11 +358,11 @@ concat :: List Expectation -> Expectation
 concat expectations =
   List.foldl
     ( \expectation acc ->
-        Internal.Expectation.join
+        Internal.append
           acc
           expectation
     )
-    Internal.Expectation.pass
+    pass
     expectations
 
 -- | Passes if the Result is an Ok rather than Err. This is useful for tests where you expect not to see an error, but you don't care what the actual result is.
@@ -373,7 +391,7 @@ concat expectations =
 ok :: Show b => Result b a -> Expectation
 ok res =
   case res of
-    Ok _ -> Expect.pass
+    Ok _ -> pass
     Err message -> fail ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
 
 -- | Passes if the Result is an Err rather than Ok. This is useful for tests where you expect to get an error but you don't care what the actual error is.
@@ -403,7 +421,7 @@ err :: Show a => Result b a -> Expectation
 err res =
   case res of
     Ok value -> fail ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
-    Err _ -> Expect.pass
+    Err _ -> pass
 
 -- | Check if a string is equal to the contents of a file.
 --
@@ -418,22 +436,24 @@ err res =
 -- use @git diff golden-results/complicated-object.txt@ to check whether the
 -- changes are acceptable.
 equalToContentsOf :: Text -> Text -> Expectation
-equalToContentsOf filepath' actual = do
-  let filepath = Data.Text.unpack filepath'
-  exists <- Internal.Expectation.fromIO <| do
-    Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
-    Directory.doesFileExist filepath
-  if exists
-    then do
-      expected <- Internal.Expectation.fromIO (Data.Text.IO.readFile filepath)
-      Internal.Expectation.build
-        (==)
-        "Expect.equalToContentsOf"
-        (UnescapedShow expected)
-        (UnescapedShow actual)
-    else do
-      Internal.Expectation.fromIO (Data.Text.IO.writeFile filepath actual)
-      Internal.Expectation.pass
+equalToContentsOf filepath' actual =
+  Internal.Expectation <| do
+    let filepath = Data.Text.unpack filepath'
+    exists <- fromIO <| do
+      Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
+      Directory.doesFileExist filepath
+    if exists
+      then do
+        expected <- fromIO (Data.Text.IO.readFile filepath)
+        assert
+          (==)
+          "Expect.equalToContentsOf"
+          (UnescapedShow expected)
+          (UnescapedShow actual)
+          |> Internal.unExpectation
+      else do
+        fromIO (Data.Text.IO.writeFile filepath actual)
+        Internal.unExpectation pass
 
 -- By default we will compare values with each other after they have been
 -- passed to @show@. Unfortunately @show@ for the @Text@ type escapes special
@@ -454,3 +474,30 @@ newtype UnescapedShow = UnescapedShow Text deriving (Eq)
 
 instance Show UnescapedShow where
   show (UnescapedShow text) = Data.Text.unpack text
+
+assert :: Show a => (a -> a -> Bool) -> Text -> a -> a -> Expectation
+assert pred funcName actual expected =
+  if pred actual expected
+    then pass
+    else Internal.Expectation <| do
+      window <- fromIO Terminal.size
+      let terminalWidth = case window of
+            Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
+            Nothing -> 80
+      Diff.pretty
+        Diff.Config
+          { Diff.separatorText = Just funcName,
+            Diff.wrapping = Diff.Wrap terminalWidth
+          }
+        (PrettyShow expected)
+        (PrettyShow actual)
+        |> fail
+        |> Internal.unExpectation
+
+fromIO :: Prelude.IO a -> Task e a
+fromIO io = Platform.Internal.Task (\_ -> map Ok io)
+
+newtype PrettyShow a = PrettyShow a
+
+instance Show a => Show (PrettyShow a) where
+  show (PrettyShow x) = Text.Show.Pretty.ppShow x

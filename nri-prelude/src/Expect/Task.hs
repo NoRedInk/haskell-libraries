@@ -4,39 +4,34 @@ module Expect.Task
     andCheck,
     succeeds,
     fails,
-    TestFailure,
+    Failure,
   )
 where
 
 import qualified Debug
 import qualified Expect
-import qualified Internal.Expectation
-import qualified Internal.TestResult
-import Internal.TestResult (TestFailure)
 import NriPrelude
-import qualified Platform
-import qualified Platform.DoAnything as DoAnything
 import qualified Task
+import qualified Test.Internal as Internal
+
+-- | Error generated when a test expectation is not met.
+type Failure = Internal.Failure
 
 -- | Check a task returns an expected value, than pass that value on.
 --
 -- > task "Greetings are friendly" <| do
 -- >     getGreeting
 -- >         |> andCheck (Expect.equal "Hi!")
-andCheck :: (a -> Expect.Expectation) -> Task TestFailure a -> Task TestFailure a
-andCheck expectation t = do
-  x <- t
-  expectation x
-    |> Internal.Expectation.toResult
-    |> map Ok
-    |> Platform.doAnything DoAnything.Handler
-    |> Task.andThen
-      ( \res -> case res of
-          Internal.TestResult.Passed -> Task.succeed ()
-          Internal.TestResult.Skipped -> Task.succeed ()
-          Internal.TestResult.Failed message -> Task.fail message
-      )
-  Task.succeed x
+andCheck :: (a -> Expect.Expectation) -> Task Failure a -> Task Failure a
+andCheck expectation task = do
+  x <- task
+  res <-
+    expectation x
+      |> Internal.unExpectation
+      |> Task.mapError never
+  case res of
+    Internal.Succeeded -> task
+    Internal.Failed failure -> Task.fail failure
 
 -- | Check an expectation in the middle of a @do@ block.
 --
@@ -45,7 +40,7 @@ andCheck expectation t = do
 -- >     check (weightInKgs |> Expect.atMost 8)
 -- >     soapInWasher
 -- >     startMachine
-check :: Expect.Expectation -> Task TestFailure ()
+check :: Expect.Expectation -> Task Failure ()
 check expectation =
   Task.succeed ()
     |> andCheck (\() -> expectation)
@@ -55,18 +50,21 @@ check expectation =
 -- > task "solve rubicskube" <| do
 -- >     solveRubicsKube
 -- >         |> succeeds
-succeeds :: Show err => Task err a -> Task TestFailure a
-succeeds =
+succeeds :: Show err => Task err a -> Task Failure a
+succeeds task =
   Task.mapError
     ( \message ->
-        Internal.TestResult.TestFailure (Debug.toString message)
+        Internal.FailedAssertion (Debug.toString message)
     )
+    task
 
 -- | Check a task fails.
 --
 -- > task "chemistry experiment" <| do
 -- >     mixRedAndGreenLiquids
 -- >         |> fails
-fails :: Text -> Task TestFailure a
-fails =
-  Task.fail << Internal.TestResult.TestFailure << Debug.toString
+fails :: Text -> Task Failure a
+fails msg =
+  msg
+    |> Internal.FailedAssertion
+    |> Task.fail
