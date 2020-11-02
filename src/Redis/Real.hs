@@ -19,6 +19,7 @@ import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
+import qualified Set
 import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 import qualified Prelude
@@ -66,6 +67,7 @@ acquireHandler namespace settings = do
                       -- initial MULTI command to.
                       let firstKey =
                             Internal.keysTouchedByQuery query
+                              |> Set.toList
                               |> List.head
                               -- If a command is not touching any keys then we
                               -- can send it to any node in the cluster. We're
