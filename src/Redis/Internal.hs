@@ -10,6 +10,7 @@ import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified List
 import NriPrelude hiding (map)
+import qualified Set
 import qualified Text
 import qualified Tuple
 import qualified Prelude
@@ -43,7 +44,12 @@ errorForHumans topError =
           "Cmds:",
           Text.join "," (cmds query'),
           "Keys:",
-          Text.join "," (keysTouchedByQuery query' |> List.map Data.Text.Encoding.decodeUtf8),
+          Text.join
+            ","
+            ( keysTouchedByQuery query'
+                |> Set.toList
+                |> List.map Data.Text.Encoding.decodeUtf8
+            ),
           "Decoding error:",
           err
         ]
@@ -157,33 +163,34 @@ defaultExpiryKeysAfterSeconds secs handler =
   let doQuery :: Query a -> Task Error a
       doQuery query' =
         keysTouchedByQuery query'
+          |> Set.toList
           |> Prelude.traverse (\key -> Expire key secs)
           |> map2 (\res _ -> res) query'
           |> doTransaction handler
    in handler {doQuery = doQuery, doTransaction = doQuery}
 
-keysTouchedByQuery :: Query a -> [ByteString]
+keysTouchedByQuery :: Query a -> Set.Set ByteString
 keysTouchedByQuery query' =
   case query' of
-    Del keys -> keys
-    Ping -> []
-    Get key -> [key]
-    Set key _ -> [key]
-    Getset key _ -> [key]
-    Mget keys -> keys
-    Hdel key _ -> [key]
-    Mset assocs -> List.map Tuple.first assocs
-    Hgetall key -> [key]
-    Hmget key _ -> [key]
-    Hget key _ -> [key]
-    Hset key _ _ -> [key]
-    Hmset key _ -> [key]
-    Pure _ -> []
-    Apply f x -> keysTouchedByQuery f ++ keysTouchedByQuery x
+    Del keys -> Set.fromList keys
+    Ping -> Set.empty
+    Get key -> Set.singleton key
+    Set key _ -> Set.singleton key
+    Getset key _ -> Set.singleton key
+    Mget keys -> Set.fromList keys
+    Hdel key _ -> Set.singleton key
+    Mset assocs -> Set.fromList (List.map Tuple.first assocs)
+    Hgetall key -> Set.singleton key
+    Hmget key _ -> Set.singleton key
+    Hget key _ -> Set.singleton key
+    Hset key _ _ -> Set.singleton key
+    Hmset key _ -> Set.singleton key
+    Pure _ -> Set.empty
+    Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)
     WithResult _ q -> keysTouchedByQuery q
     -- We use this function to collect keys we need to expire. If the user is
     -- explicitly setting an expiry we don't want to overwrite that.
-    Expire _key _ -> []
+    Expire _key _ -> Set.empty
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8
