@@ -10,6 +10,8 @@ module Redis
     Internal.Error (..),
     Internal.Handler,
     Internal.Query,
+    Internal.transaction,
+    Internal.query,
     -- Real
     Real.Info (..),
     Real.handler,
