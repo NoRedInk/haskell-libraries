@@ -15,10 +15,12 @@ module Redis.Json
     hmget,
     hmset,
     hset,
+    hsetnx,
     mget,
     mset,
     ping,
     set,
+    setnx,
     watch,
 
     -- * Running queries
@@ -76,6 +78,15 @@ set :: Aeson.ToJSON a => Text -> a -> Internal.Query ()
 set key value =
   Redis.ByteString.set key (encodeStrict value)
 
+-- | Set key to hold the string value. If key already holds a value, it is
+-- overwritten, regardless of its type. Any previous time to live associated
+-- with the key is discarded on successful SET operation.
+--
+-- https://redis.io/commands/set
+setnx :: Aeson.ToJSON a => Text -> a -> Internal.Query Bool
+setnx key value =
+  Redis.ByteString.setnx key (encodeStrict value)
+
 -- | Sets the given keys to their respective values. MSET replaces existing
 -- values with new values, just as regular SET. See MSETNX if you don't want to
 -- overwrite existing values.
@@ -111,6 +122,15 @@ getset key value =
 hset :: (Aeson.ToJSON a) => Text -> Text -> a -> Internal.Query ()
 hset key field val =
   Redis.ByteString.hset key field (encodeStrict val)
+
+-- | Sets field in the hash stored at key to value, only if field does not yet
+-- exist. If key does not exist, a new key holding a hash is created. If field
+-- already exists, this operation has no effect.
+--
+-- https://redis.io/commands/hsetnx
+hsetnx :: (Aeson.ToJSON a) => Text -> Text -> a -> Internal.Query Bool
+hsetnx key field val =
+  Redis.ByteString.hsetnx key field (encodeStrict val)
 
 -- | Get the value of the field of a hash at key. If the key does not exist,
 -- or the field in the hash does not exis the special value Nothing is returned

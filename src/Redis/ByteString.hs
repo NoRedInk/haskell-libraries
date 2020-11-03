@@ -13,10 +13,12 @@ module Redis.ByteString
     hmget,
     hmset,
     hset,
+    hsetnx,
     mget,
     mset,
     ping,
     set,
+    setnx,
     watch,
 
     -- * Running queries
@@ -60,6 +62,15 @@ get key =
 set :: Text -> ByteString -> Internal.Query ()
 set key value =
   Internal.Set (toB key) value
+
+-- | Set key to hold string value if key does not exist. In that case, it is
+-- equal to SET. When key already holds a value, no operation is performed.
+-- SETNX is short for "SET if Not eXists".
+--
+-- https://redis.io/commands/setnx
+setnx :: Text -> ByteString -> Internal.Query Bool
+setnx key value =
+  Internal.Setnx (toB key) value
 
 -- | Sets the given keys to their respective values. MSET replaces existing
 -- values with new values, just as regular SET. See MSETNX if you don't want to
@@ -166,6 +177,15 @@ hgetall key =
 hset :: Text -> Text -> ByteString -> Internal.Query ()
 hset key field val =
   Internal.Hset (toB key) (toB field) val
+
+-- | Sets field in the hash stored at key to value, only if field does not yet
+-- exist. If key does not exist, a new key holding a hash is created. If field
+-- already exists, this operation has no effect.
+--
+-- https://redis.io/commands/hsetnx
+hsetnx :: Text -> Text -> ByteString -> Internal.Query Bool
+hsetnx key field val =
+  Internal.Hsetnx (toB key) (toB field) val
 
 -- | Get the value of the field of a hash at key. If the key does not exist,
 -- or the field in the hash does not exis the special value Nothing is returned

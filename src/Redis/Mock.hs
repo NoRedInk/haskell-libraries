@@ -128,6 +128,10 @@ doQuery query hm =
       ( HM.insert key (RedisByteString value) hm,
         Ok ()
       )
+    Internal.Setnx key value ->
+      if HM.member key hm
+        then (hm, Ok False)
+        else (HM.insert key (RedisByteString value) hm, Ok True)
     Internal.Getset key value ->
       ( HM.insert key (RedisByteString value) hm,
         HM.lookup key hm
@@ -177,6 +181,26 @@ doQuery query hm =
           ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
             Ok ()
           )
+        Just (RedisByteString _) ->
+          ( hm,
+            Err wrongTypeErr
+          )
+    Internal.Hsetnx key field val ->
+      case HM.lookup key hm of
+        Nothing ->
+          ( HM.insert key (RedisHash (HM.singleton field val)) hm,
+            Ok True
+          )
+        Just (RedisHash hm') ->
+          if HM.member field hm'
+            then
+              ( hm,
+                Ok False
+              )
+            else
+              ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
+                Ok True
+              )
         Just (RedisByteString _) ->
           ( hm,
             Err wrongTypeErr

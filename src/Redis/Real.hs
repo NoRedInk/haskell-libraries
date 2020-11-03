@@ -128,12 +128,14 @@ doRawQuery query =
     Internal.Ping -> PreparedQuery ["ping"] Database.Redis.ping |> map Ok
     Internal.Get key -> PreparedQuery ["get"] (Database.Redis.get key) |> map Ok
     Internal.Set key val -> PreparedQuery ["set"] (Database.Redis.set key val) |> map (\_ -> Ok ())
+    Internal.Setnx key val -> PreparedQuery ["setnx"] (Database.Redis.setnx key val) |> map Ok
     Internal.Getset key val -> PreparedQuery ["getset"] (Database.Redis.getset key val) |> map Ok
     Internal.Mget keys -> PreparedQuery ["mget"] (Database.Redis.mget keys) |> map Ok
     Internal.Mset vals -> PreparedQuery ["mset"] (Database.Redis.mset vals) |> map (\_ -> Ok ())
     Internal.Del keys -> PreparedQuery ["del"] (Database.Redis.del keys) |> map (Ok << Prelude.fromIntegral)
     Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key) |> map Ok
     Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val) |> map (\_ -> Ok ())
+    Internal.Hsetnx key field val -> PreparedQuery ["hsetnx"] (Database.Redis.hsetnx key field val) |> map Ok
     Internal.Hget key field -> PreparedQuery ["hget"] (Database.Redis.hget key field) |> map Ok
     Internal.Hmget key fields -> PreparedQuery ["hmget"] (Database.Redis.hmget key fields) |> map Ok
     Internal.Hmset key vals -> PreparedQuery ["hmset"] (Database.Redis.hmset key vals) |> map (\_ -> Ok ())

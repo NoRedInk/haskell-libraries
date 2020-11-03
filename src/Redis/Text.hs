@@ -16,10 +16,12 @@ module Redis.Text
     hmget,
     hmset,
     hset,
+    hsetnx,
     mget,
     mset,
     ping,
     set,
+    setnx,
     watch,
 
     -- * Running queries
@@ -66,6 +68,15 @@ set :: Text -> Text -> Internal.Query ()
 set key value =
   Redis.ByteString.set key (toB value)
 
+-- | Set key to hold the string value. If key already holds a value, it is
+-- overwritten, regardless of its type. Any previous time to live associated
+-- with the key is discarded on successful SET operation.
+--
+-- https://redis.io/commands/set
+setnx :: Text -> Text -> Internal.Query Bool
+setnx key value =
+  Redis.ByteString.setnx key (toB value)
+
 -- | Sets the given keys to their respective values. MSET replaces existing
 -- values with new values, just as regular SET. See MSETNX if you don't want to
 -- overwrite existing values.
@@ -111,6 +122,15 @@ mget keys =
 hset :: Text -> Text -> Text -> Internal.Query ()
 hset key field val =
   Redis.ByteString.hset key field (toB val)
+
+-- | Sets field in the hash stored at key to value, only if field does not yet
+-- exist. If key does not exist, a new key holding a hash is created. If field
+-- already exists, this operation has no effect.
+--
+-- https://redis.io/commands/hsetnx
+hsetnx :: Text -> Text -> Text -> Internal.Query Bool
+hsetnx key field val =
+  Redis.ByteString.hsetnx key field (toB val)
 
 -- | Get the value of the field of a hash at key. If the key does not exist,
 -- or the field in the hash does not exis the special value Nothing is returned

@@ -68,10 +68,12 @@ cmds query'' =
     Hmget _ _ -> ["HMGET"]
     Hmset _ _ -> ["HMSET"]
     Hset _ _ _ -> ["HSET"]
+    Hsetnx _ _ _ -> ["HSETNX"]
     Mget _ -> ["MGET"]
     Mset _ -> ["MSET"]
     Ping -> ["PING"]
     Set _ _ -> ["SET"]
+    Setnx _ _ -> ["SETNX"]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
     WithResult _ x -> cmds x
@@ -87,10 +89,12 @@ data Query a where
   Hmget :: ByteString -> [ByteString] -> Query [Maybe ByteString]
   Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
   Hset :: ByteString -> ByteString -> ByteString -> Query ()
+  Hsetnx :: ByteString -> ByteString -> ByteString -> Query Bool
   Mget :: [ByteString] -> Query [Maybe ByteString]
   Mset :: [(ByteString, ByteString)] -> Query ()
   Ping :: Query Database.Redis.Status
   Set :: ByteString -> ByteString -> Query ()
+  Setnx :: ByteString -> ByteString -> Query Bool
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a
@@ -143,6 +147,7 @@ namespaceQuery prefix query' =
     Ping -> Ping
     Get key -> Get (prefix ++ key)
     Set key value -> Set (prefix ++ key) value
+    Setnx key value -> Setnx (prefix ++ key) value
     Getset key value -> Getset (prefix ++ key) value
     Mget keys -> Mget (List.map (\k -> prefix ++ k) keys)
     Mset assocs -> Mset (List.map (\(k, v) -> (prefix ++ k, v)) assocs)
@@ -151,6 +156,7 @@ namespaceQuery prefix query' =
     Hmget key fields -> Hmget (prefix ++ key) fields
     Hget key field -> Hget (prefix ++ key) field
     Hset key field val -> Hset (prefix ++ key) field val
+    Hsetnx key field val -> Hsetnx (prefix ++ key) field val
     Hmset key vals -> Hmset (prefix ++ key) vals
     Hdel key fields -> Hdel (prefix ++ key) fields
     Expire key secs -> Expire (prefix ++ key) secs
@@ -176,6 +182,7 @@ keysTouchedByQuery query' =
     Ping -> Set.empty
     Get key -> Set.singleton key
     Set key _ -> Set.singleton key
+    Setnx key _ -> Set.singleton key
     Getset key _ -> Set.singleton key
     Mget keys -> Set.fromList keys
     Hdel key _ -> Set.singleton key
@@ -184,6 +191,7 @@ keysTouchedByQuery query' =
     Hmget key _ -> Set.singleton key
     Hget key _ -> Set.singleton key
     Hset key _ _ -> Set.singleton key
+    Hsetnx key _ _ -> Set.singleton key
     Hmset key _ -> Set.singleton key
     Pure _ -> Set.empty
     Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)
