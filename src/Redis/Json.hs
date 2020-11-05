@@ -261,7 +261,7 @@ decodeResult query' byteString =
   case Aeson.eitherDecodeStrict' byteString of
     Prelude.Right decoded -> Ok decoded
     Prelude.Left err ->
-      Internal.DecodingError (Internal.FailedQuery query') (Data.Text.pack err)
+      Internal.DecodingError (Internal.TracedQuery query') (Data.Text.pack err)
         |> Err
 
 unparsableKeyError :: Internal.Error

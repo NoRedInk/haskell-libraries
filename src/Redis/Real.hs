@@ -10,6 +10,7 @@ where
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
@@ -20,7 +21,6 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Set
-import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 import qualified Prelude
 
@@ -53,10 +53,10 @@ acquireHandler namespace settings = do
   pure
     ( Internal.Handler
         { Internal.doQuery = \query ->
-            let PreparedQuery {cmds, redisCtx} = doRawQuery query
-             in platformRedis (Text.join " " cmds) connection anything redisCtx,
+            let PreparedQuery {redisCtx} = doRawQuery query
+             in platformRedis (Internal.TracedQuery query) connection anything redisCtx,
           Internal.doTransaction = \query ->
-            let PreparedQuery {cmds, redisCtx} = doRawQuery query
+            let PreparedQuery {redisCtx} = doRawQuery query
                 redisCmd =
                   case Settings.clusterMode settings of
                     Settings.Cluster ->
@@ -78,7 +78,7 @@ acquireHandler namespace settings = do
                               -- about load-balancing these transactions across
                               -- nodes just yet.
                               |> Maybe.withDefault "any-key"
-                       in Database.Redis.multiExecWithHash firstKey redisCtx
+                       in Database.Redis.multiExecWithHash (toB firstKey) redisCtx
                     Settings.NotCluster ->
                       Database.Redis.multiExec redisCtx
              in redisCmd
@@ -89,33 +89,30 @@ acquireHandler namespace settings = do
                           Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
                     )
-                  |> platformRedis (Text.join " " cmds) connection anything,
+                  |> platformRedis (Internal.TracedQuery query) connection anything,
           Internal.doWatch = \keys ->
-            Database.Redis.watch keys
+            Database.Redis.watch (map toB keys)
               |> map (map (\_ -> Ok ()))
-              |> platformRedis "watch" connection anything,
-          Internal.namespace = Data.Text.Encoding.encodeUtf8 namespace
+              |> platformRedis (Internal.TracedQuery (Internal.Pure ())) connection anything,
+          Internal.namespace = namespace
         },
       connection
     )
 
-data PreparedQuery m f result
+newtype PreparedQuery m f result
   = PreparedQuery
-      { cmds :: [Text],
-        redisCtx :: m (f result)
+      { redisCtx :: m (f result)
       }
   deriving (Prelude.Functor)
 
 instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (PreparedQuery m f) where
   pure x =
     PreparedQuery
-      { cmds = [],
-        redisCtx = pure (pure x)
+      { redisCtx = pure (pure x)
       }
   f <*> x =
     PreparedQuery
-      { cmds = cmds f ++ cmds x,
-        redisCtx = map2 (map2 (<|)) (redisCtx f) (redisCtx x)
+      { redisCtx = map2 (map2 (<|)) (redisCtx f) (redisCtx x)
       }
 
 -- Construct a query in the underlying `hedis` library we depend on. It has a
@@ -125,28 +122,86 @@ instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (
 doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> PreparedQuery m f (Result Internal.Error result)
 doRawQuery query =
   case query of
-    Internal.Ping -> PreparedQuery ["ping"] Database.Redis.ping |> map Ok
-    Internal.Get key -> PreparedQuery ["get"] (Database.Redis.get key) |> map Ok
-    Internal.Set key val -> PreparedQuery ["set"] (Database.Redis.set key val) |> map (\_ -> Ok ())
-    Internal.Setnx key val -> PreparedQuery ["setnx"] (Database.Redis.setnx key val) |> map Ok
-    Internal.Getset key val -> PreparedQuery ["getset"] (Database.Redis.getset key val) |> map Ok
-    Internal.Mget keys -> PreparedQuery ["mget"] (Database.Redis.mget keys) |> map Ok
-    Internal.Mset vals -> PreparedQuery ["mset"] (Database.Redis.mset vals) |> map (\_ -> Ok ())
-    Internal.Del keys -> PreparedQuery ["del"] (Database.Redis.del keys) |> map (Ok << Prelude.fromIntegral)
-    Internal.Hgetall key -> PreparedQuery ["hgetall"] (Database.Redis.hgetall key) |> map Ok
-    Internal.Hset key field val -> PreparedQuery ["hset"] (Database.Redis.hset key field val) |> map (\_ -> Ok ())
-    Internal.Hsetnx key field val -> PreparedQuery ["hsetnx"] (Database.Redis.hsetnx key field val) |> map Ok
-    Internal.Hget key field -> PreparedQuery ["hget"] (Database.Redis.hget key field) |> map Ok
-    Internal.Hmget key fields -> PreparedQuery ["hmget"] (Database.Redis.hmget key fields) |> map Ok
-    Internal.Hmset key vals -> PreparedQuery ["hmset"] (Database.Redis.hmset key vals) |> map (\_ -> Ok ())
-    Internal.Hdel key fields -> PreparedQuery ["hdel"] (Database.Redis.hdel key fields) |> map (Ok << Prelude.fromIntegral)
-    Internal.Expire key secs -> PreparedQuery ["expire"] (Database.Redis.expire key (fromIntegral secs)) |> map (\_ -> Ok ())
-    Internal.Pure x -> pure (Ok x)
-    Internal.Apply f x -> map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
+    Internal.Ping ->
+      Database.Redis.ping
+        |> PreparedQuery
+        |> map Ok
+    Internal.Get key ->
+      Database.Redis.get (toB key)
+        |> PreparedQuery
+        |> map Ok
+    Internal.Set key val ->
+      Database.Redis.set (toB key) val
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Setnx key val ->
+      Database.Redis.setnx (toB key) val
+        |> PreparedQuery
+        |> map Ok
+    Internal.Getset key val ->
+      Database.Redis.getset (toB key) val
+        |> PreparedQuery
+        |> map Ok
+    Internal.Mget keys ->
+      Database.Redis.mget (map toB keys)
+        |> PreparedQuery
+        |> map Ok
+    Internal.Mset vals ->
+      Database.Redis.mset (List.map (\(key, val) -> (toB key, val)) vals)
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Del keys ->
+      Database.Redis.del (map toB keys)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
+    Internal.Hgetall key ->
+      Database.Redis.hgetall (toB key)
+        |> PreparedQuery
+        |> map
+          ( \results ->
+              results
+                |> Prelude.traverse
+                  ( \(byteKey, v) ->
+                      case Data.Text.Encoding.decodeUtf8' byteKey of
+                        Prelude.Right textKey -> Ok (textKey, v)
+                        Prelude.Left _ -> Err (Internal.LibraryError "key exists but not parsable text")
+                  )
+          )
+    Internal.Hset key field val ->
+      Database.Redis.hset (toB key) (toB field) val
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Hsetnx key field val ->
+      Database.Redis.hsetnx (toB key) (toB field) val
+        |> PreparedQuery
+        |> map Ok
+    Internal.Hget key field ->
+      Database.Redis.hget (toB key) (toB field)
+        |> PreparedQuery
+        |> map Ok
+    Internal.Hmget key fields ->
+      Database.Redis.hmget (toB key) (map toB fields)
+        |> PreparedQuery
+        |> map Ok
+    Internal.Hmset key vals ->
+      Database.Redis.hmset (toB key) (map (\(field, val) -> (toB field, val)) vals)
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Hdel key fields ->
+      Database.Redis.hdel (toB key) (map toB fields)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
+    Internal.Expire key secs ->
+      Database.Redis.expire (toB key) (fromIntegral secs)
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Pure x ->
+      pure (Ok x)
+    Internal.Apply f x ->
+      map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
     Internal.WithResult f q ->
-      let PreparedQuery cmds redisCtx = doRawQuery q
+      let PreparedQuery redisCtx = doRawQuery q
        in PreparedQuery
-            cmds
             ( (map << map)
                 ( \result -> case result of
                     Err a -> Err a
@@ -166,12 +221,12 @@ data Connection
       }
 
 platformRedis ::
-  Text ->
+  Internal.TracedQuery ->
   Connection ->
   Platform.DoAnythingHandler ->
   Database.Redis.Redis (Either Database.Redis.Reply (Result Internal.Error a)) ->
   Task Internal.Error a
-platformRedis command connection anything action =
+platformRedis query connection anything action =
   Database.Redis.runRedis (connectionHedis connection) action
     |> map toResult
     |> map
@@ -190,13 +245,13 @@ platformRedis command connection anything action =
             |> pure
       )
     |> Platform.doAnything anything
-    |> traceQuery command connection
+    |> traceQuery query connection
 
-traceQuery :: Text -> Connection -> Task e a -> Task e a
-traceQuery command connection task =
+traceQuery :: Internal.TracedQuery -> Connection -> Task e a -> Task e a
+traceQuery (Internal.TracedQuery query) connection task =
   let info =
         Info
-          { infoCommand = command,
+          { infoCommands = Internal.cmds query,
             infoHost = connectionHost connection,
             infoPort = connectionPort connection
           }
@@ -206,7 +261,7 @@ traceQuery command connection task =
 
 data Info
   = Info
-      { infoCommand :: Text,
+      { infoCommands :: List Text,
         infoHost :: Text,
         infoPort :: Text
       }
@@ -222,3 +277,6 @@ toResult reply =
     Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
     Left _ -> Err (Internal.RedisError "The Redis library said this was an error but returned no error message.")
     Right r -> Ok r
+
+toB :: Text -> Data.ByteString.ByteString
+toB = Data.Text.Encoding.encodeUtf8

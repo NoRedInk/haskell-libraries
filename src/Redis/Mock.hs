@@ -8,7 +8,6 @@ where
 import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
-import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified List
 import NriPrelude
@@ -55,7 +54,7 @@ handler namespace = do
               )
           )
           |> Platform.doAnything anything,
-      Internal.namespace = Data.Text.Encoding.encodeUtf8 namespace
+      Internal.namespace = namespace
     }
     |> Prelude.pure
 
@@ -63,8 +62,8 @@ handler namespace = do
 -- will store a single value of this type, and redis commands will modify it.
 data Model
   = Model
-      { hash :: HM.HashMap ByteString RedisType,
-        watchedKeys :: HM.HashMap ByteString (Maybe RedisType)
+      { hash :: HM.HashMap Text RedisType,
+        watchedKeys :: HM.HashMap Text (Maybe RedisType)
       }
 
 -- | Redis supports a small number of types and most of its commands expect a
@@ -74,7 +73,7 @@ data Model
 -- we currently have commands for.
 data RedisType
   = RedisByteString ByteString
-  | RedisHash (HM.HashMap ByteString ByteString)
+  | RedisHash (HM.HashMap Text ByteString)
   deriving (Eq)
 
 expectByteString :: RedisType -> Result Internal.Error ByteString
@@ -83,13 +82,13 @@ expectByteString val =
     RedisByteString bytestring -> Ok bytestring
     RedisHash _ -> Err wrongTypeErr
 
-expectHash :: RedisType -> Result Internal.Error (HM.HashMap ByteString ByteString)
+expectHash :: RedisType -> Result Internal.Error (HM.HashMap Text ByteString)
 expectHash val =
   case val of
     RedisByteString _ -> Err wrongTypeErr
     RedisHash hash -> Ok hash
 
-watchKeys :: [ByteString] -> Model -> Model
+watchKeys :: [Text] -> Model -> Model
 watchKeys keys model =
   model
     { watchedKeys =
@@ -100,7 +99,7 @@ watchKeys keys model =
         snapshotKeys keys (hash model) ++ watchedKeys model
     }
 
-snapshotKeys :: [ByteString] -> HM.HashMap ByteString RedisType -> HM.HashMap ByteString (Maybe RedisType)
+snapshotKeys :: [Text] -> HM.HashMap Text RedisType -> HM.HashMap Text (Maybe RedisType)
 snapshotKeys keys hm =
   Prelude.foldMap
     (\key -> HM.singleton key (HM.lookup key hm))
@@ -111,8 +110,8 @@ init = newIORef (Model HM.empty HM.empty)
 
 doQuery ::
   Internal.Query a ->
-  HM.HashMap ByteString RedisType ->
-  (HM.HashMap ByteString RedisType, Result Internal.Error a)
+  HM.HashMap Text RedisType ->
+  (HM.HashMap Text RedisType, Result Internal.Error a)
 doQuery query hm =
   case query of
     Internal.Ping ->

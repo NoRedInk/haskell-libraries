@@ -18,7 +18,7 @@ import qualified Prelude
 data Error
   = RedisError Text
   | ConnectionLost
-  | DecodingError FailedQuery Text
+  | DecodingError TracedQuery Text
   | LibraryError Text
   | TransactionAborted
 
@@ -28,8 +28,8 @@ instance Aeson.ToJSON Error where
 instance Show Error where
   show = errorForHumans >> Data.Text.unpack
 
-data FailedQuery where
-  FailedQuery :: Query a -> FailedQuery
+data TracedQuery where
+  TracedQuery :: Query a -> TracedQuery
 
 errorForHumans :: Error -> Text
 errorForHumans topError =
@@ -37,7 +37,7 @@ errorForHumans topError =
     RedisError err -> "Redis error: " ++ err
     ConnectionLost -> "Connection Lost"
     LibraryError err -> "Library error when executing (probably due to a bug in the library): " ++ err
-    DecodingError (FailedQuery query') err ->
+    DecodingError (TracedQuery query') err ->
       Text.join
         " "
         [ "Could not decode value in key.",
@@ -48,7 +48,6 @@ errorForHumans topError =
             ","
             ( keysTouchedByQuery query'
                 |> Set.toList
-                |> List.map Data.Text.Encoding.decodeUtf8
             ),
           "Decoding error:",
           err
@@ -79,22 +78,22 @@ cmds query'' =
     WithResult _ x -> cmds x
 
 data Query a where
-  Del :: [ByteString] -> Query Int
-  Expire :: ByteString -> Int -> Query ()
-  Get :: ByteString -> Query (Maybe ByteString)
-  Getset :: ByteString -> ByteString -> Query (Maybe ByteString)
-  Hdel :: ByteString -> [ByteString] -> Query Int
-  Hgetall :: ByteString -> Query [(ByteString, ByteString)]
-  Hget :: ByteString -> ByteString -> Query (Maybe ByteString)
-  Hmget :: ByteString -> [ByteString] -> Query [Maybe ByteString]
-  Hmset :: ByteString -> [(ByteString, ByteString)] -> Query ()
-  Hset :: ByteString -> ByteString -> ByteString -> Query ()
-  Hsetnx :: ByteString -> ByteString -> ByteString -> Query Bool
-  Mget :: [ByteString] -> Query [Maybe ByteString]
-  Mset :: [(ByteString, ByteString)] -> Query ()
+  Del :: [Text] -> Query Int
+  Expire :: Text -> Int -> Query ()
+  Get :: Text -> Query (Maybe ByteString)
+  Getset :: Text -> ByteString -> Query (Maybe ByteString)
+  Hdel :: Text -> [Text] -> Query Int
+  Hgetall :: Text -> Query [(Text, ByteString)]
+  Hget :: Text -> Text -> Query (Maybe ByteString)
+  Hmget :: Text -> [Text] -> Query [Maybe ByteString]
+  Hmset :: Text -> [(Text, ByteString)] -> Query ()
+  Hset :: Text -> Text -> ByteString -> Query ()
+  Hsetnx :: Text -> Text -> ByteString -> Query Bool
+  Mget :: [Text] -> Query [Maybe ByteString]
+  Mset :: [(Text, ByteString)] -> Query ()
   Ping :: Query Database.Redis.Status
-  Set :: ByteString -> ByteString -> Query ()
-  Setnx :: ByteString -> ByteString -> Query Bool
+  Set :: Text -> ByteString -> Query ()
+  Setnx :: Text -> ByteString -> Query Bool
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a
@@ -115,8 +114,8 @@ data Handler
   = Handler
       { doQuery :: forall a. Query a -> Task Error a,
         doTransaction :: forall a. Query a -> Task Error a,
-        doWatch :: [ByteString] -> Task Error (),
-        namespace :: ByteString
+        doWatch :: [Text] -> Task Error (),
+        namespace :: Text
       }
 
 -- | Run a redis Query.
@@ -136,12 +135,12 @@ transaction handler query' =
 -- Runs the redis `WATCH` command. This isn't one of the `Query`
 -- constructors because we're not able to run `WATCH` in a transaction,
 -- only as a separate command.
-watch :: Handler -> List ByteString -> Task Error ()
+watch :: Handler -> List Text -> Task Error ()
 watch handler keys =
   List.map (\key -> namespace handler ++ ":" ++ key) keys
     |> doWatch handler
 
-namespaceQuery :: ByteString -> Query a -> Query a
+namespaceQuery :: Text -> Query a -> Query a
 namespaceQuery prefix query' =
   case query' of
     Ping -> Ping
@@ -175,7 +174,7 @@ defaultExpiryKeysAfterSeconds secs handler =
           |> doTransaction handler
    in handler {doQuery = doQuery, doTransaction = doQuery}
 
-keysTouchedByQuery :: Query a -> Set.Set ByteString
+keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
   case query' of
     Del keys -> Set.fromList keys

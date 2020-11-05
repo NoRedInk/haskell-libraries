@@ -36,14 +36,12 @@ module Redis.ByteString
 where
 
 import Data.ByteString (ByteString)
-import qualified Data.Text.Encoding
 import qualified Dict
 import qualified List
 import NriPrelude
 import qualified Redis.Internal as Internal
 import qualified Task
 import qualified Tuple
-import qualified Prelude
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
@@ -52,7 +50,7 @@ import qualified Prelude
 -- https://redis.io/commands/get
 get :: Text -> Internal.Query (Maybe ByteString)
 get key =
-  Internal.Get (toB key)
+  Internal.Get key
 
 -- | Set key to hold the string value. If key already holds a value, it is
 -- overwritten, regardless of its type. Any previous time to live associated
@@ -61,7 +59,7 @@ get key =
 -- https://redis.io/commands/set
 set :: Text -> ByteString -> Internal.Query ()
 set key value =
-  Internal.Set (toB key) value
+  Internal.Set key value
 
 -- | Set key to hold string value if key does not exist. In that case, it is
 -- equal to SET. When key already holds a value, no operation is performed.
@@ -70,7 +68,7 @@ set key value =
 -- https://redis.io/commands/setnx
 setnx :: Text -> ByteString -> Internal.Query Bool
 setnx key value =
-  Internal.Setnx (toB key) value
+  Internal.Setnx key value
 
 -- | Sets the given keys to their respective values. MSET replaces existing
 -- values with new values, just as regular SET. See MSETNX if you don't want to
@@ -85,7 +83,7 @@ mset :: Dict.Dict Text ByteString -> Internal.Query ()
 mset values =
   values
     |> Dict.toList
-    |> List.map (\(k, v) -> (toB k, v))
+    |> List.map (\(k, v) -> (k, v))
     |> Internal.Mset
 
 -- | Atomically sets key to value and returns the old value stored at key.
@@ -94,14 +92,14 @@ mset values =
 -- https://redis.io/commands/getset
 getset :: Text -> ByteString -> Internal.Query (Maybe ByteString)
 getset key value =
-  Internal.Getset (toB key) value
+  Internal.Getset key value
 
 -- | Removes the specified keys. A key is ignored if it does not exist.
 --
 -- https://redis.io/commands/del
 del :: [Text] -> Internal.Query Int
 del keys =
-  Internal.Del (map toB keys)
+  Internal.Del keys
 
 -- | Returns the values of all specified keys. For every key that does not hold
 -- a string value or does not exist, no value is returned. Because of this, the
@@ -111,7 +109,6 @@ del keys =
 mget :: List Text -> Internal.Query (Dict.Dict Text ByteString)
 mget keys =
   keys
-    |> List.map toB
     |> Internal.Mget
     |> map (maybesToDict keys)
 
@@ -158,25 +155,15 @@ atomicModifyWithContext handler key f =
 -- https://redis.io/commands/hgetall
 hgetall :: Text -> Internal.Query (Dict.Dict Text ByteString)
 hgetall key =
-  Internal.Hgetall (toB key)
-    |> Internal.WithResult
-      ( \results ->
-          results
-            |> Prelude.traverse
-              ( \(byteKey, v) ->
-                  case Data.Text.Encoding.decodeUtf8' byteKey of
-                    Prelude.Right textKey -> Ok (textKey, v)
-                    Prelude.Left _ -> Err <| Internal.LibraryError "key exists but not parsable text"
-              )
-            |> map Dict.fromList
-      )
+  Internal.Hgetall key
+    |> Internal.map Dict.fromList
 
 -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
 --
 -- https://redis.io/commands/hset
 hset :: Text -> Text -> ByteString -> Internal.Query ()
 hset key field val =
-  Internal.Hset (toB key) (toB field) val
+  Internal.Hset key field val
 
 -- | Sets field in the hash stored at key to value, only if field does not yet
 -- exist. If key does not exist, a new key holding a hash is created. If field
@@ -185,7 +172,7 @@ hset key field val =
 -- https://redis.io/commands/hsetnx
 hsetnx :: Text -> Text -> ByteString -> Internal.Query Bool
 hsetnx key field val =
-  Internal.Hsetnx (toB key) (toB field) val
+  Internal.Hsetnx key field val
 
 -- | Get the value of the field of a hash at key. If the key does not exist,
 -- or the field in the hash does not exis the special value Nothing is returned
@@ -195,7 +182,7 @@ hsetnx key field val =
 -- https://redis.io/commands/hget
 hget :: Text -> Text -> Internal.Query (Maybe ByteString)
 hget key field =
-  Internal.Hget (toB key) (toB field)
+  Internal.Hget key field
 
 -- | Returns the values associated with the specified fields in the hash stored at key.--
 --
@@ -204,8 +191,7 @@ hget key field =
 hmget :: Text -> [Text] -> Internal.Query (Dict.Dict Text ByteString)
 hmget key fields =
   fields
-    |> List.map toB
-    |> Internal.Hmget (toB key)
+    |> Internal.Hmget key
     |> map (maybesToDict fields)
 
 maybesToDict :: List Text -> List (Maybe a) -> Dict.Dict Text a
@@ -227,8 +213,7 @@ hmset :: Text -> Dict.Dict Text ByteString -> Internal.Query ()
 hmset key vals =
   vals
     |> Dict.toList
-    |> map (\(k, v) -> (toB k, v))
-    |> Internal.Hmset (toB key)
+    |> Internal.Hmset key
 
 -- | Set a timeout on key. After the timeout has expired, the key will
 -- automatically be deleted. A key with an associated timeout is often said to
@@ -236,7 +221,7 @@ hmset key vals =
 --
 -- https://redis.io/commands/expire
 expire :: Text -> Int -> Internal.Query ()
-expire key secs = Internal.Expire (toB key) secs
+expire key secs = Internal.Expire key secs
 
 -- | Removes the specified fields from the hash stored at key. Specified fields
 -- that do not exist within this hash are ignored. If key does not exist, it is
@@ -244,7 +229,7 @@ expire key secs = Internal.Expire (toB key) secs
 --
 -- https://redis.io/commands/hdel
 hdel :: Text -> [Text] -> Internal.Query Int
-hdel key fields = Internal.Hdel (toB key) (map toB fields)
+hdel key fields = Internal.Hdel key fields
 
 -- | Returns PONG if no argument is provided, otherwise return a copy of the
 -- argument as a bulk. This command is often used to test if a connection is
@@ -262,8 +247,4 @@ ping = Internal.Ping |> map (\_ -> ())
 -- https://redis.io/commands/watch
 watch :: Internal.Handler -> [Text] -> Task Internal.Error ()
 watch h keys =
-  List.map Data.Text.Encoding.encodeUtf8 keys
-    |> Internal.watch h
-
-toB :: Text -> Data.ByteString.ByteString
-toB = Data.Text.Encoding.encodeUtf8
+  Internal.watch h keys
