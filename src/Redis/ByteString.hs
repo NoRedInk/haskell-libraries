@@ -141,7 +141,7 @@ atomicModifyWithContext handler key f =
             else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
         Internal.ConnectionLost -> Task.fail err
         Internal.RedisError _ -> Task.fail err
-        Internal.DecodingError _ _ -> Task.fail err
+        Internal.DecodingError _ -> Task.fail err
         Internal.LibraryError _ -> Task.fail err
     action = do
       watch handler [key]

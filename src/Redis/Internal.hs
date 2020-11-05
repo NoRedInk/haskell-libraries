@@ -18,7 +18,7 @@ import qualified Prelude
 data Error
   = RedisError Text
   | ConnectionLost
-  | DecodingError TracedQuery Text
+  | DecodingError Text
   | LibraryError Text
   | TransactionAborted
 
@@ -37,21 +37,7 @@ errorForHumans topError =
     RedisError err -> "Redis error: " ++ err
     ConnectionLost -> "Connection Lost"
     LibraryError err -> "Library error when executing (probably due to a bug in the library): " ++ err
-    DecodingError (TracedQuery query') err ->
-      Text.join
-        " "
-        [ "Could not decode value in key.",
-          "Cmds:",
-          Text.join "," (cmds query'),
-          "Keys:",
-          Text.join
-            ","
-            ( keysTouchedByQuery query'
-                |> Set.toList
-            ),
-          "Decoding error:",
-          err
-        ]
+    DecodingError err -> "Could not decode value in key: " ++ err
     TransactionAborted -> "Transaction aborted. Watched key has changed."
 
 -- | Render the commands a query is going to run for monitoring and debugging
