@@ -54,28 +54,34 @@ errorForHumans topError =
         ]
     TransactionAborted -> "Transaction aborted. Watched key has changed."
 
+-- | Render the commands a query is going to run for monitoring and debugging
+-- purposes. Values we write are replaced with "*****" because they might
+-- contain sensitive data.
 cmds :: Query b -> [Text]
 cmds query'' =
   case query'' of
-    Del _ -> ["DEL"]
-    Expire _ _ -> ["EXPIRE"]
-    Get _ -> ["GET"]
-    Getset _ _ -> ["GETSET"]
-    Hdel _ _ -> ["HDEL"]
-    Hgetall _ -> ["HGETALL"]
-    Hget _ _ -> ["HGET"]
-    Hmget _ _ -> ["HMGET"]
-    Hmset _ _ -> ["HMSET"]
-    Hset _ _ _ -> ["HSET"]
-    Hsetnx _ _ _ -> ["HSETNX"]
-    Mget _ -> ["MGET"]
-    Mset _ -> ["MSET"]
+    Del keys -> [unwords ("DEL" : keys)]
+    Expire key val -> [unwords ["EXPIRE", key, Text.fromInt val]]
+    Get key -> [unwords ["GET", key]]
+    Getset key _ -> [unwords ["GETSET", key, "*****"]]
+    Hdel key fields -> [unwords ("HDEL" : key : fields)]
+    Hgetall key -> [unwords ["HGETALL", key]]
+    Hget key field -> [unwords ["HGET", key, field]]
+    Hmget key fields -> [unwords ("HMGET" : key : fields)]
+    Hmset key _ -> [unwords ["HMSET", key, "*****"]]
+    Hset key field _ -> [unwords ["HSET", key, field, "*****"]]
+    Hsetnx key field _ -> [unwords ["HSETNX", key, field, "*****"]]
+    Mget keys -> [unwords ("MGET" : keys)]
+    Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) pairs)]
     Ping -> ["PING"]
-    Set _ _ -> ["SET"]
-    Setnx _ _ -> ["SETNX"]
+    Set key _ -> [unwords ["SET", key, "*****"]]
+    Setnx key _ -> [unwords ["SETNX", key, "*****"]]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
     WithResult _ x -> cmds x
+
+unwords :: [Text] -> Text
+unwords = Text.join " "
 
 data Query a where
   Del :: [Text] -> Query Int
