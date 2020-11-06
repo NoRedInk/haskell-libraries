@@ -2,7 +2,6 @@ module Main (main) where
 
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
-import qualified Data.Text.Encoding
 import qualified Debug
 import qualified Dict
 import Dict (Dict)
@@ -219,4 +218,4 @@ getHandlers = do
 
 addNamespace :: Text -> Handler -> Handler
 addNamespace namespace handler =
-  handler {Internal.namespace = Internal.namespace handler ++ ":" ++ Data.Text.Encoding.encodeUtf8 namespace}
+  handler {Internal.namespace = Internal.namespace handler ++ ":" ++ namespace}
