@@ -27,6 +27,7 @@ import qualified Data.Text.Encoding
 import qualified Data.Typeable as Typeable
 import qualified Environment
 import qualified Http
+import qualified List
 import qualified Log
 import qualified Maybe
 import qualified Monitoring
@@ -178,12 +179,18 @@ redisToDatastore info =
   NewRelic.DatastoreSegment
     { NewRelic.datastoreSegmentProduct = NewRelic.Redis,
       NewRelic.datastoreSegmentCollection = Nothing,
-      NewRelic.datastoreSegmentOperation = Just (Redis.infoCommand info),
+      NewRelic.datastoreSegmentOperation = firstCommand (Redis.infoCommands info),
       NewRelic.datastoreSegmentHost = Just (Redis.infoHost info),
       NewRelic.datastoreSegmentPortPathOrId = Just (Redis.infoPort info),
       NewRelic.datastoreSegmentDatabaseName = Nothing,
-      NewRelic.datastoreSegmentQuery = Nothing
+      NewRelic.datastoreSegmentQuery = Just (Text.join "\n" (Redis.infoCommands info))
     }
+
+firstCommand :: [Text] -> Maybe Text
+firstCommand cmds =
+  case cmds of
+    [] -> Nothing
+    first : _ -> List.head (Text.split " " first)
 
 httpToExternalSegment :: Http.Info -> NewRelic.ExternalSegment
 httpToExternalSegment info =
