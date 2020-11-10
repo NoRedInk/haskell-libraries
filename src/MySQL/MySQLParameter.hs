@@ -16,6 +16,9 @@ import qualified Prelude
 class MySQLParameter a where
   mysqlEncode :: a -> Base.MySQLValue
 
+instance MySQLParameter Bool where
+  mysqlEncode n = Base.MySQLInt8 (if n then 1 else 0)
+
 instance MySQLParameter Data.Int.Int8 where
   mysqlEncode = Base.MySQLInt8
 

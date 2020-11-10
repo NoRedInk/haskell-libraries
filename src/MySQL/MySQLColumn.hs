@@ -23,6 +23,16 @@ instance Exception.Exception UnexpectedMySQLValue
 class MySQLColumn a where
   decodeParam :: Base.MySQLValue -> a
 
+instance MySQLColumn Bool where
+  decodeParam (Base.MySQLInt8U n) = n > 0
+  decodeParam (Base.MySQLInt8 n) = n > 0
+  decodeParam (Base.MySQLInt16U n) = n > 0
+  decodeParam (Base.MySQLInt16 n) = n > 0
+  -- HACK WARNING: We get a Int64 from calculated values in selects
+  -- unfortunatelly even if it should be a Int16 that represents a boolean.
+  decodeParam (Base.MySQLInt64 n) = n > 0
+  decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Bool" n)
+
 instance MySQLColumn Int where
   decodeParam (Base.MySQLInt8U n) = Prelude.fromIntegral n
   decodeParam (Base.MySQLInt8 n) = Prelude.fromIntegral n
