@@ -25,6 +25,7 @@ module Observability.Honeycomb
 where
 
 import qualified Conduit
+import Control.Monad (unless)
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.HashMap.Strict as HashMap
@@ -39,6 +40,7 @@ import NriPrelude
 import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
+import qualified System.Random as Random
 import qualified Task
 import qualified Text as NriText
 import qualified Prelude
@@ -63,18 +65,37 @@ report handler' requestId span = do
             Http._timeout = Nothing,
             Http._expect = Http.expectText
           }
-  result <-
-    Http.request (handler_http handler') requestSettings
-      |> Task.attempt silentHandler'
-  case result of
-    Ok body' -> do
-      Prelude.putStrLn "OK"
-      Prelude.putStrLn <| Text.unpack body'
-      Prelude.pure ()
-    Err err -> do
-      _ <- Prelude.fail <| Prelude.show err
-      Prelude.putStrLn "ERROR"
-      Prelude.pure ()
+  -- This is an initial implementation of sampling, based on
+  -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
+  -- using Dynamic Sampling based on whether the request was successful or not.
+  --
+  -- We can go further and:
+  --
+  --  * Not sample requests above a certain configurable threshold, to replicate
+  --    NewRelic's slow request tracing.
+  --  * Apply some sampling rate to errors
+  --  * Apply different sample rates depending on traffic (easiest approximation
+  --    is basing it off of time of day) so we sample less at low traffic
+  skipLogging <-
+    case Platform.succeeded span of
+      Platform.Succeeded -> do
+        roll <- Random.randomRIO (0, 1)
+        Prelude.pure (roll > (handler_fractionOfSuccessRequestsLogged handler'))
+      Platform.Failed -> Prelude.pure False
+      Platform.FailedWith _ -> Prelude.pure False
+  unless skipLogging <| do
+    result <-
+      Http.request (handler_http handler') requestSettings
+        |> Task.attempt silentHandler'
+    case result of
+      Ok body' -> do
+        Prelude.putStrLn "OK"
+        Prelude.putStrLn <| Text.unpack body'
+        Prelude.pure ()
+      Err err -> do
+        _ <- Prelude.fail <| Prelude.show err
+        Prelude.putStrLn "ERROR"
+        Prelude.pure ()
 
 toBatchEvents :: CommonFields -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents commonFields parentSpanId spanIndex span = do
@@ -174,7 +195,8 @@ data Handler
         handler_http :: Http.Handler,
         handler_serviceName :: Text,
         handler_environment :: Text,
-        handler_honeycombApiKey :: Log.Secret Text
+        handler_honeycombApiKey :: Log.Secret Text,
+        handler_fractionOfSuccessRequestsLogged :: Float
       }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
@@ -186,14 +208,16 @@ handler timer settings = do
         handler_http = http,
         handler_serviceName = appName settings,
         handler_environment = appEnvironment settings,
-        handler_honeycombApiKey = honeycombApiKey settings
+        handler_honeycombApiKey = honeycombApiKey settings,
+        handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings
       }
 
 data Settings
   = Settings
       { appName :: Text,
         appEnvironment :: Text,
-        honeycombApiKey :: Log.Secret Text
+        honeycombApiKey :: Log.Secret Text,
+        fractionOfSuccessRequestsLogged :: Float
       }
 
 decoder :: Environment.Decoder Settings
@@ -202,6 +226,7 @@ decoder =
     |> andMap appNameDecoder
     |> andMap appEnvironmentDecoder
     |> andMap honeycombApiKeyDecoder
+    |> andMap fractionOfSuccessRequestsLoggedDecoder
 
 honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret Text)
 honeycombApiKeyDecoder =
@@ -232,3 +257,13 @@ appNameDecoder =
         Environment.defaultValue = "your-application-name-here"
       }
     Environment.text
+
+fractionOfSuccessRequestsLoggedDecoder :: Environment.Decoder Float
+fractionOfSuccessRequestsLoggedDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "HONEYCOMB_FRACTION_OF_SUCCESS_REQUESTS_LOGGED",
+        Environment.description = "The fraction of successful requests logged. Defaults to logging all successful requests.",
+        Environment.defaultValue = "1"
+      }
+    Environment.float
