@@ -80,7 +80,7 @@ report handler' requestId span = do
     case Platform.succeeded span of
       Platform.Succeeded -> do
         roll <- Random.randomRIO (0, 1)
-        Prelude.pure (roll > (handler_fractionOfSuccessRequestsLogged handler'))
+        Prelude.pure (roll > handler_fractionOfSuccessRequestsLogged handler')
       Platform.Failed -> Prelude.pure False
       Platform.FailedWith _ -> Prelude.pure False
   unless skipLogging <| do
