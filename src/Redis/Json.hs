@@ -19,6 +19,7 @@ module Redis.Json
     mget,
     mset,
     ping,
+    rpush,
     set,
     setnx,
     watch,
@@ -194,6 +195,12 @@ hdel = Redis.ByteString.hdel
 -- https://redis.io/commands/ping
 ping :: Internal.Query ()
 ping = Redis.ByteString.ping
+
+-- | Insert all the specified values at the tail of the list stored at key. If key does not exist, it is created as empty list before performing the push operation. When key holds a value that is not a list, an error is returned.
+--
+-- https://redis.io/commands/rpush
+rpush :: Aeson.ToJSON a => Text -> [a] -> Internal.Query Int
+rpush key vals = Internal.Rpush key (map encodeStrict vals)
 
 -- | Marks the given keys to be watched for conditional execution of a
 -- transaction.

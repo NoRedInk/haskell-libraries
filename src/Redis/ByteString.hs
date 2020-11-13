@@ -17,6 +17,7 @@ module Redis.ByteString
     mget,
     mset,
     ping,
+    rpush,
     set,
     setnx,
     watch,
@@ -238,6 +239,12 @@ hdel key fields = Internal.Hdel key fields
 -- https://redis.io/commands/ping
 ping :: Internal.Query ()
 ping = Internal.Ping |> map (\_ -> ())
+
+-- | Insert all the specified values at the tail of the list stored at key. If key does not exist, it is created as empty list before performing the push operation. When key holds a value that is not a list, an error is returned.
+--
+-- https://redis.io/commands/rpush
+rpush :: Text -> [ByteString] -> Internal.Query Int
+rpush = Internal.Rpush
 
 -- | Marks the given keys to be watched for conditional execution of a
 -- transaction.

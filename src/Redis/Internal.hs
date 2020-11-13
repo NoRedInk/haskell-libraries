@@ -60,6 +60,7 @@ cmds query'' =
     Mget keys -> [unwords ("MGET" : keys)]
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) pairs)]
     Ping -> ["PING"]
+    Rpush _ _ -> ["RPUSH"]
     Set key _ -> [unwords ["SET", key, "*****"]]
     Setnx key _ -> [unwords ["SETNX", key, "*****"]]
     Pure _ -> []
@@ -84,6 +85,7 @@ data Query a where
   Mget :: [Text] -> Query [Maybe ByteString]
   Mset :: [(Text, ByteString)] -> Query ()
   Ping :: Query Database.Redis.Status
+  Rpush :: Text -> [ByteString] -> Query Int
   Set :: Text -> ByteString -> Query ()
   Setnx :: Text -> ByteString -> Query Bool
   -- The constructors below are not Redis-related, but support using functions
@@ -151,6 +153,7 @@ namespaceQuery prefix query' =
     Hmset key vals -> Hmset (prefix ++ key) vals
     Hdel key fields -> Hdel (prefix ++ key) fields
     Expire key secs -> Expire (prefix ++ key) secs
+    Rpush key vals -> Rpush (prefix ++ key) vals
     Pure x -> Pure x
     Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
     WithResult f q -> WithResult f (namespaceQuery prefix q)
@@ -184,6 +187,7 @@ keysTouchedByQuery query' =
     Hset key _ _ -> Set.singleton key
     Hsetnx key _ _ -> Set.singleton key
     Hmset key _ -> Set.singleton key
+    Rpush key _ -> Set.singleton key
     Pure _ -> Set.empty
     Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)
     WithResult _ q -> keysTouchedByQuery q

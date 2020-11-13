@@ -74,6 +74,7 @@ data Model
 data RedisType
   = RedisByteString ByteString
   | RedisHash (HM.HashMap Text ByteString)
+  | RedisList [ByteString]
   deriving (Eq)
 
 expectByteString :: RedisType -> Result Internal.Error ByteString
@@ -81,12 +82,14 @@ expectByteString val =
   case val of
     RedisByteString bytestring -> Ok bytestring
     RedisHash _ -> Err wrongTypeErr
+    RedisList _ -> Err wrongTypeErr
 
 expectHash :: RedisType -> Result Internal.Error (HM.HashMap Text ByteString)
 expectHash val =
   case val of
     RedisByteString _ -> Err wrongTypeErr
     RedisHash hash -> Ok hash
+    RedisList _ -> Err wrongTypeErr
 
 watchKeys :: [Text] -> Model -> Model
 watchKeys keys model =
@@ -180,7 +183,7 @@ doQuery query hm =
           ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
             Ok ()
           )
-        Just (RedisByteString _) ->
+        Just _ ->
           ( hm,
             Err wrongTypeErr
           )
@@ -200,7 +203,7 @@ doQuery query hm =
               ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
                 Ok True
               )
-        Just (RedisByteString _) ->
+        Just _ ->
           ( hm,
             Err wrongTypeErr
           )
@@ -214,7 +217,7 @@ doQuery query hm =
           ( hm,
             Ok (HM.lookup field hm')
           )
-        Just (RedisByteString _) ->
+        Just _ ->
           ( hm,
             Err wrongTypeErr
           )
@@ -229,7 +232,7 @@ doQuery query hm =
             map (\field -> HM.lookup field hm') fields
               |> Ok
           )
-        Just (RedisByteString _) ->
+        Just _ ->
           ( hm,
             Err wrongTypeErr
           )
@@ -243,7 +246,7 @@ doQuery query hm =
           ( HM.insert key (RedisHash (hm' ++ HM.fromList vals)) hm,
             Ok ()
           )
-        Just (RedisByteString _) ->
+        Just _ ->
           ( hm,
             Err wrongTypeErr
           )
@@ -260,7 +263,22 @@ doQuery query hm =
                   |> Prelude.fromIntegral
                   |> Ok
               )
-        Just (RedisByteString _) ->
+        Just _ ->
+          ( hm,
+            Err wrongTypeErr
+          )
+    Internal.Rpush key vals ->
+      case HM.lookup key hm of
+        Nothing ->
+          ( HM.insert key (RedisList vals) hm,
+            Ok (List.length vals)
+          )
+        Just (RedisList prev) ->
+          let combined = prev ++ vals
+           in ( HM.insert key (RedisList combined) hm,
+                Ok (List.length combined)
+              )
+        Just _ ->
           ( hm,
             Err wrongTypeErr
           )
