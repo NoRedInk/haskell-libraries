@@ -35,6 +35,7 @@ module Redis.Json
     -- * helper functions
     atomicModify,
     atomicModifyWithContext,
+    codec,
   )
 where
 
@@ -45,20 +46,24 @@ import qualified Data.Text
 import qualified Dict
 import NriPrelude
 import qualified Redis.ByteString
+import qualified Redis.Generic as Generic
 import qualified Redis.Internal as Internal
 import qualified Task
 import qualified Tuple
 import qualified Prelude
+
+api :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Api a
+api =
+  Generic.fromCodec codec
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
 -- string, because GET only handles string values.
 --
 -- https://redis.io/commands/get
-get :: Aeson.FromJSON a => Text -> Internal.Query (Maybe a)
-get key =
-  Redis.ByteString.get key
-    |> Internal.WithResult decodeIfFound
+get :: (Aeson.ToJSON a, Aeson.FromJSON a) => Text -> Internal.Query (Maybe a)
+get =
+  Generic.get api
 
 -- | Returns the values of all specified keys. For every key that does not hold
 -- a string value or does not exist, no value is returned. Because of this, the
@@ -251,6 +256,13 @@ atomicModifyWithContext handler key f =
             Err _ -> Task.fail unparsableKeyError
             Ok _ -> Task.succeed res
       )
+
+codec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Codec a
+codec =
+  Generic.Codec
+    { Generic.encode = encodeStrict,
+      Generic.decode = decodeIfFound
+    }
 
 encodeStrict :: Aeson.ToJSON a => a -> Data.ByteString.ByteString
 encodeStrict x =
