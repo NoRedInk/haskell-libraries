@@ -50,7 +50,7 @@ tests =
         [sql|SELECT id FROM monolith.users WHERE id IN (${[] :: [Int]})|]
           |> Expect.equal
             Query
-              { preparedStatement = "SELECT id FROM users WHERE id IN (\"THIS_IS_NEVER_TRUE_ELSE_COMPLAIN_TO_PUFFERFISH\")",
+              { preparedStatement = "SELECT id FROM users WHERE id IN (FALSE)",
                 params = Log.mkSecret [],
                 quasiQuotedString = "SELECT id FROM monolith.users WHERE id IN (${[] :: [Int]})",
                 sqlOperation = "SELECT",
