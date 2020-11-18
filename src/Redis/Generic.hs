@@ -7,7 +7,7 @@
 -- TODO expose only one module `module Redis (fromCordec, Codec, Api, jsonCodec, textCodec) where`
 module Redis.Generic
   ( -- * Creating api access functions
-    fromCodec,
+    makeApi,
     Codec (..),
     Api (..),
 
@@ -34,15 +34,15 @@ data Codec a
           Result Internal.Error (Maybe a)
       }
 
-data Api a
+data Api key a
   = Api
-      { get :: Text -> Internal.Query (Maybe a),
-        set :: Text -> a -> Internal.Query ()
+      { get :: key -> Internal.Query (Maybe a),
+        set :: key -> a -> Internal.Query ()
       }
 
-fromCodec :: Codec a -> Api a
-fromCodec Codec {encode, decode} =
+makeApi :: (key -> Text) -> Codec a -> Api key a
+makeApi toKey Codec {encode, decode} =
   Api
-    { get = Internal.WithResult decode << (\key -> Internal.Get key),
-      set = \key value -> Internal.Set key (encode value)
+    { get = Internal.WithResult decode << (\key -> Internal.Get (toKey key)),
+      set = \key value -> Internal.Set (toKey key) (encode value)
     }

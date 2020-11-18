@@ -52,9 +52,10 @@ import qualified Task
 import qualified Tuple
 import qualified Prelude
 
-api :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Api a
+-- TODO this module would actually go away
+api :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Api Text a
 api =
-  Generic.fromCodec codec
+  Generic.makeApi identity codec
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
