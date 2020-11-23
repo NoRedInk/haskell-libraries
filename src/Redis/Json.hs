@@ -35,7 +35,6 @@ module Redis.Json
     -- * helper functions
     atomicModify,
     atomicModifyWithContext,
-    codec,
   )
 where
 
@@ -55,7 +54,7 @@ import qualified Prelude
 -- TODO this module would actually go away
 api :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Api Text a
 api =
-  Generic.makeApi identity codec
+  Generic.makeApi identity Generic.jsonCodec
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
@@ -257,13 +256,6 @@ atomicModifyWithContext handler key f =
             Err _ -> Task.fail unparsableKeyError
             Ok _ -> Task.succeed res
       )
-
-codec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Codec a
-codec =
-  Generic.Codec
-    { Generic.encode = encodeStrict,
-      Generic.decode = decodeIfFound
-    }
 
 encodeStrict :: Aeson.ToJSON a => a -> Data.ByteString.ByteString
 encodeStrict x =
