@@ -11,6 +11,7 @@ import qualified Database.Redis
 import qualified List
 import NriPrelude hiding (map)
 import qualified Set
+import qualified Task
 import qualified Text
 import qualified Tuple
 import qualified Prelude
@@ -21,6 +22,7 @@ data Error
   | DecodingError Text
   | LibraryError Text
   | TransactionAborted
+  | TimeoutError
 
 instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
@@ -39,6 +41,7 @@ errorForHumans topError =
     LibraryError err -> "Library error when executing (probably due to a bug in the library): " ++ err
     DecodingError err -> "Could not decode value in key: " ++ err
     TransactionAborted -> "Transaction aborted. Watched key has changed."
+    TimeoutError -> "Redis query took too long."
 
 -- | Render the commands a query is going to run for monitoring and debugging
 -- purposes. Values we write are replaced with "*****" because they might
@@ -117,6 +120,13 @@ query :: Handler -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> doQuery handler
+
+timeoutAfterMilliseconds :: Float -> Handler -> Handler
+timeoutAfterMilliseconds milliseconds handler =
+  handler
+    { doQuery = doQuery handler >> Task.timeout milliseconds TimeoutError,
+      doTransaction = doTransaction handler >> Task.timeout milliseconds TimeoutError
+    }
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other

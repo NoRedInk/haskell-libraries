@@ -27,11 +27,20 @@ import qualified Prelude
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings = do
   (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
-  Prelude.pure
-    <| case Settings.defaultExpiry settings of
-      Settings.NoDefaultExpiry -> namespacedHandler
-      Settings.ExpireKeysAfterSeconds secs ->
-        Internal.defaultExpiryKeysAfterSeconds secs namespacedHandler
+  namespacedHandler
+    |> ( \handler' ->
+           case Settings.defaultExpiry settings of
+             Settings.NoDefaultExpiry -> handler'
+             Settings.ExpireKeysAfterSeconds secs ->
+               Internal.defaultExpiryKeysAfterSeconds secs handler'
+       )
+    |> ( \handler' ->
+           case Settings.queryTimeout settings of
+             Settings.NoQueryTimeout -> handler'
+             Settings.TimeoutQueryAfterMilliseconds milliseconds ->
+               Internal.timeoutAfterMilliseconds (toFloat milliseconds) handler'
+       )
+    |> Prelude.pure
 
 acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler, Connection)
 acquireHandler namespace settings = do

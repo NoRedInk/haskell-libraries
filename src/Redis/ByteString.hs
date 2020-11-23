@@ -144,6 +144,7 @@ atomicModifyWithContext handler key f =
         Internal.RedisError _ -> Task.fail err
         Internal.DecodingError _ -> Task.fail err
         Internal.LibraryError _ -> Task.fail err
+        Internal.TimeoutError -> Task.fail err
     action = do
       watch handler [key]
       oldValue <- Internal.query handler (get key)

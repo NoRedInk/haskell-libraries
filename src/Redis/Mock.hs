@@ -284,7 +284,7 @@ doQuery query hm =
           )
     Internal.Expire _ _ ->
       -- Expiring is an intentional no-op in `Redis.Mock`. Implementing it would
-      -- like take a long effort, and only support writing slow tests.
+      -- likely be a lot of effort, and only support writing slow tests.
       ( hm,
         Ok ()
       )

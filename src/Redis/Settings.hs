@@ -1,4 +1,4 @@
-module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), decoder) where
+module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), QueryTimeout (..), decoder) where
 
 import qualified Data.Text
 import Database.Redis hiding (Ok)
@@ -13,18 +13,22 @@ data Settings
   = Settings
       { connectionInfo :: ConnectInfo,
         clusterMode :: ClusterMode,
-        defaultExpiry :: DefaultExpiry
+        defaultExpiry :: DefaultExpiry,
+        queryTimeout :: QueryTimeout
       }
 
 data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
 
+data QueryTimeout = NoQueryTimeout | TimeoutQueryAfterMilliseconds Int
+
 decoder :: Environment.Decoder Settings
 decoder =
-  map3
+  map4
     Settings
     decoderConnectInfo
     decoderClusterMode
     decoderDefaultExpiry
+    decoderQueryTimeout
 
 decoderClusterMode :: Environment.Decoder ClusterMode
 decoderClusterMode =
@@ -75,3 +79,20 @@ decoderDefaultExpiry =
             then NoDefaultExpiry
             else ExpireKeysAfterSeconds secs
       )
+
+decoderQueryTimeout :: Environment.Decoder QueryTimeout
+decoderQueryTimeout =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "REDIS_QUERY_TIMEOUT_MILLISECONDS",
+        Environment.description = "0 means no timeout, every other value is a timeout in milliseconds.",
+        Environment.defaultValue = "1000"
+      }
+    ( Environment.custom
+        Environment.int
+        ( \milliseconds ->
+            if milliseconds <= 0
+              then Ok NoQueryTimeout
+              else Ok (TimeoutQueryAfterMilliseconds milliseconds)
+        )
+    )
