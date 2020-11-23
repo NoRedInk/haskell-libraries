@@ -20,6 +20,7 @@ data Error
   = RedisError Text
   | ConnectionLost
   | DecodingError Text
+  | DecodingFieldError Text
   | LibraryError Text
   | TransactionAborted
   | TimeoutError
@@ -40,6 +41,7 @@ errorForHumans topError =
     ConnectionLost -> "Connection Lost"
     LibraryError err -> "Library error when executing (probably due to a bug in the library): " ++ err
     DecodingError err -> "Could not decode value in key: " ++ err
+    DecodingFieldError err -> "Could not decode field of hash: " ++ err
     TransactionAborted -> "Transaction aborted. Watched key has changed."
     TimeoutError -> "Redis query took too long."
 

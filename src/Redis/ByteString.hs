@@ -143,6 +143,7 @@ atomicModifyWithContext handler key f =
         Internal.ConnectionLost -> Task.fail err
         Internal.RedisError _ -> Task.fail err
         Internal.DecodingError _ -> Task.fail err
+        Internal.DecodingFieldError _ -> Task.fail err
         Internal.LibraryError _ -> Task.fail err
         Internal.TimeoutError -> Task.fail err
     action = do
