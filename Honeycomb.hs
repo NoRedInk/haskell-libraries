@@ -60,13 +60,13 @@ report handler' requestId span = do
   --  * Apply some sampling rate to errors
   --  * Apply different sample rates depending on traffic (easiest approximation
   --    is basing it off of time of day) so we sample less at low traffic
-  
+
   (skipLogging, sampleRate) <-
     case Platform.succeeded span of
       Platform.Succeeded -> do
         roll <- Random.randomRIO (0, 1)
         let fractionOfSuccessRequestsLogged' = handler_fractionOfSuccessRequestsLogged handler'
-        Prelude.pure (roll > fractionOfSuccessRequestsLogged', round (1/fractionOfSuccessRequestsLogged'))
+        Prelude.pure (roll > fractionOfSuccessRequestsLogged', round (1 / fractionOfSuccessRequestsLogged'))
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
   let commonFields = CommonFields (handler_timer handler') (handler_serviceName handler') (handler_environment handler') requestId
