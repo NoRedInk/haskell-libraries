@@ -50,8 +50,28 @@ batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetNam
 
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' requestId span = do
+  -- This is an initial implementation of sampling, based on
+  -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
+  -- using Dynamic Sampling based on whether the request was successful or not.
+  --
+  -- We can go further and:
+  --
+  --  * Not sample requests above a certain configurable threshold, to replicate
+  --    NewRelic's slow request tracing.
+  --  * Apply some sampling rate to errors
+  --  * Apply different sample rates depending on traffic (easiest approximation
+  --    is basing it off of time of day) so we sample less at low traffic
+  
+  (skipLogging, sampleRate) <-
+    case Platform.succeeded span of
+      Platform.Succeeded -> do
+        roll <- Random.randomRIO (0, 1)
+        let fractionOfSuccessRequestsLogged' = handler_fractionOfSuccessRequestsLogged handler'
+        Prelude.pure (roll > fractionOfSuccessRequestsLogged', round (1/fractionOfSuccessRequestsLogged'))
+      Platform.Failed -> Prelude.pure (False, 1)
+      Platform.FailedWith _ -> Prelude.pure (False, 1)
   let commonFields = CommonFields (handler_timer handler') (handler_serviceName handler') (handler_environment handler') requestId
-  let (_, spans) = toBatchEvents commonFields Nothing 0 span
+  let (_, spans) = toBatchEvents commonFields sampleRate Nothing 0 span
   let body = Http.jsonBody spans
   silentHandler' <- Platform.silentHandler
   let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
@@ -65,24 +85,6 @@ report handler' requestId span = do
             Http._timeout = Nothing,
             Http._expect = Http.expectText
           }
-  -- This is an initial implementation of sampling, based on
-  -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
-  -- using Dynamic Sampling based on whether the request was successful or not.
-  --
-  -- We can go further and:
-  --
-  --  * Not sample requests above a certain configurable threshold, to replicate
-  --    NewRelic's slow request tracing.
-  --  * Apply some sampling rate to errors
-  --  * Apply different sample rates depending on traffic (easiest approximation
-  --    is basing it off of time of day) so we sample less at low traffic
-  skipLogging <-
-    case Platform.succeeded span of
-      Platform.Succeeded -> do
-        roll <- Random.randomRIO (0, 1)
-        Prelude.pure (roll > handler_fractionOfSuccessRequestsLogged handler')
-      Platform.Failed -> Prelude.pure False
-      Platform.FailedWith _ -> Prelude.pure False
   unless skipLogging <| do
     result <-
       Http.request (handler_http handler') requestSettings
@@ -97,10 +99,10 @@ report handler' requestId span = do
         Prelude.putStrLn "ERROR"
         Prelude.pure ()
 
-toBatchEvents :: CommonFields -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
-toBatchEvents commonFields parentSpanId spanIndex span = do
+toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
+toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
-  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
+  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration = Platform.finished span - Platform.started span |> Platform.inMicroseconds
   let timestamp = toISO8601 (common_timer commonFields) (Platform.started span)
   let hcSpan =
@@ -118,7 +120,8 @@ toBatchEvents commonFields parentSpanId spanIndex span = do
   ( lastSpanIndex,
     BatchEvent
       { batchevent_time = timestamp,
-        batchevent_data = hcSpan
+        batchevent_data = hcSpan,
+        batchevent_samplerate = sampleRate
       }
       : List.concat children
     )
@@ -126,7 +129,8 @@ toBatchEvents commonFields parentSpanId spanIndex span = do
 data BatchEvent
   = BatchEvent
       { batchevent_time :: Text,
-        batchevent_data :: Span
+        batchevent_data :: Span,
+        batchevent_samplerate :: Int
       }
   deriving (Generic)
 
