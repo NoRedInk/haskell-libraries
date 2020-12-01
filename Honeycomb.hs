@@ -30,7 +30,6 @@ import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
-import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Environment
 import qualified Http
@@ -85,19 +84,10 @@ report handler' requestId span = do
             Http._timeout = Nothing,
             Http._expect = Http.expectText
           }
-  unless skipLogging <| do
-    result <-
-      Http.request (handler_http handler') requestSettings
-        |> Task.attempt silentHandler'
-    case result of
-      Ok body' -> do
-        Prelude.putStrLn "OK"
-        Prelude.putStrLn <| Text.unpack body'
-        Prelude.pure ()
-      Err err -> do
-        _ <- Prelude.fail <| Prelude.show err
-        Prelude.putStrLn "ERROR"
-        Prelude.pure ()
+  Http.request (handler_http handler') requestSettings
+    |> Task.attempt silentHandler'
+    |> map (\_ -> ())
+    |> unless skipLogging
 
 toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
