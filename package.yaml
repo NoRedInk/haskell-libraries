@@ -3,6 +3,7 @@ name: database
 synopsis: NRI helper for database queries
 extra-source-files:
 - README.md
+- "test/golden-results/*.json"
 dependencies:
 - aeson
 - attoparsec
