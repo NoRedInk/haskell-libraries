@@ -3,6 +3,7 @@ name: http
 synopsis: Make Elm style HTTP requests
 extra-source-files:
 - README.md
+- "test/golden-results/*.json"
 library:
   dependencies:
   - aeson
