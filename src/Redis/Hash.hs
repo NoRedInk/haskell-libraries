@@ -25,6 +25,9 @@ module Redis.Hash
     -- * Creating api access functions
     makeHashApi,
     HashApi,
+    del,
+    expire,
+    ping,
     hdel,
     hget,
     hgetall,
@@ -52,7 +55,23 @@ import qualified Prelude
 
 data HashApi key field a
   = HashApi
-      { -- | Removes the specified fields from the hash stored at key. Specified fields
+      { -- | Removes the specified keys. A key is ignored if it does not exist.
+        --
+        -- https://redis.io/commands/del
+        del :: List.List key -> Internal.Query Int,
+        -- | Set a timeout on key. After the timeout has expired, the key will
+        -- automatically be deleted. A key with an associated timeout is often said to
+        -- be volatile in Redis terminology.
+        --
+        -- https://redis.io/commands/expire
+        expire :: key -> Int -> Internal.Query (),
+        -- | Returns PONG if no argument is provided, otherwise return a copy of the
+        -- argument as a bulk. This command is often used to test if a connection is
+        -- still alive, or to measure latency.
+        --
+        -- https://redis.io/commands/ping
+        ping :: Internal.Query (),
+        -- | Removes the specified fields from the hash stored at key. Specified fields
         -- that do not exist within this hash are ignored. If key does not exist, it is
         -- treated as an empty hash and this command returns 0.
         --
@@ -102,7 +121,10 @@ makeHashApi ::
   HashApi key field a
 makeHashApi encode decode toKey toField fromField =
   HashApi
-    { hdel = \key fields -> Internal.Hdel (toKey key) (List.map toField fields),
+    { del = Internal.Del << List.map toKey,
+      expire = \key secs -> Internal.Expire (toKey key) secs,
+      ping = Internal.Ping |> map (\_ -> ()),
+      hdel = \key fields -> Internal.Hdel (toKey key) (List.map toField fields),
       hget = \key field -> Internal.WithResult (Prelude.traverse decode) (Internal.Hget (toKey key) (toField field)),
       hgetall = Internal.WithResult (toDict fromField decode) << Internal.Hgetall << toKey,
       hmget = \key fields ->
