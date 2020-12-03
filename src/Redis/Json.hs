@@ -45,24 +45,20 @@ import qualified Data.Text
 import qualified Dict
 import NriPrelude
 import qualified Redis.ByteString
-import qualified Redis.Generic as Generic
 import qualified Redis.Internal as Internal
 import qualified Task
 import qualified Tuple
 import qualified Prelude
-
-api :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Api Text a
-api =
-  Generic.makeApi identity Generic.jsonCodec
 
 -- | Get the value of key. If the key does not exist the special value Nothing
 -- is returned. An error is returned if the value stored at key is not a
 -- string, because GET only handles string values.
 --
 -- https://redis.io/commands/get
-get :: (Aeson.ToJSON a, Aeson.FromJSON a) => Text -> Internal.Query (Maybe a)
-get =
-  Generic.get api
+get :: Aeson.FromJSON a => Text -> Internal.Query (Maybe a)
+get key =
+  Redis.ByteString.get key
+    |> Internal.WithResult decodeIfFound
 
 -- | Returns the values of all specified keys. For every key that does not hold
 -- a string value or does not exist, no value is returned. Because of this, the
