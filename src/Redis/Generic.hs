@@ -12,8 +12,10 @@ module Redis.Generic
     Api (..),
     makeHashApi,
     HashApi (..),
-    Codec (..),
-    jsonCodec,
+    Decoder,
+    Encoder,
+    jsonDecoder,
+    jsonEncoder,
 
     -- * Running queries
     Internal.Query,
@@ -37,15 +39,9 @@ import qualified Redis.Internal as Internal
 import qualified Result
 import qualified Prelude
 
-data Codec a
-  = Codec
-      { encode :: Encode a,
-        decode :: Decode a
-      }
+type Encoder a = a -> ByteString
 
-type Encode a = a -> ByteString
-
-type Decode a = ByteString -> Result Internal.Error a
+type Decoder a = ByteString -> Result Internal.Error a
 
 data Api key a
   = Api
@@ -61,8 +57,8 @@ data Api key a
         setnx :: key -> a -> Internal.Query Bool
       }
 
-makeApi :: (key -> Text) -> Codec a -> Api key a
-makeApi toKey Codec {encode, decode} =
+makeApi :: Encoder a -> Decoder a -> (key -> Text) -> Api key a
+makeApi encode decode toKey =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
@@ -96,12 +92,13 @@ data HashApi key field a
 
 makeHashApi ::
   Ord field =>
+  Encoder a ->
+  Decoder a ->
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
-  Codec a ->
   HashApi key field a
-makeHashApi toKey toField fromField Codec {encode, decode} =
+makeHashApi encode decode toKey toField fromField =
   HashApi
     { hdel = \key fields -> Internal.Hdel (toKey key) (List.map toField fields),
       hgetall = Internal.WithResult (toDict fromField decode) << Internal.Hgetall << toKey,
@@ -122,7 +119,7 @@ makeHashApi toKey toField fromField Codec {encode, decode} =
         Internal.Hsetnx (toKey key) (toField field) (encode val)
     }
 
-toDict :: Ord field => (Text -> Maybe field) -> Decode a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
+toDict :: Ord field => (Text -> Maybe field) -> Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
 toDict fromField decode =
   Result.map Dict.fromList
     << Prelude.traverse
@@ -136,17 +133,16 @@ toDict fromField decode =
             (decode v)
       )
 
-jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
-jsonCodec =
-  Codec
-    { encode = Aeson.encode >> Data.ByteString.Lazy.toStrict,
-      decode = \byteString ->
-        case Aeson.eitherDecodeStrict' byteString of
-          Prelude.Right decoded -> Ok decoded
-          Prelude.Left err ->
-            Internal.DecodingError (Data.Text.pack err)
-              |> Err
-    }
+jsonEncoder :: Aeson.ToJSON a => Encoder a
+jsonEncoder = Aeson.encode >> Data.ByteString.Lazy.toStrict
+
+jsonDecoder :: Aeson.FromJSON a => Decoder a
+jsonDecoder byteString =
+  case Aeson.eitherDecodeStrict' byteString of
+    Prelude.Right decoded -> Ok decoded
+    Prelude.Left err ->
+      Internal.DecodingError (Data.Text.pack err)
+        |> Err
 
 -- | Marks the given keys to be watched for conditional execution of a
 -- transaction.
