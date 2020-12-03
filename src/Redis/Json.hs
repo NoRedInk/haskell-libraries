@@ -51,7 +51,6 @@ import qualified Task
 import qualified Tuple
 import qualified Prelude
 
--- TODO this module would actually go away
 api :: (Aeson.FromJSON a, Aeson.ToJSON a) => Generic.Api Text a
 api =
   Generic.makeApi identity Generic.jsonCodec

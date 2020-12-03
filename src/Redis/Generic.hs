@@ -6,8 +6,6 @@
 --
 -- When data is found in Redis but cannot be decoded these functions will return
 -- an error.
---
--- TODO expose only one module `module Redis (fromCordec, Codec, Api, jsonCodec, textCodec) where`
 module Redis.Generic
   ( -- * Creating api access functions
     makeApi,
