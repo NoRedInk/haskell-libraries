@@ -106,6 +106,7 @@ makeApi encode decode toKey =
 data HashApi key field a
   = HashApi
       { hdel :: key -> List.List field -> Internal.Query Int,
+        hget :: key -> field -> Internal.Query (Maybe a),
         hgetall :: key -> Internal.Query (Dict.Dict field a),
         hmget :: key -> List.List field -> Internal.Query (Dict.Dict field a),
         hmset :: key -> Dict.Dict field a -> Internal.Query (),
@@ -124,6 +125,7 @@ makeHashApi ::
 makeHashApi encode decode toKey toField fromField =
   HashApi
     { hdel = \key fields -> Internal.Hdel (toKey key) (List.map toField fields),
+      hget = \key field -> Internal.WithResult (Prelude.traverse decode) (Internal.Hget (toKey key) (toField field)),
       hgetall = Internal.WithResult (toDict fromField decode) << Internal.Hgetall << toKey,
       hmget = \key fields ->
         fields
