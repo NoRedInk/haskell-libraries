@@ -18,7 +18,6 @@ library:
   - unordered-containers
   exposed-modules:
   - Redis
-  - Redis.Generic
   - Redis.Text
   - Redis.Json
   - Redis.ByteString
