@@ -32,7 +32,6 @@ module Redis
     mget,
     mset,
     ping,
-    rpush,
     set,
     setnx,
     Decoder,
@@ -118,15 +117,6 @@ data Api key a
         --
         -- https://redis.io/commands/ping
         ping :: Internal.Query (),
-        -- | Insert all the specified values at the tail of the list stored at key. If key does not exist, it is created as empty list before performing the push operation. When key holds a value that is not a list, an error is returned.
-        --
-        -- https://redis.io/commands/rpush
-        rpush :: key -> List.List a -> Internal.Query Int,
-        -- | Set key to hold the string value. If key already holds a value, it is
-        -- overwritten, regardless of its type. Any previous time to live associated
-        -- with the key is discarded on successful SET operation.
-        --
-        -- https://redis.io/commands/set
         set :: key -> a -> Internal.Query (),
         -- | Set key to hold the string value. If key already holds a value, it is
         -- overwritten, regardless of its type. Any previous time to live associated
@@ -153,8 +143,6 @@ makeApi encode decode toKey =
           >> List.map (\(k, v) -> (toKey k, encode v))
           >> Internal.Mset,
       ping = Internal.Ping |> map (\_ -> ()),
-      rpush = \key vals ->
-        Internal.Rpush (toKey key) (List.map encode vals),
       set = \key value -> Internal.Set (toKey key) (encode value),
       setnx = \key value -> Internal.Setnx (toKey key) (encode value)
     }

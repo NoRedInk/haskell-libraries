@@ -19,6 +19,7 @@ library:
   exposed-modules:
   - Redis
   - Redis.Hash
+  - Redis.List
   - Redis.Text
   - Redis.Json
   - Redis.ByteString
