@@ -21,6 +21,7 @@ library:
   - Redis.Hash
   - Redis.List
   - Redis.Mock
+  - Redis.Deprecated
   source-dirs:
   - src
 tests:
