@@ -35,8 +35,8 @@ module Redis
     set,
     setnx,
     Codec (..),
-    Redis.Encoder,
-    Redis.Decoder,
+    Encoder,
+    Decoder,
     jsonCodec,
   )
 where
