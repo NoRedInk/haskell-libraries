@@ -34,6 +34,7 @@ module Redis.List
     Redis.Decoder,
     Redis.jsonCodec,
     Redis.byteStringCodec,
+    Redis.textCodec,
   )
 where
 

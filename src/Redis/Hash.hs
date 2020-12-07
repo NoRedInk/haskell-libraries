@@ -40,6 +40,7 @@ module Redis.Hash
     Redis.Decoder,
     Redis.jsonCodec,
     Redis.byteStringCodec,
+    Redis.textCodec,
   )
 where
 

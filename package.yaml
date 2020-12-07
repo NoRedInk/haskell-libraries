@@ -20,7 +20,6 @@ library:
   - Redis
   - Redis.Hash
   - Redis.List
-  - Redis.Text
   - Redis.Json
   - Redis.Mock
   source-dirs:

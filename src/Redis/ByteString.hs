@@ -1,6 +1,5 @@
 -- | This module exports low-level bindings to Redis that read and write
--- `ByteString` values. We need this to integrate Redis with some libraries. In
--- most cases you'll likely want to use either `Redis.Json` or `Redis.Text`.
+-- `ByteString` values
 module Redis.ByteString
   ( -- * Redis commands
     del,

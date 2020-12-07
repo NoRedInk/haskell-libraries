@@ -34,11 +34,13 @@ module Redis
     ping,
     set,
     setnx,
+    atomicModifyWithContext,
     Codec (..),
     Encoder,
     Decoder,
     jsonCodec,
     byteStringCodec,
+    textCodec,
   )
 where
 
@@ -46,11 +48,13 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
 import qualified Data.Text
+import qualified Data.Text.Encoding
 import qualified Dict
 import qualified Health
 import qualified List
 import NriPrelude
 import qualified Platform
+import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -130,7 +134,10 @@ data Api key a
         -- with the key is discarded on successful SET operation.
         --
         -- https://redis.io/commands/set
-        setnx :: key -> a -> Internal.Query Bool
+        setnx :: key -> a -> Internal.Query Bool,
+        -- | As `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
+        -- that was set.
+        atomicModifyWithContext :: forall b. Internal.Handler -> key -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
       }
 
 makeApi :: Codec a -> (key -> Text) -> Api key a
@@ -151,7 +158,26 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
           >> Internal.Mset,
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
-      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value)
+      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
+      atomicModifyWithContext = \handler key f ->
+        Redis.ByteString.atomicModifyWithContext
+          handler
+          (toKey key)
+          ( \maybeByteString ->
+              let context = Prelude.traverse codecDecoder maybeByteString
+               in ( case context of
+                      Ok maybeText -> maybeText
+                      Err _ -> Nothing
+                  )
+                    |> f
+                    |> (\r@(res, _ctx) -> (codecEncoder res, (r, context)))
+          )
+          |> Task.andThen
+            ( \(_, (res, context)) ->
+                case context of
+                  Err _ -> Task.fail unparsableKeyError
+                  Ok _ -> Task.succeed res
+            )
     }
 
 jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
@@ -170,6 +196,9 @@ jsonDecoder byteString =
 
 byteStringCodec :: Codec ByteString
 byteStringCodec = Codec identity Ok
+
+textCodec :: Codec Text
+textCodec = Codec Data.Text.Encoding.encodeUtf8 (Data.Text.Encoding.decodeUtf8 >> Ok)
 
 -- | Marks the given keys to be watched for conditional execution of a
 -- transaction.
@@ -191,3 +220,6 @@ maybesToDict keys values =
             Just v -> Just (key, v)
       )
     |> Dict.fromList
+
+unparsableKeyError :: Internal.Error
+unparsableKeyError = Internal.LibraryError "key exists but not parsable json"
