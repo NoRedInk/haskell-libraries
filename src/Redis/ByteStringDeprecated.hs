@@ -1,6 +1,6 @@
 -- | This module exports low-level bindings to Redis that read and write
 -- `ByteString` values
-module Redis.ByteString
+module Redis.ByteStringDeprecated
   ( -- * Redis commands
     del,
     expire,

@@ -44,7 +44,7 @@ import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Dict
 import NriPrelude
-import qualified Redis.ByteString
+import qualified Redis.ByteStringDeprecated as Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Task
 import qualified Tuple
