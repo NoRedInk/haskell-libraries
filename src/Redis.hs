@@ -20,7 +20,6 @@ module Redis
     Real.Info (..),
     Real.handler,
     readiness,
-    watch,
 
     -- * Creating api access functions
     makeApi,
@@ -137,13 +136,6 @@ data Api key a
         --
         -- https://redis.io/commands/set
         setnx :: key -> a -> Internal.Query Bool,
-        -- | Marks the given keys to be watched for conditional execution of a
-        -- transaction.
-        --
-        -- This returns a task because it cannot be ran as part of a transaction.
-        --
-        -- https://redis.io/commands/watch
-        watch :: Internal.Handler -> [key] -> Task Internal.Error (),
         experimental :: Experimental key a
       }
 
@@ -178,7 +170,6 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
-      watch = \h keys -> Internal.watch h (List.map toKey keys),
       experimental =
         Experimental
           { atomicModify = \handler key f ->
