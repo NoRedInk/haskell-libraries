@@ -38,6 +38,7 @@ module Redis
     Encoder,
     Decoder,
     jsonCodec,
+    byteStringCodec,
   )
 where
 
@@ -166,6 +167,9 @@ jsonDecoder byteString =
     Prelude.Left err ->
       Internal.DecodingError (Data.Text.pack err)
         |> Err
+
+byteStringCodec :: Codec ByteString
+byteStringCodec = Codec identity Ok
 
 -- | Marks the given keys to be watched for conditional execution of a
 -- transaction.

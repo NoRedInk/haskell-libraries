@@ -39,6 +39,7 @@ module Redis.Hash
     Redis.Encoder,
     Redis.Decoder,
     Redis.jsonCodec,
+    Redis.byteStringCodec,
   )
 where
 
