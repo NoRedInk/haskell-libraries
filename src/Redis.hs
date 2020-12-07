@@ -137,7 +137,13 @@ data Api key a
         --
         -- https://redis.io/commands/set
         setnx :: key -> a -> Internal.Query Bool,
-        -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
+        -- | Marks the given keys to be watched for conditional execution of a
+        -- transaction.
+        --
+        -- This returns a task because it cannot be ran as part of a transaction.
+        --
+        -- https://redis.io/commands/watch
+        watch :: Internal.Handler -> [key] -> Task Internal.Error (),
         experimental :: Experimental key a
       }
 
@@ -172,6 +178,7 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
+      watch = \h keys -> Internal.watch h (List.map toKey keys),
       experimental =
         Experimental
           { atomicModify = \handler key f ->
@@ -184,7 +191,7 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
     atomicModifyWithContext handler key f =
       atomicModifyWithContext'
         handler
-        (toKey key)
+        key
         ( \maybeByteString ->
             let context = Prelude.traverse codecDecoder maybeByteString
              in ( case context of
@@ -200,36 +207,30 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
                 Err _ -> Task.fail unparsableKeyError
                 Ok _ -> Task.succeed res
           )
-
-atomicModifyWithContext' ::
-  Internal.Handler ->
-  Text ->
-  (Maybe ByteString -> (ByteString, a)) ->
-  Task Internal.Error (ByteString, a)
-atomicModifyWithContext' handler key f =
-  loop (100 :: Int)
-  where
-    loop count =
-      action
-        |> Task.onError (handleError count)
-    handleError count err =
-      case err of
-        Internal.TransactionAborted ->
-          if count > 0
-            then loop (count - 1)
-            else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
-        Internal.ConnectionLost -> Task.fail err
-        Internal.RedisError _ -> Task.fail err
-        Internal.DecodingError _ -> Task.fail err
-        Internal.DecodingFieldError _ -> Task.fail err
-        Internal.LibraryError _ -> Task.fail err
-        Internal.TimeoutError -> Task.fail err
-    action = do
-      watch handler [key]
-      oldValue <- Internal.query handler (Internal.Get key)
-      let (setValue, returnValue) = f oldValue
-      Internal.transaction handler (Internal.Set key setValue)
-      Task.succeed (setValue, returnValue)
+    atomicModifyWithContext' handler key f =
+      loop (100 :: Int)
+      where
+        loop count =
+          action
+            |> Task.onError (handleError count)
+        handleError count err =
+          case err of
+            Internal.TransactionAborted ->
+              if count > 0
+                then loop (count - 1)
+                else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
+            Internal.ConnectionLost -> Task.fail err
+            Internal.RedisError _ -> Task.fail err
+            Internal.DecodingError _ -> Task.fail err
+            Internal.DecodingFieldError _ -> Task.fail err
+            Internal.LibraryError _ -> Task.fail err
+            Internal.TimeoutError -> Task.fail err
+        action = do
+          Internal.watch handler [toKey key]
+          oldValue <- Internal.query handler (Internal.Get (toKey key))
+          let (setValue, returnValue) = f oldValue
+          Internal.transaction handler (Internal.Set (toKey key) setValue)
+          Task.succeed (setValue, returnValue)
 
 jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
 jsonCodec = Codec jsonEncoder jsonDecoder
@@ -250,16 +251,6 @@ byteStringCodec = Codec identity Ok
 
 textCodec :: Codec Text
 textCodec = Codec Data.Text.Encoding.encodeUtf8 (Data.Text.Encoding.decodeUtf8 >> Ok)
-
--- | Marks the given keys to be watched for conditional execution of a
--- transaction.
---
--- This returns a task because it cannot be ran as part of a transaction.
---
--- https://redis.io/commands/watch
-watch :: Internal.Handler -> [Text] -> Task Internal.Error ()
-watch h keys =
-  Internal.watch h keys
 
 maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
 maybesToDict keys values =
