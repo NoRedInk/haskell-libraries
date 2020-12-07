@@ -22,7 +22,6 @@ library:
   - Redis.List
   - Redis.Text
   - Redis.Json
-  - Redis.ByteString
   - Redis.Mock
   source-dirs:
   - src
