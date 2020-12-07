@@ -23,8 +23,8 @@ module Redis.Hash
     Redis.watch,
 
     -- * Creating api access functions
-    makeHashApi,
-    HashApi,
+    makeApi,
+    Api,
     del,
     expire,
     ping,
@@ -53,8 +53,8 @@ import qualified Redis.Settings as Settings
 import qualified Result
 import qualified Prelude
 
-data HashApi key field a
-  = HashApi
+data Api key field a
+  = Api
       { -- | Removes the specified keys. A key is ignored if it does not exist.
         --
         -- https://redis.io/commands/del
@@ -111,16 +111,16 @@ data HashApi key field a
         hsetnx :: key -> field -> a -> Internal.Query Bool
       }
 
-makeHashApi ::
+makeApi ::
   Ord field =>
   Redis.Encoder a ->
   Redis.Decoder a ->
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
-  HashApi key field a
-makeHashApi encode decode toKey toField fromField =
-  HashApi
+  Api key field a
+makeApi encode decode toKey toField fromField =
+  Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
