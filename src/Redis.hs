@@ -169,7 +169,7 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
       mget = \keys ->
         List.map toKey keys
           |> Internal.Mget
-          |> map (maybesToDict keys)
+          |> map (Internal.maybesToDict keys)
           |> Internal.WithResult (Prelude.traverse codecDecoder),
       mset =
         Dict.toList
@@ -251,17 +251,6 @@ byteStringCodec = Codec identity Ok
 
 textCodec :: Codec Text
 textCodec = Codec Data.Text.Encoding.encodeUtf8 (Data.Text.Encoding.decodeUtf8 >> Ok)
-
-maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
-maybesToDict keys values =
-  List.map2 (,) keys values
-    |> List.filterMap
-      ( \(key, value) ->
-          case value of
-            Nothing -> Nothing
-            Just v -> Just (key, v)
-      )
-    |> Dict.fromList
 
 unparsableKeyError :: Internal.Error
 unparsableKeyError = Internal.LibraryError "key exists but not parsable json"

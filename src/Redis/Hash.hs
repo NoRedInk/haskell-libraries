@@ -131,7 +131,7 @@ makeApi Redis.Codec {Redis.codecEncoder, Redis.codecDecoder} toKey toField fromF
         fields
           |> List.map toField
           |> Internal.Hmget (toKey key)
-          |> map (maybesToDict fields)
+          |> map (Internal.maybesToDict fields)
           |> Internal.WithResult (Prelude.traverse codecDecoder),
       hmset = \key vals ->
         vals
@@ -157,14 +157,3 @@ toDict fromField decode =
             )
             (decode v)
       )
-
-maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
-maybesToDict keys values =
-  List.map2 (,) keys values
-    |> List.filterMap
-      ( \(key, value) ->
-          case value of
-            Nothing -> Nothing
-            Just v -> Just (key, v)
-      )
-    |> Dict.fromList
