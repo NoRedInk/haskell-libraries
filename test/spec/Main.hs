@@ -73,6 +73,18 @@ specs logHandler whichHandler redisHandler =
         set jsonApi "JSON list" testData |> query testNS
         result <- get jsonApi "JSON list" |> query testNS
         pure <| Expect.equal (Just testData) result,
+      redisTest "atomic modify with no value" <| do
+        _ <- del api ["Empty Atom"] |> query testNS
+        result <-
+          atomicModify
+            (experimental api)
+            testNS
+            "Empty Atom"
+            ( \v -> case v of
+                Just v' -> "Prefix:" ++ v'
+                Nothing -> "Nothing"
+            )
+        pure <| Expect.equal "Nothing" result,
       redisTest "mget retrieves a mapping of the requested keys and their corresponding values" <| do
         set api "mgetTest::key1" "value 1" |> query testNS
         set api "mgetTest::key3" "value 3" |> query testNS
@@ -113,11 +125,24 @@ specs logHandler whichHandler redisHandler =
         mset jsonApi dict |> query testNS
         result <- mget jsonApi (Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
+      redisTest "atomic modify with value" <| do
+        _ <- del api ["Full Atom"] |> query testNS
+        set api "Full Atom" "Something" |> query testNS
+        result <-
+          atomicModify
+            (experimental api)
+            testNS
+            "Full Atom"
+            ( \v -> case v of
+                Just v' -> "Prefix:" ++ v'
+                Nothing -> "Nothing"
+            )
+        pure <| Expect.equal "Prefix:Something" result,
       redisTest "atomicModifyWithContext works empty" <| do
         _ <- del api ["Atom With Context"] |> query testNS
         result <-
           atomicModifyWithContext
-            api
+            (experimental api)
             testNS
             "Atom With Context"
             ( \v -> case v of
@@ -129,7 +154,7 @@ specs logHandler whichHandler redisHandler =
         set api "Atom With Context (full)" "A piece of text" |> query testNS
         result <-
           atomicModifyWithContext
-            api
+            (experimental api)
             testNS
             "Atom With Context (full)"
             ( \v -> case v of
@@ -141,7 +166,7 @@ specs logHandler whichHandler redisHandler =
         _ <- del api ["JSON Atom With Context"] |> query testNS
         result <-
           atomicModifyWithContext
-            jsonApi
+            (experimental jsonApi)
             testNS
             "JSON Atom With Context"
             ( \v -> case v of

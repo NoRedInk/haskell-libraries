@@ -34,6 +34,7 @@ module Redis
     ping,
     set,
     setnx,
+    experimental,
     atomicModify,
     atomicModifyWithContext,
     Codec (..),
@@ -137,6 +138,13 @@ data Api key a
         -- https://redis.io/commands/set
         setnx :: key -> a -> Internal.Query Bool,
         -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
+        experimental :: Experimental key a
+      }
+
+-- | These functions are experimental and may not work.
+data Experimental key a
+  = Experimental
+      { -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
         -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
         -- The returned value is the value that was set.
         atomicModify :: Internal.Handler -> key -> (Maybe a -> a) -> Task Internal.Error a,
@@ -164,10 +172,13 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
-      atomicModify = \handler key f ->
-        atomicModifyWithContext handler key (\x -> (f x, ()))
-          |> map Tuple.first,
-      atomicModifyWithContext
+      experimental =
+        Experimental
+          { atomicModify = \handler key f ->
+              atomicModifyWithContext handler key (\x -> (f x, ()))
+                |> map Tuple.first,
+            atomicModifyWithContext
+          }
     }
   where
     atomicModifyWithContext handler key f =
