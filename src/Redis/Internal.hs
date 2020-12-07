@@ -8,6 +8,7 @@ import Data.ByteString (ByteString)
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
+import qualified Dict
 import qualified List
 import NriPrelude hiding (map)
 import qualified Set
@@ -209,3 +210,14 @@ keysTouchedByQuery query' =
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8
+
+maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
+maybesToDict keys values =
+  List.map2 (,) keys values
+    |> List.filterMap
+      ( \(key, value) ->
+          case value of
+            Nothing -> Nothing
+            Just v -> Just (key, v)
+      )
+    |> Dict.fromList

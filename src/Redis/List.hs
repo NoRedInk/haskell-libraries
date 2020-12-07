@@ -20,7 +20,6 @@ module Redis.List
     Real.Info (..),
     Real.handler,
     Redis.readiness,
-    Redis.watch,
 
     -- * Creating api access functions
     makeApi,
