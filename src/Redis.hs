@@ -34,6 +34,7 @@ module Redis
     ping,
     set,
     setnx,
+    atomicModify,
     atomicModifyWithContext,
     Codec (..),
     Encoder,
@@ -59,6 +60,7 @@ import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Task
+import qualified Tuple
 import qualified Prelude
 
 -- |
@@ -135,6 +137,10 @@ data Api key a
         --
         -- https://redis.io/commands/set
         setnx :: key -> a -> Internal.Query Bool,
+        -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
+        -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
+        -- The returned value is the value that was set.
+        atomicModify :: Internal.Handler -> key -> (Maybe a -> a) -> Task Internal.Error a,
         -- | As `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
         -- that was set.
         atomicModifyWithContext :: forall b. Internal.Handler -> key -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
@@ -159,26 +165,31 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
-      atomicModifyWithContext = \handler key f ->
-        Redis.ByteString.atomicModifyWithContext
-          handler
-          (toKey key)
-          ( \maybeByteString ->
-              let context = Prelude.traverse codecDecoder maybeByteString
-               in ( case context of
-                      Ok maybeText -> maybeText
-                      Err _ -> Nothing
-                  )
-                    |> f
-                    |> (\r@(res, _ctx) -> (codecEncoder res, (r, context)))
-          )
-          |> Task.andThen
-            ( \(_, (res, context)) ->
-                case context of
-                  Err _ -> Task.fail unparsableKeyError
-                  Ok _ -> Task.succeed res
-            )
+      atomicModify = \handler key f ->
+        atomicModifyWithContext handler key (\x -> (f x, ()))
+          |> map Tuple.first,
+      atomicModifyWithContext
     }
+  where
+    atomicModifyWithContext handler key f =
+      Redis.ByteString.atomicModifyWithContext
+        handler
+        (toKey key)
+        ( \maybeByteString ->
+            let context = Prelude.traverse codecDecoder maybeByteString
+             in ( case context of
+                    Ok maybeText -> maybeText
+                    Err _ -> Nothing
+                )
+                  |> f
+                  |> (\r@(res, _ctx) -> (codecEncoder res, (r, context)))
+        )
+        |> Task.andThen
+          ( \(_, (res, context)) ->
+              case context of
+                Err _ -> Task.fail unparsableKeyError
+                Ok _ -> Task.succeed res
+          )
 
 jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
 jsonCodec = Codec jsonEncoder jsonDecoder
