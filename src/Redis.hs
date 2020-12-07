@@ -55,7 +55,6 @@ import qualified Health
 import qualified List
 import NriPrelude
 import qualified Platform
-import qualified Redis.ByteString
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -172,7 +171,7 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
     }
   where
     atomicModifyWithContext handler key f =
-      Redis.ByteString.atomicModifyWithContext
+      atomicModifyWithContext'
         handler
         (toKey key)
         ( \maybeByteString ->
@@ -190,6 +189,36 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
                 Err _ -> Task.fail unparsableKeyError
                 Ok _ -> Task.succeed res
           )
+
+atomicModifyWithContext' ::
+  Internal.Handler ->
+  Text ->
+  (Maybe ByteString -> (ByteString, a)) ->
+  Task Internal.Error (ByteString, a)
+atomicModifyWithContext' handler key f =
+  loop (100 :: Int)
+  where
+    loop count =
+      action
+        |> Task.onError (handleError count)
+    handleError count err =
+      case err of
+        Internal.TransactionAborted ->
+          if count > 0
+            then loop (count - 1)
+            else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
+        Internal.ConnectionLost -> Task.fail err
+        Internal.RedisError _ -> Task.fail err
+        Internal.DecodingError _ -> Task.fail err
+        Internal.DecodingFieldError _ -> Task.fail err
+        Internal.LibraryError _ -> Task.fail err
+        Internal.TimeoutError -> Task.fail err
+    action = do
+      watch handler [key]
+      oldValue <- Internal.query handler (Internal.Get key)
+      let (setValue, returnValue) = f oldValue
+      Internal.transaction handler (Internal.Set key setValue)
+      Task.succeed (setValue, returnValue)
 
 jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
 jsonCodec = Codec jsonEncoder jsonDecoder
