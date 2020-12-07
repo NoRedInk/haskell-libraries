@@ -23,16 +23,16 @@ module Redis.List
     Redis.watch,
 
     -- * Creating api access functions
-    makeListApi,
-    ListApi,
+    makeApi,
+    Api,
     del,
     expire,
     ping,
     rpush,
-    Redis.Decoder,
+    Redis.Codec,
     Redis.Encoder,
-    Redis.jsonDecoder,
-    Redis.jsonEncoder,
+    Redis.Decoder,
+    Redis.jsonCodec,
   )
 where
 
@@ -43,8 +43,8 @@ import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 
-data ListApi key a
-  = ListApi
+data Api key a
+  = Api
       { -- | Removes the specified keys. A key is ignored if it does not exist.
         --
         -- https://redis.io/commands/del
@@ -67,16 +67,15 @@ data ListApi key a
         rpush :: key -> List.List a -> Internal.Query Int
       }
 
-makeListApi ::
-  Redis.Encoder a ->
-  Redis.Decoder a ->
+makeApi ::
+  Redis.Codec a ->
   (key -> Text) ->
-  ListApi key a
-makeListApi encode _decode toKey =
-  ListApi
+  Api key a
+makeApi Redis.Codec {Redis.codecEncoder} toKey =
+  Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
       rpush = \key vals ->
-        Internal.Rpush (toKey key) (List.map encode vals)
+        Internal.Rpush (toKey key) (List.map codecEncoder vals)
     }

@@ -34,10 +34,10 @@ module Redis
     ping,
     set,
     setnx,
-    Decoder,
-    Encoder,
-    jsonDecoder,
-    jsonEncoder,
+    Codec (..),
+    Redis.Encoder,
+    Redis.Decoder,
+    jsonCodec,
   )
 where
 
@@ -67,6 +67,12 @@ readiness handler =
       |> Task.map (\_ -> Health.Good)
       |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
       |> Task.perform log
+
+data Codec a
+  = Codec
+      { codecEncoder :: Encoder a,
+        codecDecoder :: Decoder a
+      }
 
 type Encoder a = a -> ByteString
 
@@ -126,26 +132,29 @@ data Api key a
         setnx :: key -> a -> Internal.Query Bool
       }
 
-makeApi :: Encoder a -> Decoder a -> (key -> Text) -> Api key a
-makeApi encode decode toKey =
+makeApi :: Codec a -> (key -> Text) -> Api key a
+makeApi Codec {codecEncoder, codecDecoder} toKey =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
-      get = \key -> Internal.WithResult (Prelude.traverse decode) (Internal.Get (toKey key)),
-      getset = \key value -> Internal.WithResult (Prelude.traverse decode) (Internal.Getset (toKey key) (encode value)),
+      get = \key -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Get (toKey key)),
+      getset = \key value -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Getset (toKey key) (codecEncoder value)),
       mget = \keys ->
         List.map toKey keys
           |> Internal.Mget
           |> map (maybesToDict keys)
-          |> Internal.WithResult (Prelude.traverse decode),
+          |> Internal.WithResult (Prelude.traverse codecDecoder),
       mset =
         Dict.toList
-          >> List.map (\(k, v) -> (toKey k, encode v))
+          >> List.map (\(k, v) -> (toKey k, codecEncoder v))
           >> Internal.Mset,
       ping = Internal.Ping |> map (\_ -> ()),
-      set = \key value -> Internal.Set (toKey key) (encode value),
-      setnx = \key value -> Internal.Setnx (toKey key) (encode value)
+      set = \key value -> Internal.Set (toKey key) (codecEncoder value),
+      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value)
     }
+
+jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
+jsonCodec = Codec jsonEncoder jsonDecoder
 
 jsonEncoder :: Aeson.ToJSON a => Encoder a
 jsonEncoder = Aeson.encode >> Data.ByteString.Lazy.toStrict

@@ -35,10 +35,10 @@ module Redis.Hash
     hmset,
     hset,
     hsetnx,
-    Redis.Decoder,
+    Redis.Codec (..),
     Redis.Encoder,
-    Redis.jsonDecoder,
-    Redis.jsonEncoder,
+    Redis.Decoder,
+    Redis.jsonCodec,
   )
 where
 
@@ -113,35 +113,34 @@ data Api key field a
 
 makeApi ::
   Ord field =>
-  Redis.Encoder a ->
-  Redis.Decoder a ->
+  Redis.Codec a ->
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
   Api key field a
-makeApi encode decode toKey toField fromField =
+makeApi Redis.Codec {Redis.codecEncoder, Redis.codecDecoder} toKey toField fromField =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
       hdel = \key fields -> Internal.Hdel (toKey key) (List.map toField fields),
-      hget = \key field -> Internal.WithResult (Prelude.traverse decode) (Internal.Hget (toKey key) (toField field)),
-      hgetall = Internal.WithResult (toDict fromField decode) << Internal.Hgetall << toKey,
+      hget = \key field -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Hget (toKey key) (toField field)),
+      hgetall = Internal.WithResult (toDict fromField codecDecoder) << Internal.Hgetall << toKey,
       hmget = \key fields ->
         fields
           |> List.map toField
           |> Internal.Hmget (toKey key)
           |> map (maybesToDict fields)
-          |> Internal.WithResult (Prelude.traverse decode),
+          |> Internal.WithResult (Prelude.traverse codecDecoder),
       hmset = \key vals ->
         vals
           |> Dict.toList
-          |> List.map (\(k, v) -> (toField k, encode v))
+          |> List.map (\(k, v) -> (toField k, codecEncoder v))
           |> Internal.Hmset (toKey key),
       hset = \key field val ->
-        Internal.Hset (toKey key) (toField field) (encode val),
+        Internal.Hset (toKey key) (toField field) (codecEncoder val),
       hsetnx = \key field val ->
-        Internal.Hsetnx (toKey key) (toField field) (encode val)
+        Internal.Hsetnx (toKey key) (toField field) (codecEncoder val)
     }
 
 toDict :: Ord field => (Text -> Maybe field) -> Redis.Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
