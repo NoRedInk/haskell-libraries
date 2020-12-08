@@ -10,6 +10,7 @@ import qualified Data.HashMap.Strict as HM
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
 import qualified Database.Redis
 import qualified List
+import qualified Maybe
 import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
@@ -75,6 +76,7 @@ data RedisType
   = RedisByteString ByteString
   | RedisHash (HM.HashMap Text ByteString)
   | RedisList [ByteString]
+  | RedisInt Int
   deriving (Eq)
 
 expectByteString :: RedisType -> Result Internal.Error ByteString
@@ -83,12 +85,22 @@ expectByteString val =
     RedisByteString bytestring -> Ok bytestring
     RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
+    RedisInt _ -> Err wrongTypeErr
 
 expectHash :: RedisType -> Result Internal.Error (HM.HashMap Text ByteString)
 expectHash val =
   case val of
     RedisByteString _ -> Err wrongTypeErr
     RedisHash hash -> Ok hash
+    RedisList _ -> Err wrongTypeErr
+    RedisInt _ -> Err wrongTypeErr
+
+expectInt :: RedisType -> Result Internal.Error Int
+expectInt val =
+  case val of
+    RedisInt int -> Ok int
+    RedisByteString _ -> Err wrongTypeErr
+    RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
 
 watchKeys :: [Text] -> Model -> Model
@@ -267,6 +279,19 @@ doQuery query hm =
           ( hm,
             Err wrongTypeErr
           )
+    Internal.Incr key ->
+      ( HM.alter
+          ( \member ->
+              case member of
+                Just (RedisInt x) -> Just (RedisInt (x + 1))
+                _ -> Just (RedisInt 0)
+          )
+          key
+          hm,
+        HM.lookup key hm
+          |> Maybe.withDefault (RedisInt 0)
+          |> expectInt
+      )
     Internal.Rpush key vals ->
       case HM.lookup key hm of
         Nothing ->

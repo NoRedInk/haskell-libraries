@@ -175,6 +175,10 @@ doRawQuery query =
       Database.Redis.hdel (toB key) (map toB fields)
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
+    Internal.Incr key ->
+      Database.Redis.incr (toB key)
+        |> PreparedQuery
+        |> map (Ok << fromIntegral)
     Internal.Expire key secs ->
       Database.Redis.expire (toB key) (fromIntegral secs)
         |> PreparedQuery

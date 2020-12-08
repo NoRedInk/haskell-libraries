@@ -18,6 +18,7 @@ library:
   - unordered-containers
   exposed-modules:
   - Redis
+  - Redis.Counter
   - Redis.Hash
   - Redis.List
   - Redis.Mock
