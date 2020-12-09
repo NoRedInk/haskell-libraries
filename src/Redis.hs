@@ -13,7 +13,9 @@ module Redis
     Settings.decoder,
 
     -- * Creating a redis API
-    makeApi,
+    jsonApi,
+    textApi,
+    byteStringApi,
     Api,
 
     -- * Creating redis queries
@@ -43,12 +45,14 @@ module Redis
   )
 where
 
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as ByteString
 import qualified Dict
 import qualified Health
 import qualified List
 import NriPrelude
 import qualified Platform
-import Redis.Codec
+import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -135,8 +139,17 @@ data Experimental key a
         atomicModifyWithContext :: forall b. Internal.Handler -> key -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
       }
 
-makeApi :: Codec a -> (key -> Text) -> Api key a
-makeApi Codec {codecEncoder, codecDecoder} toKey =
+jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
+jsonApi = makeApi Codec.jsonCodec
+
+textApi :: (key -> Text) -> Api key Text
+textApi = makeApi Codec.textCodec
+
+byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
+byteStringApi = makeApi Codec.byteStringCodec
+
+makeApi :: Codec.Codec a -> (key -> Text) -> Api key a
+makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,

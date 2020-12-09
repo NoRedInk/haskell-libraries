@@ -13,7 +13,9 @@ module Redis.Hash
     Settings.decoder,
 
     -- * Creating a redis API
-    makeApi,
+    jsonApi,
+    textApi,
+    byteStringApi,
     Api,
 
     -- * Creating redis queries
@@ -41,6 +43,8 @@ module Redis.Hash
   )
 where
 
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as ByteString
 import Data.ByteString (ByteString)
 import qualified Dict
 import qualified List
@@ -110,6 +114,30 @@ data Api key field a
         -- https://redis.io/commands/hsetnx
         hsetnx :: key -> field -> a -> Internal.Query Bool
       }
+
+jsonApi ::
+  (Aeson.ToJSON a, Aeson.FromJSON a, Ord field) =>
+  (key -> Text) ->
+  (field -> Text) ->
+  (Text -> Maybe field) ->
+  Api key field a
+jsonApi = makeApi Codec.jsonCodec
+
+textApi ::
+  Ord field =>
+  (key -> Text) ->
+  (field -> Text) ->
+  (Text -> Maybe field) ->
+  Api key field Text
+textApi = makeApi Codec.textCodec
+
+byteStringApi ::
+  Ord field =>
+  (key -> Text) ->
+  (field -> Text) ->
+  (Text -> Maybe field) ->
+  Api key field ByteString.ByteString
+byteStringApi = makeApi Codec.byteStringCodec
 
 makeApi ::
   Ord field =>

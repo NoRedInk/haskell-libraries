@@ -13,7 +13,9 @@ module Redis.List
     Settings.decoder,
 
     -- * Creating a redis API
-    makeApi,
+    jsonApi,
+    textApi,
+    byteStringApi,
     Api,
 
     -- * Creating redis queries
@@ -35,6 +37,8 @@ module Redis.List
   )
 where
 
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as ByteString
 import qualified List
 import NriPrelude
 import qualified Redis
@@ -66,6 +70,15 @@ data Api key a
         -- https://redis.io/commands/rpush
         rpush :: key -> List.List a -> Internal.Query Int
       }
+
+jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
+jsonApi = makeApi Codec.jsonCodec
+
+textApi :: (key -> Text) -> Api key Text
+textApi = makeApi Codec.textCodec
+
+byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
+byteStringApi = makeApi Codec.byteStringCodec
 
 makeApi ::
   Codec.Codec a ->
