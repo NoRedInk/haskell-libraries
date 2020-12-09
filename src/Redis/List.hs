@@ -28,6 +28,7 @@ module Redis.List
     expire,
     ping,
     rpush,
+    lrange,
     Redis.Codec,
     Redis.Encoder,
     Redis.Decoder,
@@ -43,6 +44,7 @@ import qualified Redis
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
+import qualified Prelude
 
 data Api key a
   = Api
@@ -62,6 +64,15 @@ data Api key a
         --
         -- https://redis.io/commands/ping
         ping :: Internal.Query (),
+        -- | Returns the specified elements of the list stored at key. The
+        -- offsets start and stop are zero-based indexes, with 0 being the
+        -- first element of the list (the head of the list), 1 being the next
+        -- element and so on.
+        --
+        -- These offsets can also be negative numbers indicating offsets
+        -- starting at the end of the list. For example, -1 is the last element
+        -- of the list, -2 the penultimate, and so on.
+        lrange :: key -> Int -> Int -> Internal.Query [a],
         -- | Insert all the specified values at the tail of the list stored at key. If key does not exist, it is created as empty list before performing the push operation. When key holds a value that is not a list, an error is returned.
         --
         -- https://redis.io/commands/rpush
@@ -72,11 +83,14 @@ makeApi ::
   Redis.Codec a ->
   (key -> Text) ->
   Api key a
-makeApi Redis.Codec {Redis.codecEncoder} toKey =
+makeApi Redis.Codec {Redis.codecEncoder, Redis.codecDecoder} toKey =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
+      lrange = \key lower upper ->
+        Internal.Lrange (toKey key) lower upper
+          |> Internal.WithResult (Prelude.traverse codecDecoder),
       rpush = \key vals ->
         Internal.Rpush (toKey key) (List.map codecEncoder vals)
     }
