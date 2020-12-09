@@ -6,28 +6,32 @@
 --
 -- As with our Ruby Redis access, we enforce working within a "namespace".
 module Redis.List
-  ( -- Settings
+  ( -- * Creating a redis handler
+    Real.handler,
+    Internal.Handler,
     Settings.Settings (..),
     Settings.decoder,
-    -- Internal
-    Internal.Error (..),
-    Internal.Handler,
-    Internal.Query,
-    Internal.transaction,
-    Internal.query,
-    Internal.map,
-    -- Real
-    Real.Info (..),
-    Real.handler,
-    Redis.readiness,
 
-    -- * Creating api access functions
+    -- * Creating a redis API
     makeApi,
     Api,
+
+    -- * Creating redis queries
     del,
     expire,
     ping,
     rpush,
+
+    -- * Running Redis queries
+    Internal.query,
+    Internal.transaction,
+    Internal.Query,
+    Internal.Error (..),
+    Internal.map,
+
+    -- * Observability hepers
+    Real.Info (..),
+    Redis.readiness,
   )
 where
 

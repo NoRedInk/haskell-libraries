@@ -6,24 +6,17 @@
 --
 -- As with our Ruby Redis access, we enforce working within a "namespace".
 module Redis.Hash
-  ( -- Settings
+  ( -- * Creating a redis handler
+    Real.handler,
+    Internal.Handler,
     Settings.Settings (..),
     Settings.decoder,
-    -- Internal
-    Internal.Error (..),
-    Internal.Handler,
-    Internal.Query,
-    Internal.transaction,
-    Internal.query,
-    Internal.map,
-    -- Real
-    Real.Info (..),
-    Real.handler,
-    Redis.readiness,
 
-    -- * Creating api access functions
+    -- * Creating a redis API
     makeApi,
     Api,
+
+    -- * Creating redis queries
     del,
     expire,
     ping,
@@ -34,6 +27,17 @@ module Redis.Hash
     hmset,
     hset,
     hsetnx,
+
+    -- * Running Redis queries
+    Internal.query,
+    Internal.transaction,
+    Internal.Query,
+    Internal.Error (..),
+    Internal.map,
+
+    -- * Observability helpers
+    Real.Info (..),
+    Redis.readiness,
   )
 where
 
