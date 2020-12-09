@@ -34,12 +34,6 @@ module Redis.Hash
     hmset,
     hset,
     hsetnx,
-    Redis.Codec (..),
-    Redis.Encoder,
-    Redis.Decoder,
-    Redis.jsonCodec,
-    Redis.byteStringCodec,
-    Redis.textCodec,
   )
 where
 
@@ -48,6 +42,7 @@ import qualified Dict
 import qualified List
 import NriPrelude
 import qualified Redis
+import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -114,12 +109,12 @@ data Api key field a
 
 makeApi ::
   Ord field =>
-  Redis.Codec a ->
+  Codec.Codec a ->
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
   Api key field a
-makeApi Redis.Codec {Redis.codecEncoder, Redis.codecDecoder} toKey toField fromField =
+makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey toField fromField =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
@@ -144,7 +139,7 @@ makeApi Redis.Codec {Redis.codecEncoder, Redis.codecDecoder} toKey toField fromF
         Internal.Hsetnx (toKey key) (toField field) (codecEncoder val)
     }
 
-toDict :: Ord field => (Text -> Maybe field) -> Redis.Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
+toDict :: Ord field => (Text -> Maybe field) -> Codec.Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
 toDict fromField decode =
   Result.map Dict.fromList
     << Prelude.traverse

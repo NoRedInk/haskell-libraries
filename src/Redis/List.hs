@@ -28,18 +28,13 @@ module Redis.List
     expire,
     ping,
     rpush,
-    Redis.Codec,
-    Redis.Encoder,
-    Redis.Decoder,
-    Redis.jsonCodec,
-    Redis.byteStringCodec,
-    Redis.textCodec,
   )
 where
 
 import qualified List
 import NriPrelude
 import qualified Redis
+import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -69,10 +64,10 @@ data Api key a
       }
 
 makeApi ::
-  Redis.Codec a ->
+  Codec.Codec a ->
   (key -> Text) ->
   Api key a
-makeApi Redis.Codec {Redis.codecEncoder} toKey =
+makeApi Codec.Codec {Codec.codecEncoder} toKey =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,

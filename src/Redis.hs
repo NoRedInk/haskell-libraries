@@ -36,25 +36,15 @@ module Redis
     experimental,
     atomicModify,
     atomicModifyWithContext,
-    Codec (..),
-    Encoder,
-    Decoder,
-    jsonCodec,
-    byteStringCodec,
-    textCodec,
   )
 where
 
-import qualified Data.Aeson as Aeson
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy
-import qualified Data.Text
-import qualified Data.Text.Encoding
 import qualified Dict
 import qualified Health
 import qualified List
 import NriPrelude
 import qualified Platform
+import Redis.Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -73,16 +63,6 @@ readiness handler =
       |> Task.map (\_ -> Health.Good)
       |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
       |> Task.perform log
-
-data Codec a
-  = Codec
-      { codecEncoder :: Encoder a,
-        codecDecoder :: Decoder a
-      }
-
-type Encoder a = a -> ByteString
-
-type Decoder a = ByteString -> Result Internal.Error a
 
 data Api key a
   = Api
@@ -222,26 +202,6 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
           let (setValue, returnValue) = f oldValue
           Internal.transaction handler (Internal.Set (toKey key) setValue)
           Task.succeed (setValue, returnValue)
-
-jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
-jsonCodec = Codec jsonEncoder jsonDecoder
-
-jsonEncoder :: Aeson.ToJSON a => Encoder a
-jsonEncoder = Aeson.encode >> Data.ByteString.Lazy.toStrict
-
-jsonDecoder :: Aeson.FromJSON a => Decoder a
-jsonDecoder byteString =
-  case Aeson.eitherDecodeStrict' byteString of
-    Prelude.Right decoded -> Ok decoded
-    Prelude.Left err ->
-      Internal.DecodingError (Data.Text.pack err)
-        |> Err
-
-byteStringCodec :: Codec ByteString
-byteStringCodec = Codec identity Ok
-
-textCodec :: Codec Text
-textCodec = Codec Data.Text.Encoding.encodeUtf8 (Data.Text.Encoding.decodeUtf8 >> Ok)
 
 unparsableKeyError :: Internal.Error
 unparsableKeyError = Internal.LibraryError "key exists but not parsable json"
