@@ -183,6 +183,10 @@ doRawQuery query =
       Database.Redis.incr (toB key)
         |> PreparedQuery
         |> map (Ok << fromIntegral)
+    Internal.Incrby key amount ->
+      Database.Redis.incrby (toB key) (fromIntegral amount)
+        |> PreparedQuery
+        |> map (Ok << fromIntegral)
     Internal.Expire key secs ->
       Database.Redis.expire (toB key) (fromIntegral secs)
         |> PreparedQuery

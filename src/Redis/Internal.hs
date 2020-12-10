@@ -65,6 +65,7 @@ cmds query'' =
     Hset key field _ -> [unwords ["HSET", key, field, "*****"]]
     Hsetnx key field _ -> [unwords ["HSETNX", key, field, "*****"]]
     Incr key -> [unwords ["INCR", key]]
+    Incrby key amount -> [unwords ["INCRBY", key, Text.fromInt amount]]
     Lrange key lower upper -> [unwords ["LRANGE", key, Text.fromInt lower, Text.fromInt upper]]
     Mget keys -> [unwords ("MGET" : keys)]
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) pairs)]
@@ -93,6 +94,7 @@ data Query a where
   Hset :: Text -> Text -> ByteString -> Query ()
   Hsetnx :: Text -> Text -> ByteString -> Query Bool
   Incr :: Text -> Query Int
+  Incrby :: Text -> Int -> Query Int
   Lrange :: Text -> Int -> Int -> Query [ByteString]
   Mget :: [Text] -> Query [Maybe ByteString]
   Mset :: [(Text, ByteString)] -> Query ()
@@ -173,6 +175,7 @@ namespaceQuery prefix query' =
     Hmset key vals -> Hmset (prefix ++ key) vals
     Hdel key fields -> Hdel (prefix ++ key) fields
     Incr key -> Incr (prefix ++ key)
+    Incrby key amount -> Incrby (prefix ++ key) amount
     Expire key secs -> Expire (prefix ++ key) secs
     Lrange key lower upper -> Lrange (prefix ++ key) lower upper
     Rpush key vals -> Rpush (prefix ++ key) vals
@@ -204,6 +207,7 @@ keysTouchedByQuery query' =
     Mget keys -> Set.fromList keys
     Hdel key _ -> Set.singleton key
     Incr key -> Set.singleton key
+    Incrby key _ -> Set.singleton key
     Mset assocs -> Set.fromList (List.map Tuple.first assocs)
     Hgetall key -> Set.singleton key
     Hmget key _ -> Set.singleton key

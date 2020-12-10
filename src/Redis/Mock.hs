@@ -77,7 +77,9 @@ data RedisType
   = RedisByteString ByteString
   | RedisHash (HM.HashMap Text ByteString)
   | RedisList [ByteString]
-  | RedisInt Int
+  | -- TODO: remove int type for compatibility with SET and GET commands (real
+    -- Redis doesn't have a separate int type either)
+    RedisInt Int
   deriving (Eq)
 
 expectByteString :: RedisType -> Result Internal.Error ByteString
@@ -294,6 +296,21 @@ doQuery query hm =
           key
           hm,
         HM.lookup key hm
+          |> Maybe.withDefault (RedisInt 0)
+          |> expectInt
+      )
+    Internal.Incrby key amount ->
+      ( HM.alter
+          ( \member ->
+              case member of
+                Just (RedisInt x) -> Just (RedisInt (x + amount))
+                -- TODO: fail with an error if we don't detect an int
+                _ -> Just (RedisInt amount)
+          )
+          key
+          hm,
+        HM.lookup key hm
+          -- TODO: return the value after addition, not before
           |> Maybe.withDefault (RedisInt 0)
           |> expectInt
       )
