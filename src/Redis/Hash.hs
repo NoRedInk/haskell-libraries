@@ -6,24 +6,19 @@
 --
 -- As with our Ruby Redis access, we enforce working within a "namespace".
 module Redis.Hash
-  ( -- Settings
+  ( -- * Creating a redis handler
+    Real.handler,
+    Internal.Handler,
     Settings.Settings (..),
     Settings.decoder,
-    -- Internal
-    Internal.Error (..),
-    Internal.Handler,
-    Internal.Query,
-    Internal.transaction,
-    Internal.query,
-    Internal.map,
-    -- Real
-    Real.Info (..),
-    Real.handler,
-    Redis.readiness,
 
-    -- * Creating api access functions
-    makeApi,
+    -- * Creating a redis API
+    jsonApi,
+    textApi,
+    byteStringApi,
     Api,
+
+    -- * Creating redis queries
     del,
     expire,
     ping,
@@ -34,20 +29,28 @@ module Redis.Hash
     hmset,
     hset,
     hsetnx,
-    Redis.Codec (..),
-    Redis.Encoder,
-    Redis.Decoder,
-    Redis.jsonCodec,
-    Redis.byteStringCodec,
-    Redis.textCodec,
+
+    -- * Running Redis queries
+    Internal.query,
+    Internal.transaction,
+    Internal.Query,
+    Internal.Error (..),
+    Internal.map,
+
+    -- * Observability helpers
+    Real.Info (..),
+    Redis.readiness,
   )
 where
 
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as ByteString
 import Data.ByteString (ByteString)
 import qualified Dict
 import qualified List
 import NriPrelude
 import qualified Redis
+import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -112,14 +115,38 @@ data Api key field a
         hsetnx :: key -> field -> a -> Internal.Query Bool
       }
 
-makeApi ::
-  Ord field =>
-  Redis.Codec a ->
+jsonApi ::
+  (Aeson.ToJSON a, Aeson.FromJSON a, Ord field) =>
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
   Api key field a
-makeApi Redis.Codec {Redis.codecEncoder, Redis.codecDecoder} toKey toField fromField =
+jsonApi = makeApi Codec.jsonCodec
+
+textApi ::
+  Ord field =>
+  (key -> Text) ->
+  (field -> Text) ->
+  (Text -> Maybe field) ->
+  Api key field Text
+textApi = makeApi Codec.textCodec
+
+byteStringApi ::
+  Ord field =>
+  (key -> Text) ->
+  (field -> Text) ->
+  (Text -> Maybe field) ->
+  Api key field ByteString.ByteString
+byteStringApi = makeApi Codec.byteStringCodec
+
+makeApi ::
+  Ord field =>
+  Codec.Codec a ->
+  (key -> Text) ->
+  (field -> Text) ->
+  (Text -> Maybe field) ->
+  Api key field a
+makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey toField fromField =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
@@ -144,7 +171,7 @@ makeApi Redis.Codec {Redis.codecEncoder, Redis.codecDecoder} toKey toField fromF
         Internal.Hsetnx (toKey key) (toField field) (codecEncoder val)
     }
 
-toDict :: Ord field => (Text -> Maybe field) -> Redis.Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
+toDict :: Ord field => (Text -> Maybe field) -> Codec.Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
 toDict fromField decode =
   Result.map Dict.fromList
     << Prelude.traverse

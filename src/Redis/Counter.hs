@@ -6,41 +6,40 @@
 --
 -- As with our Ruby Redis access, we enforce working within a "namespace".
 module Redis.Counter
-  ( -- Settings
+  ( -- * Creating a redis handler
+    Real.handler,
+    Internal.Handler,
     Settings.Settings (..),
     Settings.decoder,
-    -- Internal
-    Internal.Error (..),
-    Internal.Handler,
-    Internal.Query,
-    Internal.transaction,
-    Internal.query,
-    Internal.map,
-    -- Real
-    Real.Info (..),
-    Real.handler,
-    Redis.readiness,
 
-    -- * Creating api access functions
+    -- * Creating a redis API
     makeApi,
     Api,
+
+    -- * Creating redis queries
     del,
     expire,
     ping,
     get,
     incr,
-    Redis.Codec,
-    Redis.Encoder,
-    Redis.Decoder,
-    Redis.jsonCodec,
-    Redis.byteStringCodec,
-    Redis.textCodec,
+
+    -- * Running Redis queries
+    Internal.query,
+    Internal.transaction,
+    Internal.Query,
+    Internal.Error (..),
+    Internal.map,
+
+    -- * Observability helpers
+    Real.Info (..),
+    Redis.readiness,
   )
 where
 
 import qualified List
 import NriPrelude
 import qualified Redis
+import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -90,6 +89,6 @@ makeApi toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       get = \key ->
         Internal.Get (toKey key)
-          |> Internal.WithResult (Prelude.traverse (Redis.codecDecoder Redis.jsonCodec)),
+          |> Internal.WithResult (Prelude.traverse (Codec.codecDecoder Codec.jsonCodec)),
       incr = \key -> Internal.Incr (toKey key)
     }

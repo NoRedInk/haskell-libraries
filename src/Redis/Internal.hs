@@ -64,6 +64,7 @@ cmds query'' =
     Hset key field _ -> [unwords ["HSET", key, field, "*****"]]
     Hsetnx key field _ -> [unwords ["HSETNX", key, field, "*****"]]
     Incr key -> [unwords ["INCR", key]]
+    Lrange key lower upper -> [unwords ["LRANGE", key, Text.fromInt lower, Text.fromInt upper]]
     Mget keys -> [unwords ("MGET" : keys)]
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) pairs)]
     Ping -> ["PING"]
@@ -90,6 +91,7 @@ data Query a where
   Hset :: Text -> Text -> ByteString -> Query ()
   Hsetnx :: Text -> Text -> ByteString -> Query Bool
   Incr :: Text -> Query Int
+  Lrange :: Text -> Int -> Int -> Query [ByteString]
   Mget :: [Text] -> Query [Maybe ByteString]
   Mset :: [(Text, ByteString)] -> Query ()
   Ping :: Query Database.Redis.Status
@@ -169,6 +171,7 @@ namespaceQuery prefix query' =
     Hdel key fields -> Hdel (prefix ++ key) fields
     Incr key -> Incr (prefix ++ key)
     Expire key secs -> Expire (prefix ++ key) secs
+    Lrange key lower upper -> Lrange (prefix ++ key) lower upper
     Rpush key vals -> Rpush (prefix ++ key) vals
     Pure x -> Pure x
     Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
@@ -204,6 +207,7 @@ keysTouchedByQuery query' =
     Hset key _ _ -> Set.singleton key
     Hsetnx key _ _ -> Set.singleton key
     Hmset key _ -> Set.singleton key
+    Lrange key _ _ -> Set.singleton key
     Rpush key _ -> Set.singleton key
     Pure _ -> Set.empty
     Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)

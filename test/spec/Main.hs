@@ -70,8 +70,8 @@ specs logHandler whichHandler redisHandler =
         pure <| Expect.equal 1 result,
       redisTest "json roundtrip" <| do
         let testData :: [Int] = [1, 2, 3]
-        set jsonApi "JSON list" testData |> query testNS
-        result <- get jsonApi "JSON list" |> query testNS
+        set jsonApi' "JSON list" testData |> query testNS
+        result <- get jsonApi' "JSON list" |> query testNS
         pure <| Expect.equal (Just testData) result,
       redisTest "atomic modify with no value" <| do
         _ <- del api ["Empty Atom"] |> query testNS
@@ -95,10 +95,10 @@ specs logHandler whichHandler redisHandler =
               [("mgetTest::key1", "value 1"), ("mgetTest::key3", "value 3")]
           ),
       redisTest "mget json roundtrip" <| do
-        set jsonApi "Json.mgetTest::key1" ([1, 2] :: [Int]) |> query testNS
-        set jsonApi "Json.mgetTest::key2" ([3, 4] :: [Int]) |> query testNS
+        set jsonApi' "Json.mgetTest::key1" ([1, 2] :: [Int]) |> query testNS
+        set jsonApi' "Json.mgetTest::key2" ([3, 4] :: [Int]) |> query testNS
         result <-
-          mget jsonApi ["Json.mgetTest::key1", "Json.mgetTest::key2"] |> query testNS ::
+          mget jsonApi' ["Json.mgetTest::key1", "Json.mgetTest::key2"] |> query testNS ::
             Task Error (Dict Text [Int])
         pure
           ( Expect.equal
@@ -122,8 +122,8 @@ specs logHandler whichHandler redisHandler =
                 [ ("Json.msetTest::key1", [1, 2] :: [Int]),
                   ("Json.msetTest::key2", [3, 4] :: [Int])
                 ]
-        mset jsonApi dict |> query testNS
-        result <- mget jsonApi (Dict.keys dict) |> query testNS
+        mset jsonApi' dict |> query testNS
+        result <- mget jsonApi' (Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do
         _ <- del api ["Full Atom"] |> query testNS
@@ -166,7 +166,7 @@ specs logHandler whichHandler redisHandler =
         _ <- del api ["JSON Atom With Context"] |> query testNS
         result <-
           atomicModifyWithContext
-            (experimental jsonApi)
+            (experimental jsonApi')
             testNS
             "JSON Atom With Context"
             ( \v -> case v of
@@ -224,7 +224,7 @@ addNamespace namespace handler' =
   handler' {Internal.namespace = Internal.namespace handler' ++ ":" ++ namespace}
 
 api :: Api Text Text
-api = makeApi textCodec identity
+api = textApi identity
 
-jsonApi :: Api Text [Int]
-jsonApi = makeApi jsonCodec identity
+jsonApi' :: Api Text [Int]
+jsonApi' = jsonApi identity

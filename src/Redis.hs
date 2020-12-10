@@ -6,24 +6,19 @@
 --
 -- As with our Ruby Redis access, we enforce working within a "namespace".
 module Redis
-  ( -- Settings
+  ( -- * Creating a redis handler
+    Real.handler,
+    Internal.Handler,
     Settings.Settings (..),
     Settings.decoder,
-    -- Internal
-    Internal.Error (..),
-    Internal.Handler,
-    Internal.Query,
-    Internal.transaction,
-    Internal.query,
-    Internal.map,
-    -- Real
-    Real.Info (..),
-    Real.handler,
-    readiness,
 
-    -- * Creating api access functions
-    makeApi,
+    -- * Creating a redis API
+    jsonApi,
+    textApi,
+    byteStringApi,
     Api,
+
+    -- * Creating redis queries
     del,
     expire,
     get,
@@ -36,25 +31,28 @@ module Redis
     experimental,
     atomicModify,
     atomicModifyWithContext,
-    Codec (..),
-    Encoder,
-    Decoder,
-    jsonCodec,
-    byteStringCodec,
-    textCodec,
+
+    -- * Running Redis queries
+    Internal.query,
+    Internal.transaction,
+    Internal.Query,
+    Internal.Error (..),
+    Internal.map,
+
+    -- * Observability hepers
+    Real.Info (..),
+    readiness,
   )
 where
 
 import qualified Data.Aeson as Aeson
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy
-import qualified Data.Text
-import qualified Data.Text.Encoding
+import qualified Data.ByteString as ByteString
 import qualified Dict
 import qualified Health
 import qualified List
 import NriPrelude
 import qualified Platform
+import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
@@ -73,16 +71,6 @@ readiness handler =
       |> Task.map (\_ -> Health.Good)
       |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
       |> Task.perform log
-
-data Codec a
-  = Codec
-      { codecEncoder :: Encoder a,
-        codecDecoder :: Decoder a
-      }
-
-type Encoder a = a -> ByteString
-
-type Decoder a = ByteString -> Result Internal.Error a
 
 data Api key a
   = Api
@@ -151,8 +139,17 @@ data Experimental key a
         atomicModifyWithContext :: forall b. Internal.Handler -> key -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
       }
 
-makeApi :: Codec a -> (key -> Text) -> Api key a
-makeApi Codec {codecEncoder, codecDecoder} toKey =
+jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
+jsonApi = makeApi Codec.jsonCodec
+
+textApi :: (key -> Text) -> Api key Text
+textApi = makeApi Codec.textCodec
+
+byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
+byteStringApi = makeApi Codec.byteStringCodec
+
+makeApi :: Codec.Codec a -> (key -> Text) -> Api key a
+makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
   Api
     { del = Internal.Del << List.map toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
@@ -222,26 +219,6 @@ makeApi Codec {codecEncoder, codecDecoder} toKey =
           let (setValue, returnValue) = f oldValue
           Internal.transaction handler (Internal.Set (toKey key) setValue)
           Task.succeed (setValue, returnValue)
-
-jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
-jsonCodec = Codec jsonEncoder jsonDecoder
-
-jsonEncoder :: Aeson.ToJSON a => Encoder a
-jsonEncoder = Aeson.encode >> Data.ByteString.Lazy.toStrict
-
-jsonDecoder :: Aeson.FromJSON a => Decoder a
-jsonDecoder byteString =
-  case Aeson.eitherDecodeStrict' byteString of
-    Prelude.Right decoded -> Ok decoded
-    Prelude.Left err ->
-      Internal.DecodingError (Data.Text.pack err)
-        |> Err
-
-byteStringCodec :: Codec ByteString
-byteStringCodec = Codec identity Ok
-
-textCodec :: Codec Text
-textCodec = Codec Data.Text.Encoding.encodeUtf8 (Data.Text.Encoding.decodeUtf8 >> Ok)
 
 unparsableKeyError :: Internal.Error
 unparsableKeyError = Internal.LibraryError "key exists but not parsable json"

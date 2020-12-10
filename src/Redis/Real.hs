@@ -183,6 +183,10 @@ doRawQuery query =
       Database.Redis.expire (toB key) (fromIntegral secs)
         |> PreparedQuery
         |> map (\_ -> Ok ())
+    Internal.Lrange key lower upper ->
+      Database.Redis.lrange (toB key) (fromIntegral lower) (fromIntegral upper)
+        |> PreparedQuery
+        |> map Ok
     Internal.Rpush key vals ->
       Database.Redis.rpush (toB key) vals
         |> PreparedQuery

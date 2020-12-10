@@ -8,6 +8,7 @@ where
 import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
+import qualified Data.List
 import qualified Database.Redis
 import qualified List
 import qualified Maybe
@@ -291,6 +292,23 @@ doQuery query hm =
         HM.lookup key hm
           |> Maybe.withDefault (RedisInt 0)
           |> expectInt
+      )
+    Internal.Lrange key lower' upper' ->
+      ( hm,
+        case HM.lookup key hm of
+          Nothing ->
+            Ok []
+          Just (RedisList elems) ->
+            let length = List.length elems
+                lower = if lower' >= 0 then lower' else length - lower'
+                upper = if upper' >= 0 then upper' else length - upper'
+             in elems
+                  |> Data.List.splitAt (Prelude.fromIntegral (upper + 1))
+                  |> Tuple.first
+                  |> List.drop lower
+                  |> Ok
+          Just _ ->
+            Err wrongTypeErr
       )
     Internal.Rpush key vals ->
       case HM.lookup key hm of
