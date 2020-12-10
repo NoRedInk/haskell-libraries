@@ -53,6 +53,7 @@ cmds :: Query b -> [Text]
 cmds query'' =
   case query'' of
     Del keys -> [unwords ("DEL" : keys)]
+    Exists key -> [unwords ["EXISTS", key]]
     Expire key val -> [unwords ["EXPIRE", key, Text.fromInt val]]
     Get key -> [unwords ["GET", key]]
     Getset key _ -> [unwords ["GETSET", key, "*****"]]
@@ -80,6 +81,7 @@ unwords = Text.join " "
 
 data Query a where
   Del :: [Text] -> Query Int
+  Exists :: Text -> Query Bool
   Expire :: Text -> Int -> Query ()
   Get :: Text -> Query (Maybe ByteString)
   Getset :: Text -> ByteString -> Query (Maybe ByteString)
@@ -154,6 +156,7 @@ watch handler keys =
 namespaceQuery :: Text -> Query a -> Query a
 namespaceQuery prefix query' =
   case query' of
+    Exists key -> Exists (prefix ++ key)
     Ping -> Ping
     Get key -> Get (prefix ++ key)
     Set key value -> Set (prefix ++ key) value
@@ -192,6 +195,7 @@ keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
   case query' of
     Del keys -> Set.fromList keys
+    Exists key -> Set.singleton key
     Ping -> Set.empty
     Get key -> Set.singleton key
     Set key _ -> Set.singleton key

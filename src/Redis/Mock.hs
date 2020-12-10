@@ -130,6 +130,10 @@ doQuery ::
   (HM.HashMap Text RedisType, Result Internal.Error a)
 doQuery query hm =
   case query of
+    Internal.Exists key ->
+      ( hm,
+        Ok (HM.member key hm)
+      )
     Internal.Ping ->
       ( hm,
         Ok Database.Redis.Pong

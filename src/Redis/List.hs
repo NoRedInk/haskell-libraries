@@ -20,6 +20,7 @@ module Redis.List
 
     -- * Creating redis queries
     del,
+    exists,
     expire,
     ping,
     lrange,
@@ -55,6 +56,8 @@ data Api key a
         --
         -- https://redis.io/commands/del
         del :: List.List key -> Internal.Query Int,
+        -- | Returns if key exists.
+        exists :: key -> Internal.Query Bool,
         -- | Set a timeout on key. After the timeout has expired, the key will
         -- automatically be deleted. A key with an associated timeout is often said to
         -- be volatile in Redis terminology.
@@ -98,6 +101,7 @@ makeApi ::
 makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
   Api
     { del = Internal.Del << List.map toKey,
+      exists = Internal.Exists << toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
       lrange = \key lower upper ->

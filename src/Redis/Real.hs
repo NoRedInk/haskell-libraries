@@ -106,6 +106,10 @@ instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (
 doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> PreparedQuery m f (Result Internal.Error result)
 doRawQuery query =
   case query of
+    Internal.Exists key ->
+      Database.Redis.exists (toB key)
+        |> PreparedQuery
+        |> map Ok
     Internal.Ping ->
       Database.Redis.ping
         |> PreparedQuery
