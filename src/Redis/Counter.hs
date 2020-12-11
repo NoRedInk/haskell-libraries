@@ -91,7 +91,13 @@ data Api key
         -- operation is limited to 64 bit signed integers.
         --
         -- https://redis.io/commands/incrby
-        incrby :: key -> Int -> Internal.Query Int
+        incrby :: key -> Int -> Internal.Query Int,
+        -- | Set key to hold the string value. If key already holds a value, it is
+        -- overwritten, regardless of its type. Any previous time to live associated
+        -- with the key is discarded on successful SET operation.
+        --
+        -- https://redis.io/commands/set
+        set :: key -> Int -> Internal.Query ()
       }
 
 makeApi ::
@@ -107,5 +113,6 @@ makeApi toKey =
         Internal.Get (toKey key)
           |> Internal.WithResult (Prelude.traverse (Codec.codecDecoder Codec.jsonCodec)),
       incr = \key -> Internal.Incr (toKey key),
-      incrby = \key amount -> Internal.Incrby (toKey key) amount
+      incrby = \key amount -> Internal.Incrby (toKey key) amount,
+      set = \key val -> Internal.Set (toKey key) (Codec.codecEncoder Codec.jsonCodec val)
     }
