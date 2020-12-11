@@ -57,6 +57,8 @@ data Api key a
         -- https://redis.io/commands/del
         del :: List.List key -> Internal.Query Int,
         -- | Returns if key exists.
+        --
+        -- https://redis.io/commands/exists
         exists :: key -> Internal.Query Bool,
         -- | Set a timeout on key. After the timeout has expired, the key will
         -- automatically be deleted. A key with an associated timeout is often said to

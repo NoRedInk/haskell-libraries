@@ -24,6 +24,7 @@ module Redis.Counter
     get,
     incr,
     incrby,
+    set,
 
     -- * Running Redis queries
     Internal.query,
@@ -54,6 +55,8 @@ data Api key
         -- https://redis.io/commands/del
         del :: List.List key -> Internal.Query Int,
         -- | Returns if key exists.
+        --
+        -- https://redis.io/commands/exists
         exists :: key -> Internal.Query Bool,
         -- | Set a timeout on key. After the timeout has expired, the key will
         -- automatically be deleted. A key with an associated timeout is often said to
@@ -86,6 +89,8 @@ data Api key
         -- is returned if the key contains a value of the wrong type or
         -- contains a string that can not be represented as integer. This
         -- operation is limited to 64 bit signed integers.
+        --
+        -- https://redis.io/commands/incrby
         incrby :: key -> Int -> Internal.Query Int
       }
 

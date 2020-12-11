@@ -80,6 +80,8 @@ data Api key a
         -- https://redis.io/commands/del
         del :: List.List key -> Internal.Query Int,
         -- | Returns if key exists.
+        --
+        -- https://redis.io/commands/exists
         exists :: key -> Internal.Query Bool,
         -- | Set a timeout on key. After the timeout has expired, the key will
         -- automatically be deleted. A key with an associated timeout is often said to
@@ -120,12 +122,17 @@ data Api key a
         --
         -- https://redis.io/commands/ping
         ping :: Internal.Query (),
-        set :: key -> a -> Internal.Query (),
         -- | Set key to hold the string value. If key already holds a value, it is
         -- overwritten, regardless of its type. Any previous time to live associated
         -- with the key is discarded on successful SET operation.
         --
         -- https://redis.io/commands/set
+        set :: key -> a -> Internal.Query (),
+        -- Set key to hold string value if key does not exist. In that case, it
+        -- is equal to SET. When key already holds a value, no operation is
+        -- performed. SETNX is short for "SET if Not eXists".
+        --
+        -- https://redis.io/commands/setnx
         setnx :: key -> a -> Internal.Query Bool,
         experimental :: Experimental key a
       }
