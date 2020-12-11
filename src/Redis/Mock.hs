@@ -9,12 +9,13 @@ import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
 import qualified Data.List
+import qualified Data.Text.Encoding as TE
 import qualified Database.Redis
 import qualified List
-import qualified Maybe
 import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
+import qualified Text
 import qualified Tuple
 import Prelude (IO, pure)
 import qualified Prelude
@@ -77,9 +78,6 @@ data RedisType
   = RedisByteString ByteString
   | RedisHash (HM.HashMap Text ByteString)
   | RedisList [ByteString]
-  | -- TODO: remove int type for compatibility with SET and GET commands (real
-    -- Redis doesn't have a separate int type either)
-    RedisInt Int
   deriving (Eq)
 
 expectByteString :: RedisType -> Result Internal.Error ByteString
@@ -88,7 +86,6 @@ expectByteString val =
     RedisByteString bytestring -> Ok bytestring
     RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
-    RedisInt _ -> Err wrongTypeErr
 
 expectHash :: RedisType -> Result Internal.Error (HM.HashMap Text ByteString)
 expectHash val =
@@ -96,13 +93,17 @@ expectHash val =
     RedisByteString _ -> Err wrongTypeErr
     RedisHash hash -> Ok hash
     RedisList _ -> Err wrongTypeErr
-    RedisInt _ -> Err wrongTypeErr
 
 expectInt :: RedisType -> Result Internal.Error Int
 expectInt val =
   case val of
-    RedisInt int -> Ok int
-    RedisByteString _ -> Err wrongTypeErr
+    RedisByteString val' ->
+      case TE.decodeUtf8' val' of
+        Prelude.Left _ -> Err wrongTypeErr
+        Prelude.Right str ->
+          case Text.toInt str of
+            Nothing -> Err wrongTypeErr
+            Just int -> Ok int
     RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
 
@@ -287,33 +288,21 @@ doQuery query hm =
             Err wrongTypeErr
           )
     Internal.Incr key ->
-      ( HM.alter
-          ( \member ->
-              case member of
-                Just (RedisInt x) -> Just (RedisInt (x + 1))
-                _ -> Just (RedisInt 0)
-          )
-          key
-          hm,
-        HM.lookup key hm
-          |> Maybe.withDefault (RedisInt 0)
-          |> expectInt
-      )
+      doQuery (Internal.Incrby key 1) hm
     Internal.Incrby key amount ->
-      ( HM.alter
-          ( \member ->
-              case member of
-                Just (RedisInt x) -> Just (RedisInt (x + amount))
-                -- TODO: fail with an error if we don't detect an int
-                _ -> Just (RedisInt amount)
-          )
-          key
-          hm,
-        HM.lookup key hm
-          -- TODO: return the value after addition, not before
-          |> Maybe.withDefault (RedisInt 0)
-          |> expectInt
-      )
+      let encodeInt = RedisByteString << TE.encodeUtf8 << Text.fromInt
+       in case HM.lookup key hm of
+            Nothing ->
+              ( HM.insert key (encodeInt amount) hm,
+                Ok 1
+              )
+            Just val ->
+              case expectInt val of
+                Err err -> (hm, Err err)
+                Ok x ->
+                  ( HM.insert key (encodeInt (x + amount)) hm,
+                    Ok (x + amount)
+                  )
     Internal.Lrange key lower' upper' ->
       ( hm,
         case HM.lookup key hm of
