@@ -28,7 +28,10 @@ flatCodec :: Flat.Flat a => Codec a
 flatCodec = Codec Flat.flat <| \x ->
   case Flat.unflat x of
     Prelude.Right a -> Ok a
-    Prelude.Left _ -> Debug.todo "TODO"
+    Prelude.Left err ->
+      Debug.toString err
+        |> Internal.DecodingError
+        |> Err
 
 instance Flat.Flat a => Flat.Flat (NonEmpty.NonEmpty a)
 
