@@ -3,8 +3,10 @@ module Redis.Codec where
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
+import qualified Data.Flat as Flat
 import qualified Data.Text
 import qualified Data.Text.Encoding
+import qualified Debug
 import NriPrelude
 import qualified Redis.Internal as Internal
 import qualified Prelude
@@ -18,6 +20,12 @@ data Codec a
 type Encoder a = a -> ByteString
 
 type Decoder a = ByteString -> Result Internal.Error a
+
+flatCodec :: Flat.Flat a => Codec a
+flatCodec = Codec Flat.flat <| \x ->
+  case Flat.unflat x of
+    Prelude.Right a -> Ok a
+    Prelude.Left _ -> Debug.todo "TODO"
 
 jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
 jsonCodec = Codec jsonEncoder jsonDecoder
