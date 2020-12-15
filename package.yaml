@@ -5,15 +5,15 @@ library:
   dependencies: &dependencies
   - aeson
   - async
-  - bytestring
   - base
-  - nri-prelude
+  - bytestring
   - conduit
-  - nri-env-parser
-  - safe-exceptions
   - health
   - hedis
+  - nri-env-parser
+  - nri-prelude
   - resourcet
+  - safe-exceptions
   - text
   - unordered-containers
   exposed-modules:
