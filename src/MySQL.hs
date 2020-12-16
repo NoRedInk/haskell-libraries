@@ -50,6 +50,7 @@ module MySQL
     -- logic.
     MySQL.MySQLColumn.MySQLColumn,
     MySQL.MySQLParameter.MySQLParameter,
+    MySQL.MySQLParameter.mysqlEncode,
 
     -- * Handling transactions
     transaction,
