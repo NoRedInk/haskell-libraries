@@ -49,6 +49,7 @@ module MySQL
     -- that can fail we can still do so, but not as part of MySQL parsing
     -- logic.
     MySQL.MySQLColumn.MySQLColumn,
+    MySQL.MySQLColumn.decodeParam,
     MySQL.MySQLParameter.MySQLParameter,
     MySQL.MySQLParameter.mysqlEncode,
 
