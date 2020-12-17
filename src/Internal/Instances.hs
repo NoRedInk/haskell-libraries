@@ -39,3 +39,9 @@ instance PGTypes.PGParameter "smallint" Int where
   pgEncode tid tv =
     let (i :: Data.Int.Int16) = fromIntegral tv
      in PGTypes.pgEncode tid i
+
+instance PGTypes.PGColumn "smallint" Bool where
+  pgDecode tid tv = PGTypes.pgDecode tid tv
+
+instance PGTypes.PGParameter "smallint" Bool where
+  pgEncode tid tv = PGTypes.pgEncode tid tv
