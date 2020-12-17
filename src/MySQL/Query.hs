@@ -60,6 +60,11 @@ data Query row
         sqlOperation :: Text,
         -- | The main table/view/.. queried.
         queriedRelation :: Text,
+        -- | This is only used for checking the query during compilation.
+        -- We use `pgSQL` to check the query during compilation. It doesn't
+        -- know about the types of the resulting rows though. We need to tie
+        -- the type variable `row` of `Query` to the query returned by `pgSQL`.
+        -- We can use `pgQuery` which has a constraint to bind them to each other.
         neverRun :: PGTyped.PGConnection -> Prelude.IO [row]
       }
   deriving (Show)
