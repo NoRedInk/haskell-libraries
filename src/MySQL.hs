@@ -247,7 +247,8 @@ queryFromText text =
       Query.params = Log.mkSecret [],
       Query.quasiQuotedString = text,
       Query.sqlOperation = text,
-      Query.queriedRelation = ""
+      Query.queriedRelation = "",
+      Query.neverRun = Query.noOp
     }
 
 --

@@ -9,6 +9,7 @@ module MySQL.Query
     Query (..),
     Info (..),
     ConnectionInfo (..),
+    noOp,
     mkInfo,
   )
 where
@@ -23,6 +24,7 @@ import qualified Database.MySQL.Base as Base
 import qualified Database.PostgreSQL.Typed as PGTyped
 import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
+import qualified Debug
 import qualified Environment
 import Internal.Instances ()
 import qualified Internal.QueryParser as Parser
@@ -57,9 +59,21 @@ data Query row
         -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
         sqlOperation :: Text,
         -- | The main table/view/.. queried.
-        queriedRelation :: Text
+        queriedRelation :: Text,
+        neverRun :: PGTyped.PGConnection -> Prelude.IO [row]
       }
-  deriving (Eq, Show)
+  deriving (Show)
+
+noOp :: forall a. PGTyped.PGConnection -> Prelude.IO [a]
+noOp _ = Debug.todo "this should never be run"
+
+instance Eq (Query a) where
+  x == y =
+    preparedStatement x == preparedStatement y
+      && params x == params y
+      && quasiQuotedString x == quasiQuotedString y
+      && sqlOperation x == sqlOperation y
+      && queriedRelation x == queriedRelation y
 
 qqSQL :: Prelude.String -> TH.ExpQ
 qqSQL queryWithPgTypedFlags = do
@@ -72,11 +86,10 @@ qqSQL queryWithPgTypedFlags = do
   -- we're uninterested in the results it produces. At runtime we're taking our
   -- queries straight to MySQL. Consider the line below like a validation
   -- function running against the query string at compile time.
-  _ <-
-    Data.Text.pack queryWithPgTypedFlags
-      |> Internal.inToAny
-      |> Data.Text.unpack
-      |> QQ.quoteExp PGTyped.pgSQL
+  let forCompilation =
+        Data.Text.pack queryWithPgTypedFlags
+          |> Internal.inToAny
+          |> Data.Text.unpack
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
   let query =
         queryWithPgTypedFlags
@@ -89,12 +102,14 @@ qqSQL queryWithPgTypedFlags = do
   let rel = Data.Text.unpack (Parser.queriedRelation meta)
   [e|
     let tokens = $(tokenize query)
+        q = $(QQ.quoteExp PGTyped.pgSQL forCompilation)
      in Query
           { preparedStatement = generatePreparedStatement tokens,
             params = collectQueryParams tokens,
             quasiQuotedString = queryWithPgTypedFlags,
             sqlOperation = op,
-            queriedRelation = Data.Text.pack rel
+            queriedRelation = Data.Text.pack rel,
+            neverRun = \c -> PGTyped.pgQuery c q
           }
     |]
 
