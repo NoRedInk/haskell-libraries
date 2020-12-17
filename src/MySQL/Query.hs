@@ -9,7 +9,6 @@ module MySQL.Query
     Query (..),
     Info (..),
     ConnectionInfo (..),
-    noOp,
     mkInfo,
   )
 where
@@ -23,8 +22,8 @@ import qualified Data.Text.Lazy.Builder as Builder
 import qualified Database.MySQL.Base as Base
 import qualified Database.PostgreSQL.Typed as PGTyped
 import Database.PostgreSQL.Typed.Array ()
+import qualified Database.PostgreSQL.Typed.Query as PGTyped.Query
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
-import qualified Debug
 import qualified Environment
 import Internal.Instances ()
 import qualified Internal.QueryParser as Parser
@@ -59,26 +58,9 @@ data Query row
         -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
         sqlOperation :: Text,
         -- | The main table/view/.. queried.
-        queriedRelation :: Text,
-        -- | This is only used for checking the query during compilation.
-        -- We use `pgSQL` to check the query during compilation. It doesn't
-        -- know about the types of the resulting rows though. We need to tie
-        -- the type variable `row` of `Query` to the query returned by `pgSQL`.
-        -- We can use `pgQuery` which has a constraint to bind them to each other.
-        neverRun :: PGTyped.PGConnection -> Prelude.IO [row]
+        queriedRelation :: Text
       }
-  deriving (Show)
-
-noOp :: forall a. PGTyped.PGConnection -> Prelude.IO [a]
-noOp _ = Debug.todo "this should never be run"
-
-instance Eq (Query a) where
-  x == y =
-    preparedStatement x == preparedStatement y
-      && params x == params y
-      && quasiQuotedString x == quasiQuotedString y
-      && sqlOperation x == sqlOperation y
-      && queriedRelation x == queriedRelation y
+  deriving (Eq, Show)
 
 qqSQL :: Prelude.String -> TH.ExpQ
 qqSQL queryWithPgTypedFlags = do
@@ -108,14 +90,19 @@ qqSQL queryWithPgTypedFlags = do
   [e|
     let tokens = $(tokenize query)
         q = $(QQ.quoteExp PGTyped.pgSQL forCompilation)
-     in Query
-          { preparedStatement = generatePreparedStatement tokens,
-            params = collectQueryParams tokens,
-            quasiQuotedString = queryWithPgTypedFlags,
-            sqlOperation = op,
-            queriedRelation = Data.Text.pack rel,
-            neverRun = \c -> PGTyped.pgQuery c q
-          }
+        mkQuery :: PGTyped.Query.PGQuery q row => q -> Query row
+        mkQuery q' =
+          -- Do something, anything, with q', or we'll see a
+          -- 'RedundantConstraint' warning where we generate this code.
+          let _ = PGTyped.Query.unsafeModifyQuery q'
+           in Query
+                { preparedStatement = generatePreparedStatement tokens,
+                  params = collectQueryParams tokens,
+                  quasiQuotedString = queryWithPgTypedFlags,
+                  sqlOperation = op,
+                  queriedRelation = Data.Text.pack rel
+                }
+     in mkQuery q
     |]
 
 -- Our own token type, not to be confused with the `SQLToken` type provided by
