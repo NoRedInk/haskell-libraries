@@ -22,6 +22,7 @@ import qualified Data.Text.Lazy.Builder as Builder
 import qualified Database.MySQL.Base as Base
 import qualified Database.PostgreSQL.Typed as PGTyped
 import Database.PostgreSQL.Typed.Array ()
+import qualified Database.PostgreSQL.Typed.Query as PGTyped.Query
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
 import qualified Environment
 import Internal.Instances ()
@@ -72,11 +73,10 @@ qqSQL queryWithPgTypedFlags = do
   -- we're uninterested in the results it produces. At runtime we're taking our
   -- queries straight to MySQL. Consider the line below like a validation
   -- function running against the query string at compile time.
-  _ <-
-    Data.Text.pack queryWithPgTypedFlags
-      |> Internal.inToAny
-      |> Data.Text.unpack
-      |> QQ.quoteExp PGTyped.pgSQL
+  let forCompilation =
+        Data.Text.pack queryWithPgTypedFlags
+          |> Internal.inToAny
+          |> Data.Text.unpack
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
   let query =
         queryWithPgTypedFlags
@@ -89,13 +89,20 @@ qqSQL queryWithPgTypedFlags = do
   let rel = Data.Text.unpack (Parser.queriedRelation meta)
   [e|
     let tokens = $(tokenize query)
-     in Query
-          { preparedStatement = generatePreparedStatement tokens,
-            params = collectQueryParams tokens,
-            quasiQuotedString = queryWithPgTypedFlags,
-            sqlOperation = op,
-            queriedRelation = Data.Text.pack rel
-          }
+        q = $(QQ.quoteExp PGTyped.pgSQL forCompilation)
+        mkQuery :: PGTyped.Query.PGQuery q row => q -> Query row
+        mkQuery q' =
+          -- Do something, anything, with q', or we'll see a
+          -- 'RedundantConstraint' warning where we generate this code.
+          let _ = PGTyped.Query.unsafeModifyQuery q'
+           in Query
+                { preparedStatement = generatePreparedStatement tokens,
+                  params = collectQueryParams tokens,
+                  quasiQuotedString = queryWithPgTypedFlags,
+                  sqlOperation = op,
+                  queriedRelation = Data.Text.pack rel
+                }
+     in mkQuery q
     |]
 
 -- Our own token type, not to be confused with the `SQLToken` type provided by
