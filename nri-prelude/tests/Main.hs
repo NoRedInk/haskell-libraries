@@ -10,13 +10,12 @@ import qualified DictSpec
 import qualified LogSpec
 import qualified PlatformSpec
 import qualified SetSpec
-import Test (Test, describe)
-import qualified Test.Runner.Tasty
+import Test (Test, describe, run)
 import qualified TextSpec
 import Prelude (IO)
 
 main :: IO ()
-main = Test.run tests
+main = run tests
 
 tests :: Test
 tests =
