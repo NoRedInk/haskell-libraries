@@ -1,10 +1,18 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE NumericUnderscores #-}
 
 module Test.Internal where
 
 import qualified Control.Exception.Safe as Exception
+import qualified Control.Monad.IO.Class
+import qualified Data.IORef as IORef
 import qualified Dict
 import qualified GHC.Stack as Stack
+import qualified Hedgehog
+import qualified Hedgehog.Internal.Property
+import qualified Hedgehog.Internal.Report
+import qualified Hedgehog.Internal.Runner
+import qualified Hedgehog.Internal.Seed
 import qualified List
 import qualified Maybe
 import NriPrelude
@@ -33,6 +41,8 @@ data Failure
   = FailedAssertion Text
   | ThrewException Exception.SomeException
   | TookTooLong
+  | TestRunnerMessedUp Text
+  deriving (Show)
 
 data SuiteResult
   = AllPassed
@@ -41,9 +51,18 @@ data SuiteResult
   | TestsFailed [SingleTest Failure]
   | NoTestsInSuite
 
+-- | A test which has yet to be evaluated. When evaluated, it produces one
+-- or more 'Expect.Expectation's.
+-- See 'test' and 'fuzz' for some ways to create a @Test@.
 newtype Test = Test {unTest :: [SingleTest Expectation]}
 
+-- |  The result of a single test run: either a 'pass' or a 'fail'.
 newtype Expectation = Expectation {unExpectation :: Task Never TestResult}
+
+-- | A @Fuzzer a@ knows how to produce random values of @a@ and how to "shrink"
+-- a value of @a@, that is turn a value into another that is slightly simpler.
+data Fuzzer a where
+  Fuzzer :: Show a => Hedgehog.Gen a -> Fuzzer a
 
 describe :: Text -> [Test] -> Test
 describe description tests =
@@ -75,6 +94,97 @@ test name expectation =
           body = handleUnexpectedErrors (expectation ())
         }
     ]
+
+fuzz :: Fuzzer a -> Text -> (a -> Expectation) -> Test
+fuzz fuzzer name expectation =
+  Test
+    [ SingleTest
+        { describes = [],
+          name = name,
+          loc = Stack.withFrozenCallStack getFrame,
+          label = None,
+          body = fuzzBody fuzzer expectation
+        }
+    ]
+
+fuzz2 :: Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expectation) -> Test
+fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
+  Test
+    [ SingleTest
+        { describes = [],
+          name = name,
+          loc = Stack.withFrozenCallStack getFrame,
+          label = None,
+          body =
+            fuzzBody
+              (Fuzzer (map2 (,) genA genB))
+              (\(a, b) -> expectation a b)
+        }
+    ]
+
+fuzz3 :: Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expectation) -> Test
+fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
+  Test
+    [ SingleTest
+        { describes = [],
+          name = name,
+          loc = Stack.withFrozenCallStack getFrame,
+          label = None,
+          body =
+            fuzzBody
+              (Fuzzer (map3 (,,) genA genB genC))
+              (\(a, b, c) -> expectation a b c)
+        }
+    ]
+
+fuzzBody :: Fuzzer a -> (a -> Expectation) -> Expectation
+fuzzBody (Fuzzer gen) expectation =
+  handleUnexpectedErrors
+    <| Expectation
+    <| Platform.Internal.Task
+      ( \log -> do
+          seed <- Hedgehog.Internal.Seed.random
+          resultRef <- IORef.newIORef Nothing
+          hedgehogResult <-
+            Hedgehog.Internal.Runner.checkReport
+              Hedgehog.Internal.Property.defaultConfig
+              0 -- Same value used as in Hedgehog internals.
+              seed
+              ( do
+                  generated <- Hedgehog.forAll gen
+                  result <-
+                    expectation generated
+                      |> unExpectation
+                      |> Task.perform log
+                      |> Control.Monad.IO.Class.liftIO
+                  IORef.writeIORef resultRef (Just result)
+                    |> Control.Monad.IO.Class.liftIO
+                  case result of
+                    Succeeded -> Prelude.pure ()
+                    Failed failure -> Prelude.fail (Prelude.show failure)
+              )
+              (\_ -> Prelude.pure ())
+          case Hedgehog.Internal.Report.reportStatus hedgehogResult of
+            Hedgehog.Internal.Report.Failed _ -> do
+              maybeResult <- IORef.readIORef resultRef
+              case maybeResult of
+                Nothing ->
+                  TestRunnerMessedUp "I lost the error report of a failed fuzz test test."
+                    |> Failed
+                    |> Ok
+                    |> Prelude.pure
+                Just result ->
+                  Ok result
+                    |> Prelude.pure
+            Hedgehog.Internal.Report.GaveUp ->
+              TestRunnerMessedUp "I couldn't generate any values for a fuzz test."
+                |> Failed
+                |> Ok
+                |> Prelude.pure
+            Hedgehog.Internal.Report.OK ->
+              Ok Succeeded
+                |> Prelude.pure
+      )
 
 skip :: Test -> Test
 skip (Test tests) =

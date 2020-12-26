@@ -8,6 +8,11 @@ module Test
     only,
     todo,
 
+    -- * Fuzz Testing
+    fuzz,
+    fuzz2,
+    fuzz3,
+
     -- * Task Testing
     task,
 
@@ -22,12 +27,8 @@ import qualified Platform
 import qualified System.Exit
 import qualified Task
 import qualified Test.Internal as Internal
+import Test.Internal (Fuzzer, Test)
 import qualified Prelude
-
--- | A test which has yet to be evaluated. When evaluated, it produces one
--- or more 'Expect.Expectation's.
--- See 'test' and 'fuzz' for some ways to create a @Test@.
-type Test = Internal.Test
 
 -- | Apply a description to a list of tests.
 --
@@ -152,6 +153,26 @@ only = Test.only
 -- that a todo test is considered failing but a pending test often is not.
 todo :: Text -> Test
 todo = Test.todo
+
+-- | Take a function that produces a test, and calls it several (usually 100)
+-- times, using a randomly-generated input from a 'Fuzzer' each time. This
+-- allows you to test that a property that should always be true is indeed true
+-- under a wide variety of conditions. The function also takes a string
+-- describing the test.
+--
+-- These are called "fuzz tests" because of the randomness. You may find them
+-- elsewhere called property-based tests, generative tests, or QuickCheck-style
+-- tests.
+fuzz :: Fuzzer a -> Text -> (a -> Expect.Expectation) -> Test
+fuzz = Internal.fuzz
+
+-- | Run a fuzz test using two random inputs.
+fuzz2 :: Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expect.Expectation) -> Test
+fuzz2 = Internal.fuzz2
+
+-- | Run a fuzz test using three random inputs.
+fuzz3 :: Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expect.Expectation) -> Test
+fuzz3 = Internal.fuzz3
 
 -- | Run a test that executes a task. The test passes if the task returns a
 -- success value.

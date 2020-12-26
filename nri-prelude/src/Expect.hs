@@ -58,11 +58,9 @@ import qualified System.Directory as Directory
 import qualified System.FilePath as FilePath
 import qualified Task
 import qualified Test.Internal as Internal
+import Test.Internal (Expectation)
 import qualified Text.Show.Pretty
 import Prelude (Eq, IO, Ord, Show, show)
-
--- |  The result of a single test run: either a 'pass' or a 'fail'.
-type Expectation = Internal.Expectation
 
 -- | Run some IO and assert the value it produces.
 --
