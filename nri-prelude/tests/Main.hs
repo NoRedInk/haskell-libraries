@@ -16,7 +16,7 @@ import qualified TextSpec
 import Prelude (IO)
 
 main :: IO ()
-main = Test.Runner.Tasty.main tests
+main = Test.run tests
 
 tests :: Test
 tests =

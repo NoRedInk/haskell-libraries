@@ -10,12 +10,19 @@ module Test
 
     -- * Task Testing
     task,
+
+    -- * Running test
+    run,
   )
 where
 
 import qualified Expect
 import NriPrelude
+import qualified Platform
+import qualified System.Exit
+import qualified Task
 import qualified Test.Internal as Internal
+import qualified Prelude
 
 -- | A test which has yet to be evaluated. When evaluated, it produces one
 -- or more 'Expect.Expectation's.
@@ -150,3 +157,20 @@ todo = Test.todo
 -- success value.
 task :: Text -> Task Internal.Failure a -> Test
 task = Internal.task
+
+-- | Turn a test suite into a program that can be executed in Haskell. Use like
+-- this:
+--
+-- > module Main (main) where
+-- >
+-- > import qualified Test
+-- >
+-- > main :: IO ()
+-- > main = Test.run (Test.todo "write your tests here!")
+run :: Test -> Prelude.IO ()
+run suite = do
+  log <- Platform.silentHandler
+  results <- Task.perform log (Internal.run suite)
+  case results of
+    Internal.AllPassed -> System.Exit.exitSuccess
+    _ -> System.Exit.exitFailure
