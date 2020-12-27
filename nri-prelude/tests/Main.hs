@@ -12,9 +12,9 @@ import qualified PlatformSpec
 import qualified SetSpec
 import Test (Test, describe, run)
 import qualified TextSpec
-import Prelude (IO)
+import qualified Prelude
 
-main :: IO ()
+main :: Prelude.IO ()
 main = run tests
 
 tests :: Test

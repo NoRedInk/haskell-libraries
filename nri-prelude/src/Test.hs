@@ -28,6 +28,7 @@ import qualified Task
 import qualified Test.Internal as Internal
 import Test.Internal (Fuzzer, Test)
 import qualified Test.Reporter.ExitCode
+import qualified Test.Reporter.Stdout
 import qualified Prelude
 
 -- | Apply a description to a list of tests.
@@ -53,7 +54,7 @@ import qualified Prelude
 -- mistake or are creating a placeholder.
 describe :: Text -> List Test -> Test
 describe =
-  Test.describe
+  Internal.describe
 
 -- | Return a 'Test' that evaluates a single
 -- 'Expect.Expectation'
@@ -66,7 +67,7 @@ describe =
 -- >             |> Expect.equal 0
 test :: Text -> (() -> Expect.Expectation) -> Test
 test =
-  Test.test
+  Internal.test
 
 -- | Returns a 'Test' that gets skipped.
 --
@@ -98,7 +99,7 @@ test =
 -- >                 |> Expect.equal 0
 -- >     ]
 skip :: Test -> Test
-skip = Test.skip
+skip = Internal.skip
 
 -- | Returns a 'Test' that causes other tests to be skipped, and only runs the given one.
 --
@@ -132,7 +133,7 @@ skip = Test.skip
 -- >                 |> Expect.equal 0
 -- >     ]
 only :: Test -> Test
-only = Test.only
+only = Internal.only
 
 -- | Returns a 'Test' that is "todo" (not yet implemented). These tests always
 -- fail.
@@ -152,7 +153,7 @@ only = Test.only
 -- This functionality is similar to "pending" tests in other frameworks, except
 -- that a todo test is considered failing but a pending test often is not.
 todo :: Text -> Test
-todo = Test.todo
+todo = Internal.todo
 
 -- | Take a function that produces a test, and calls it several (usually 100)
 -- times, using a randomly-generated input from a 'Fuzzer' each time. This
@@ -192,4 +193,5 @@ run :: Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
+  Test.Reporter.Stdout.report results
   Test.Reporter.ExitCode.report results

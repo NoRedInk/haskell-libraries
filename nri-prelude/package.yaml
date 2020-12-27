@@ -17,6 +17,7 @@ extra-doc-files:
 library:
   dependencies: &dependencies
   - aeson >= 1.4.6.0 && < 1.6
+  - ansi-terminal >= 0.9.1 && < 0.12
   - async >= 2.2.2 && < 2.3
   - auto-update >= 0.1.6 && < 0.2
   - base >= 4.12.0.0 && < 4.15
