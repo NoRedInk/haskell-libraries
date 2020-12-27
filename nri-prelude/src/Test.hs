@@ -24,10 +24,10 @@ where
 import qualified Expect
 import NriPrelude
 import qualified Platform
-import qualified System.Exit
 import qualified Task
 import qualified Test.Internal as Internal
 import Test.Internal (Fuzzer, Test)
+import qualified Test.Reporter.ExitCode
 import qualified Prelude
 
 -- | Apply a description to a list of tests.
@@ -192,6 +192,4 @@ run :: Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
-  case results of
-    Internal.AllPassed -> System.Exit.exitSuccess
-    _ -> System.Exit.exitFailure
+  Test.Reporter.ExitCode.report results
