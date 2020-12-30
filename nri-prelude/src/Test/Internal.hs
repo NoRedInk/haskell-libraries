@@ -158,7 +158,7 @@ test name expectation =
 -- These are called "fuzz tests" because of the randomness. You may find them
 -- elsewhere called property-based tests, generative tests, or QuickCheck-style
 -- tests.
-fuzz :: Show a => Fuzzer a -> Text -> (a -> Expectation) -> Test
+fuzz :: (Stack.HasCallStack, Show a) => Fuzzer a -> Text -> (a -> Expectation) -> Test
 fuzz fuzzer name expectation =
   Test
     [ SingleTest
@@ -171,7 +171,7 @@ fuzz fuzzer name expectation =
     ]
 
 -- | Run a fuzz test using two random inputs.
-fuzz2 :: (Show a, Show b) => Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expectation) -> Test
+fuzz2 :: (Stack.HasCallStack, Show a, Show b) => Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expectation) -> Test
 fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
   Test
     [ SingleTest
@@ -187,7 +187,7 @@ fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
     ]
 
 -- | Run a fuzz test using three random inputs.
-fuzz3 :: (Show a, Show b, Show c) => Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expectation) -> Test
+fuzz3 :: (Stack.HasCallStack, Show a, Show b, Show c) => Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expectation) -> Test
 fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
   Test
     [ SingleTest
