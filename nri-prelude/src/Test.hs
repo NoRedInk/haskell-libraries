@@ -193,5 +193,5 @@ run :: Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
-  Test.Reporter.Stdout.report results
+  Test.Reporter.Stdout.report suite results
   Test.Reporter.ExitCode.report results
