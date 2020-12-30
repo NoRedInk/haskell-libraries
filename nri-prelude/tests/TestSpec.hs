@@ -1,18 +1,33 @@
 module TestSpec (tests) where
 
+import qualified Control.Exception.Safe as Exception
 import qualified Data.Text
+import qualified Data.Text.IO
 import qualified Expect
 import qualified Expect.Task
 import qualified Fuzz
+import qualified GHC.Exts
 import qualified GHC.Stack as Stack
 import NriPrelude
+import qualified Platform.Internal
+import qualified System.IO
 import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, task, test, todo)
 import qualified Test.Internal as Internal
+import qualified Test.Reporter.Stdout
+import qualified Prelude
 
 tests :: Test
 tests =
   describe
     "Test"
+    [ api,
+      stdoutReporter
+    ]
+
+api :: Test
+api =
+  describe
+    "Api"
     [ task "suite result is 'AllPassed' when all tests passed" <| do
         let suite =
               describe
@@ -37,7 +52,7 @@ tests =
           |> simplify
           |> Expect.equal (OnlysPassed ["test 2"] ["test 1"])
           |> Expect.Task.check,
-      task "suite result is 'PassedWithSkipped' when containing a skipped test" <| do
+      task "suite result is 'PassedWithSkipped' when containing  skipped test" <| do
         let suite =
               describe
                 "suite"
@@ -165,3 +180,139 @@ simplify suiteResult =
         (map Internal.name skipped)
         (map Internal.name failed)
     Internal.NoTestsInSuite -> NoTestsInSuite
+
+stdoutReporter :: Test
+stdoutReporter =
+  describe
+    "Stdout Reporter"
+    [ task "all passed" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.AllPassed
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  |> Test.Reporter.Stdout.report handle
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-all-passed"
+          |> Expect.Task.check,
+      task "onlys passed" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.OnlysPassed
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  [ mockTest "test 3" Internal.NotRan,
+                    mockTest "test 4" Internal.NotRan
+                  ]
+                  |> Test.Reporter.Stdout.report handle
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-onlys-passed"
+          |> Expect.Task.check,
+      task "passed with skipped" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.PassedWithSkipped
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  [ mockTest "test 3" Internal.NotRan,
+                    mockTest "test 4" Internal.NotRan
+                  ]
+                  |> Test.Reporter.Stdout.report handle
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-passed-with-skipped"
+          |> Expect.Task.check,
+      task "no tests in suite" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.NoTestsInSuite
+                  |> Test.Reporter.Stdout.report handle
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-no-tests-in-suite"
+          |> Expect.Task.check,
+      task "tests failed" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.TestsFailed
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  [ mockTest "test 3" Internal.NotRan,
+                    mockTest "test 4" Internal.NotRan
+                  ]
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error"),
+                    mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
+                    mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
+                    mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
+                  ]
+                  |> Test.Reporter.Stdout.report handle
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed"
+          |> Expect.Task.check
+    ]
+
+-- | Provide a temporary file for a test to do some work in, then return the
+-- contents of the file when the test is done with it.
+withTempFile :: (System.IO.FilePath -> System.IO.Handle -> Prelude.IO ()) -> Task e Text
+withTempFile go = do
+  Platform.Internal.Task
+    ( \_ -> do
+        (path, handle) <-
+          System.IO.openTempFile "/tmp" "nri-haskell-libraries-test-file"
+        go path handle
+        System.IO.hClose handle
+        Data.Text.IO.readFile path
+          |> map Ok
+    )
+
+mockTest :: Text -> body -> Internal.SingleTest body
+mockTest name body =
+  Internal.SingleTest
+    { Internal.describes = ["suite", "sub suite"],
+      Internal.name = name,
+      Internal.label = Internal.None,
+      Internal.loc = Just mockSrcLoc,
+      Internal.body = body
+    }
+
+mockTracingSpan :: Platform.Internal.TracingSpan
+mockTracingSpan =
+  Platform.Internal.TracingSpan
+    { Platform.Internal.name = "name",
+      Platform.Internal.started = Platform.Internal.MonotonicTime 0,
+      Platform.Internal.finished = Platform.Internal.MonotonicTime 0,
+      Platform.Internal.frame = Nothing,
+      Platform.Internal.details = Nothing,
+      Platform.Internal.succeeded = Platform.Internal.Succeeded,
+      Platform.Internal.allocated = 1,
+      Platform.Internal.children = []
+    }
+
+mockSrcLoc :: Stack.SrcLoc
+mockSrcLoc =
+  Stack.SrcLoc
+    { Stack.srcLocPackage = "package",
+      Stack.srcLocModule = "Module",
+      Stack.srcLocFile = "Module.hs",
+      Stack.srcLocStartLine = 2,
+      Stack.srcLocStartCol = 4,
+      Stack.srcLocEndLine = 12,
+      Stack.srcLocEndCol = 14
+    }
+
+mockException :: Exception.SomeException
+mockException =
+  Exception.StringException "exception" (GHC.Exts.fromList [])
+    |> Exception.toException

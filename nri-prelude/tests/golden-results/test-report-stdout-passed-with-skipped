@@ -1,0 +1,16 @@
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 3
+This test was skipped.
+
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 4
+This test was skipped.
+
+TEST RUN INCOMPLETE because 2 tests were skipped
+
+Passed:    2
+Skipped:   2
