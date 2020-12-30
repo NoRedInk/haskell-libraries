@@ -21,7 +21,11 @@ module Test
   )
 where
 
+import NriPrelude
 import qualified Platform
+import qualified System.Environment
+import qualified System.FilePath as FilePath
+import qualified System.IO
 import qualified Task
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
@@ -42,6 +46,16 @@ run :: Internal.Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
-  Test.Reporter.Stdout.report results
-  Test.Reporter.Junit.report results
+  Test.Reporter.Stdout.report System.IO.stdout results
+  args <- System.Environment.getArgs
+  case getPath args of
+    Nothing -> Prelude.pure ()
+    Just path -> Test.Reporter.Junit.report path results
   Test.Reporter.ExitCode.report results
+
+getPath :: [Prelude.String] -> Maybe FilePath.FilePath
+getPath args =
+  case args of
+    [] -> Nothing
+    "--xml" : path : _ -> Just path
+    _ : rest -> getPath rest

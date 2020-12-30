@@ -18,16 +18,16 @@ import qualified Test.Internal as Internal
 import qualified Tuple
 import qualified Prelude
 
-report :: Internal.SuiteResult -> Prelude.IO ()
-report results = do
-  color <- ANSI.hSupportsANSIColor System.IO.stdout
+report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
+report handle results = do
+  color <- ANSI.hSupportsANSIColor handle
   let styled =
         if color
           then (\styles builder -> sgr styles ++ builder ++ sgr [ANSI.Reset])
           else (\_ builder -> builder)
   let reportByteString = renderReport styled results
-  Builder.hPutBuilder System.IO.stdout reportByteString
-  System.IO.hFlush System.IO.stdout
+  Builder.hPutBuilder handle reportByteString
+  System.IO.hFlush handle
 
 renderReport ::
   ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
