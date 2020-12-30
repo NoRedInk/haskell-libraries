@@ -3,7 +3,7 @@ module TestSpec (tests) where
 import qualified Expect
 import qualified Expect.Task
 import NriPrelude
-import Test (Test, describe, only, skip, task, test)
+import Test (Test, describe, only, skip, task, test, todo)
 import qualified Test.Internal as Internal
 
 tests :: Test
@@ -40,6 +40,18 @@ tests =
                 "suite"
                 [ test "test 1" (\_ -> Expect.pass),
                   skip <| test "test 2" (\_ -> Expect.pass)
+                ]
+        result <- Internal.run suite
+        result
+          |> simplify
+          |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"])
+          |> Expect.Task.check,
+      task "suite result is 'PassedWithSkipped' when containing a todo test" <| do
+        let suite =
+              describe
+                "suite"
+                [ test "test 1" (\_ -> Expect.pass),
+                  todo "test 2"
                 ]
         result <- Internal.run suite
         result
