@@ -51,12 +51,12 @@ data Failure
 
 data SuiteResult
   = AllPassed [SingleTest TracingSpan]
-  | OnlysPassed [SingleTest TracingSpan] [SingleTest Skipped]
-  | PassedWithSkipped [SingleTest TracingSpan] [SingleTest Skipped]
-  | TestsFailed [SingleTest TracingSpan] [SingleTest Skipped] [SingleTest (TracingSpan, Failure)]
+  | OnlysPassed [SingleTest TracingSpan] [SingleTest NotRan]
+  | PassedWithSkipped [SingleTest TracingSpan] [SingleTest NotRan]
+  | TestsFailed [SingleTest TracingSpan] [SingleTest NotRan] [SingleTest (TracingSpan, Failure)]
   | NoTestsInSuite
 
-data Skipped = Skipped
+data NotRan = NotRan
 
 -- | A test which has yet to be evaluated. When evaluated, it produces one
 -- or more 'Expect.Expectation's.
@@ -355,7 +355,7 @@ run (Test all) = do
         Dict.toList grouped
           |> List.partition (doRun << Tuple.first)
           |> Tuple.mapBoth (List.concatMap Tuple.second) (List.concatMap Tuple.second)
-  let notToRun = List.map (\test' -> test' {body = Skipped}) notToRun'
+  let notToRun = List.map (\test' -> test' {body = NotRan}) notToRun'
   results <- Task.parallel (List.map runSingle toRun)
   let (failed, passed) =
         results

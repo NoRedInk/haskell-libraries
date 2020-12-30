@@ -54,7 +54,7 @@ renderPassed test =
     |> JUnit.time (duration (Internal.body test))
     |> JUnit.inSuite (suiteName test)
 
-renderSkipped :: Internal.SingleTest Internal.Skipped -> JUnit.TestSuite
+renderSkipped :: Internal.SingleTest Internal.NotRan -> JUnit.TestSuite
 renderSkipped test =
   JUnit.skipped (Internal.name test)
     |> JUnit.inSuite (suiteName test)
