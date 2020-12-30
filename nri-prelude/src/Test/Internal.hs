@@ -317,7 +317,7 @@ skip (Test tests) =
 -- >     ]
 only :: Test -> Test
 only (Test tests) =
-  Test <| List.map (\test' -> test' {label = Skip}) tests
+  Test <| List.map (\test' -> test' {label = Only}) tests
 
 -- | Run a test that executes a task. The test passes if the task returns a
 -- success value.
