@@ -9,6 +9,7 @@ where
 import qualified Control.Exception as Exception
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text.Encoding as TE
+import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
 import qualified System.Console.ANSI as ANSI
@@ -128,10 +129,23 @@ prettyPath ::
   Internal.SingleTest a ->
   Builder.Builder
 prettyPath styled styles test =
-  let segment text = styled [grey] ("↓ " ++ TE.encodeUtf8Builder text) ++ "\n"
-   in Prelude.foldMap segment (Internal.describes test)
-        ++ styled styles ("✗ " ++ TE.encodeUtf8Builder (Internal.name test))
-        ++ "\n"
+  ( case Internal.loc test of
+      Nothing -> ""
+      Just loc ->
+        styled
+          [grey]
+          ( "↓ "
+              ++ Builder.stringUtf8 (Stack.srcLocFile loc)
+              ++ ":"
+              ++ Builder.intDec (Stack.srcLocStartLine loc)
+              ++ "\n"
+          )
+  )
+    ++ Prelude.foldMap
+      (\text -> styled [grey] ("↓ " ++ TE.encodeUtf8Builder text) ++ "\n")
+      (Internal.describes test)
+    ++ styled styles ("✗ " ++ TE.encodeUtf8Builder (Internal.name test))
+    ++ "\n"
 
 testFailure :: Internal.SingleTest Internal.Failure -> Builder.Builder
 testFailure test =
