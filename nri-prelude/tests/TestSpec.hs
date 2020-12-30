@@ -11,67 +11,61 @@ tests =
   describe
     "Test"
     [ task "suite result is 'AllPassed' when all tests passed" <| do
-        describe
-          "suite"
-          [ test "test 1" (\_ -> Expect.pass),
-            test "test 2" (\_ -> Expect.pass)
-          ]
-          |> Internal.run
-          |> Expect.Task.andCheck
-            ( \result ->
-                result
-                  |> simplify
-                  |> Expect.equal (AllPassed ["test 1", "test 2"])
-            ),
+        let suite =
+              describe
+                "suite"
+                [ test "test 1" (\_ -> Expect.pass),
+                  test "test 2" (\_ -> Expect.pass)
+                ]
+        result <- Internal.run suite
+        result
+          |> simplify
+          |> Expect.equal (AllPassed ["test 1", "test 2"])
+          |> Expect.Task.check,
       task "suite result is 'OnlysPassed' when containing an `only`" <| do
-        describe
-          "suite"
-          [ test "test 1" (\_ -> Expect.pass),
-            only <| test "test 2" (\_ -> Expect.pass)
-          ]
-          |> Internal.run
-          |> Expect.Task.andCheck
-            ( \result ->
-                result
-                  |> simplify
-                  |> Expect.equal (OnlysPassed ["test 2"] ["test 1"])
-            ),
+        let suite =
+              describe
+                "suite"
+                [ test "test 1" (\_ -> Expect.pass),
+                  only <| test "test 2" (\_ -> Expect.pass)
+                ]
+        result <- Internal.run suite
+        result
+          |> simplify
+          |> Expect.equal (OnlysPassed ["test 2"] ["test 1"])
+          |> Expect.Task.check,
       task "suite result is 'PassedWithSkipped' when containing a skipped test" <| do
-        describe
-          "suite"
-          [ test "test 1" (\_ -> Expect.pass),
-            skip <| test "test 2" (\_ -> Expect.pass)
-          ]
-          |> Internal.run
-          |> Expect.Task.andCheck
-            ( \result ->
-                result
-                  |> simplify
-                  |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"])
-            ),
+        let suite =
+              describe
+                "suite"
+                [ test "test 1" (\_ -> Expect.pass),
+                  skip <| test "test 2" (\_ -> Expect.pass)
+                ]
+        result <- Internal.run suite
+        result
+          |> simplify
+          |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"])
+          |> Expect.Task.check,
       task "suite result is 'NoTestsInSuite' when it contains no tests" <| do
-        describe "suite" []
-          |> Internal.run
-          |> Expect.Task.andCheck
-            ( \result ->
-                result
-                  |> simplify
-                  |> Expect.equal NoTestsInSuite
-            ),
+        let suite = describe "suite" []
+        result <- Internal.run suite
+        result
+          |> simplify
+          |> Expect.equal NoTestsInSuite
+          |> Expect.Task.check,
       task "suite result is 'TestsFailed' when it contains a failing test" <| do
-        describe
-          "suite"
-          [ test "test 1" (\_ -> Expect.pass),
-            skip <| test "test 2" (\_ -> Expect.pass),
-            test "test 3" (\_ -> Expect.fail "oops")
-          ]
-          |> Internal.run
-          |> Expect.Task.andCheck
-            ( \result ->
-                result
-                  |> simplify
-                  |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"])
-            ),
+        let suite =
+              describe
+                "suite"
+                [ test "test 1" (\_ -> Expect.pass),
+                  skip <| test "test 2" (\_ -> Expect.pass),
+                  test "test 3" (\_ -> Expect.fail "oops")
+                ]
+        result <- Internal.run suite
+        result
+          |> simplify
+          |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"])
+          |> Expect.Task.check,
       test "nested describes are exposed on each test" <| \_ ->
         let suite =
               describe
