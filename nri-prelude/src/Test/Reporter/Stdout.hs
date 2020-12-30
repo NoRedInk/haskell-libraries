@@ -7,6 +7,7 @@ module Test.Reporter.Stdout
 where
 
 import qualified Data.ByteString.Builder as Builder
+import qualified Data.Text.Encoding as TE
 import qualified List
 import NriPrelude
 import qualified System.Console.ANSI as ANSI
@@ -39,12 +40,21 @@ renderReport styled (Internal.Test tests) results =
             ++ styled [black] ("Passed:    " ++ Builder.int64Dec amountPassed)
             ++ "\n"
     Internal.OnlysPassed ->
-      let amountPassed =
+      let onlys =
             tests
               |> List.filter (\test -> Internal.label test == Internal.Only)
-              |> List.length
+          amountPassed =
+            List.length onlys
           amountSkipped = List.length tests - amountPassed
-       in styled [yellow, underlined] "TEST RUN INCOMPLETE"
+       in Prelude.foldMap
+            ( \only ->
+                prettyPath styled [yellow] only
+                  ++ "This test passed, but there is a `Test.only` in your test."
+                  ++ "I failed the test, because it's easy to forget to remove `Test.only`."
+                  ++ "\n\n"
+            )
+            onlys
+            ++ styled [yellow, underlined] "TEST RUN INCOMPLETE"
             ++ styled [yellow] " because there is an `only` in your tests."
             ++ "\n\n"
             ++ styled [black] ("Passed:    " ++ Builder.int64Dec amountPassed)
@@ -54,7 +64,14 @@ renderReport styled (Internal.Test tests) results =
     Internal.PassedWithSkipped skipped ->
       let amountSkipped = List.length skipped
           amountPassed = List.length tests - amountSkipped
-       in styled [yellow, underlined] "TEST RUN INCOMPLETE"
+       in Prelude.foldMap
+            ( \only ->
+                prettyPath styled [yellow] only
+                  ++ "This test was skipped."
+                  ++ "\n\n"
+            )
+            skipped
+            ++ styled [yellow, underlined] "TEST RUN INCOMPLETE"
             ++ styled
               [yellow]
               ( case List.length skipped of
@@ -80,7 +97,14 @@ renderReport styled (Internal.Test tests) results =
               else List.length tests - amountOnly
           amountFailed = List.length failed
           amountPassed = List.length tests - amountSkipped - amountFailed
-       in styled [red, underlined] "TEST RUN FAILED"
+       in Prelude.foldMap
+            ( \only ->
+                prettyPath styled [red] only
+                  ++ "This test failed."
+                  ++ "\n\n"
+            )
+            failed
+            ++ styled [red, underlined] "TEST RUN FAILED"
             ++ "\n\n"
             ++ styled [black] ("Passed:    " ++ Builder.int64Dec amountPassed)
             ++ "\n"
@@ -97,6 +121,17 @@ renderReport styled (Internal.Test tests) results =
         ++ styled [yellow] (" because the test suite is empty.")
         ++ "\n"
 
+prettyPath ::
+  ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
+  [ANSI.SGR] ->
+  Internal.SingleTest a ->
+  Builder.Builder
+prettyPath styled styles test =
+  let segment text = styled [grey] ("↓ " ++ TE.encodeUtf8Builder text) ++ "\n"
+   in Prelude.foldMap segment (Internal.describes test)
+        ++ styled styles ("✗ " ++ TE.encodeUtf8Builder (Internal.name test))
+        ++ "\n"
+
 sgr :: [ANSI.SGR] -> Builder.Builder
 sgr = Builder.stringUtf8 << ANSI.setSGRCode
 
@@ -109,8 +144,8 @@ yellow = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Yellow
 green :: ANSI.SGR
 green = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Green
 
-_grey :: ANSI.SGR
-_grey = ANSI.SetColor ANSI.Foreground ANSI.Vivid ANSI.Black
+grey :: ANSI.SGR
+grey = ANSI.SetColor ANSI.Foreground ANSI.Vivid ANSI.Black
 
 black :: ANSI.SGR
 black = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.White
