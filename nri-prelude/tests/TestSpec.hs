@@ -1,9 +1,12 @@
 module TestSpec (tests) where
 
+import qualified Data.Text
 import qualified Expect
 import qualified Expect.Task
+import qualified Fuzz
+import qualified GHC.Stack as Stack
 import NriPrelude
-import Test (Test, describe, only, skip, task, test, todo)
+import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, task, test, todo)
 import qualified Test.Internal as Internal
 
 tests :: Test
@@ -87,12 +90,50 @@ tests =
                     [ test "test 1" (\_ -> Expect.pass)
                     ]
                 ]
-         in case suite of
-              Internal.Test [test'] ->
-                Internal.describes test'
-                  |> Expect.equal ["suite", "sub suite"]
-              _ -> Expect.fail "I didn't find a single test as I expected."
+         in suite
+              |> expectSingleTest
+                ( \test' ->
+                    Internal.describes test'
+                      |> Expect.equal ["suite", "sub suite"]
+                ),
+      test "source location of `test` are the file in which the test is defined" <| \_ ->
+        test "test 1" (\_ -> Expect.pass)
+          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
+      test "source location of `todo` are the file in which the test is defined" <| \_ ->
+        todo "test 1"
+          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
+      test "source location of `task` are the file in which the test is defined" <| \_ ->
+        task "test 1" (Expect.Task.check Expect.pass)
+          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
+      test "source location of `fuzz` are the file in which the test is defined" <| \_ ->
+        fuzz Fuzz.int "test 1" (\_ -> Expect.pass)
+          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
+      test "source location of `fuzz2` are the file in which the test is defined" <| \_ ->
+        fuzz2 Fuzz.int Fuzz.int "test 1" (\_ _ -> Expect.pass)
+          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
+      test "source location of `fuzz3` are the file in which the test is defined" <| \_ ->
+        fuzz3 Fuzz.int Fuzz.int Fuzz.int "test 1" (\_ _ _ -> Expect.pass)
+          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs")
     ]
+
+expectSingleTest ::
+  (Internal.SingleTest Internal.Expectation -> Expect.Expectation) ->
+  Test ->
+  Expect.Expectation
+expectSingleTest check (Internal.Test tests') =
+  case tests' of
+    [test'] -> check test'
+    _ -> Expect.fail "I didn't find a single test as I expected."
+
+expectSrcFile :: Text -> Internal.SingleTest a -> Expect.Expectation
+expectSrcFile expected test' =
+  case Internal.loc test' of
+    Nothing ->
+      Expect.fail "Expected source file location for test, but none was set."
+    Just loc ->
+      Stack.srcLocFile loc
+        |> Data.Text.pack
+        |> Expect.equal expected
 
 -- | A type mirroring `Internal.SuiteResult`, simplified to allow easy
 -- comparisons in tests.
