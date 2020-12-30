@@ -20,8 +20,8 @@ tests =
           |> Expect.Task.andCheck
             ( \result ->
                 result
-                  |> resultConstructor
-                  |> Expect.equal "AllPassed"
+                  |> simplify
+                  |> Expect.equal AllPassed
             ),
       task "suite result is 'OnlysPassed' when containing an `only`" <| do
         describe
@@ -33,8 +33,8 @@ tests =
           |> Expect.Task.andCheck
             ( \result ->
                 result
-                  |> resultConstructor
-                  |> Expect.equal "OnlysPassed"
+                  |> simplify
+                  |> Expect.equal OnlysPassed
             ),
       task "suite result is 'PassedWithSkipped' when containing a skipped test" <| do
         describe
@@ -46,8 +46,8 @@ tests =
           |> Expect.Task.andCheck
             ( \result ->
                 result
-                  |> resultConstructor
-                  |> Expect.equal "PassedWithSkipped"
+                  |> simplify
+                  |> Expect.equal PassedWithSkipped
             ),
       task "suite result is 'NoTestsInSuite' when it contains no tests" <| do
         describe "suite" []
@@ -55,8 +55,8 @@ tests =
           |> Expect.Task.andCheck
             ( \result ->
                 result
-                  |> resultConstructor
-                  |> Expect.equal "NoTestsInSuite"
+                  |> simplify
+                  |> Expect.equal NoTestsInSuite
             ),
       task "suite result is 'TestsFailed' when it contains a failing test" <| do
         describe
@@ -68,8 +68,8 @@ tests =
           |> Expect.Task.andCheck
             ( \result ->
                 result
-                  |> resultConstructor
-                  |> Expect.equal "TestsFailed"
+                  |> simplify
+                  |> Expect.equal TestsFailed
             ),
       test "nested describes are exposed on each test" <| \_ ->
         let suite =
@@ -87,11 +87,21 @@ tests =
               _ -> Expect.fail "I didn't find a single test as I expected."
     ]
 
-resultConstructor :: Internal.SuiteResult -> Text
-resultConstructor suiteResult =
+-- | A type mirroring `Internal.SuiteResult`, simplified to allow easy
+-- comparisons in tests.
+data SimplifiedSuiteResult
+  = AllPassed
+  | OnlysPassed
+  | PassedWithSkipped
+  | TestsFailed
+  | NoTestsInSuite
+  deriving (Eq, Show)
+
+simplify :: Internal.SuiteResult -> SimplifiedSuiteResult
+simplify suiteResult =
   case suiteResult of
-    Internal.AllPassed _ -> "AllPassed"
-    Internal.OnlysPassed _ _ -> "OnlysPassed"
-    Internal.PassedWithSkipped _ _ -> "PassedWithSkipped"
-    Internal.TestsFailed _ _ _ -> "TestsFailed"
-    Internal.NoTestsInSuite -> "NoTestsInSuite"
+    Internal.AllPassed _ -> AllPassed
+    Internal.OnlysPassed _ _ -> OnlysPassed
+    Internal.PassedWithSkipped _ _ -> PassedWithSkipped
+    Internal.TestsFailed _ _ _ -> TestsFailed
+    Internal.NoTestsInSuite -> NoTestsInSuite
