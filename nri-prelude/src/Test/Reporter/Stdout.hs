@@ -6,6 +6,7 @@ module Test.Reporter.Stdout
   )
 where
 
+import qualified Control.Exception as Exception
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text.Encoding as TE
 import qualified List
@@ -98,9 +99,9 @@ renderReport styled (Internal.Test tests) results =
           amountFailed = List.length failed
           amountPassed = List.length tests - amountSkipped - amountFailed
        in Prelude.foldMap
-            ( \only ->
-                prettyPath styled [red] only
-                  ++ "This test failed."
+            ( \test ->
+                prettyPath styled [red] test
+                  ++ testFailure test
                   ++ "\n\n"
             )
             failed
@@ -131,6 +132,24 @@ prettyPath styled styles test =
    in Prelude.foldMap segment (Internal.describes test)
         ++ styled styles ("✗ " ++ TE.encodeUtf8Builder (Internal.name test))
         ++ "\n"
+
+testFailure :: Internal.SingleTest Internal.Failure -> Builder.Builder
+testFailure test =
+  case Internal.body test of
+    Internal.FailedAssertion msg ->
+      TE.encodeUtf8Builder msg
+    Internal.ThrewException exception ->
+      "Test threw an exception\n"
+        ++ Builder.stringUtf8 (Exception.displayException exception)
+    Internal.TookTooLong ->
+      "Test timed out"
+    Internal.TestRunnerMessedUp msg ->
+      "Test runner encountered an unexpected error:\n"
+        ++ TE.encodeUtf8Builder msg
+        ++ "\n"
+        ++ "This is a bug.\n\n"
+        ++ "If you have some time to report the bug it would be much appreciated!\n"
+        ++ "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
 
 sgr :: [ANSI.SGR] -> Builder.Builder
 sgr = Builder.stringUtf8 << ANSI.setSGRCode
