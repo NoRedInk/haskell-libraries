@@ -21,7 +21,7 @@ tests =
             ( \result ->
                 result
                   |> simplify
-                  |> Expect.equal AllPassed
+                  |> Expect.equal (AllPassed ["test 1", "test 2"])
             ),
       task "suite result is 'OnlysPassed' when containing an `only`" <| do
         describe
@@ -34,7 +34,7 @@ tests =
             ( \result ->
                 result
                   |> simplify
-                  |> Expect.equal OnlysPassed
+                  |> Expect.equal (OnlysPassed ["test 2"] ["test 1"])
             ),
       task "suite result is 'PassedWithSkipped' when containing a skipped test" <| do
         describe
@@ -47,7 +47,7 @@ tests =
             ( \result ->
                 result
                   |> simplify
-                  |> Expect.equal PassedWithSkipped
+                  |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"])
             ),
       task "suite result is 'NoTestsInSuite' when it contains no tests" <| do
         describe "suite" []
@@ -62,14 +62,15 @@ tests =
         describe
           "suite"
           [ test "test 1" (\_ -> Expect.pass),
-            test "test 2" (\_ -> Expect.fail "oops")
+            skip <| test "test 2" (\_ -> Expect.pass),
+            test "test 3" (\_ -> Expect.fail "oops")
           ]
           |> Internal.run
           |> Expect.Task.andCheck
             ( \result ->
                 result
                   |> simplify
-                  |> Expect.equal TestsFailed
+                  |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"])
             ),
       test "nested describes are exposed on each test" <| \_ ->
         let suite =
@@ -90,18 +91,30 @@ tests =
 -- | A type mirroring `Internal.SuiteResult`, simplified to allow easy
 -- comparisons in tests.
 data SimplifiedSuiteResult
-  = AllPassed
-  | OnlysPassed
-  | PassedWithSkipped
-  | TestsFailed
+  = AllPassed [Text]
+  | OnlysPassed [Text] [Text]
+  | PassedWithSkipped [Text] [Text]
+  | TestsFailed [Text] [Text] [Text]
   | NoTestsInSuite
   deriving (Eq, Show)
 
 simplify :: Internal.SuiteResult -> SimplifiedSuiteResult
 simplify suiteResult =
   case suiteResult of
-    Internal.AllPassed _ -> AllPassed
-    Internal.OnlysPassed _ _ -> OnlysPassed
-    Internal.PassedWithSkipped _ _ -> PassedWithSkipped
-    Internal.TestsFailed _ _ _ -> TestsFailed
+    Internal.AllPassed passed ->
+      AllPassed
+        (map Internal.name passed)
+    Internal.OnlysPassed passed skipped ->
+      OnlysPassed
+        (map Internal.name passed)
+        (map Internal.name skipped)
+    Internal.PassedWithSkipped passed skipped ->
+      PassedWithSkipped
+        (map Internal.name passed)
+        (map Internal.name skipped)
+    Internal.TestsFailed passed skipped failed ->
+      TestsFailed
+        (map Internal.name passed)
+        (map Internal.name skipped)
+        (map Internal.name failed)
     Internal.NoTestsInSuite -> NoTestsInSuite
