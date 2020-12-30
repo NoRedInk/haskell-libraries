@@ -14,17 +14,17 @@ import qualified Test.Internal as Internal
 import qualified Text.XML.JUnit as JUnit
 import qualified Prelude
 
-report :: Internal.Test -> Internal.SuiteResult -> Prelude.IO ()
-report suite result = do
+report :: Internal.SuiteResult -> Prelude.IO ()
+report result = do
   args <- System.Environment.getArgs
   case getPath args of
     Nothing -> Prelude.pure ()
     Just path -> do
       createPathDirIfMissing path
-      JUnit.writeXmlReport path (testResults suite result)
+      JUnit.writeXmlReport path (testResults result)
 
-testResults :: Internal.Test -> Internal.SuiteResult -> List JUnit.TestSuite
-testResults _ _ = []
+testResults :: Internal.SuiteResult -> List JUnit.TestSuite
+testResults _ = []
 
 getPath :: [Prelude.String] -> Maybe FilePath.FilePath
 getPath args =

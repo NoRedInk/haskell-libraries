@@ -50,10 +50,12 @@ data Failure
 
 data SuiteResult
   = AllPassed [SingleTest TracingSpan]
-  | OnlysPassed [SingleTest TracingSpan]
-  | PassedWithSkipped [SingleTest TracingSpan]
-  | TestsFailed [SingleTest TracingSpan] [SingleTest (TracingSpan, Failure)]
+  | OnlysPassed [SingleTest TracingSpan] [SingleTest Skipped]
+  | PassedWithSkipped [SingleTest TracingSpan] [SingleTest Skipped]
+  | TestsFailed [SingleTest TracingSpan] [SingleTest Skipped] [SingleTest (TracingSpan, Failure)]
   | NoTestsInSuite
+
+data Skipped = Skipped
 
 -- | A test which has yet to be evaluated. When evaluated, it produces one
 -- or more 'Expect.Expectation's.
@@ -338,26 +340,36 @@ task name expectation =
 run :: Test -> Task e SuiteResult
 run (Test all) = do
   let grouped = groupBy label all
-  let onlys = Dict.get Only grouped |> Maybe.withDefault []
-  let regulars = Dict.get None grouped |> Maybe.withDefault []
   let skipped = Dict.get Skip grouped |> Maybe.withDefault []
   let todos = Dict.get Todo grouped |> Maybe.withDefault []
-  let toRun = if List.isEmpty onlys then regulars else onlys
+  let containsOnlys =
+        case Dict.get Only grouped |> Maybe.withDefault [] of
+          [] -> False
+          _ -> True
+  let doRun label =
+        if containsOnlys
+          then label == Only
+          else label == None
+  let (toRun, notToRun') =
+        Dict.toList grouped
+          |> List.partition (doRun << Tuple.first)
+          |> Tuple.mapBoth (List.concatMap Tuple.second) (List.concatMap Tuple.second)
+  let notToRun = List.map (\test' -> test' {body = Skipped}) notToRun'
   results <- Task.parallel (List.map runSingle toRun)
   let failed = List.filterMap justFailure results
   let summary =
         Summary
           { noTests = List.isEmpty all,
             allPassed = List.isEmpty failed,
-            noOnlys = List.isEmpty onlys,
+            noOnlys = containsOnlys,
             noneSkipped = List.isEmpty (skipped ++ todos)
           }
   let passed = List.map (map Tuple.first) results
   Task.succeed <| case summary of
     Summary {noTests = True} -> NoTestsInSuite
-    Summary {allPassed = False} -> TestsFailed passed failed
-    Summary {noOnlys = False} -> OnlysPassed passed
-    Summary {noneSkipped = False} -> PassedWithSkipped passed
+    Summary {allPassed = False} -> TestsFailed passed notToRun failed
+    Summary {noOnlys = False} -> OnlysPassed passed notToRun
+    Summary {noneSkipped = False} -> PassedWithSkipped passed notToRun
     Summary {} -> AllPassed passed
 
 data Summary
