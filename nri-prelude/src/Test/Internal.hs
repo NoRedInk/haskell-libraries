@@ -372,13 +372,13 @@ run (Test all) = do
         Summary
           { noTests = List.isEmpty all,
             allPassed = List.isEmpty failed,
-            noOnlys = containsOnlys,
+            anyOnlys = containsOnlys,
             noneSkipped = List.isEmpty (skipped ++ todos)
           }
   Task.succeed <| case summary of
     Summary {noTests = True} -> NoTestsInSuite
     Summary {allPassed = False} -> TestsFailed passed notToRun failed
-    Summary {noOnlys = False} -> OnlysPassed passed notToRun
+    Summary {anyOnlys = True} -> OnlysPassed passed notToRun
     Summary {noneSkipped = False} -> PassedWithSkipped passed notToRun
     Summary {} -> AllPassed passed
 
@@ -386,7 +386,7 @@ data Summary
   = Summary
       { noTests :: Bool,
         allPassed :: Bool,
-        noOnlys :: Bool,
+        anyOnlys :: Bool,
         noneSkipped :: Bool
       }
 

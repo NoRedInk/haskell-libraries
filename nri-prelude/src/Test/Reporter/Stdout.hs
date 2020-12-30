@@ -47,8 +47,8 @@ renderReport styled results =
        in Prelude.foldMap
             ( \only ->
                 prettyPath styled [yellow] only
-                  ++ "This test passed, but there is a `Test.only` in your test."
-                  ++ "I failed the test, because it's easy to forget to remove `Test.only`."
+                  ++ "This test passed, but there is a `Test.only` in your test.\n"
+                  ++ "I failed the test, because it's easy to forget to remove `Test.only`.\n"
                   ++ "\n\n"
             )
             passed
