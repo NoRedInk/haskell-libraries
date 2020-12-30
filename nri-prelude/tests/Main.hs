@@ -11,6 +11,7 @@ import qualified LogSpec
 import qualified PlatformSpec
 import qualified SetSpec
 import Test (Test, describe, run)
+import qualified TestSpec
 import qualified TextSpec
 import qualified Prelude
 
@@ -25,6 +26,7 @@ tests =
       BitwiseSpec.tests,
       DictSpec.tests,
       SetSpec.tests,
+      TestSpec.tests,
       TextSpec.tests,
       LogSpec.tests,
       PlatformSpec.tests,
