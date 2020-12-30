@@ -27,6 +27,7 @@ library:
   - exceptions >= 0.10.4 && < 0.11
   - filepath >= 1.4.2.1 && < 1.5
   - hedgehog >= 1.0.2 && < 1.1
+  - junit-xml >= 0.1.0.0 && < 0.2.0.0
   - pretty-diff >= 0.1.0.0 && < 0.3
   - pretty-show >= 1.9.5 && < 1.11
   - safe-exceptions >= 0.1.7.0 && < 1.3

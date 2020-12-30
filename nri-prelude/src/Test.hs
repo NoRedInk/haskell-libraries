@@ -25,6 +25,7 @@ import qualified Platform
 import qualified Task
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
+import qualified Test.Reporter.Junit
 import qualified Test.Reporter.Stdout
 import qualified Prelude
 
@@ -42,4 +43,5 @@ run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
   Test.Reporter.Stdout.report suite results
+  Test.Reporter.Junit.report suite results
   Test.Reporter.ExitCode.report results
