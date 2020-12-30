@@ -15,6 +15,7 @@ import NriPrelude
 import qualified System.Console.ANSI as ANSI
 import qualified System.IO
 import qualified Test.Internal as Internal
+import qualified Tuple
 import qualified Prelude
 
 report :: Internal.Test -> Internal.SuiteResult -> Prelude.IO ()
@@ -35,18 +36,15 @@ renderReport ::
   Builder.Builder
 renderReport styled (Internal.Test tests) results =
   case results of
-    Internal.AllPassed ->
-      let amountPassed = List.length tests
+    Internal.AllPassed passed ->
+      let amountPassed = List.length passed
        in styled [green, underlined] "TEST RUN PASSED"
             ++ "\n\n"
             ++ styled [black] ("Passed:    " ++ Builder.int64Dec amountPassed)
             ++ "\n"
-    Internal.OnlysPassed ->
-      let onlys =
-            tests
-              |> List.filter (\test -> Internal.label test == Internal.Only)
-          amountPassed =
-            List.length onlys
+    Internal.OnlysPassed passed ->
+      let amountPassed =
+            List.length passed
           amountSkipped = List.length tests - amountPassed
        in Prelude.foldMap
             ( \only ->
@@ -55,7 +53,7 @@ renderReport styled (Internal.Test tests) results =
                   ++ "I failed the test, because it's easy to forget to remove `Test.only`."
                   ++ "\n\n"
             )
-            onlys
+            passed
             ++ styled [yellow, underlined] "TEST RUN INCOMPLETE"
             ++ styled [yellow] " because there is an `only` in your tests."
             ++ "\n\n"
@@ -63,9 +61,10 @@ renderReport styled (Internal.Test tests) results =
             ++ "\n"
             ++ styled [black] ("Skipped:   " ++ Builder.int64Dec amountSkipped)
             ++ "\n"
-    Internal.PassedWithSkipped skipped ->
-      let amountSkipped = List.length skipped
-          amountPassed = List.length tests - amountSkipped
+    Internal.PassedWithSkipped passed ->
+      let amountPassed = List.length passed
+          skipped = List.filter (\test -> Internal.label test == Internal.Skip) tests
+          amountSkipped = List.length skipped
        in Prelude.foldMap
             ( \only ->
                 prettyPath styled [yellow] only
@@ -85,27 +84,17 @@ renderReport styled (Internal.Test tests) results =
             ++ "\n"
             ++ styled [black] ("Skipped:   " ++ Builder.int64Dec amountSkipped)
             ++ "\n"
-    Internal.TestsFailed failed ->
-      let amountOnly =
-            tests
-              |> List.filter (\test -> Internal.label test == Internal.Only)
-              |> List.length
-          amountSkipped =
-            if amountOnly == 0
-              then
-                tests
-                  |> List.filter (\test -> Internal.label test == Internal.Skip)
-                  |> List.length
-              else List.length tests - amountOnly
+    Internal.TestsFailed passed failed ->
+      let amountPassed = List.length passed
           amountFailed = List.length failed
-          amountPassed = List.length tests - amountSkipped - amountFailed
+          amountSkipped = List.length tests - amountPassed - amountFailed
        in Prelude.foldMap
             ( \test ->
                 prettyPath styled [red] test
                   ++ testFailure test
                   ++ "\n\n"
             )
-            failed
+            (List.map (map Tuple.second) failed)
             ++ styled [red, underlined] "TEST RUN FAILED"
             ++ "\n\n"
             ++ styled [black] ("Passed:    " ++ Builder.int64Dec amountPassed)

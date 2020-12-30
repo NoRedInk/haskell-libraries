@@ -7,5 +7,5 @@ import qualified Prelude
 report :: Internal.SuiteResult -> Prelude.IO ()
 report results =
   case results of
-    Internal.AllPassed -> System.Exit.exitSuccess
+    Internal.AllPassed _ -> System.Exit.exitSuccess
     _ -> System.Exit.exitFailure

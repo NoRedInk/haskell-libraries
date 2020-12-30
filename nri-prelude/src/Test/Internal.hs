@@ -1,8 +1,10 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NumericUnderscores #-}
 
 module Test.Internal where
 
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.IORef as IORef
@@ -16,6 +18,7 @@ import qualified Hedgehog.Internal.Seed
 import qualified List
 import qualified Maybe
 import NriPrelude
+import Platform (TracingSpan)
 import qualified Platform.Internal
 import qualified Task
 import qualified Tuple
@@ -29,6 +32,7 @@ data SingleTest a
         loc :: Maybe Stack.SrcLoc,
         body :: a
       }
+  deriving (Prelude.Functor)
 
 data Label = None | Skip | Only | Todo
   deriving (Eq, Ord)
@@ -45,10 +49,10 @@ data Failure
   deriving (Show)
 
 data SuiteResult
-  = AllPassed
-  | OnlysPassed
-  | PassedWithSkipped [SingleTest ()]
-  | TestsFailed [SingleTest Failure]
+  = AllPassed [SingleTest TracingSpan]
+  | OnlysPassed [SingleTest TracingSpan]
+  | PassedWithSkipped [SingleTest TracingSpan]
+  | TestsFailed [SingleTest TracingSpan] [SingleTest (TracingSpan, Failure)]
   | NoTestsInSuite
 
 -- | A test which has yet to be evaluated. When evaluated, it produces one
@@ -338,7 +342,6 @@ run (Test all) = do
   let regulars = Dict.get None grouped |> Maybe.withDefault []
   let skipped = Dict.get Skip grouped |> Maybe.withDefault []
   let todos = Dict.get Todo grouped |> Maybe.withDefault []
-  let skippedAndTodos = List.map (\test' -> test' {body = ()}) (skipped ++ todos)
   let toRun = if List.isEmpty onlys then regulars else onlys
   results <- Task.parallel (List.map runSingle toRun)
   let failed = List.filterMap justFailure results
@@ -347,14 +350,15 @@ run (Test all) = do
           { noTests = List.isEmpty all,
             allPassed = List.isEmpty failed,
             noOnlys = List.isEmpty onlys,
-            noneSkipped = List.isEmpty skippedAndTodos
+            noneSkipped = List.isEmpty (skipped ++ todos)
           }
+  let passed = List.map (map Tuple.first) results
   Task.succeed <| case summary of
     Summary {noTests = True} -> NoTestsInSuite
-    Summary {allPassed = False} -> TestsFailed failed
-    Summary {noOnlys = False} -> OnlysPassed
-    Summary {noneSkipped = False} -> PassedWithSkipped skippedAndTodos
-    Summary {} -> AllPassed
+    Summary {allPassed = False} -> TestsFailed passed failed
+    Summary {noOnlys = False} -> OnlysPassed passed
+    Summary {noneSkipped = False} -> PassedWithSkipped passed
+    Summary {} -> AllPassed passed
 
 data Summary
   = Summary
@@ -364,11 +368,11 @@ data Summary
         noneSkipped :: Bool
       }
 
-justFailure :: SingleTest TestResult -> Maybe (SingleTest Failure)
+justFailure :: SingleTest (a, TestResult) -> Maybe (SingleTest (a, Failure))
 justFailure test' =
   case body test' of
-    Succeeded -> Nothing
-    Failed failure -> Just test' {body = failure}
+    (_, Succeeded) -> Nothing
+    (a, Failed failure) -> Just test' {body = (a, failure)}
 
 handleUnexpectedErrors :: Expectation -> Expectation
 handleUnexpectedErrors (Expectation task') =
@@ -379,12 +383,28 @@ handleUnexpectedErrors (Expectation task') =
     |> Task.onError (Task.succeed << Failed)
     |> Expectation
 
-runSingle :: SingleTest Expectation -> Task e (SingleTest TestResult)
-runSingle test' = do
-  body test'
-    |> unExpectation
-    |> Task.mapError never
-    |> map (\res -> test' {body = res})
+runSingle :: SingleTest Expectation -> Task e (SingleTest (TracingSpan, TestResult))
+runSingle test' =
+  Platform.Internal.Task
+    ( \_ -> do
+        spanVar <- MVar.newEmptyMVar
+        res <-
+          Platform.Internal.rootTracingSpanIO
+            ""
+            (MVar.putMVar spanVar)
+            "run single test"
+            ( \log ->
+                body test'
+                  |> unExpectation
+                  |> Task.mapError never
+                  |> map Ok
+                  |> Task.perform log
+            )
+        span <- MVar.takeMVar spanVar
+        res
+          |> map (\res' -> test' {body = (span, res')})
+          |> Prelude.pure
+    )
 
 ioToTask :: Prelude.IO a -> Task Exception.SomeException a
 ioToTask io =
