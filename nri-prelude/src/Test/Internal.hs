@@ -62,6 +62,7 @@ newtype Expectation = Expectation {unExpectation :: Task Never TestResult}
 -- | A @Fuzzer a@ knows how to produce random values of @a@ and how to "shrink"
 -- a value of @a@, that is turn a value into another that is slightly simpler.
 newtype Fuzzer a = Fuzzer (Hedgehog.Gen a)
+  deriving (Prelude.Functor, Prelude.Applicative)
 
 describe :: Text -> [Test] -> Test
 describe description tests =
