@@ -61,8 +61,7 @@ newtype Expectation = Expectation {unExpectation :: Task Never TestResult}
 
 -- | A @Fuzzer a@ knows how to produce random values of @a@ and how to "shrink"
 -- a value of @a@, that is turn a value into another that is slightly simpler.
-data Fuzzer a where
-  Fuzzer :: Show a => Hedgehog.Gen a -> Fuzzer a
+newtype Fuzzer a = Fuzzer (Hedgehog.Gen a)
 
 describe :: Text -> [Test] -> Test
 describe description tests =
@@ -95,7 +94,7 @@ test name expectation =
         }
     ]
 
-fuzz :: Fuzzer a -> Text -> (a -> Expectation) -> Test
+fuzz :: Show a => Fuzzer a -> Text -> (a -> Expectation) -> Test
 fuzz fuzzer name expectation =
   Test
     [ SingleTest
@@ -107,7 +106,7 @@ fuzz fuzzer name expectation =
         }
     ]
 
-fuzz2 :: Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expectation) -> Test
+fuzz2 :: (Show a, Show b) => Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expectation) -> Test
 fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
   Test
     [ SingleTest
@@ -122,7 +121,7 @@ fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
         }
     ]
 
-fuzz3 :: Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expectation) -> Test
+fuzz3 :: (Show a, Show b, Show c) => Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expectation) -> Test
 fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
   Test
     [ SingleTest
@@ -137,7 +136,7 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
         }
     ]
 
-fuzzBody :: Fuzzer a -> (a -> Expectation) -> Expectation
+fuzzBody :: Show a => Fuzzer a -> (a -> Expectation) -> Expectation
 fuzzBody (Fuzzer gen) expectation =
   handleUnexpectedErrors
     <| Expectation

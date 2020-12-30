@@ -164,15 +164,15 @@ todo = Internal.todo
 -- These are called "fuzz tests" because of the randomness. You may find them
 -- elsewhere called property-based tests, generative tests, or QuickCheck-style
 -- tests.
-fuzz :: Fuzzer a -> Text -> (a -> Expect.Expectation) -> Test
+fuzz :: Show a => Fuzzer a -> Text -> (a -> Expect.Expectation) -> Test
 fuzz = Internal.fuzz
 
 -- | Run a fuzz test using two random inputs.
-fuzz2 :: Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expect.Expectation) -> Test
+fuzz2 :: (Show a, Show b) => Fuzzer a -> Fuzzer b -> Text -> (a -> b -> Expect.Expectation) -> Test
 fuzz2 = Internal.fuzz2
 
 -- | Run a fuzz test using three random inputs.
-fuzz3 :: Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expect.Expectation) -> Test
+fuzz3 :: (Show a, Show b, Show c) => Fuzzer a -> Fuzzer b -> Fuzzer c -> Text -> (a -> b -> c -> Expect.Expectation) -> Test
 fuzz3 = Internal.fuzz3
 
 -- | Run a test that executes a task. The test passes if the task returns a
