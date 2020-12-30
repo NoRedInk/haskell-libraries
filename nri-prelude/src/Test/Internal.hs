@@ -7,6 +7,7 @@ module Test.Internal where
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
+import qualified Data.Either
 import qualified Data.IORef as IORef
 import qualified Dict
 import qualified GHC.Stack as Stack
@@ -356,7 +357,17 @@ run (Test all) = do
           |> Tuple.mapBoth (List.concatMap Tuple.second) (List.concatMap Tuple.second)
   let notToRun = List.map (\test' -> test' {body = Skipped}) notToRun'
   results <- Task.parallel (List.map runSingle toRun)
-  let failed = List.filterMap justFailure results
+  let (failed, passed) =
+        results
+          |> List.map
+            ( \test' ->
+                case body test' of
+                  (tracingSpan, Failed failure) ->
+                    Prelude.Left test' {body = (tracingSpan, failure)}
+                  (tracingSpan, Succeeded) ->
+                    Prelude.Right test' {body = tracingSpan}
+            )
+          |> Data.Either.partitionEithers
   let summary =
         Summary
           { noTests = List.isEmpty all,
@@ -364,7 +375,6 @@ run (Test all) = do
             noOnlys = containsOnlys,
             noneSkipped = List.isEmpty (skipped ++ todos)
           }
-  let passed = List.map (map Tuple.first) results
   Task.succeed <| case summary of
     Summary {noTests = True} -> NoTestsInSuite
     Summary {allPassed = False} -> TestsFailed passed notToRun failed
@@ -379,12 +389,6 @@ data Summary
         noOnlys :: Bool,
         noneSkipped :: Bool
       }
-
-justFailure :: SingleTest (a, TestResult) -> Maybe (SingleTest (a, Failure))
-justFailure test' =
-  case body test' of
-    (_, Succeeded) -> Nothing
-    (a, Failed failure) -> Just test' {body = (a, failure)}
 
 handleUnexpectedErrors :: Expectation -> Expectation
 handleUnexpectedErrors (Expectation task') =
