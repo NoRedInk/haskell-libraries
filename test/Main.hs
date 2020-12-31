@@ -14,12 +14,11 @@ import qualified ObservabilitySpec
 import qualified Postgres
 import qualified PostgresSettingsSpec
 import qualified QueryParserSpec
-import Test (Test, describe)
-import qualified Test.Runner.Tasty
+import Test (Test, describe, run)
 import qualified TimeSpec
 import qualified Prelude
 
--- `Test.Runner.Tasty.main` exits after finishing, so run other tests first.
+-- `Test.run` exits after finishing, so run other tests first.
 --
 -- We're not running this spec: MySQLTransactionSpec.main
 -- The spec runs a fuzz test against the database. Reasonbly fast locally but
@@ -38,7 +37,7 @@ main = do
         postgres <- Postgres.connection postgresSettings
         Prelude.pure (mysql, postgres)
     )
-    (Test.Runner.Tasty.main << tests)
+    (run << tests)
 
 tests :: (MySQL.Connection, Postgres.Connection) -> Test
 tests (mysql, postgres) =
