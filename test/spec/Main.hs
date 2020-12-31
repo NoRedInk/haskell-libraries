@@ -18,7 +18,6 @@ import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Task
 import Test
-import qualified Test.Runner.Tasty
 import Prelude (IO, pure, uncurry)
 
 buildSpecs :: TestHandlers -> Test
@@ -190,7 +189,7 @@ specs logHandler whichHandler redisHandler =
 main :: IO ()
 main =
   Conduit.withAcquire getHandlers <| \testHandlers ->
-    Test.Runner.Tasty.main <| buildSpecs testHandlers
+    run <| buildSpecs testHandlers
 
 data TestHandlers
   = TestHandlers
