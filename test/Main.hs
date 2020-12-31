@@ -15,12 +15,11 @@ import qualified Network.Wai.Handler.Warp as Warp
 import NriPrelude
 import qualified Platform
 import qualified Task
-import Test (Test, describe, test)
-import qualified Test.Runner.Tasty
+import Test (Test, describe, run, test)
 import qualified Prelude
 
 main :: Prelude.IO ()
-main = Test.Runner.Tasty.main tests
+main = run tests
 
 tests :: Test
 tests =
