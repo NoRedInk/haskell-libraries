@@ -49,6 +49,8 @@ data Failure
   | TestRunnerMessedUp Text
   deriving (Show)
 
+instance Exception.Exception Failure
+
 data SuiteResult
   = AllPassed [SingleTest TracingSpan]
   | OnlysPassed [SingleTest TracingSpan] [SingleTest NotRan]
@@ -204,12 +206,11 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
 
 fuzzBody :: Show a => Fuzzer a -> (a -> Expectation) -> Expectation
 fuzzBody (Fuzzer gen) expectation =
-  handleUnexpectedErrors
-    <| Expectation
+  Expectation
     <| Platform.Internal.Task
       ( \log -> do
           seed <- Hedgehog.Internal.Seed.random
-          resultRef <- IORef.newIORef Nothing
+          failureRef <- IORef.newIORef Nothing
           hedgehogResult <-
             Hedgehog.Internal.Runner.checkReport
               Hedgehog.Internal.Property.defaultConfig
@@ -219,27 +220,30 @@ fuzzBody (Fuzzer gen) expectation =
                   generated <- Hedgehog.forAll gen
                   result <-
                     expectation generated
+                      |> handleUnexpectedErrors
                       |> unExpectation
                       |> Task.perform log
                       |> Control.Monad.IO.Class.liftIO
-                  IORef.writeIORef resultRef (Just result)
-                    |> Control.Monad.IO.Class.liftIO
                   case result of
                     Succeeded -> Prelude.pure ()
-                    Failed failure -> Prelude.fail (Prelude.show failure)
+                    Failed failure -> do
+                      IORef.writeIORef failureRef (Just failure)
+                        |> Control.Monad.IO.Class.liftIO
+                      Hedgehog.failure
               )
               (\_ -> Prelude.pure ())
           case Hedgehog.Internal.Report.reportStatus hedgehogResult of
             Hedgehog.Internal.Report.Failed _ -> do
-              maybeResult <- IORef.readIORef resultRef
-              case maybeResult of
+              maybeFailure <- IORef.readIORef failureRef
+              case maybeFailure of
                 Nothing ->
                   TestRunnerMessedUp "I lost the error report of a failed fuzz test test."
                     |> Failed
                     |> Ok
                     |> Prelude.pure
-                Just result ->
-                  Ok result
+                Just failure ->
+                  Failed failure
+                    |> Ok
                     |> Prelude.pure
             Hedgehog.Internal.Report.GaveUp ->
               TestRunnerMessedUp "I couldn't generate any values for a fuzz test."
