@@ -93,7 +93,7 @@ exceptionTests mysqlConn =
               )
     ]
 
-resultToTask :: Prelude.Show e => Result e a -> Task Expect.Task.TestFailure a
+resultToTask :: Prelude.Show e => Result e a -> Task Expect.Task.Failure a
 resultToTask res =
   case res of
     Ok x -> Task.succeed x
