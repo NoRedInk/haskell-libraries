@@ -1,0 +1,39 @@
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 5
+assertion error
+
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 6
+Test threw an exception
+Control.Exception.Safe.throwString called with:
+
+exception
+Called from:
+
+
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 7
+Test timed out
+
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 7
+Test runner encountered an unexpected error:
+sorry
+This is a bug.
+
+If you have some time to report the bug it would be much appreciated!
+You can do so here: https://github.com/NoRedInk/haskell-libraries/issues
+
+TEST RUN FAILED
+
+Passed:    2
+Skipped:   2
+Failed:    4

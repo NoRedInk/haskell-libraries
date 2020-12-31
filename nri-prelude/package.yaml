@@ -22,19 +22,15 @@ library:
   - auto-update >= 0.1.6 && < 0.2
   - base >= 4.12.0.0 && < 4.15
   - bytestring >= 0.10.8.2 && < 0.12
-  - concurrent-output >= 1.10.11 && < 1.11
   - containers >= 0.6.0.1 && < 0.7
   - directory >= 1.3.3.0 && < 1.4
   - exceptions >= 0.10.4 && < 0.11
   - filepath >= 1.4.2.1 && < 1.5
   - hedgehog >= 1.0.2 && < 1.1
-  - junit-xml >= 0.1.0.0 && < 0.2
+  - junit-xml >= 0.1.0.0 && < 0.2.0.0
   - pretty-diff >= 0.1.0.0 && < 0.3
   - pretty-show >= 1.9.5 && < 1.11
-  - resourcet >= 1.2.2 && < 1.3
   - safe-exceptions >= 0.1.7.0 && < 1.3
-  - tasty >= 1.2.3 && < 1.5
-  - tasty-test-reporter >= 0.1.1.1 && < 0.2
   - terminal-size >= 0.3.2.1 && < 0.4
   - text >= 1.2.3.1 && < 1.3
   - time >= 1.8.0.2 && < 1.12
@@ -59,7 +55,6 @@ library:
   - Set
   - Task
   - Test
-  - Test.Runner.Tasty
   - Text
   - Tuple
   source-dirs:
