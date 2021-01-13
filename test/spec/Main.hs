@@ -13,12 +13,13 @@ import qualified NriPrelude
 import qualified Platform
 import Redis
 import qualified Redis.Internal as Internal
+import qualified Redis.List
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Task
 import Test
-import Prelude (IO, pure, uncurry)
+import Prelude (IO, pure, sequenceA, uncurry)
 
 buildSpecs :: TestHandlers -> Test
 buildSpecs TestHandlers {logHandler, redisHandlers} =
@@ -172,7 +173,18 @@ specs logHandler whichHandler redisHandler =
                 Just _ -> ([10], Just ())
                 Nothing -> ([10], Nothing)
             )
-        pure <| Expect.equal ([10], Nothing) result
+        pure <| Expect.equal ([10], Nothing) result,
+      redisTest "transaction preserves order" <| do
+        [ Redis.List.del listApi ["order"],
+          Redis.List.rpush listApi "order" ["1"],
+          Redis.List.rpush listApi "order" ["2"],
+          Redis.List.rpush listApi "order" ["3"]
+          ]
+          |> sequenceA
+          |> map (\_ -> ())
+          |> transaction testNS
+        result <- Redis.List.lrange listApi "order" 0 (-1) |> query testNS
+        pure <| Expect.equal result ["1", "2", "3"]
     ]
   where
     testNS = addNamespace "testNamespace" redisHandler
@@ -224,6 +236,9 @@ addNamespace namespace handler' =
 
 api :: Api Text Text
 api = textApi identity
+
+listApi :: Redis.List.Api Text Text
+listApi = Redis.List.textApi identity
 
 jsonApi' :: Api Text [Int]
 jsonApi' = jsonApi identity
