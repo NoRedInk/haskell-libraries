@@ -310,8 +310,8 @@ doQuery query hm =
             Ok []
           Just (RedisList elems) ->
             let length = List.length elems
-                lower = if lower' >= 0 then lower' else length - lower'
-                upper = if upper' >= 0 then upper' else length - upper'
+                lower = if lower' >= 0 then lower' else length + lower'
+                upper = if upper' >= 0 then upper' else length + upper'
              in elems
                   |> Data.List.splitAt (Prelude.fromIntegral (upper + 1))
                   |> Tuple.first
