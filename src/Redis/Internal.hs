@@ -10,7 +10,7 @@ import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
 import qualified List
-import NriPrelude hiding (map)
+import NriPrelude hiding (map, map2)
 import qualified Set
 import qualified Task
 import qualified Text
@@ -112,11 +112,21 @@ instance Prelude.Functor Query where
   fmap = map
 
 map :: (a -> b) -> Query a -> Query b
-map a = WithResult (a >> Ok)
+map f q = WithResult (f >> Ok) q
 
-instance Prelude.Applicative Query where
-  pure = Pure
-  (<*>) = Apply
+map2 :: (a -> b -> c) -> Query a -> Query b -> Query c
+map2 f queryA queryB =
+  Apply (map f queryA) queryB
+
+map3 :: (a -> b -> c -> d) -> Query a -> Query b -> Query c -> Query d
+map3 f queryA queryB queryC =
+  Apply (Apply (map f queryA) queryB) queryC
+
+traverse :: (a -> Query b) -> List a -> Query (List b)
+traverse f list =
+  list
+    |> List.map f
+    |> List.foldr (map2 (:)) (Pure [])
 
 data Handler
   = Handler
@@ -189,7 +199,7 @@ defaultExpiryKeysAfterSeconds secs handler =
       doQuery query' =
         keysTouchedByQuery query'
           |> Set.toList
-          |> Prelude.traverse (\key -> Expire key secs)
+          |> traverse (\key -> Expire key secs)
           |> map2 (\res _ -> res) query'
           |> doTransaction handler
    in handler {doQuery = doQuery, doTransaction = doQuery}

@@ -37,6 +37,9 @@ module Redis.Hash
     Internal.Query,
     Internal.Error (..),
     Internal.map,
+    Internal.map2,
+    Internal.map3,
+    Internal.traverse,
 
     -- * Observability helpers
     Real.Info (..),

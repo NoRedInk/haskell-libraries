@@ -40,6 +40,9 @@ module Redis
     Internal.Query,
     Internal.Error (..),
     Internal.map,
+    Internal.map2,
+    Internal.map3,
+    Internal.traverse,
 
     -- * Observability hepers
     Real.Info (..),
