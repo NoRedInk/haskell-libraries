@@ -11,7 +11,7 @@ import qualified List
 import NriPrelude hiding (map)
 import qualified NriPrelude
 import qualified Platform
-import Redis
+import Redis hiding (map2)
 import qualified Redis.Internal as Internal
 import qualified Redis.List
 import qualified Redis.Mock as Mock
@@ -19,7 +19,7 @@ import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Task
 import Test
-import Prelude (IO, pure, sequenceA, uncurry)
+import Prelude (IO, pure, uncurry)
 
 buildSpecs :: TestHandlers -> Test
 buildSpecs TestHandlers {logHandler, redisHandlers} =
@@ -180,7 +180,7 @@ specs logHandler whichHandler redisHandler =
           Redis.List.rpush listApi "order" ["2"],
           Redis.List.rpush listApi "order" ["3"]
           ]
-          |> sequenceA
+          |> Redis.traverse identity
           |> map (\_ -> ())
           |> transaction testNS
         result <- Redis.List.lrange listApi "order" 0 (-1) |> query testNS
@@ -220,7 +220,7 @@ getRedisHandlers settings = do
       |> Exception.handleAny (\_ -> pure False)
       |> Conduit.liftIO
   if redisAvailable
-    then map2 (\real mock -> [("Real", real), ("Mock", mock)]) realHandler mockHandler
+    then NriPrelude.map2 (\real mock -> [("Real", real), ("Mock", mock)]) realHandler mockHandler
     else NriPrelude.map (\mock -> [("Mock", mock)]) mockHandler
 
 getHandlers :: Conduit.Acquire TestHandlers
