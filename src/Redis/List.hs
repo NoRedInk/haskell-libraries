@@ -34,7 +34,7 @@ module Redis.List
     Internal.map,
     Internal.map2,
     Internal.map3,
-    Internal.traverse,
+    Internal.sequence,
 
     -- * Observability hepers
     Real.Info (..),

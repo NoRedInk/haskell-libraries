@@ -180,7 +180,7 @@ specs logHandler whichHandler redisHandler =
           Redis.List.rpush listApi "order" ["2"],
           Redis.List.rpush listApi "order" ["3"]
           ]
-          |> Redis.traverse identity
+          |> Redis.sequence
           |> map (\_ -> ())
           |> transaction testNS
         result <- Redis.List.lrange listApi "order" 0 (-1) |> query testNS

@@ -122,11 +122,9 @@ map3 :: (a -> b -> c -> d) -> Query a -> Query b -> Query c -> Query d
 map3 f queryA queryB queryC =
   Apply (Apply (map f queryA) queryB) queryC
 
-traverse :: (a -> Query b) -> List a -> Query (List b)
-traverse f list =
-  list
-    |> List.map f
-    |> List.foldr (map2 (:)) (Pure [])
+sequence :: List (Query a) -> Query (List a)
+sequence =
+  List.foldr (map2 (:)) (Pure [])
 
 data Handler
   = Handler
@@ -199,7 +197,8 @@ defaultExpiryKeysAfterSeconds secs handler =
       doQuery query' =
         keysTouchedByQuery query'
           |> Set.toList
-          |> traverse (\key -> Expire key secs)
+          |> List.map (\key -> Expire key secs)
+          |> sequence
           |> map2 (\res _ -> res) query'
           |> doTransaction handler
    in handler {doQuery = doQuery, doTransaction = doQuery}

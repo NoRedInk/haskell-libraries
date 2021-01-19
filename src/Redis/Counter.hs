@@ -34,7 +34,7 @@ module Redis.Counter
     Internal.map,
     Internal.map2,
     Internal.map3,
-    Internal.traverse,
+    Internal.sequence,
 
     -- * Observability helpers
     Real.Info (..),
