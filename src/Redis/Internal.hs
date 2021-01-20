@@ -59,7 +59,7 @@ cmds query'' =
     Expire key val -> [unwords ["EXPIRE", key, Text.fromInt val]]
     Get key -> [unwords ["GET", key]]
     Getset key _ -> [unwords ["GETSET", key, "*****"]]
-    Hdel key fields -> [unwords ("HDEL" : key : fields)]
+    Hdel key fields -> [unwords ("HDEL" : key : NonEmpty.toList fields)]
     Hgetall key -> [unwords ["HGETALL", key]]
     Hget key field -> [unwords ["HGET", key, field]]
     Hmget key fields -> [unwords ("HMGET" : key : NonEmpty.toList fields)]
@@ -67,7 +67,7 @@ cmds query'' =
       [ unwords
           ( "HMSET"
               : key
-              : List.concatMap (\(field, _) -> [field, "*****"]) pairs
+              : List.concatMap (\(field, _) -> [field, "*****"]) (NonEmpty.toList pairs)
           )
       ]
     Hset key field _ -> [unwords ["HSET", key, field, "*****"]]
@@ -94,7 +94,7 @@ data Query a where
   Expire :: Text -> Int -> Query ()
   Get :: Text -> Query (Maybe ByteString)
   Getset :: Text -> ByteString -> Query (Maybe ByteString)
-  Hdel :: Text -> [Text] -> Query Int
+  Hdel :: Text -> NonEmpty Text -> Query Int
   Hgetall :: Text -> Query [(Text, ByteString)]
   Hget :: Text -> Text -> Query (Maybe ByteString)
   Hmget :: Text -> NonEmpty Text -> Query [Maybe ByteString]

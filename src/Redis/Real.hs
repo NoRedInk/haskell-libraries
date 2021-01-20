@@ -176,7 +176,7 @@ doRawQuery query =
         |> PreparedQuery
         |> map (\_ -> Ok ())
     Internal.Hdel key fields ->
-      Database.Redis.hdel (toB key) (map toB fields)
+      Database.Redis.hdel (toB key) (NonEmpty.toList (map toB fields))
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
     Internal.Incr key ->

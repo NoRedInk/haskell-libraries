@@ -53,7 +53,6 @@ import Data.ByteString (ByteString)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
-import qualified List
 import NriPrelude
 import qualified Redis
 import qualified Redis.Codec as Codec
@@ -90,7 +89,7 @@ data Api key field a
         -- treated as an empty hash and this command returns 0.
         --
         -- https://redis.io/commands/hdel
-        hdel :: key -> List.List field -> Internal.Query Int,
+        hdel :: key -> NonEmpty field -> Internal.Query Int,
         -- | Get the value of the field of a hash at key. If the key does not exist,
         -- or the field in the hash does not exis the special value Nothing is returned
         -- An error is returned if the value stored at key is not a
@@ -162,7 +161,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey toField fromF
       exists = Internal.Exists << toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
-      hdel = \key fields -> Internal.Hdel (toKey key) (List.map toField fields),
+      hdel = \key fields -> Internal.Hdel (toKey key) (NonEmpty.map toField fields),
       hget = \key field -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Hget (toKey key) (toField field)),
       hgetall = Internal.WithResult (toDict fromField codecDecoder) << Internal.Hgetall << toKey,
       hmget = \key fields ->
