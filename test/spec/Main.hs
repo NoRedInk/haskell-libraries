@@ -9,6 +9,7 @@ import Dict (Dict)
 import qualified Environment
 import qualified Expect
 import qualified List
+import qualified NonEmptyDict
 import NriPrelude hiding (map)
 import qualified NriPrelude
 import qualified Platform
@@ -111,15 +112,17 @@ specs logHandler whichHandler redisHandler =
       redisTest "mset allows setting multiple values at once" <| do
         let firstKey = "msetTest::key1"
         let firstValue = "value 1"
-        let dict = Dict.fromList [(firstKey, firstValue), ("msetTest::key2", "value 2")]
-        mset api firstKey firstValue dict |> query testNS
+        let nonEmptyDict = NonEmptyDict.init firstKey firstValue (Dict.fromList [("msetTest::key2", "value 2")])
+        let dict = NonEmptyDict.toDict nonEmptyDict
+        mset api nonEmptyDict |> query testNS
         result <- mget api (firstKey :| Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
       redisTest "Json.mset allows setting multiple JSON values at once" <| do
         let firstKey = "Json.msetTest::key1"
         let firstValue = [1, 2]
-        let dict = Dict.fromList [(firstKey, firstValue), ("Json.msetTest::key2", [3, 4] :: [Int])]
-        mset jsonApi' firstKey firstValue dict |> query testNS
+        let nonEmptyDict = NonEmptyDict.init firstKey firstValue (Dict.fromList [("Json.msetTest::key2", [3, 4] :: [Int])])
+        let dict = NonEmptyDict.toDict nonEmptyDict
+        mset jsonApi' nonEmptyDict |> query testNS
         result <- mget jsonApi' (firstKey :| Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do

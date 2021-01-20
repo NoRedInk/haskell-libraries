@@ -18,6 +18,7 @@ library:
   - text
   - unordered-containers
   exposed-modules:
+  - NonEmptyDict
   - Redis
   - Redis.Counter
   - Redis.Hash

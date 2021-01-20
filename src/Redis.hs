@@ -53,10 +53,11 @@ where
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import qualified Data.Flat as Flat
-import Data.List.NonEmpty (NonEmpty ((:|)))
+import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
 import qualified Health
+import qualified NonEmptyDict
 import NriPrelude
 import qualified Platform
 import qualified Redis.Codec as Codec
@@ -121,7 +122,7 @@ data Api key a
         -- unchanged.
         --
         -- https://redis.io/commands/mset
-        mset :: key -> a -> Dict.Dict key a -> Internal.Query (),
+        mset :: NonEmptyDict.NonEmptyDict key a -> Internal.Query (),
         -- | Returns PONG if no argument is provided, otherwise return a copy of the
         -- argument as a bulk. This command is often used to test if a connection is
         -- still alive, or to measure latency.
@@ -180,9 +181,8 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
           |> Internal.Mget
           |> map (Internal.maybesToDict (NonEmpty.toList keys))
           |> Internal.WithResult (Prelude.traverse codecDecoder),
-      mset = \firstKey firstVal vals ->
-        Dict.toList vals
-          |> (:|) (firstKey, firstVal)
+      mset = \vals ->
+        NonEmptyDict.toNonEmptyList vals
           |> map (\(k, v) -> (toKey k, codecEncoder v))
           |> Internal.Mset,
       ping = Internal.Ping |> map (\_ -> ()),
