@@ -62,7 +62,7 @@ cmds query'' =
     Hdel key fields -> [unwords ("HDEL" : key : fields)]
     Hgetall key -> [unwords ["HGETALL", key]]
     Hget key field -> [unwords ["HGET", key, field]]
-    Hmget key fields -> [unwords ("HMGET" : key : fields)]
+    Hmget key fields -> [unwords ("HMGET" : key : NonEmpty.toList fields)]
     Hmset key pairs ->
       [ unwords
           ( "HMSET"
@@ -97,7 +97,7 @@ data Query a where
   Hdel :: Text -> [Text] -> Query Int
   Hgetall :: Text -> Query [(Text, ByteString)]
   Hget :: Text -> Text -> Query (Maybe ByteString)
-  Hmget :: Text -> [Text] -> Query [Maybe ByteString]
+  Hmget :: Text -> NonEmpty Text -> Query [Maybe ByteString]
   Hmset :: Text -> [(Text, ByteString)] -> Query ()
   Hset :: Text -> Text -> ByteString -> Query ()
   Hsetnx :: Text -> Text -> ByteString -> Query Bool

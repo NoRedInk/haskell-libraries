@@ -272,6 +272,7 @@ doQuery query hm =
         Just (RedisHash hm') ->
           ( hm,
             map (\field -> HM.lookup field hm') fields
+              |> NonEmpty.toList
               |> Ok
           )
         Just _ ->

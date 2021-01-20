@@ -107,7 +107,7 @@ data Api key field a
         --
         -- equivalent to modern hget
         -- https://redis.io/commands/hmget
-        hmget :: key -> List.List field -> Internal.Query (Dict.Dict field a),
+        hmget :: key -> NonEmpty field -> Internal.Query (Dict.Dict field a),
         -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
         --
         -- equivalent to modern hset
@@ -167,9 +167,9 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey toField fromF
       hgetall = Internal.WithResult (toDict fromField codecDecoder) << Internal.Hgetall << toKey,
       hmget = \key fields ->
         fields
-          |> List.map toField
+          |> NonEmpty.map toField
           |> Internal.Hmget (toKey key)
-          |> map (Internal.maybesToDict fields)
+          |> map (Internal.maybesToDict (NonEmpty.toList fields))
           |> Internal.WithResult (Prelude.traverse codecDecoder),
       hmset = \key vals ->
         vals
