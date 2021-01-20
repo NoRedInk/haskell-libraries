@@ -98,7 +98,7 @@ data Query a where
   Hgetall :: Text -> Query [(Text, ByteString)]
   Hget :: Text -> Text -> Query (Maybe ByteString)
   Hmget :: Text -> NonEmpty Text -> Query [Maybe ByteString]
-  Hmset :: Text -> [(Text, ByteString)] -> Query ()
+  Hmset :: Text -> NonEmpty (Text, ByteString) -> Query ()
   Hset :: Text -> Text -> ByteString -> Query ()
   Hsetnx :: Text -> Text -> ByteString -> Query Bool
   Incr :: Text -> Query Int

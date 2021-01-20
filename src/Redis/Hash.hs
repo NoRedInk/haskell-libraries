@@ -50,7 +50,7 @@ where
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.ByteString (ByteString)
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
 import qualified List
@@ -112,7 +112,7 @@ data Api key field a
         --
         -- equivalent to modern hset
         -- https://redis.io/commands/hmset
-        hmset :: key -> Dict.Dict field a -> Internal.Query (),
+        hmset :: key -> field -> a -> Dict.Dict field a -> Internal.Query (),
         -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
         --
         -- https://redis.io/commands/hset
@@ -171,10 +171,11 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey toField fromF
           |> Internal.Hmget (toKey key)
           |> map (Internal.maybesToDict (NonEmpty.toList fields))
           |> Internal.WithResult (Prelude.traverse codecDecoder),
-      hmset = \key vals ->
+      hmset = \key firstKey firstVal vals ->
         vals
           |> Dict.toList
-          |> List.map (\(k, v) -> (toField k, codecEncoder v))
+          |> (:|) (firstKey, firstVal)
+          |> NonEmpty.map (\(k, v) -> (toField k, codecEncoder v))
           |> Internal.Hmset (toKey key),
       hset = \key field val ->
         Internal.Hset (toKey key) (toField field) (codecEncoder val),

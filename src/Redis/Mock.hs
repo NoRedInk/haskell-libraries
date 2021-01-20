@@ -279,20 +279,21 @@ doQuery query hm =
           ( hm,
             Err wrongTypeErr
           )
-    Internal.Hmset key vals ->
-      case HM.lookup key hm of
-        Nothing ->
-          ( HM.insert key (RedisHash (HM.fromList vals)) hm,
-            Ok ()
-          )
-        Just (RedisHash hm') ->
-          ( HM.insert key (RedisHash (hm' ++ HM.fromList vals)) hm,
-            Ok ()
-          )
-        Just _ ->
-          ( hm,
-            Err wrongTypeErr
-          )
+    Internal.Hmset key vals' ->
+      let vals = NonEmpty.toList vals'
+       in case HM.lookup key hm of
+            Nothing ->
+              ( HM.insert key (RedisHash (HM.fromList vals)) hm,
+                Ok ()
+              )
+            Just (RedisHash hm') ->
+              ( HM.insert key (RedisHash (hm' ++ HM.fromList vals)) hm,
+                Ok ()
+              )
+            Just _ ->
+              ( hm,
+                Err wrongTypeErr
+              )
     Internal.Hdel key fields ->
       case HM.lookup key hm of
         Nothing ->

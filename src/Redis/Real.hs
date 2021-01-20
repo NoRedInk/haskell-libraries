@@ -172,7 +172,7 @@ doRawQuery query =
         |> PreparedQuery
         |> map Ok
     Internal.Hmset key vals ->
-      Database.Redis.hmset (toB key) (map (\(field, val) -> (toB field, val)) vals)
+      Database.Redis.hmset (toB key) (map (\(field, val) -> (toB field, val)) (NonEmpty.toList vals))
         |> PreparedQuery
         |> map (\_ -> Ok ())
     Internal.Hdel key fields ->
