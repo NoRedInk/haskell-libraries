@@ -11,6 +11,7 @@ import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
 import qualified Data.List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding as TE
 import qualified Database.Redis
 import qualified List
@@ -184,13 +185,13 @@ doQuery query hm =
       ( hm,
         Prelude.traverse
           (\key -> HM.lookup key hm |> Prelude.traverse expectByteString)
-          keys
+          (NonEmpty.toList keys)
       )
     Internal.Mset assocs ->
       ( List.foldl
           (\(key, val) hm' -> HM.insert key val hm')
           hm
-          (List.map (\(k, v) -> (k, RedisByteString v)) assocs),
+          (List.map (\(k, v) -> (k, RedisByteString v)) (NonEmpty.toList assocs)),
         Ok ()
       )
     Internal.Del keys ->
@@ -201,7 +202,7 @@ doQuery query hm =
               else (hm', count)
         )
         (hm, 0 :: Int)
-        keys
+        (NonEmpty.toList keys)
         |> Tuple.mapSecond Ok
     Internal.Hgetall key ->
       ( hm,

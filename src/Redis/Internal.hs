@@ -5,6 +5,8 @@ module Redis.Internal where
 
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
@@ -52,7 +54,7 @@ errorForHumans topError =
 cmds :: Query b -> [Text]
 cmds query'' =
   case query'' of
-    Del keys -> [unwords ("DEL" : keys)]
+    Del keys -> [unwords ("DEL" : NonEmpty.toList keys)]
     Exists key -> [unwords ["EXISTS", key]]
     Expire key val -> [unwords ["EXPIRE", key, Text.fromInt val]]
     Get key -> [unwords ["GET", key]]
@@ -73,8 +75,8 @@ cmds query'' =
     Incr key -> [unwords ["INCR", key]]
     Incrby key amount -> [unwords ["INCRBY", key, Text.fromInt amount]]
     Lrange key lower upper -> [unwords ["LRANGE", key, Text.fromInt lower, Text.fromInt upper]]
-    Mget keys -> [unwords ("MGET" : keys)]
-    Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) pairs)]
+    Mget keys -> [unwords ("MGET" : NonEmpty.toList keys)]
+    Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) (NonEmpty.toList pairs))]
     Ping -> ["PING"]
     Rpush key vals -> [unwords ("RPUSH" : key : List.map (\_ -> "*****") vals)]
     Set key _ -> [unwords ["SET", key, "*****"]]
@@ -87,7 +89,7 @@ unwords :: [Text] -> Text
 unwords = Text.join " "
 
 data Query a where
-  Del :: [Text] -> Query Int
+  Del :: NonEmpty Text -> Query Int
   Exists :: Text -> Query Bool
   Expire :: Text -> Int -> Query ()
   Get :: Text -> Query (Maybe ByteString)
@@ -102,8 +104,8 @@ data Query a where
   Incr :: Text -> Query Int
   Incrby :: Text -> Int -> Query Int
   Lrange :: Text -> Int -> Int -> Query [ByteString]
-  Mget :: [Text] -> Query [Maybe ByteString]
-  Mset :: [(Text, ByteString)] -> Query ()
+  Mget :: NonEmpty Text -> Query [Maybe ByteString]
+  Mset :: NonEmpty (Text, ByteString) -> Query ()
   Ping :: Query Database.Redis.Status
   Rpush :: Text -> [ByteString] -> Query Int
   Set :: Text -> ByteString -> Query ()
@@ -178,9 +180,9 @@ namespaceQuery prefix query' =
     Set key value -> Set (prefix ++ key) value
     Setnx key value -> Setnx (prefix ++ key) value
     Getset key value -> Getset (prefix ++ key) value
-    Mget keys -> Mget (List.map (\k -> prefix ++ k) keys)
-    Mset assocs -> Mset (List.map (\(k, v) -> (prefix ++ k, v)) assocs)
-    Del keys -> Del (List.map (prefix ++) keys)
+    Mget keys -> Mget (NonEmpty.map (\k -> prefix ++ k) keys)
+    Mset assocs -> Mset (NonEmpty.map (\(k, v) -> (prefix ++ k, v)) assocs)
+    Del keys -> Del (NonEmpty.map (prefix ++) keys)
     Hgetall key -> Hgetall (prefix ++ key)
     Hmget key fields -> Hmget (prefix ++ key) fields
     Hget key field -> Hget (prefix ++ key) field
@@ -212,18 +214,18 @@ defaultExpiryKeysAfterSeconds secs handler =
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
   case query' of
-    Del keys -> Set.fromList keys
+    Del keys -> Set.fromList (NonEmpty.toList keys)
     Exists key -> Set.singleton key
     Ping -> Set.empty
     Get key -> Set.singleton key
     Set key _ -> Set.singleton key
     Setnx key _ -> Set.singleton key
     Getset key _ -> Set.singleton key
-    Mget keys -> Set.fromList keys
+    Mget keys -> Set.fromList (NonEmpty.toList keys)
     Hdel key _ -> Set.singleton key
     Incr key -> Set.singleton key
     Incrby key _ -> Set.singleton key
-    Mset assocs -> Set.fromList (List.map Tuple.first assocs)
+    Mset assocs -> Set.fromList (NonEmpty.toList (NonEmpty.map Tuple.first assocs))
     Hgetall key -> Set.singleton key
     Hmget key _ -> Set.singleton key
     Hget key _ -> Set.singleton key

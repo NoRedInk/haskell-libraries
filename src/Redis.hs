@@ -53,9 +53,10 @@ where
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import qualified Data.Flat as Flat
+import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
 import qualified Health
-import qualified List
 import NriPrelude
 import qualified Platform
 import qualified Redis.Codec as Codec
@@ -83,7 +84,7 @@ data Api key a
       { -- | Removes the specified keys. A key is ignored if it does not exist.
         --
         -- https://redis.io/commands/del
-        del :: List.List key -> Internal.Query Int,
+        del :: NonEmpty key -> Internal.Query Int,
         -- | Returns if key exists.
         --
         -- https://redis.io/commands/exists
@@ -110,7 +111,7 @@ data Api key a
         -- operation never fails.
         --
         -- https://redis.io/commands/mget
-        mget :: Ord key => List.List key -> Internal.Query (Dict.Dict key a),
+        mget :: Ord key => NonEmpty key -> Internal.Query (Dict.Dict key a),
         -- | Sets the given keys to their respective values. MSET replaces existing
         -- values with new values, just as regular SET. See MSETNX if you don't want to
         -- overwrite existing values.
@@ -120,7 +121,7 @@ data Api key a
         -- unchanged.
         --
         -- https://redis.io/commands/mset
-        mset :: Dict.Dict key a -> Internal.Query (),
+        mset :: key -> a -> Dict.Dict key a -> Internal.Query (),
         -- | Returns PONG if no argument is provided, otherwise return a copy of the
         -- argument as a bulk. This command is often used to test if a connection is
         -- still alive, or to measure latency.
@@ -169,20 +170,21 @@ byteStringApi = makeApi Codec.byteStringCodec
 makeApi :: Codec.Codec a -> (key -> Text) -> Api key a
 makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
   Api
-    { del = Internal.Del << List.map toKey,
+    { del = Internal.Del << NonEmpty.map toKey,
       exists = Internal.Exists << toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       get = \key -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Get (toKey key)),
       getset = \key value -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Getset (toKey key) (codecEncoder value)),
       mget = \keys ->
-        List.map toKey keys
+        NonEmpty.map toKey keys
           |> Internal.Mget
-          |> map (Internal.maybesToDict keys)
+          |> map (Internal.maybesToDict (NonEmpty.toList keys))
           |> Internal.WithResult (Prelude.traverse codecDecoder),
-      mset =
-        Dict.toList
-          >> List.map (\(k, v) -> (toKey k, codecEncoder v))
-          >> Internal.Mset,
+      mset = \firstKey firstVal vals ->
+        Dict.toList vals
+          |> (:|) (firstKey, firstVal)
+          |> map (\(k, v) -> (toKey k, codecEncoder v))
+          |> Internal.Mset,
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),

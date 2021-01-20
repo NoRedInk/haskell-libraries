@@ -11,10 +11,10 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
-import qualified List
 import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
@@ -131,15 +131,15 @@ doRawQuery query =
         |> PreparedQuery
         |> map Ok
     Internal.Mget keys ->
-      Database.Redis.mget (map toB keys)
+      Database.Redis.mget (NonEmpty.toList (map toB keys))
         |> PreparedQuery
         |> map Ok
     Internal.Mset vals ->
-      Database.Redis.mset (List.map (\(key, val) -> (toB key, val)) vals)
+      Database.Redis.mset (NonEmpty.toList (NonEmpty.map (\(key, val) -> (toB key, val)) vals))
         |> PreparedQuery
         |> map (\_ -> Ok ())
     Internal.Del keys ->
-      Database.Redis.del (map toB keys)
+      Database.Redis.del (NonEmpty.toList (map toB keys))
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
     Internal.Hgetall key ->

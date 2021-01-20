@@ -2,6 +2,7 @@ module Main (main) where
 
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Debug
 import qualified Dict
 import Dict (Dict)
@@ -61,12 +62,12 @@ specs logHandler whichHandler redisHandler =
             (),
       redisTest "del dels" <| do
         set api "del" "mistake..." |> query testNS
-        _ <- del api ["del"] |> query testNS
+        _ <- del api ("del" :| []) |> query testNS
         result <- get api "del" |> query testNS
         pure <| Expect.equal Nothing result,
       redisTest "del counts" <| do
         set api "delCount" "A thing" |> query testNS
-        result <- del api ["delCount", "key that doesn't exist"] |> query testNS
+        result <- del api ("delCount" :| ["key that doesn't exist"]) |> query testNS
         pure <| Expect.equal 1 result,
       redisTest "json roundtrip" <| do
         let testData :: [Int] = [1, 2, 3]
@@ -74,7 +75,7 @@ specs logHandler whichHandler redisHandler =
         result <- get jsonApi' "JSON list" |> query testNS
         pure <| Expect.equal (Just testData) result,
       redisTest "atomic modify with no value" <| do
-        _ <- del api ["Empty Atom"] |> query testNS
+        _ <- del api ("Empty Atom" :| []) |> query testNS
         result <-
           atomicModify
             (experimental api)
@@ -88,7 +89,7 @@ specs logHandler whichHandler redisHandler =
       redisTest "mget retrieves a mapping of the requested keys and their corresponding values" <| do
         set api "mgetTest::key1" "value 1" |> query testNS
         set api "mgetTest::key3" "value 3" |> query testNS
-        result <- mget api ["mgetTest::key1", "mgetTest::key2", "mgetTest::key3"] |> query testNS
+        result <- mget api ("mgetTest::key1" :| ["mgetTest::key2", "mgetTest::key3"]) |> query testNS
         pure
           ( Expect.equal
               (Dict.toList result)
@@ -98,7 +99,7 @@ specs logHandler whichHandler redisHandler =
         set jsonApi' "Json.mgetTest::key1" ([1, 2] :: [Int]) |> query testNS
         set jsonApi' "Json.mgetTest::key2" ([3, 4] :: [Int]) |> query testNS
         result <-
-          mget jsonApi' ["Json.mgetTest::key1", "Json.mgetTest::key2"] |> query testNS ::
+          mget jsonApi' ("Json.mgetTest::key1" :| ["Json.mgetTest::key2"]) |> query testNS ::
             Task Error (Dict Text [Int])
         pure
           ( Expect.equal
@@ -108,25 +109,21 @@ specs logHandler whichHandler redisHandler =
               ]
           ),
       redisTest "mset allows setting multiple values at once" <| do
-        let dict =
-              Dict.fromList
-                [ ("msetTest::key1", "value 1"),
-                  ("msetTest::key2", "value 2")
-                ]
-        mset api dict |> query testNS
-        result <- mget api (Dict.keys dict) |> query testNS
+        let firstKey = "msetTest::key1"
+        let firstValue = "value 1"
+        let dict = Dict.fromList [(firstKey, firstValue), ("msetTest::key2", "value 2")]
+        mset api firstKey firstValue dict |> query testNS
+        result <- mget api (firstKey :| Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
       redisTest "Json.mset allows setting multiple JSON values at once" <| do
-        let dict =
-              Dict.fromList
-                [ ("Json.msetTest::key1", [1, 2] :: [Int]),
-                  ("Json.msetTest::key2", [3, 4] :: [Int])
-                ]
-        mset jsonApi' dict |> query testNS
-        result <- mget jsonApi' (Dict.keys dict) |> query testNS
+        let firstKey = "Json.msetTest::key1"
+        let firstValue = [1, 2]
+        let dict = Dict.fromList [(firstKey, firstValue), ("Json.msetTest::key2", [3, 4] :: [Int])]
+        mset jsonApi' firstKey firstValue dict |> query testNS
+        result <- mget jsonApi' (firstKey :| Dict.keys dict) |> query testNS
         pure (Expect.equal result dict),
       redisTest "atomic modify with value" <| do
-        _ <- del api ["Full Atom"] |> query testNS
+        _ <- del api ("Full Atom" :| []) |> query testNS
         set api "Full Atom" "Something" |> query testNS
         result <-
           atomicModify
@@ -139,7 +136,7 @@ specs logHandler whichHandler redisHandler =
             )
         pure <| Expect.equal "Prefix:Something" result,
       redisTest "atomicModifyWithContext works empty" <| do
-        _ <- del api ["Atom With Context"] |> query testNS
+        _ <- del api ("Atom With Context" :| []) |> query testNS
         result <-
           atomicModifyWithContext
             (experimental api)
@@ -163,7 +160,7 @@ specs logHandler whichHandler redisHandler =
             )
         pure <| Expect.equal ("after", "Just") result,
       redisTest "Json.atomicModifyWithContext works" <| do
-        _ <- del api ["JSON Atom With Context"] |> query testNS
+        _ <- del api ("JSON Atom With Context" :| []) |> query testNS
         result <-
           atomicModifyWithContext
             (experimental jsonApi')
@@ -175,7 +172,7 @@ specs logHandler whichHandler redisHandler =
             )
         pure <| Expect.equal ([10], Nothing) result,
       redisTest "transaction preserves order" <| do
-        [ Redis.List.del listApi ["order"],
+        [ Redis.List.del listApi ("order" :| []),
           Redis.List.rpush listApi "order" ["1"],
           Redis.List.rpush listApi "order" ["2"],
           Redis.List.rpush listApi "order" ["3"]

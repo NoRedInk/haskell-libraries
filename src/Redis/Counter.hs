@@ -42,7 +42,8 @@ module Redis.Counter
   )
 where
 
-import qualified List
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
 import NriPrelude
 import qualified Redis
 import qualified Redis.Codec as Codec
@@ -56,7 +57,7 @@ data Api key
       { -- | Removes the specified keys. A key is ignored if it does not exist.
         --
         -- https://redis.io/commands/del
-        del :: List.List key -> Internal.Query Int,
+        del :: NonEmpty key -> Internal.Query Int,
         -- | Returns if key exists.
         --
         -- https://redis.io/commands/exists
@@ -108,7 +109,7 @@ makeApi ::
   Api key
 makeApi toKey =
   Api
-    { del = Internal.Del << List.map toKey,
+    { del = Internal.Del << NonEmpty.map toKey,
       exists = Internal.Exists << toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
