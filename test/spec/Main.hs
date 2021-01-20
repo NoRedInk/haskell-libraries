@@ -173,9 +173,9 @@ specs logHandler whichHandler redisHandler =
         pure <| Expect.equal ([10], Nothing) result,
       redisTest "transaction preserves order" <| do
         [ Redis.List.del listApi ("order" :| []),
-          Redis.List.rpush listApi "order" ["1"],
-          Redis.List.rpush listApi "order" ["2"],
-          Redis.List.rpush listApi "order" ["3"]
+          Redis.List.rpush listApi "order" ("1" :| []),
+          Redis.List.rpush listApi "order" ("2" :| []),
+          Redis.List.rpush listApi "order" ("3" :| [])
           ]
           |> Redis.sequence
           |> map (\_ -> ())
