@@ -61,7 +61,13 @@ cmds query'' =
     Hgetall key -> [unwords ["HGETALL", key]]
     Hget key field -> [unwords ["HGET", key, field]]
     Hmget key fields -> [unwords ("HMGET" : key : fields)]
-    Hmset key _ -> [unwords ["HMSET", key, "*****"]]
+    Hmset key pairs ->
+      [ unwords
+          ( "HMSET"
+              : key
+              : List.concatMap (\(field, _) -> [field, "*****"]) pairs
+          )
+      ]
     Hset key field _ -> [unwords ["HSET", key, field, "*****"]]
     Hsetnx key field _ -> [unwords ["HSETNX", key, field, "*****"]]
     Incr key -> [unwords ["INCR", key]]
@@ -70,7 +76,7 @@ cmds query'' =
     Mget keys -> [unwords ("MGET" : keys)]
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) pairs)]
     Ping -> ["PING"]
-    Rpush _ _ -> ["RPUSH"]
+    Rpush key vals -> [unwords ("RPUSH" : key : List.map (\_ -> "*****") vals)]
     Set key _ -> [unwords ["SET", key, "*****"]]
     Setnx key _ -> [unwords ["SETNX", key, "*****"]]
     Pure _ -> []
