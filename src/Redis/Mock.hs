@@ -1,7 +1,9 @@
 {-# LANGUAGE GADTs #-}
 
 module Redis.Mock
-  ( handler,
+  ( mkHandler,
+    handlerIO,
+    MkHandler,
   )
 where
 
@@ -15,15 +17,36 @@ import qualified List
 import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
+import qualified Result
+import qualified Task
 import qualified Text
 import qualified Tuple
 import Prelude (IO, pure)
 import qualified Prelude
 
-handler :: Text -> IO Internal.Handler
-handler namespace = do
-  modelRef <- init
+type MkHandler = Task () Internal.Handler
+
+-- | This functions returns a task that you can run in each test to retrieve a
+-- fresh mock handler
+mkHandler :: Text -> IO (Task () Internal.Handler)
+mkHandler namespace = do
   anything <- Platform.doAnythingHandler
+  handler anything namespace
+    |> map Result.Ok
+    |> Platform.doAnything anything
+    |> Task.mapError (\_ -> ())
+    |> Prelude.pure
+
+-- | It's better to use mkHandler and create a new mock handler for each test.
+-- Tests run in parallel which means that they all share the same hashmap.
+handlerIO :: Text -> Prelude.IO Internal.Handler
+handlerIO namespace = do
+  anything <- Platform.doAnythingHandler
+  handler anything namespace
+
+handler :: Platform.DoAnythingHandler -> Text -> IO Internal.Handler
+handler anything namespace = do
+  modelRef <- init
   Internal.Handler
     { Internal.doQuery = \query ->
         atomicModifyIORef'
