@@ -18,23 +18,21 @@ import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Result
-import qualified Task
 import qualified Text
 import qualified Tuple
 import Prelude (IO, pure)
 import qualified Prelude
 
-type MkHandler = Task () Internal.Handler
+type MkHandler = Task Never Internal.Handler
 
 -- | This functions returns a task that you can run in each test to retrieve a
 -- fresh mock handler
-mkHandler :: Text -> IO (Task () Internal.Handler)
+mkHandler :: Text -> IO MkHandler
 mkHandler namespace = do
   anything <- Platform.doAnythingHandler
   handler anything namespace
     |> map Result.Ok
     |> Platform.doAnything anything
-    |> Task.mapError (\_ -> ())
     |> Prelude.pure
 
 -- | It's better to use mkHandler and create a new mock handler for each test.
