@@ -78,7 +78,7 @@ cmds query'' =
     Mget keys -> [unwords ("MGET" : NonEmpty.toList keys)]
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) (NonEmpty.toList pairs))]
     Ping -> ["PING"]
-    Rpush key vals -> [unwords ("RPUSH" : key : List.map (\_ -> "*****") vals)]
+    Rpush key vals -> [unwords ("RPUSH" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
     Set key _ -> [unwords ["SET", key, "*****"]]
     Setnx key _ -> [unwords ["SETNX", key, "*****"]]
     Pure _ -> []
@@ -107,7 +107,7 @@ data Query a where
   Mget :: NonEmpty Text -> Query [Maybe ByteString]
   Mset :: NonEmpty (Text, ByteString) -> Query ()
   Ping :: Query Database.Redis.Status
-  Rpush :: Text -> [ByteString] -> Query Int
+  Rpush :: Text -> NonEmpty ByteString -> Query Int
   Set :: Text -> ByteString -> Query ()
   Setnx :: Text -> ByteString -> Query Bool
   -- The constructors below are not Redis-related, but support using functions

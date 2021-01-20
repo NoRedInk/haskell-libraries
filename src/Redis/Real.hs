@@ -196,7 +196,7 @@ doRawQuery query =
         |> PreparedQuery
         |> map Ok
     Internal.Rpush key vals ->
-      Database.Redis.rpush (toB key) vals
+      Database.Redis.rpush (toB key) (NonEmpty.toList vals)
         |> PreparedQuery
         |> map (Ok << fromIntegral)
     Internal.Pure x ->

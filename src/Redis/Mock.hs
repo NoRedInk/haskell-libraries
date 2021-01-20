@@ -344,21 +344,22 @@ doQuery query hm =
           Just _ ->
             Err wrongTypeErr
       )
-    Internal.Rpush key vals ->
-      case HM.lookup key hm of
-        Nothing ->
-          ( HM.insert key (RedisList vals) hm,
-            Ok (List.length vals)
-          )
-        Just (RedisList prev) ->
-          let combined = prev ++ vals
-           in ( HM.insert key (RedisList combined) hm,
-                Ok (List.length combined)
+    Internal.Rpush key vals' ->
+      let vals = NonEmpty.toList vals'
+       in case HM.lookup key hm of
+            Nothing ->
+              ( HM.insert key (RedisList vals) hm,
+                Ok (List.length vals)
               )
-        Just _ ->
-          ( hm,
-            Err wrongTypeErr
-          )
+            Just (RedisList prev) ->
+              let combined = prev ++ vals
+               in ( HM.insert key (RedisList combined) hm,
+                    Ok (List.length combined)
+                  )
+            Just _ ->
+              ( hm,
+                Err wrongTypeErr
+              )
     Internal.Expire _ _ ->
       -- Expiring is an intentional no-op in `Redis.Mock`. Implementing it would
       -- likely be a lot of effort, and only support writing slow tests.

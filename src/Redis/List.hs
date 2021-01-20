@@ -46,7 +46,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified List
 import NriPrelude
 import qualified Redis
 import qualified Redis.Codec as Codec
@@ -89,7 +88,7 @@ data Api key a
         -- | Insert all the specified values at the tail of the list stored at key. If key does not exist, it is created as empty list before performing the push operation. When key holds a value that is not a list, an error is returned.
         --
         -- https://redis.io/commands/rpush
-        rpush :: key -> List.List a -> Internal.Query Int
+        rpush :: key -> NonEmpty a -> Internal.Query Int
       }
 
 jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
@@ -115,5 +114,5 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
         Internal.Lrange (toKey key) lower upper
           |> Internal.WithResult (Prelude.traverse codecDecoder),
       rpush = \key vals ->
-        Internal.Rpush (toKey key) (List.map codecEncoder vals)
+        Internal.Rpush (toKey key) (NonEmpty.map codecEncoder vals)
     }
