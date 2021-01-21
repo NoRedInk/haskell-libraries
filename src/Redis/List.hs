@@ -26,6 +26,9 @@ module Redis.List
     lrange,
     rpush,
 
+    -- * Helpers
+    last,
+
     -- * Running Redis queries
     Internal.query,
     Internal.transaction,
@@ -46,6 +49,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified List
 import NriPrelude
 import qualified Redis
 import qualified Redis.Codec as Codec
@@ -88,7 +92,9 @@ data Api key a
         -- | Insert all the specified values at the tail of the list stored at key. If key does not exist, it is created as empty list before performing the push operation. When key holds a value that is not a list, an error is returned.
         --
         -- https://redis.io/commands/rpush
-        rpush :: key -> NonEmpty a -> Internal.Query Int
+        rpush :: key -> NonEmpty a -> Internal.Query Int,
+        -- Helper for getting the last item of a list
+        last :: key -> Internal.Query (Maybe a)
       }
 
 jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
@@ -114,5 +120,9 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
         Internal.Lrange (toKey key) lower upper
           |> Internal.WithResult (Prelude.traverse codecDecoder),
       rpush = \key vals ->
-        Internal.Rpush (toKey key) (NonEmpty.map codecEncoder vals)
+        Internal.Rpush (toKey key) (NonEmpty.map codecEncoder vals),
+      last = \key ->
+        Internal.Lrange (toKey key) (-1) (-1)
+          |> map List.head
+          |> Internal.WithResult (Prelude.traverse codecDecoder)
     }
