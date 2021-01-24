@@ -61,19 +61,18 @@ import Prelude (IO)
 --    `postgresql-typed` query type. Although this information could be
 --    calculated on the fly for each query, attaching it to our own `Query`
 --    type ensures we only need to calculate the metadata once, at compile time.
-data Query row
-  = Query
-      { -- | Run a query against Postgres
-        runQuery :: PGConnection -> IO [row],
-        -- | The raw SQL string
-        sqlString :: Text,
-        -- | The query string as extracted from an `sql` quasi quote.
-        quasiQuotedString :: Text,
-        -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
-        sqlOperation :: Text,
-        -- | The main table/view/.. queried.
-        queriedRelation :: Text
-      }
+data Query row = Query
+  { -- | Run a query against Postgres
+    runQuery :: PGConnection -> IO [row],
+    -- | The raw SQL string
+    sqlString :: Text,
+    -- | The query string as extracted from an `sql` quasi quote.
+    quasiQuotedString :: Text,
+    -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
+    sqlOperation :: Text,
+    -- | The main table/view/.. queried.
+    queriedRelation :: Text
+  }
 
 qqSQL :: String -> ExpQ
 qqSQL query = do
@@ -128,25 +127,24 @@ format query =
 -- TracingSpanDetails
 --
 
-data Info
-  = Info
-      { -- | The full query we're sending to a database. Wrapped in a Secret
-        -- because some queries might contain sensitive information, and we
-        -- don't know which ones.
-        infoQuery :: Log.Secret Text,
-        -- | The query template (QuasiQuote) that was used to build the template.
-        -- This we don't need to wrap in a `Secret` and can be safely logged.
-        infoQueryTemplate :: Text,
-        -- | Our best guess of the relation we're querying.
-        infoQueriedRelation :: Text,
-        -- | Our best guess of the SQL operation we're performing (SELECT /
-        -- DELETE / ...).
-        infoSqlOperation :: Text,
-        -- | Connection information of the database we're sending the query to.
-        infoConnection :: ConnectionInfo,
-        -- | The amount of rows this query returned.
-        infoRowsReturned :: Int
-      }
+data Info = Info
+  { -- | The full query we're sending to a database. Wrapped in a Secret
+    -- because some queries might contain sensitive information, and we
+    -- don't know which ones.
+    infoQuery :: Log.Secret Text,
+    -- | The query template (QuasiQuote) that was used to build the template.
+    -- This we don't need to wrap in a `Secret` and can be safely logged.
+    infoQueryTemplate :: Text,
+    -- | Our best guess of the relation we're querying.
+    infoQueriedRelation :: Text,
+    -- | Our best guess of the SQL operation we're performing (SELECT /
+    -- DELETE / ...).
+    infoSqlOperation :: Text,
+    -- | Connection information of the database we're sending the query to.
+    infoConnection :: ConnectionInfo,
+    -- | The amount of rows this query returned.
+    infoRowsReturned :: Int
+  }
   deriving (Generic)
 
 mkInfo :: Query row -> ConnectionInfo -> Info

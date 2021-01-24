@@ -107,28 +107,27 @@ newtype TransactionCount
   = TransactionCount Int
   deriving (Eq)
 
-data Connection
-  = Connection
-      { doAnything :: Platform.DoAnythingHandler,
-        -- | In this IORef we keep a list of statements we've prepared with
-        -- MySQL. These are SQL commands with some placeholders that MySQL has
-        -- parsed and is ready to run, if we only provide the placeholders. This
-        -- is a faster way of running similar queries multiple times than
-        -- sending MySQL full query strings every time, which it then has to
-        -- parse first.
-        --
-        -- If we prepare a query MySQL makes it available for the current
-        -- connection only, which is why we're not sharing this hash between
-        -- database connections.
-        --
-        -- Database connections can live for a long time. We have to be careful
-        -- with the memory they use because they won't get cleaned up after
-        -- every request. That's why we're using a hash of the query as the key
-        -- in the dictionary below instead of the query itself.
-        singleOrPool :: SingleOrPool Base.MySQLConn,
-        logContext :: Query.ConnectionInfo,
-        timeout :: Time.Interval
-      }
+data Connection = Connection
+  { doAnything :: Platform.DoAnythingHandler,
+    -- | In this IORef we keep a list of statements we've prepared with
+    -- MySQL. These are SQL commands with some placeholders that MySQL has
+    -- parsed and is ready to run, if we only provide the placeholders. This
+    -- is a faster way of running similar queries multiple times than
+    -- sending MySQL full query strings every time, which it then has to
+    -- parse first.
+    --
+    -- If we prepare a query MySQL makes it available for the current
+    -- connection only, which is why we're not sharing this hash between
+    -- database connections.
+    --
+    -- Database connections can live for a long time. We have to be careful
+    -- with the memory they use because they won't get cleaned up after
+    -- every request. That's why we're using a hash of the query as the key
+    -- in the dictionary below instead of the query itself.
+    singleOrPool :: SingleOrPool Base.MySQLConn,
+    logContext :: Query.ConnectionInfo,
+    timeout :: Time.Interval
+  }
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -234,13 +233,14 @@ toConnectInfo settings =
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: Stack.HasCallStack => Connection -> Health.Check
-readiness conn = Health.mkCheck "mysql" <| do
-  log <- Platform.silentHandler
-  Stack.withFrozenCallStack executeQuery conn (queryFromText "SELECT 1")
-    |> Task.map (\(_ :: [Int]) -> ())
-    |> Task.mapError (Data.Text.pack << Exception.displayException)
-    |> Task.attempt log
-    |> map Health.fromResult
+readiness conn =
+  Health.mkCheck "mysql" <| do
+    log <- Platform.silentHandler
+    Stack.withFrozenCallStack executeQuery conn (queryFromText "SELECT 1")
+      |> Task.map (\(_ :: [Int]) -> ())
+      |> Task.mapError (Data.Text.pack << Exception.displayException)
+      |> Task.attempt log
+      |> map Health.fromResult
 
 queryFromText :: Text -> Query.Query a
 queryFromText text =
@@ -544,8 +544,8 @@ unsafeBulkifyInserts runCombined first rest =
     { Query.preparedStatement =
         Data.Text.intercalate
           ","
-          ( Query.preparedStatement first
-              : map (Text.dropLeft splitAt << Query.preparedStatement) rest
+          ( Query.preparedStatement first :
+            map (Text.dropLeft splitAt << Query.preparedStatement) rest
           ),
       Query.params =
         Prelude.traverse Query.params (first : rest)

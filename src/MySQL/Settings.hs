@@ -28,31 +28,28 @@ import NriPrelude
 import Prelude (FilePath, pure, show)
 import qualified Prelude
 
-data Settings
-  = Settings
-      { mysqlConnection :: ConnectionSettings,
-        mysqlPool :: PoolSettings,
-        mysqlQueryTimeoutSeconds :: Time.Interval
-      }
+data Settings = Settings
+  { mysqlConnection :: ConnectionSettings,
+    mysqlPool :: PoolSettings,
+    mysqlQueryTimeoutSeconds :: Time.Interval
+  }
 
-data ConnectionSettings
-  = ConnectionSettings
-      { database :: Database,
-        user :: User,
-        password :: Password,
-        connection :: ConnectionType
-      }
+data ConnectionSettings = ConnectionSettings
+  { database :: Database,
+    user :: User,
+    password :: Password,
+    connection :: ConnectionType
+  }
 
 data ConnectionType
   = ConnectTcp Host Port
   | ConnectSocket Socket
 
-data PoolSettings
-  = PoolSettings
-      { mysqlPoolSize :: MysqlPoolSize,
-        mysqlPoolMaxIdleTime :: MysqlPoolMaxIdleTime,
-        mysqlPoolStripes :: MysqlPoolStripes
-      }
+data PoolSettings = PoolSettings
+  { mysqlPoolSize :: MysqlPoolSize,
+    mysqlPoolMaxIdleTime :: MysqlPoolMaxIdleTime,
+    mysqlPoolStripes :: MysqlPoolStripes
+  }
   deriving (Eq, Show, Generic)
 
 defaultSettings :: Settings
@@ -123,10 +120,9 @@ decoderSocket =
   pure ConnectSocket
     |> andMap socketDecoder
 
-newtype Database
-  = Database
-      { unDatabase :: Text
-      }
+newtype Database = Database
+  { unDatabase :: Text
+  }
 
 databaseDecoder :: Environment.Decoder Database
 databaseDecoder =
@@ -138,10 +134,9 @@ databaseDecoder =
       }
     (map Database Environment.text)
 
-newtype User
-  = User
-      { unUser :: Text
-      }
+newtype User = User
+  { unUser :: Text
+  }
 
 userDecoder :: Environment.Decoder User
 userDecoder =
@@ -153,10 +148,9 @@ userDecoder =
       }
     (map User Environment.text)
 
-newtype Host
-  = Host
-      { unHost :: Text
-      }
+newtype Host = Host
+  { unHost :: Text
+  }
 
 hostDecoder :: Environment.Decoder Host
 hostDecoder =
@@ -168,10 +162,9 @@ hostDecoder =
       }
     (map Host Environment.text)
 
-newtype Password
-  = Password
-      { unPassword :: Log.Secret Text
-      }
+newtype Password = Password
+  { unPassword :: Log.Secret Text
+  }
 
 passwordDecoder :: Environment.Decoder Password
 passwordDecoder =
@@ -183,10 +176,9 @@ passwordDecoder =
       }
     (map (Password << Log.mkSecret) Environment.text)
 
-newtype Port
-  = Port
-      { unPort :: Int
-      }
+newtype Port = Port
+  { unPort :: Int
+  }
 
 portDecoder :: Environment.Decoder Port
 portDecoder =
@@ -198,10 +190,9 @@ portDecoder =
       }
     (map Port Environment.int)
 
-newtype Socket
-  = Socket
-      { unSocket :: FilePath
-      }
+newtype Socket = Socket
+  { unSocket :: FilePath
+  }
 
 socketDecoder :: Environment.Decoder Socket
 socketDecoder =
@@ -213,8 +204,7 @@ socketDecoder =
       }
     (map (Data.Text.unpack >> Socket) Environment.text)
 
-newtype MysqlPoolStripes
-  = MysqlPoolStripes {unMysqlPoolStripes :: Int}
+newtype MysqlPoolStripes = MysqlPoolStripes {unMysqlPoolStripes :: Int}
   deriving (Eq, Show, Generic)
 
 mysqlPoolStripesDecoder :: Environment.Decoder MysqlPoolStripes
@@ -228,8 +218,7 @@ mysqlPoolStripesDecoder =
       }
     (Environment.int |> map MysqlPoolStripes)
 
-newtype MysqlPoolMaxIdleTime
-  = MysqlPoolMaxIdleTime {unMysqlPoolMaxIdleTime :: Data.Time.NominalDiffTime}
+newtype MysqlPoolMaxIdleTime = MysqlPoolMaxIdleTime {unMysqlPoolMaxIdleTime :: Data.Time.NominalDiffTime}
   deriving (Eq, Show, Generic)
 
 mysqlPoolMaxIdleTimeDecoder :: Environment.Decoder MysqlPoolMaxIdleTime
@@ -249,8 +238,7 @@ toNominalDiffTime = Prelude.realToFrac
 fromNominalDiffTime :: Data.Time.NominalDiffTime -> Int
 fromNominalDiffTime = Prelude.round
 
-newtype MysqlPoolSize
-  = MysqlPoolSize {unMysqlPoolSize :: Int}
+newtype MysqlPoolSize = MysqlPoolSize {unMysqlPoolSize :: Int}
   deriving (Eq, Show, Generic)
 
 mysqlPoolSizeDecoder :: Environment.Decoder MysqlPoolSize

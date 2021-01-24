@@ -27,20 +27,22 @@ main = do
     else Prelude.fail "test failed"
 
 spec :: Hedgehog.Property
-spec = Hedgehog.property <| do
-  cmd <- Hedgehog.forAll mysqlCommandGen
-  settings <- Hedgehog.evalIO <| Environment.decode MySQL.decoder
-  noLogger <- Hedgehog.evalIO <| Platform.silentHandler
-  res <- Hedgehog.evalIO <| Acquire.withAcquire (MySQL.connection settings) <| \conn ->
-    runCmd conn cmd
-      |> Task.attempt noLogger
-  case res of
-    Ok _ -> Prelude.pure ()
-    -- These are exceptions we intentionally throw in the test to
-    -- the effect of exceptions on transactions. They shouldn't fail
-    -- the test.
-    Err "oops" -> Prelude.pure ()
-    Err err -> Prelude.fail (Data.Text.unpack err)
+spec =
+  Hedgehog.property <| do
+    cmd <- Hedgehog.forAll mysqlCommandGen
+    settings <- Hedgehog.evalIO <| Environment.decode MySQL.decoder
+    noLogger <- Hedgehog.evalIO <| Platform.silentHandler
+    res <-
+      Hedgehog.evalIO <| Acquire.withAcquire (MySQL.connection settings) <| \conn ->
+        runCmd conn cmd
+          |> Task.attempt noLogger
+    case res of
+      Ok _ -> Prelude.pure ()
+      -- These are exceptions we intentionally throw in the test to
+      -- the effect of exceptions on transactions. They shouldn't fail
+      -- the test.
+      Err "oops" -> Prelude.pure ()
+      Err err -> Prelude.fail (Data.Text.unpack err)
 
 -- | Representation of a database command. We use this type to fuzz all sorts
 -- of complicated database interacts, to ensure transactions always work.

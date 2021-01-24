@@ -34,11 +34,10 @@ parse query =
         }
     Right result -> result
 
-data QueryMeta
-  = QueryMeta
-      { queriedRelation :: Text,
-        sqlOperation :: Text
-      }
+data QueryMeta = QueryMeta
+  { queriedRelation :: Text,
+    sqlOperation :: Text
+  }
   deriving (Eq, Show)
 
 parser :: Parser QueryMeta

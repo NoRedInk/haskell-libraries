@@ -16,9 +16,9 @@ inToAny :: Text -> Text
 inToAny =
   Lens.set
     ( [R.caselessRegex|\b(in)\s+\(\${.*}\)|] << R.group 0
-      --                ^^      ^^^^^^^^
-      -- "...where id   IN      (${ids})  ..."
-      -- Matches       "IN"
+    --                ^^      ^^^^^^^^
+    -- "...where id   IN      (${ids})  ..."
+    -- Matches       "IN"
     )
     -- Replace `IN` with `= ANY`
     "= ANY"
@@ -28,9 +28,9 @@ anyToIn :: Text -> Text
 anyToIn =
   Lens.over
     ( [R.caselessRegex|(\s+[^\s-]+\s+)(=\s*any)\s*\(\s*('{.*}')\s*\)|] << R.groups
-      --             ^^^^^^^^^    ^^^^^^^^^^^^
-      -- "...where id  = ANY      ('{1,2,3,4}')  ..."
-      -- Matches ["id", "= ANY",  "'{1,2,3,4}'"]
+    --             ^^^^^^^^^    ^^^^^^^^^^^^
+    -- "...where id  = ANY      ('{1,2,3,4}')  ..."
+    -- Matches ["id", "= ANY",  "'{1,2,3,4}'"]
     )
     replaceAny
   where

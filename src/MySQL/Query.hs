@@ -47,19 +47,18 @@ import qualified Prelude
 -- one of these requires parsing an SQL string and performing some interpolation
 -- operations in it. As much of this as we can we do at compile time, to ensure
 -- we have less work to do when we run a query.
-data Query row
-  = Query
-      { -- | The query as a prepared statement
-        preparedStatement :: Text,
-        -- | The parameters that fill the placeholders in this query
-        params :: Log.Secret [Base.MySQLValue],
-        -- | The query string as extracted from an `sql` quasi quote.
-        quasiQuotedString :: Text,
-        -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
-        sqlOperation :: Text,
-        -- | The main table/view/.. queried.
-        queriedRelation :: Text
-      }
+data Query row = Query
+  { -- | The query as a prepared statement
+    preparedStatement :: Text,
+    -- | The parameters that fill the placeholders in this query
+    params :: Log.Secret [Base.MySQLValue],
+    -- | The query string as extracted from an `sql` quasi quote.
+    quasiQuotedString :: Text,
+    -- | SELECT / INSERT / UPDATE / INSERT ON DUPLICATE KEY UPDATE ...
+    sqlOperation :: Text,
+    -- | The main table/view/.. queried.
+    queriedRelation :: Text
+  }
   deriving (Eq, Show)
 
 qqSQL :: Prelude.String -> TH.ExpQ
@@ -225,22 +224,21 @@ sql =
 -- TracingSpanDetails
 --
 
-data Info
-  = Info
-      { -- | The full query we're executing (prepared statement).
-        infoQuery :: Text,
-        -- | The quasi-quoted string of the query we're executing.
-        infoQueryTemplate :: Text,
-        -- | Our best guess of the SQL operation we're performing (SELECT /
-        -- DELETE / ...).
-        infoSqlOperation :: Text,
-        -- | Our best guess of the relation we're querying.
-        infoQueriedRelation :: Text,
-        -- | Connection information of the database we're sending the query to.
-        infoConnection :: ConnectionInfo,
-        -- | The amount of rows this query returned.
-        infoRowsReturned :: Int
-      }
+data Info = Info
+  { -- | The full query we're executing (prepared statement).
+    infoQuery :: Text,
+    -- | The quasi-quoted string of the query we're executing.
+    infoQueryTemplate :: Text,
+    -- | Our best guess of the SQL operation we're performing (SELECT /
+    -- DELETE / ...).
+    infoSqlOperation :: Text,
+    -- | Our best guess of the relation we're querying.
+    infoQueriedRelation :: Text,
+    -- | Connection information of the database we're sending the query to.
+    infoConnection :: ConnectionInfo,
+    -- | The amount of rows this query returned.
+    infoRowsReturned :: Int
+  }
   deriving (Generic)
 
 instance Aeson.ToJSON Info where

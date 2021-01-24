@@ -54,12 +54,11 @@ import NriPrelude
 import System.FilePath ((</>))
 import Prelude (Either (Left, Right), pure, realToFrac, round, show)
 
-data Settings
-  = Settings
-      { pgConnection :: ConnectionSettings,
-        pgPool :: PoolSettings,
-        pgQueryTimeout :: Time.Interval
-      }
+data Settings = Settings
+  { pgConnection :: ConnectionSettings,
+    pgPool :: PoolSettings,
+    pgQueryTimeout :: Time.Interval
+  }
   deriving (Eq, Show)
 
 defaultSettings :: Settings
@@ -86,22 +85,20 @@ defaultSettings =
       pgQueryTimeout = Time.fromSeconds 5
     }
 
-data ConnectionSettings
-  = ConnectionSettings
-      { pgDatabase :: PgDatabase,
-        pgUser :: PgUser,
-        pgHost :: PgHost,
-        pgPassword :: PgPassword,
-        pgPort :: PgPort
-      }
+data ConnectionSettings = ConnectionSettings
+  { pgDatabase :: PgDatabase,
+    pgUser :: PgUser,
+    pgHost :: PgHost,
+    pgPassword :: PgPassword,
+    pgPort :: PgPort
+  }
   deriving (Eq, Show)
 
-data PoolSettings
-  = PoolSettings
-      { pgPoolSize :: PgPoolSize,
-        pgPoolMaxIdleTime :: PgPoolMaxIdleTime,
-        pgPoolStripes :: PgPoolStripes
-      }
+data PoolSettings = PoolSettings
+  { pgPoolSize :: PgPoolSize,
+    pgPoolMaxIdleTime :: PgPoolMaxIdleTime,
+    pgPoolStripes :: PgPoolStripes
+  }
   deriving (Eq, Show)
 
 decoder :: Environment.Decoder Settings
@@ -127,8 +124,7 @@ poolDecoder =
     |> andMap pgPoolMaxIdleTimeDecoder
     |> andMap pgPoolStripesDecoder
 
-newtype PgPort
-  = PgPort {unPgPort :: Int}
+newtype PgPort = PgPort {unPgPort :: Int}
   deriving (Eq, Show)
 
 pgPortDecoder :: Environment.Decoder PgPort
@@ -142,8 +138,7 @@ pgPortDecoder =
       }
     (Environment.int |> map PgPort)
 
-newtype PgPassword
-  = PgPassword {unPgPassword :: Log.Secret Text}
+newtype PgPassword = PgPassword {unPgPassword :: Log.Secret Text}
   deriving (Eq, Show)
 
 pgPasswordDecoder :: Environment.Decoder PgPassword
@@ -157,8 +152,7 @@ pgPasswordDecoder =
       }
     (Environment.secret Environment.text |> map PgPassword)
 
-newtype PgHost
-  = PgHost {unPgHost :: Text}
+newtype PgHost = PgHost {unPgHost :: Text}
   deriving (Eq, Show)
 
 pgHostDecoder :: Environment.Decoder PgHost
@@ -172,8 +166,7 @@ pgHostDecoder =
       }
     (Environment.text |> map PgHost)
 
-newtype PgUser
-  = PgUser {unPgUser :: Text}
+newtype PgUser = PgUser {unPgUser :: Text}
   deriving (Eq, Show)
 
 pgUserDecoder :: Environment.Decoder PgUser
@@ -187,8 +180,7 @@ pgUserDecoder =
       }
     (Environment.text |> map PgUser)
 
-newtype PgDatabase
-  = PgDatabase {unPgDatabase :: Text}
+newtype PgDatabase = PgDatabase {unPgDatabase :: Text}
   deriving (Eq, Show)
 
 pgDatabaseDecoder :: Environment.Decoder PgDatabase
@@ -202,8 +194,7 @@ pgDatabaseDecoder =
       }
     (map PgDatabase Environment.text)
 
-newtype PgPoolStripes
-  = PgPoolStripes {unPgPoolStripes :: Int}
+newtype PgPoolStripes = PgPoolStripes {unPgPoolStripes :: Int}
   deriving (Eq, Show)
 
 pgPoolStripesDecoder :: Environment.Decoder PgPoolStripes
@@ -217,8 +208,7 @@ pgPoolStripesDecoder =
       }
     (Environment.int |> map PgPoolStripes)
 
-newtype PgPoolMaxIdleTime
-  = PgPoolMaxIdleTime {unPgPoolMaxIdleTime :: Data.Time.NominalDiffTime}
+newtype PgPoolMaxIdleTime = PgPoolMaxIdleTime {unPgPoolMaxIdleTime :: Data.Time.NominalDiffTime}
   deriving (Eq, Show)
 
 pgPoolMaxIdleTimeDecoder :: Environment.Decoder PgPoolMaxIdleTime
@@ -238,8 +228,7 @@ toNominalDiffTime = realToFrac
 fromNominalDiffTime :: Data.Time.NominalDiffTime -> Int
 fromNominalDiffTime = Prelude.round
 
-newtype PgPoolSize
-  = PgPoolSize {unPgPoolSize :: Int}
+newtype PgPoolSize = PgPoolSize {unPgPoolSize :: Int}
   deriving (Eq, Show)
 
 pgPoolSizeDecoder :: Environment.Decoder PgPoolSize

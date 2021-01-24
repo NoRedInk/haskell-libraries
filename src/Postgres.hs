@@ -74,15 +74,14 @@ import qualified Postgres.Settings as Settings
 import qualified System.Exit
 import qualified Task
 import qualified Tuple
-import Prelude ((<>), Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show)
+import Prelude (Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show, (<>))
 
-data Connection
-  = Connection
-      { doAnything :: Platform.DoAnythingHandler,
-        singleOrPool :: SingleOrPool PGConnection,
-        logContext :: Query.ConnectionInfo,
-        timeout :: Time.Interval
-      }
+data Connection = Connection
+  { doAnything :: Platform.DoAnythingHandler,
+    singleOrPool :: SingleOrPool PGConnection,
+    logContext :: Query.ConnectionInfo,
+    timeout :: Time.Interval
+  }
 
 -- | A database connection type.
 --   Defining our own type makes it easier to change it in the future, without
@@ -198,13 +197,14 @@ inTestTransactionIo postgres io = do
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: Connection -> Health.Check
-readiness conn = Health.mkCheck "postgres" <| do
-  log <- Platform.silentHandler
-  runQuery conn [Query.sql|!SELECT 1|]
-    |> map (\(_ :: [Int]) -> ())
-    |> Task.mapError (Data.Text.pack << Exception.displayException)
-    |> Task.attempt log
-    |> map Health.fromResult
+readiness conn =
+  Health.mkCheck "postgres" <| do
+    log <- Platform.silentHandler
+    runQuery conn [Query.sql|!SELECT 1|]
+      |> map (\(_ :: [Int]) -> ())
+      |> Task.mapError (Data.Text.pack << Exception.displayException)
+      |> Task.attempt log
+      |> map Health.fromResult
 
 doQuery ::
   HasCallStack =>

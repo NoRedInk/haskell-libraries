@@ -12,11 +12,10 @@ where
 import NriPrelude
 
 -- | A type representing a time interval.
-newtype Interval
-  = Interval
-      { -- | Get the duration of an interval in microseconds.
-        microseconds :: Int
-      }
+newtype Interval = Interval
+  { -- | Get the duration of an interval in microseconds.
+    microseconds :: Int
+  }
   deriving (Eq, Show)
 
 -- | Create an `Interval` lasting a certain number of microseconds.
