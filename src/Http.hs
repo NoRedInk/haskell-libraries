@@ -178,21 +178,22 @@ _request :: Platform.DoAnythingHandler -> HTTP.Manager -> Settings expect -> Tas
 _request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
-    response <- Exception.try <| do
-      basicRequest <-
-        HTTP.parseUrlThrow <| Data.Text.unpack (Internal.Http._url settings)
-      let finalRequest =
-            basicRequest
-              { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.Http._method settings),
-                HTTP.requestHeaders = case Internal.Http.bodyContentType (Internal.Http._body settings) of
-                  Nothing ->
-                    Internal.Http._headers settings
-                  Just mimeType ->
-                    ("content-type", mimeType) : Internal.Http._headers settings,
-                HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http._body settings),
-                HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (Internal.Http._timeout settings)
-              }
-      HTTP.httpLbs finalRequest requestManager
+    response <-
+      Exception.try <| do
+        basicRequest <-
+          HTTP.parseUrlThrow <| Data.Text.unpack (Internal.Http._url settings)
+        let finalRequest =
+              basicRequest
+                { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.Http._method settings),
+                  HTTP.requestHeaders = case Internal.Http.bodyContentType (Internal.Http._body settings) of
+                    Nothing ->
+                      Internal.Http._headers settings
+                    Just mimeType ->
+                      ("content-type", mimeType) : Internal.Http._headers settings,
+                  HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http._body settings),
+                  HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (Internal.Http._timeout settings)
+                }
+        HTTP.httpLbs finalRequest requestManager
     pure <| case response of
       Right okResponse ->
         case decode (Internal.Http._expect settings) (HTTP.responseBody okResponse) of
@@ -292,8 +293,8 @@ prepareManagerForRequest manager = do
           pure
             req
               { HTTP.requestHeaders =
-                  ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId)
-                    : HTTP.requestHeaders req
+                  ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId) :
+                  HTTP.requestHeaders req
               }
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
     wrapException log req io =
@@ -316,11 +317,10 @@ prepareManagerForRequest manager = do
                   (Platform.setTracingSpanDetailsIO log' spanDetails)
             )
 
-data Info
-  = Info
-      { infoUri :: Text,
-        infoRequestMethod :: Text
-      }
+data Info = Info
+  { infoUri :: Text,
+    infoRequestMethod :: Text
+  }
   deriving (Generic)
 
 instance Aeson.ToJSON Info where
