@@ -83,13 +83,12 @@ report Handler {http, timer, defaultEvent, apiKey'} requestId span =
     then send http apiKey' (toEvent requestId timer defaultEvent span)
     else Prelude.pure ()
 
-data Handler
-  = Handler
-      { http :: HTTP.Manager,
-        timer :: Timer.Timer,
-        defaultEvent :: Bugsnag.Event,
-        apiKey' :: Log.Secret Bugsnag.ApiKey
-      }
+data Handler = Handler
+  { http :: HTTP.Manager,
+    timer :: Timer.Timer,
+    defaultEvent :: Bugsnag.Event,
+    apiKey' :: Log.Secret Bugsnag.ApiKey
+  }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings =
@@ -432,12 +431,11 @@ typeName _ =
     |> Prelude.show
     |> Data.Text.pack
 
-data Settings
-  = Settings
-      { apiKey :: Log.Secret Bugsnag.ApiKey,
-        appName :: Namespace,
-        appEnvironment :: Environment
-      }
+data Settings = Settings
+  { apiKey :: Log.Secret Bugsnag.ApiKey,
+    appName :: Namespace,
+    appEnvironment :: Environment
+  }
 
 decoder :: Environment.Decoder Settings
 decoder =

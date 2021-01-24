@@ -28,16 +28,15 @@ import qualified Prelude
 -- past. This is the faster and more accurate way to measure precisely what the
 -- running time of spans is. This type helpers convert these times into regular
 -- dates.
-data Timer
-  = Timer
-      { -- | The POSIX time in microseconds that corresponds with t=0 according
-        -- to `GHC.Clock`. We can use this to calculate other `GHC.Clock`
-        -- values.
-        tzero :: Word.Word64,
-        -- | The timezone of the machine this code is running on. Useful for
-        -- printing local times in development reporters.
-        timezone :: LocalTime.TimeZone
-      }
+data Timer = Timer
+  { -- | The POSIX time in microseconds that corresponds with t=0 according
+    -- to `GHC.Clock`. We can use this to calculate other `GHC.Clock`
+    -- values.
+    tzero :: Word.Word64,
+    -- | The timezone of the machine this code is running on. Useful for
+    -- printing local times in development reporters.
+    timezone :: LocalTime.TimeZone
+  }
 
 mkTimer :: Prelude.IO Timer
 mkTimer = do

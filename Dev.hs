@@ -201,20 +201,19 @@ failed span =
       "failed"
         |> Doc.annotate (Terminal.color Terminal.Red)
 
-data Handler
-  = Handler
-      { timer :: Timer.Timer,
-        -- If we let each request log to stdout directly the result will be lots
-        -- of unreadable interleaved output from requests that are handled
-        -- concurrently. To prevent this we use an MVar as a lock.
-        --
-        -- After a request is done it can write it's log to the MVar. If the
-        -- MVar already contains a log this operation will block until the MVar
-        -- is empty. We have a logging thread running separately that takes logs
-        -- from the MVar and prints them to stdout one at a time.
-        writeLock :: MVar.MVar Doc,
-        loggingThread :: Async.Async ()
-      }
+data Handler = Handler
+  { timer :: Timer.Timer,
+    -- If we let each request log to stdout directly the result will be lots
+    -- of unreadable interleaved output from requests that are handled
+    -- concurrently. To prevent this we use an MVar as a lock.
+    --
+    -- After a request is done it can write it's log to the MVar. If the
+    -- MVar already contains a log this operation will block until the MVar
+    -- is empty. We have a logging thread running separately that takes logs
+    -- from the MVar and prints them to stdout one at a time.
+    writeLock :: MVar.MVar Doc,
+    loggingThread :: Async.Async ()
+  }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer Settings =

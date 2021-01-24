@@ -402,12 +402,11 @@ typeName _ =
     |> Prelude.show
     |> Data.Text.pack
 
-data Settings
-  = Settings
-      { appName :: NewRelic.AppName,
-        licenseKey :: Log.Secret NewRelic.LicenseKey,
-        timeout :: NewRelic.TimeoutMs
-      }
+data Settings = Settings
+  { appName :: NewRelic.AppName,
+    licenseKey :: Log.Secret NewRelic.LicenseKey,
+    timeout :: NewRelic.TimeoutMs
+  }
 
 decoder :: Environment.Decoder Settings
 decoder =

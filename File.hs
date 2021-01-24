@@ -132,17 +132,16 @@ instance Katip.ToObject LogItem where
 instance Katip.LogItem LogItem where
   payloadKeys _ _ = Katip.AllKeys
 
-data Handler
-  = Handler
-      { -- | A bit of configuration that Katip needs to log.
-        logEnv :: Katip.LogEnv,
-        -- | A bit of state that can be used to turn the clock values attached
-        -- to spans into real timestamps.
-        timer :: Timer,
-        -- | A function that determines for a particular span if it should be
-        -- skipped in logging.
-        skipLogging :: Platform.TracingSpan -> Prelude.IO Bool
-      }
+data Handler = Handler
+  { -- | A bit of configuration that Katip needs to log.
+    logEnv :: Katip.LogEnv,
+    -- | A bit of state that can be used to turn the clock values attached
+    -- to spans into real timestamps.
+    timer :: Timer,
+    -- | A function that determines for a particular span if it should be
+    -- skipped in logging.
+    skipLogging :: Platform.TracingSpan -> Prelude.IO Bool
+  }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
@@ -192,16 +191,15 @@ fileHandle settings =
     )
     System.IO.hClose
 
-data Settings
-  = Settings
-      { logFile :: Prelude.FilePath,
-        appName :: Katip.Namespace,
-        appEnvironment :: Katip.Environment,
-        fractionOfSuccessRequestsLogged :: Float,
-        -- These mock values are useful in tests to ensure constant output.
-        mockHostname :: Maybe Text,
-        mockPid :: Maybe Int
-      }
+data Settings = Settings
+  { logFile :: Prelude.FilePath,
+    appName :: Katip.Namespace,
+    appEnvironment :: Katip.Environment,
+    fractionOfSuccessRequestsLogged :: Float,
+    -- These mock values are useful in tests to ensure constant output.
+    mockHostname :: Maybe Text,
+    mockPid :: Maybe Int
+  }
 
 decoder :: Environment.Decoder Settings
 decoder =

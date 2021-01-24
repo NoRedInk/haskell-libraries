@@ -26,8 +26,8 @@ where
 
 import qualified Conduit
 import Control.Monad (unless)
-import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
+import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Text.Encoding as Encoding
@@ -112,16 +112,15 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
       { batchevent_time = timestamp,
         batchevent_data = hcSpan,
         batchevent_samplerate = sampleRate
-      }
-      : List.concat children
+      } :
+    List.concat children
     )
 
-data BatchEvent
-  = BatchEvent
-      { batchevent_time :: Text,
-        batchevent_data :: Span,
-        batchevent_samplerate :: Int
-      }
+data BatchEvent = BatchEvent
+  { batchevent_time :: Text,
+    batchevent_data :: Span,
+    batchevent_samplerate :: Int
+  }
   deriving (Generic)
 
 options :: Aeson.Options
@@ -134,26 +133,24 @@ options =
 instance Aeson.ToJSON BatchEvent where
   toJSON = Aeson.genericToJSON options
 
-data CommonFields
-  = CommonFields
-      { common_timer :: Timer,
-        common_serviceName :: Text,
-        common_environment :: Text,
-        common_requestId :: Text
-      }
+data CommonFields = CommonFields
+  { common_timer :: Timer,
+    common_serviceName :: Text,
+    common_environment :: Text,
+    common_requestId :: Text
+  }
 
-data Span
-  = Span
-      { name :: Text,
-        spanId :: SpanId,
-        parentId :: Maybe SpanId,
-        traceId :: Text,
-        serviceName :: Text,
-        environment :: Text,
-        durationMs :: Float,
-        allocatedBytes :: Int,
-        details :: Maybe Platform.SomeTracingSpanDetails
-      }
+data Span = Span
+  { name :: Text,
+    spanId :: SpanId,
+    parentId :: Maybe SpanId,
+    traceId :: Text,
+    serviceName :: Text,
+    environment :: Text,
+    durationMs :: Float,
+    allocatedBytes :: Int,
+    details :: Maybe Platform.SomeTracingSpanDetails
+  }
   deriving (Generic)
 
 instance Aeson.ToJSON Span where
@@ -181,17 +178,16 @@ instance Aeson.ToJSON Span where
 newtype SpanId = SpanId Text
   deriving (Aeson.ToJSON)
 
-data Handler
-  = Handler
-      { -- | A bit of state that can be used to turn the clock values attached
-        -- to spans into real timestamps.
-        handler_timer :: Timer,
-        handler_http :: Http.Handler,
-        handler_serviceName :: Text,
-        handler_environment :: Text,
-        handler_honeycombApiKey :: Log.Secret Text,
-        handler_fractionOfSuccessRequestsLogged :: Float
-      }
+data Handler = Handler
+  { -- | A bit of state that can be used to turn the clock values attached
+    -- to spans into real timestamps.
+    handler_timer :: Timer,
+    handler_http :: Http.Handler,
+    handler_serviceName :: Text,
+    handler_environment :: Text,
+    handler_honeycombApiKey :: Log.Secret Text,
+    handler_fractionOfSuccessRequestsLogged :: Float
+  }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
@@ -206,13 +202,12 @@ handler timer settings = do
         handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings
       }
 
-data Settings
-  = Settings
-      { appName :: Text,
-        appEnvironment :: Text,
-        honeycombApiKey :: Log.Secret Text,
-        fractionOfSuccessRequestsLogged :: Float
-      }
+data Settings = Settings
+  { appName :: Text,
+    appEnvironment :: Text,
+    honeycombApiKey :: Log.Secret Text,
+    fractionOfSuccessRequestsLogged :: Float
+  }
 
 decoder :: Environment.Decoder Settings
 decoder =
