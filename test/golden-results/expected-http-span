@@ -30,9 +30,9 @@ TracingSpan
                     { srcLocPackage = "http-1.0.0.0-inplace"
                     , srcLocModule = "Http"
                     , srcLocFile = "src/Http.hs"
-                    , srcLocStartLine = 310
+                    , srcLocStartLine = 311
                     , srcLocStartCol = 11
-                    , srcLocEndLine = 317
+                    , srcLocEndLine = 318
                     , srcLocEndCol = 14
                     }
                 )
