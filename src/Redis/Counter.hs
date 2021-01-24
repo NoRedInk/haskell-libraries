@@ -52,57 +52,56 @@ import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Prelude
 
-data Api key
-  = Api
-      { -- | Removes the specified keys. A key is ignored if it does not exist.
-        --
-        -- https://redis.io/commands/del
-        del :: NonEmpty key -> Internal.Query Int,
-        -- | Returns if key exists.
-        --
-        -- https://redis.io/commands/exists
-        exists :: key -> Internal.Query Bool,
-        -- | Set a timeout on key. After the timeout has expired, the key will
-        -- automatically be deleted. A key with an associated timeout is often said to
-        -- be volatile in Redis terminology.
-        --
-        -- https://redis.io/commands/expire
-        expire :: key -> Int -> Internal.Query (),
-        -- | Returns PONG if no argument is provided, otherwise return a copy of the
-        -- argument as a bulk. This command is often used to test if a connection is
-        -- still alive, or to measure latency.
-        --
-        -- https://redis.io/commands/ping
-        ping :: Internal.Query (),
-        -- | Get the value of key. If the key does not exist the special value Nothing
-        -- is returned. An error is returned if the value stored at key is not a
-        -- string, because GET only handles string values.
-        --
-        -- https://redis.io/commands/get
-        get :: key -> Internal.Query (Maybe Int),
-        -- | Increments the number stored at key by one. If the key does not
-        -- exist, it is set to 0 before performing the operation. An error is
-        -- returned if the key contains a value of the wrong type or contains a
-        -- string that can not be represented as integer. This operation is
-        -- limited to 64 bit signed integers.
-        --
-        -- https://redis.io/commands/incr
-        incr :: key -> Internal.Query Int,
-        -- | Increments the number stored at key by increment. If the key does
-        -- not exist, it is set to 0 before performing the operation. An error
-        -- is returned if the key contains a value of the wrong type or
-        -- contains a string that can not be represented as integer. This
-        -- operation is limited to 64 bit signed integers.
-        --
-        -- https://redis.io/commands/incrby
-        incrby :: key -> Int -> Internal.Query Int,
-        -- | Set key to hold the string value. If key already holds a value, it is
-        -- overwritten, regardless of its type. Any previous time to live associated
-        -- with the key is discarded on successful SET operation.
-        --
-        -- https://redis.io/commands/set
-        set :: key -> Int -> Internal.Query ()
-      }
+data Api key = Api
+  { -- | Removes the specified keys. A key is ignored if it does not exist.
+    --
+    -- https://redis.io/commands/del
+    del :: NonEmpty key -> Internal.Query Int,
+    -- | Returns if key exists.
+    --
+    -- https://redis.io/commands/exists
+    exists :: key -> Internal.Query Bool,
+    -- | Set a timeout on key. After the timeout has expired, the key will
+    -- automatically be deleted. A key with an associated timeout is often said to
+    -- be volatile in Redis terminology.
+    --
+    -- https://redis.io/commands/expire
+    expire :: key -> Int -> Internal.Query (),
+    -- | Returns PONG if no argument is provided, otherwise return a copy of the
+    -- argument as a bulk. This command is often used to test if a connection is
+    -- still alive, or to measure latency.
+    --
+    -- https://redis.io/commands/ping
+    ping :: Internal.Query (),
+    -- | Get the value of key. If the key does not exist the special value Nothing
+    -- is returned. An error is returned if the value stored at key is not a
+    -- string, because GET only handles string values.
+    --
+    -- https://redis.io/commands/get
+    get :: key -> Internal.Query (Maybe Int),
+    -- | Increments the number stored at key by one. If the key does not
+    -- exist, it is set to 0 before performing the operation. An error is
+    -- returned if the key contains a value of the wrong type or contains a
+    -- string that can not be represented as integer. This operation is
+    -- limited to 64 bit signed integers.
+    --
+    -- https://redis.io/commands/incr
+    incr :: key -> Internal.Query Int,
+    -- | Increments the number stored at key by increment. If the key does
+    -- not exist, it is set to 0 before performing the operation. An error
+    -- is returned if the key contains a value of the wrong type or
+    -- contains a string that can not be represented as integer. This
+    -- operation is limited to 64 bit signed integers.
+    --
+    -- https://redis.io/commands/incrby
+    incrby :: key -> Int -> Internal.Query Int,
+    -- | Set key to hold the string value. If key already holds a value, it is
+    -- overwritten, regardless of its type. Any previous time to live associated
+    -- with the key is discarded on successful SET operation.
+    --
+    -- https://redis.io/commands/set
+    set :: key -> Int -> Internal.Query ()
+  }
 
 makeApi ::
   (key -> Text) ->

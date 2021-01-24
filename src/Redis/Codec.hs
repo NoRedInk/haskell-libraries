@@ -14,24 +14,24 @@ import NriPrelude
 import qualified Redis.Internal as Internal
 import qualified Prelude
 
-data Codec a
-  = Codec
-      { codecEncoder :: Encoder a,
-        codecDecoder :: Decoder a
-      }
+data Codec a = Codec
+  { codecEncoder :: Encoder a,
+    codecDecoder :: Decoder a
+  }
 
 type Encoder a = a -> ByteString
 
 type Decoder a = ByteString -> Result Internal.Error a
 
 flatCodec :: Flat.Flat a => Codec a
-flatCodec = Codec Flat.flat <| \x ->
-  case Flat.unflat x of
-    Prelude.Right a -> Ok a
-    Prelude.Left err ->
-      Debug.toString err
-        |> Internal.DecodingError
-        |> Err
+flatCodec =
+  Codec Flat.flat <| \x ->
+    case Flat.unflat x of
+      Prelude.Right a -> Ok a
+      Prelude.Left err ->
+        Debug.toString err
+          |> Internal.DecodingError
+          |> Err
 
 instance Flat.Flat a => Flat.Flat (NonEmpty.NonEmpty a)
 

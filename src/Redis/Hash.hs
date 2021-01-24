@@ -48,8 +48,8 @@ module Redis.Hash
 where
 
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString as ByteString
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
@@ -63,67 +63,66 @@ import qualified Redis.Settings as Settings
 import qualified Result
 import qualified Prelude
 
-data Api key field a
-  = Api
-      { -- | Removes the specified keys. A key is ignored if it does not exist.
-        --
-        -- https://redis.io/commands/del
-        del :: NonEmpty key -> Internal.Query Int,
-        -- | Returns if key exists.
-        --
-        -- https://redis.io/commands/exists
-        exists :: key -> Internal.Query Bool,
-        -- | Set a timeout on key. After the timeout has expired, the key will
-        -- automatically be deleted. A key with an associated timeout is often said to
-        -- be volatile in Redis terminology.
-        --
-        -- https://redis.io/commands/expire
-        expire :: key -> Int -> Internal.Query (),
-        -- | Returns PONG if no argument is provided, otherwise return a copy of the
-        -- argument as a bulk. This command is often used to test if a connection is
-        -- still alive, or to measure latency.
-        --
-        -- https://redis.io/commands/ping
-        ping :: Internal.Query (),
-        -- | Removes the specified fields from the hash stored at key. Specified fields
-        -- that do not exist within this hash are ignored. If key does not exist, it is
-        -- treated as an empty hash and this command returns 0.
-        --
-        -- https://redis.io/commands/hdel
-        hdel :: key -> NonEmpty field -> Internal.Query Int,
-        -- | Get the value of the field of a hash at key. If the key does not exist,
-        -- or the field in the hash does not exis the special value Nothing is returned
-        -- An error is returned if the value stored at key is not a
-        -- hash, because HGET only handles string values.
-        --
-        -- https://redis.io/commands/hget
-        hget :: key -> field -> Internal.Query (Maybe a),
-        -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
-        -- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist
-        --
-        -- https://redis.io/commands/hgetall
-        hgetall :: key -> Internal.Query (Dict.Dict field a),
-        -- | Returns the values associated with the specified fields in the hash stored at key.--
-        --
-        -- equivalent to modern hget
-        -- https://redis.io/commands/hmget
-        hmget :: key -> NonEmpty field -> Internal.Query (Dict.Dict field a),
-        -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
-        --
-        -- equivalent to modern hset
-        -- https://redis.io/commands/hmset
-        hmset :: key -> NonEmptyDict.NonEmptyDict field a -> Internal.Query (),
-        -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
-        --
-        -- https://redis.io/commands/hset
-        hset :: key -> field -> a -> Internal.Query (),
-        -- | Sets field in the hash stored at key to value, only if field does not yet
-        -- exist. If key does not exist, a new key holding a hash is created. If field
-        -- already exists, this operation has no effect.
-        --
-        -- https://redis.io/commands/hsetnx
-        hsetnx :: key -> field -> a -> Internal.Query Bool
-      }
+data Api key field a = Api
+  { -- | Removes the specified keys. A key is ignored if it does not exist.
+    --
+    -- https://redis.io/commands/del
+    del :: NonEmpty key -> Internal.Query Int,
+    -- | Returns if key exists.
+    --
+    -- https://redis.io/commands/exists
+    exists :: key -> Internal.Query Bool,
+    -- | Set a timeout on key. After the timeout has expired, the key will
+    -- automatically be deleted. A key with an associated timeout is often said to
+    -- be volatile in Redis terminology.
+    --
+    -- https://redis.io/commands/expire
+    expire :: key -> Int -> Internal.Query (),
+    -- | Returns PONG if no argument is provided, otherwise return a copy of the
+    -- argument as a bulk. This command is often used to test if a connection is
+    -- still alive, or to measure latency.
+    --
+    -- https://redis.io/commands/ping
+    ping :: Internal.Query (),
+    -- | Removes the specified fields from the hash stored at key. Specified fields
+    -- that do not exist within this hash are ignored. If key does not exist, it is
+    -- treated as an empty hash and this command returns 0.
+    --
+    -- https://redis.io/commands/hdel
+    hdel :: key -> NonEmpty field -> Internal.Query Int,
+    -- | Get the value of the field of a hash at key. If the key does not exist,
+    -- or the field in the hash does not exis the special value Nothing is returned
+    -- An error is returned if the value stored at key is not a
+    -- hash, because HGET only handles string values.
+    --
+    -- https://redis.io/commands/hget
+    hget :: key -> field -> Internal.Query (Maybe a),
+    -- | Returns all fields and values of the hash stored at key. In the returned value, every field name is followed by its value, so the length of the reply is twice the size of the hash.
+    -- Nothing in the returned value means failed utf8 decoding, not that it doesn't exist
+    --
+    -- https://redis.io/commands/hgetall
+    hgetall :: key -> Internal.Query (Dict.Dict field a),
+    -- | Returns the values associated with the specified fields in the hash stored at key.--
+    --
+    -- equivalent to modern hget
+    -- https://redis.io/commands/hmget
+    hmget :: key -> NonEmpty field -> Internal.Query (Dict.Dict field a),
+    -- | Sets fields in the hash stored at key to values. If key does not exist, a new key holding a hash is created. If any fields exists, they are overwritten.
+    --
+    -- equivalent to modern hset
+    -- https://redis.io/commands/hmset
+    hmset :: key -> NonEmptyDict.NonEmptyDict field a -> Internal.Query (),
+    -- | Sets field in the hash stored at key to value. If key does not exist, a new key holding a hash is created. If field already exists in the hash, it is overwritten.
+    --
+    -- https://redis.io/commands/hset
+    hset :: key -> field -> a -> Internal.Query (),
+    -- | Sets field in the hash stored at key to value, only if field does not yet
+    -- exist. If key does not exist, a new key holding a hash is created. If field
+    -- already exists, this operation has no effect.
+    --
+    -- https://redis.io/commands/hsetnx
+    hsetnx :: key -> field -> a -> Internal.Query Bool
+  }
 
 jsonApi ::
   (Aeson.ToJSON a, Aeson.FromJSON a, Ord field) =>

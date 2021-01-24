@@ -83,10 +83,9 @@ acquireHandler namespace settings = do
       connection
     )
 
-newtype PreparedQuery m f result
-  = PreparedQuery
-      { redisCtx :: m (f result)
-      }
+newtype PreparedQuery m f result = PreparedQuery
+  { redisCtx :: m (f result)
+  }
   deriving (Prelude.Functor)
 
 instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (PreparedQuery m f) where
@@ -217,12 +216,11 @@ doRawQuery query =
 releaseHandler :: (Internal.Handler, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis
 
-data Connection
-  = Connection
-      { connectionHedis :: Database.Redis.Connection,
-        connectionHost :: Text,
-        connectionPort :: Text
-      }
+data Connection = Connection
+  { connectionHedis :: Database.Redis.Connection,
+    connectionHost :: Text,
+    connectionPort :: Text
+  }
 
 platformRedis ::
   Internal.TracedQuery ->
@@ -263,12 +261,11 @@ traceQuery (Internal.TracedQuery query) connection task =
         "Redis Query"
         (Platform.finally task (Platform.setTracingSpanDetails info))
 
-data Info
-  = Info
-      { infoCommands :: List Text,
-        infoHost :: Text,
-        infoPort :: Text
-      }
+data Info = Info
+  { infoCommands :: List Text,
+    infoHost :: Text,
+    infoPort :: Text
+  }
   deriving (Generic)
 
 instance Aeson.ToJSON Info

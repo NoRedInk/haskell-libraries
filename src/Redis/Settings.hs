@@ -9,13 +9,12 @@ import Prelude (Either (Left, Right))
 
 data ClusterMode = Cluster | NotCluster
 
-data Settings
-  = Settings
-      { connectionInfo :: ConnectInfo,
-        clusterMode :: ClusterMode,
-        defaultExpiry :: DefaultExpiry,
-        queryTimeout :: QueryTimeout
-      }
+data Settings = Settings
+  { connectionInfo :: ConnectInfo,
+    clusterMode :: ClusterMode,
+    defaultExpiry :: DefaultExpiry,
+    queryTimeout :: QueryTimeout
+  }
 
 data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
 

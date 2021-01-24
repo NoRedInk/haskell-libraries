@@ -85,11 +85,10 @@ handler anything namespace = do
 
 -- | This is our mock implementation of the Redis state. Our mock implementation
 -- will store a single value of this type, and redis commands will modify it.
-data Model
-  = Model
-      { hash :: HM.HashMap Text RedisType,
-        watchedKeys :: HM.HashMap Text (Maybe RedisType)
-      }
+data Model = Model
+  { hash :: HM.HashMap Text RedisType,
+    watchedKeys :: HM.HashMap Text (Maybe RedisType)
+  }
 
 -- | Redis supports a small number of types and most of its commands expect a
 -- particular type in the keys the command is used on.

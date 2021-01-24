@@ -65,9 +65,9 @@ cmds query'' =
     Hmget key fields -> [unwords ("HMGET" : key : NonEmpty.toList fields)]
     Hmset key pairs ->
       [ unwords
-          ( "HMSET"
-              : key
-              : List.concatMap (\(field, _) -> [field, "*****"]) (NonEmpty.toList pairs)
+          ( "HMSET" :
+            key :
+            List.concatMap (\(field, _) -> [field, "*****"]) (NonEmpty.toList pairs)
           )
       ]
     Hset key field _ -> [unwords ["HSET", key, field, "*****"]]
@@ -134,13 +134,12 @@ sequence :: List (Query a) -> Query (List a)
 sequence =
   List.foldr (map2 (:)) (Pure [])
 
-data Handler
-  = Handler
-      { doQuery :: forall a. Query a -> Task Error a,
-        doTransaction :: forall a. Query a -> Task Error a,
-        doWatch :: [Text] -> Task Error (),
-        namespace :: Text
-      }
+data Handler = Handler
+  { doQuery :: forall a. Query a -> Task Error a,
+    doTransaction :: forall a. Query a -> Task Error a,
+    doWatch :: [Text] -> Task Error (),
+    namespace :: Text
+  }
 
 -- | Run a redis Query.
 query :: Handler -> Query a -> Task Error a

@@ -4,8 +4,8 @@ import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Debug
-import qualified Dict
 import Dict (Dict)
+import qualified Dict
 import qualified Environment
 import qualified Expect
 import qualified List
@@ -203,11 +203,10 @@ main =
   Conduit.withAcquire getHandlers <| \testHandlers ->
     run <| buildSpecs testHandlers
 
-data TestHandlers
-  = TestHandlers
-      { logHandler :: Platform.LogHandler,
-        redisHandlers :: [(Text, Handler)]
-      }
+data TestHandlers = TestHandlers
+  { logHandler :: Platform.LogHandler,
+    redisHandlers :: [(Text, Handler)]
+  }
 
 getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, Handler)]
 getRedisHandlers settings = do
