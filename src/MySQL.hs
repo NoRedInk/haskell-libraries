@@ -5,6 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-cse #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
@@ -55,7 +56,6 @@ module MySQL
 
     -- * Handling transactions
     transaction,
-    inTestTransaction,
 
     -- * Helpers for uncommon queries
     unsafeBulkifyInserts,
@@ -63,9 +63,13 @@ module MySQL
     onDuplicateDoNothing,
     sqlYearly,
     replace,
+
+    -- * Testing with MySQL
+    test,
   )
 where
 
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Control.Lens.Regex.Text as R
@@ -81,6 +85,8 @@ import qualified Database.MySQL.Connection
 import qualified Database.MySQL.Protocol.Packet
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Debug
+import qualified Environment
+import qualified Expect.Task
 import qualified GHC.Stack as Stack
 import qualified Health
 import qualified Internal.CaselessRegex as CaselessRegex
@@ -98,7 +104,9 @@ import qualified MySQL.Settings as Settings
 import NriPrelude
 import qualified Platform
 import qualified System.IO.Streams as Streams
+import qualified System.IO.Unsafe
 import qualified Task
+import qualified Test
 import qualified Text
 import qualified Tuple
 import qualified Prelude
@@ -143,29 +151,32 @@ data SingleOrPool c
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  Data.Acquire.mkAcquire acquire release
+  Data.Acquire.mkAcquire (acquire settings) release
   where
-    acquire = do
-      doAnything <- Platform.doAnythingHandler
-      pool <-
-        map Pool
-          <| Data.Pool.createPool
-            (Base.connect database)
-            Base.close
-            stripes
-            maxIdleTime
-            size
-      Prelude.pure
-        ( Connection
-            doAnything
-            pool
-            (toConnectionLogContext settings)
-            (Settings.mysqlQueryTimeoutSeconds settings)
-        )
     release Connection {singleOrPool} =
       case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
         Single _ c -> Base.close c
+
+acquire :: Settings.Settings -> Prelude.IO Connection
+acquire settings = do
+  doAnything <- Platform.doAnythingHandler
+  pool <-
+    map Pool
+      <| Data.Pool.createPool
+        (Base.connect database)
+        Base.close
+        stripes
+        maxIdleTime
+        size
+  Prelude.pure
+    ( Connection
+        doAnything
+        pool
+        (toConnectionLogContext settings)
+        (Settings.mysqlQueryTimeoutSeconds settings)
+    )
+  where
     stripes =
       Settings.mysqlPool settings
         |> Settings.mysqlPoolStripes
@@ -414,6 +425,40 @@ transaction conn' func =
       )
       (\() -> func conn)
 
+test ::
+  Stack.HasCallStack =>
+  Text ->
+  (Connection -> Task Expect.Task.Failure a) ->
+  Test.Test
+test description body =
+  Stack.withFrozenCallStack Test.task description <| do
+    conn <- getTestConnection
+    inTestTransaction conn body
+
+getTestConnection :: Task e Connection
+getTestConnection =
+  MVar.modifyMVar
+    testConnectionVar
+    ( \maybeConn -> do
+        conn <-
+          case maybeConn of
+            Just conn -> Prelude.pure conn
+            Nothing -> do
+              settings <- Environment.decode Settings.decoder
+              acquire settings
+        Prelude.pure (Just conn, conn)
+    )
+    |> map Ok
+    |> Platform.doAnything testDoAnything
+
+{-# NOINLINE testConnectionVar #-}
+testConnectionVar :: MVar.MVar (Maybe Connection)
+testConnectionVar = System.IO.Unsafe.unsafePerformIO (MVar.newMVar Nothing)
+
+{-# NOINLINE testDoAnything #-}
+testDoAnything :: Platform.DoAnythingHandler
+testDoAnything = System.IO.Unsafe.unsafePerformIO Platform.doAnythingHandler
+
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
@@ -491,8 +536,8 @@ withTransaction conn func =
 --   queries on the same connection.
 withConnection :: Stack.HasCallStack => Connection -> (Base.MySQLConn -> Task e a) -> Task e a
 withConnection conn func =
-  let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
-      acquire pool =
+  let acquire' :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
+      acquire' pool =
         Stack.withFrozenCallStack Log.withContext "acquiring MySQL connection from pool" []
           <| doIO conn
           <| Data.Pool.takeResource pool
@@ -513,7 +558,7 @@ withConnection conn func =
           func c
         --
         (Pool pool) ->
-          Platform.bracketWithError (acquire pool) (release pool) (Tuple.first >> func)
+          Platform.bracketWithError (acquire' pool) (release pool) (Tuple.first >> func)
 
 --
 -- TYPE CLASSES
