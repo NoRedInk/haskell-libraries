@@ -53,9 +53,6 @@ module MySQL
     onDuplicateDoNothing,
     sqlYearly,
     replace,
-
-    -- * Testing with MySQL
-    test,
   )
 where
 
