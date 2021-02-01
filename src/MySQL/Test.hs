@@ -50,7 +50,21 @@ getTestConnection =
             Just conn -> Prelude.pure conn
             Nothing -> do
               settings <- Environment.decode Settings.decoder
-              acquire settings
+              acquire
+                settings
+                  { Settings.mysqlPool =
+                      Settings.defaultPoolSettings
+                        { Settings.mysqlPoolSize = Settings.MysqlPoolSize 1
+                        },
+                    Settings.mysqlConnection =
+                      Settings.defaultConnectionSettings
+                        { Settings.database = Settings.Database "noredink_test",
+                          Settings.connection =
+                            Settings.ConnectTcp
+                              (Settings.Host "127.0.0.1")
+                              (Settings.Port 3306)
+                        }
+                  }
         Prelude.pure (Just conn, conn)
     )
     |> map Ok
