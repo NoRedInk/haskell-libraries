@@ -15,7 +15,7 @@ import qualified Test
 import qualified Prelude
 
 -- | A variant of `Test.task` that is passed a MySQL connection, for doing tests
--- that require access to MySQL. The test body is ran without a transaction that
+-- that require access to MySQL. The test body is run within a transaction that
 -- gets rolled back after the test completes.
 --
 -- Usage:
