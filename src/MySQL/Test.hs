@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-cse #-}
 
-module MySQL.Test (test, inTestTransaction) where
+module MySQL.Test (task, inTestTransaction) where
 
 import qualified Control.Concurrent.MVar as MVar
 import qualified Environment
@@ -20,14 +20,14 @@ import qualified Prelude
 --
 -- Usage:
 --
---     MySQL.Test.test "My MySQL test" <| \mysql -> do
+--     MySQL.Test.task "My MySQL test" <| \mysql -> do
 --        -- test stuff!
-test ::
+task ::
   Stack.HasCallStack =>
   Text ->
   (Connection -> Task Expect.Task.Failure a) ->
   Test.Test
-test description body =
+task description body =
   Stack.withFrozenCallStack Test.task description <| do
     conn <- getTestConnection
     inTestTransaction conn body
