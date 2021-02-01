@@ -11,6 +11,7 @@ import qualified Log
 import MySQL.Query
 import NriPrelude
 import Test (Test, describe, test)
+import qualified Text
 
 tests :: Test
 tests =

@@ -9,9 +9,9 @@ TracingSpan
             { srcLocPackage = "main"
             , srcLocModule = "ObservabilitySpec"
             , srcLocFile = "test/ObservabilitySpec.hs"
-            , srcLocStartLine = 61
+            , srcLocStartLine = 66
             , srcLocStartCol = 5
-            , srcLocEndLine = 65
+            , srcLocEndLine = 70
             , srcLocEndCol = 38
             }
         )
@@ -30,37 +30,15 @@ TracingSpan
                     { srcLocPackage = "main"
                     , srcLocModule = "ObservabilitySpec"
                     , srcLocFile = "test/ObservabilitySpec.hs"
-                    , srcLocStartLine = 45
+                    , srcLocStartLine = 49
                     , srcLocStartCol = 9
-                    , srcLocEndLine = 52
+                    , srcLocEndLine = 56
                     , srcLocEndCol = 12
                     }
                 )
           , details =
               Just
-                "{\"query\":\"SELECT 1\",\"query template\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"SELECT 1\",\"connection\":\"127.0.0.1:3306/noredink_development\",\"rows returned\":1}"
-          , succeeded = Succeeded
-          , allocated = 0
-          , children = []
-          }
-      , TracingSpan
-          { name = "acquiring MySQL connection from pool"
-          , started = MonotonicTime { inMicroseconds = 0 }
-          , finished = MonotonicTime { inMicroseconds = 0 }
-          , frame =
-              Just
-                ( "doQuery"
-                , SrcLoc
-                    { srcLocPackage = "main"
-                    , srcLocModule = "ObservabilitySpec"
-                    , srcLocFile = "test/ObservabilitySpec.hs"
-                    , srcLocStartLine = 45
-                    , srcLocStartCol = 9
-                    , srcLocEndLine = 52
-                    , srcLocEndCol = 12
-                    }
-                )
-          , details = Just "{}"
+                "{\"query\":\"SELECT 1\",\"query template\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"SELECT 1\",\"connection\":\"127.0.0.1:3306/noredink_test\",\"rows returned\":1}"
           , succeeded = Succeeded
           , allocated = 0
           , children = []

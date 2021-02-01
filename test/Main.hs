@@ -5,7 +5,6 @@ where
 
 import qualified Data.Acquire as Acquire
 import qualified Environment
-import qualified MySQL
 import qualified MySQLQuerySpec
 import qualified MySQLSpec
 import NriPrelude
@@ -28,24 +27,19 @@ import qualified Prelude
 -- it's not essential as a regression test.
 main :: Prelude.IO ()
 main = do
-  mysqlSettings <- Environment.decode MySQL.decoder
   postgresSettings <- Environment.decode Postgres.decoder
   Acquire.withAcquire
-    ( do
-        mysql <- MySQL.connection mysqlSettings
-        postgres <- Postgres.connection postgresSettings
-        Prelude.pure (mysql, postgres)
-    )
+    (Postgres.connection postgresSettings)
     (run << tests)
 
-tests :: (MySQL.Connection, Postgres.Connection) -> Test
-tests (mysql, postgres) =
+tests :: Postgres.Connection -> Test
+tests postgres =
   describe
     "lib/database"
     [ PostgresSettingsSpec.tests,
       QueryParserSpec.tests,
       TimeSpec.tests,
       MySQLQuerySpec.tests,
-      ObservabilitySpec.tests mysql postgres,
-      MySQLSpec.tests mysql
+      ObservabilitySpec.tests postgres,
+      MySQLSpec.tests
     ]

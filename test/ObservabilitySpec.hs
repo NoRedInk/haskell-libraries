@@ -8,13 +8,16 @@ where
 import qualified Control.Concurrent.MVar as MVar
 import qualified Debug
 import qualified Expect
+import qualified Expect.Task
 import qualified Maybe
 import qualified MySQL
+import qualified MySQL.Test
 import NriPrelude
 import qualified Platform
 import qualified Postgres
 import qualified Task
-import Test (Test, describe, test)
+import Test (Test, describe)
+import qualified Test
 import qualified Prelude
 
 -- | Note: the tests below pretty easily break because of code movemenents in
@@ -26,11 +29,11 @@ import qualified Prelude
 -- the tests again. That will regenerate the expectation files. Then check the
 -- diff of the new file to make sure it's only line numbers that changed, not
 -- something more significant such as the module name of the stack trace.
-tests :: MySQL.Connection -> Postgres.Connection -> Test
-tests mysql postgres =
+tests :: Postgres.Connection -> Test
+tests postgres =
   describe
     "ObservabilitySpec"
-    [ test "Postgres queries report the span data we expect" <| \_ ->
+    [ Test.task "Postgres queries report the span data we expect" <| do
         Postgres.doQuery
           postgres
           [Postgres.sql|!SELECT 1|]
@@ -40,8 +43,9 @@ tests mysql postgres =
                 Ok (_ :: [Int]) -> Task.succeed ()
           )
           |> spanForTask
-          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-postgres-reporting"),
-      test "MySQL queries report the span data we expect" <| \_ ->
+          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-postgres-reporting")
+          |> Expect.Task.check,
+      MySQL.Test.task "MySQL queries report the span data we expect" <| \mysql ->
         MySQL.doQuery
           mysql
           [MySQL.sql|!SELECT 1|]
@@ -52,6 +56,7 @@ tests mysql postgres =
           )
           |> spanForTask
           |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-mysql-reporting")
+          |> Expect.Task.check
     ]
 
 spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan

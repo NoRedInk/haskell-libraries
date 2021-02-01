@@ -12,21 +12,21 @@ import qualified Expect.Task
 import qualified Log
 import qualified MySQL
 import MySQL.Query (Query (..))
+import qualified MySQL.Test
 import NriPrelude
 import qualified Task
 import Test (Test, describe, test)
-import qualified Test
 import qualified Text
 import qualified Prelude
 
-tests :: MySQL.Connection -> Test
-tests mysqlConn =
+tests :: Test
+tests =
   describe
     "MySQL"
     [ unsafeBulkifyInsertsTests,
       onDuplicateDoNothingTests,
-      queriesWithQuestionMarks mysqlConn,
-      exceptionTests mysqlConn
+      queriesWithQuestionMarks,
+      exceptionTests
     ]
 
 unsafeBulkifyInsertsTests :: Test
@@ -44,53 +44,49 @@ unsafeBulkifyInsertsTests =
           |> Expect.equal "INSERT INTO foos (id, bars, bazs) valUES (1,2,3), (4,5,6)"
     ]
 
-queriesWithQuestionMarks :: MySQL.Connection -> Test
-queriesWithQuestionMarks mysqlConn =
+queriesWithQuestionMarks :: Test
+queriesWithQuestionMarks =
   describe
     "queries with question marks don't fail"
-    [ Test.task "inserts and selects"
-        <| MySQL.inTestTransaction mysqlConn
-        <| \conn -> do
-          let x = "?" :: Text
-          (_ :: Int) <-
-            MySQL.doQuery
-              conn
-              [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES (${x}, 5)|]
-              resultToTask
+    [ MySQL.Test.task "inserts and selects" <| \conn -> do
+        let x = "?" :: Text
+        (_ :: Int) <-
           MySQL.doQuery
             conn
-            [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = ${x}|]
+            [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES (${x}, 5)|]
             resultToTask
-            |> Expect.Task.andCheck (Expect.equal [("?", 5) :: (Text, Int)])
+        MySQL.doQuery
+          conn
+          [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = ${x}|]
+          resultToTask
+          |> Expect.Task.andCheck (Expect.equal [("?", 5) :: (Text, Int)])
     ]
 
-exceptionTests :: MySQL.Connection -> Test
-exceptionTests mysqlConn =
+exceptionTests :: Test
+exceptionTests =
   describe
     "exceptions"
-    [ Test.task "dupplicate key errors have groupable error messages"
-        <| MySQL.inTestTransaction mysqlConn
-        <| \conn -> do
-          (_ :: Int) <-
-            MySQL.doQuery
-              conn
-              ( [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
-                  -- If this topic already exists that's fine for the purpose of
-                  -- this test. Don't fail on that.
-                  |> MySQL.onDuplicateDoNothing
-              )
-              resultToTask
+    [ MySQL.Test.task "dupplicate key errors have groupable error messages" <| \conn -> do
+        (_ :: Int) <-
           MySQL.doQuery
             conn
-            [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
-            ( \res ->
-                case res of
-                  Err err -> Task.succeed err
-                  Ok (_ :: Int) -> Expect.Task.fails ("Expected an error, but none was returned." :: Text)
+            ( [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+                -- If this topic already exists that's fine for the purpose of
+                -- this test. Don't fail on that.
+                |> MySQL.onDuplicateDoNothing
             )
-            |> Expect.Task.andCheck
-              ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Exception.displayException
-              )
+            resultToTask
+        MySQL.doQuery
+          conn
+          [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+          ( \res ->
+              case res of
+                Err err -> Task.succeed err
+                Ok (_ :: Int) -> Expect.Task.fails ("Expected an error, but none was returned." :: Text)
+          )
+          |> Expect.Task.andCheck
+            ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Exception.displayException
+            )
     ]
 
 resultToTask :: Prelude.Show e => Result e a -> Task Expect.Task.Failure a
