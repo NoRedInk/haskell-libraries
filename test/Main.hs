@@ -6,7 +6,6 @@ where
 import qualified Data.Acquire as Acquire
 import qualified Environment
 import qualified MySQL
-import qualified MySQLInternalSpec
 import qualified MySQLQuerySpec
 import qualified MySQLSpec
 import NriPrelude
@@ -44,7 +43,6 @@ tests (mysql, postgres) =
   describe
     "lib/database"
     [ PostgresSettingsSpec.tests,
-      MySQLInternalSpec.tests,
       QueryParserSpec.tests,
       TimeSpec.tests,
       MySQLQuerySpec.tests,

@@ -39,7 +39,7 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import qualified Log
-import MySQL.Internal (inToAny)
+import MySQL.Query (inToAny)
 import NriPrelude
 import qualified Platform
 import qualified Postgres.Settings

@@ -10,10 +10,13 @@ module MySQL.Query
     Info (..),
     ConnectionInfo (..),
     mkInfo,
+    anyToIn,
+    inToAny,
   )
 where
 
 import qualified Control.Exception.Safe as Exception
+import qualified Control.Lens as Lens
 import qualified Data.Aeson as Aeson
 import qualified Data.Proxy as Proxy
 import qualified Data.Text
@@ -25,6 +28,7 @@ import Database.PostgreSQL.Typed.Array ()
 import qualified Database.PostgreSQL.Typed.Query as PGTyped.Query
 import qualified Database.PostgreSQL.Typed.SQLToken as SQLToken
 import qualified Environment
+import qualified Internal.CaselessRegex as R
 import Internal.Instances ()
 import qualified Internal.QueryParser as Parser
 import qualified Language.Haskell.Meta.Parse as Parse
@@ -32,7 +36,6 @@ import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
-import qualified MySQL.Internal as Internal
 import qualified MySQL.MySQLParameter as MySQLParameter
 import NriPrelude
 import qualified Platform
@@ -74,7 +77,7 @@ qqSQL queryWithPgTypedFlags = do
   -- function running against the query string at compile time.
   let forCompilation =
         Data.Text.pack queryWithPgTypedFlags
-          |> Internal.inToAny
+          |> inToAny
           |> Data.Text.unpack
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
   let query =
@@ -286,3 +289,44 @@ type DatabaseName = Text
 connectionToText :: ConnectionInfo -> Text
 connectionToText (TcpSocket host port db) = host ++ ":" ++ port ++ "/" ++ db
 connectionToText (UnixSocket path db) = path ++ ":" ++ db
+
+-- | MySQL doesn't support `= ANY`, we can use `IN` during compilation.
+inToAny :: Text -> Text
+inToAny =
+  Lens.set
+    ( [R.caselessRegex|\b(in)\s+\(\${.*}\)|] << R.group 0
+    --                ^^      ^^^^^^^^
+    -- "...where id   IN      (${ids})  ..."
+    -- Matches       "IN"
+    )
+    -- Replace `IN` with `= ANY`
+    "= ANY"
+
+-- | MySQL doesn't support `= ANY`, we can use `IN` when running the query.
+anyToIn :: Text -> Text
+anyToIn =
+  Lens.over
+    ( [R.caselessRegex|(\s+[^\s-]+\s+)(=\s*any)\s*\(\s*('{.*}')\s*\)|] << R.groups
+    --             ^^^^^^^^^    ^^^^^^^^^^^^
+    -- "...where id  = ANY      ('{1,2,3,4}')  ..."
+    -- Matches ["id", "= ANY",  "'{1,2,3,4}'"]
+    )
+    replaceAny
+  where
+    -- Replace matched groups with SQL that MySQL understands.
+    -- Example groupes from regex:
+    --   Groups:    ["id", "= ANY", "'{1,2,3,4}'"]
+    --   Converted: ["id", "IN", "1,2,3,4"]
+    replaceAny :: [Text] -> [Text]
+    replaceAny groups =
+      case groups of
+        [field, _, "'{}'"] ->
+          [field, "!=", field]
+        [field, _, elems] ->
+          [ field,
+            "IN",
+            elems
+              |> Text.dropLeft 2 -- '{
+              |> Text.dropRight 2 -- }'
+          ]
+        _ -> groups -- Didn't match the right groups.

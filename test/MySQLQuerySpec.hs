@@ -15,6 +15,16 @@ import Test (Test, describe, test)
 tests :: Test
 tests =
   describe
+    "MySQL.Query"
+    [ anyToInTests,
+      inToAnyTests,
+      emptyAnyTests,
+      sqlTests
+    ]
+
+sqlTests :: Test
+sqlTests =
+  describe
     "MySQL.sql"
     [ test "removes monolith. prefixes from table names" <| \_ ->
         [sql|SELECT id FROM monolith.users|]
@@ -87,5 +97,100 @@ tests =
                   queriedRelation = "users"
                 } ::
                 Query Int
+            )
+    ]
+
+queryInFixValues :: Text
+queryInFixValues =
+  Text.join
+    "\n"
+    [ "SELECT hat FROM royalty",
+      "WHERE hat IN (\"crown\", \"fedora\", \"cap\");"
+    ]
+
+anyToInTests :: Test
+anyToInTests =
+  describe
+    "anyToIn"
+    [ test "Replaces ANY query with IN query" <| \_ ->
+        [ "SELECT hat FROM royalty",
+          "WHERE hat = ANY ('{\"crown\", \"fedora\", \"cap\"}');"
+        ]
+          |> Text.join "\n"
+          |> anyToIn
+          |> Expect.equal queryInFixValues
+    ]
+
+inToAnyTests :: Test
+inToAnyTests =
+  describe
+    "inToAny"
+    [ test "DON'T replaces IN with fix values." <| \_ ->
+        queryInFixValues
+          |> inToAny
+          |> Expect.equal queryInFixValues,
+      test "Replaces IN query with ANY query" <| \_ ->
+        Text.join
+          "\n"
+          [ "SELECT hat FROM royalty",
+            "WHERE hat IN (${ids});"
+          ]
+          |> inToAny
+          |> Expect.equal
+            ( Text.join
+                "\n"
+                [ "SELECT hat FROM royalty",
+                  "WHERE hat = ANY (${ids});"
+                ]
+            ),
+      test "Multiple INs" <| \_ ->
+        Text.join
+          "\n"
+          [ "SELECT hat FROM royalty",
+            "WHERE hat IN (${ids})",
+            "AND hat IN (${hats});"
+          ]
+          |> inToAny
+          |> Expect.equal
+            ( Text.join
+                "\n"
+                [ "SELECT hat FROM royalty",
+                  "WHERE hat = ANY (${ids})",
+                  "AND hat = ANY (${hats});"
+                ]
+            ),
+      test "Select in brackets" <| \_ ->
+        let subQuery =
+              [ "DELETE FROM content_creation.seeds as seeds",
+                "WHERE seeds.submitted = 'draft'",
+                "AND seeds.id IN (",
+                "SELECT DISTINCT ON(seeds.public_id) seeds.id",
+                "FROM content_creation.seeds as seeds",
+                "WHERE seeds.public_id = ${publicId}",
+                "ORDER BY seeds.public_id, seeds.created_at DESC",
+                ")"
+              ]
+                |> Text.join "\n"
+         in subQuery
+              |> inToAny
+              |> Expect.equal subQuery
+    ]
+
+emptyAnyTests :: Test
+emptyAnyTests =
+  describe
+    "emptyAnyTests"
+    [ test "Replaces ANY with no elements with a predicate that is always false" <| \_ ->
+        [ "SELECT hat FROM royalty",
+          "WHERE hat = ANY ('{}');"
+        ]
+          |> Text.join "\n"
+          |> anyToIn
+          |> Expect.equal
+            ( Text.join
+                "\n"
+                [ "SELECT hat FROM royalty",
+                  "WHERE hat != ( hat );"
+                ]
             )
     ]
