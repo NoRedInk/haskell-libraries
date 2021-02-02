@@ -30,11 +30,13 @@ import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
+import qualified Data.Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Environment
 import qualified Http
 import qualified List
 import qualified Log
+import qualified Network.HostName
 import NriPrelude
 import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
@@ -69,7 +71,14 @@ report handler' requestId span = do
         Prelude.pure (roll > fractionOfSuccessRequestsLogged', round (1 / fractionOfSuccessRequestsLogged'))
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
-  let commonFields = CommonFields (handler_timer handler') (handler_serviceName handler') (handler_environment handler') requestId
+  hostname' <- Network.HostName.getHostName
+  let commonFields =
+        CommonFields
+          (handler_timer handler')
+          (handler_serviceName handler')
+          (handler_environment handler')
+          requestId
+          (Data.Text.pack hostname')
   let (_, spans) = toBatchEvents commonFields sampleRate Nothing 0 span
   let body = Http.jsonBody spans
   silentHandler' <- Platform.silentHandler
@@ -105,6 +114,7 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
             environment = common_environment commonFields,
             durationMs = Prelude.fromIntegral duration / 1000,
             allocatedBytes = Platform.allocated span,
+            hostname = common_hostname commonFields,
             details = Platform.details span
           }
   ( lastSpanIndex,
@@ -137,7 +147,8 @@ data CommonFields = CommonFields
   { common_timer :: Timer,
     common_serviceName :: Text,
     common_environment :: Text,
-    common_requestId :: Text
+    common_requestId :: Text,
+    common_hostname :: Text
   }
 
 data Span = Span
@@ -149,6 +160,7 @@ data Span = Span
     environment :: Text,
     durationMs :: Float,
     allocatedBytes :: Int,
+    hostname :: Text,
     details :: Maybe Platform.SomeTracingSpanDetails
   }
   deriving (Generic)
