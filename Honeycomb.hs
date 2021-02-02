@@ -36,6 +36,8 @@ import qualified Environment
 import qualified Http
 import qualified List
 import qualified Log
+import qualified Maybe
+import qualified Monitoring
 import qualified Network.HostName
 import NriPrelude
 import Observability.Helpers (toHashMap)
@@ -66,9 +68,7 @@ report handler' requestId span = do
   (skipLogging, sampleRate) <-
     case Platform.succeeded span of
       Platform.Succeeded -> do
-        roll <- Random.randomRIO (0, 1)
-        let fractionOfSuccessRequestsLogged' = handler_fractionOfSuccessRequestsLogged handler'
-        Prelude.pure (roll > fractionOfSuccessRequestsLogged', round (1 / fractionOfSuccessRequestsLogged'))
+        deriveSampleRate span (handler_fractionOfSuccessRequestsLogged handler')
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
   hostname' <- Network.HostName.getHostName
@@ -97,6 +97,35 @@ report handler' requestId span = do
     |> Task.attempt silentHandler'
     |> map (\_ -> ())
     |> unless skipLogging
+
+deriveSampleRate :: Platform.TracingSpan -> Float -> Prelude.IO (Bool, Int)
+deriveSampleRate rootSpan fractionOfSuccessRequestsLogged' = do
+  let maybeEndpoint =
+        Platform.details rootSpan
+          |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
+  let isNonAppEndpoint =
+        case maybeEndpoint of
+          Nothing -> False
+          Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
+  let probability =
+        if isNonAppEndpoint
+          -- We have 2678400 seconds in a month
+          -- We health-check once per second per Pod in Haskell
+          -- We have 2-3 pods at idle per service
+          -- We have some 5 services
+          -- We have up to 4 environments (staging, prod, demo, backyard)
+          --
+          -- Healthchecks would be 107,136,000 / sampleRate traces per month
+          --
+          -- But we also don't wanna never log them, who knows, they might cause
+          -- problems
+          --
+          -- High sample rates might make honeycomb make ridiculous assumptions
+          -- about the actual request rate tho. Adjust if that's the case.
+          then 1 / 500
+          else fractionOfSuccessRequestsLogged'
+  roll <- Random.randomRIO (0, 1)
+  Prelude.pure (roll > probability, round (1 / probability))
 
 toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
