@@ -147,6 +147,10 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
   let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration = Platform.finished span - Platform.started span |> Platform.inMicroseconds
   let timestamp = toISO8601 (common_timer commonFields) (Platform.started span)
+  let isError = case Platform.succeeded span of
+        Platform.Succeeded -> False
+        Platform.Failed -> True
+        Platform.FailedWith _ -> True
   let hcSpan =
         Span
           { name = Platform.name span,
@@ -158,6 +162,7 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
             durationMs = Prelude.fromIntegral duration / 1000,
             allocatedBytes = Platform.allocated span,
             hostname = common_hostname commonFields,
+            failed = isError,
             enrichedData = [],
             details = Platform.details span
           }
@@ -248,6 +253,7 @@ data Span = Span
     durationMs :: Float,
     allocatedBytes :: Int,
     hostname :: Text,
+    failed :: Bool,
     enrichedData :: [(Text, Text)],
     details :: Maybe Platform.SomeTracingSpanDetails
   }
@@ -266,7 +272,8 @@ instance Aeson.ToJSON Span where
             "service_name" .= serviceName span,
             "duration_ms" .= durationMs span,
             "allocated_bytes" .= allocatedBytes span,
-            "hostname" .= hostname span
+            "hostname" .= hostname span,
+            "failed" .= failed span
           ]
         detailsPairs =
           span
