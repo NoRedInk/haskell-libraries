@@ -1,9 +1,8 @@
 {-# LANGUAGE GADTs #-}
 
 module Redis.Mock
-  ( mkHandler,
+  ( handler,
     handlerIO,
-    MkHandler,
   )
 where
 
@@ -18,33 +17,24 @@ import qualified List
 import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
-import qualified Result
+import qualified System.IO.Unsafe
 import qualified Text
 import qualified Tuple
 import Prelude (IO, pure)
 import qualified Prelude
 
-type MkHandler = Task Never Internal.Handler
-
 -- | This functions returns a task that you can run in each test to retrieve a
 -- fresh mock handler
-mkHandler :: Text -> IO MkHandler
-mkHandler namespace = do
-  anything <- Platform.doAnythingHandler
-  handler anything namespace
-    |> map Result.Ok
-    |> Platform.doAnything anything
-    |> Prelude.pure
+handler :: Task e Internal.Handler
+handler =
+  handlerIO
+    |> map Ok
+    |> Platform.doAnything testDoAnything
 
--- | It's better to use mkHandler and create a new mock handler for each test.
+-- | It's better to use handler and create a new mock handler for each test.
 -- Tests run in parallel which means that they all share the same hashmap.
-handlerIO :: Text -> Prelude.IO Internal.Handler
-handlerIO namespace = do
-  anything <- Platform.doAnythingHandler
-  handler anything namespace
-
-handler :: Platform.DoAnythingHandler -> Text -> IO Internal.Handler
-handler anything namespace = do
+handlerIO :: IO Internal.Handler
+handlerIO = do
   modelRef <- init
   Internal.Handler
     { Internal.doQuery = \query ->
@@ -56,7 +46,7 @@ handler anything namespace = do
                     res
                   )
           )
-          |> Platform.doAnything anything,
+          |> Platform.doAnything testDoAnything,
       Internal.doTransaction = \query ->
         atomicModifyIORef'
           modelRef
@@ -69,7 +59,7 @@ handler anything namespace = do
                     res
                   )
           )
-          |> Platform.doAnything anything,
+          |> Platform.doAnything testDoAnything,
       Internal.doWatch = \keys ->
         atomicModifyIORef'
           modelRef
@@ -78,8 +68,8 @@ handler anything namespace = do
                 Ok ()
               )
           )
-          |> Platform.doAnything anything,
-      Internal.namespace = namespace
+          |> Platform.doAnything testDoAnything,
+      Internal.namespace = "tests"
     }
     |> Prelude.pure
 
@@ -381,3 +371,10 @@ doQuery query hm =
 
 wrongTypeErr :: Internal.Error
 wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"
+
+-- | Creates a unpacked `DoAnythingHandler`, allowing us to use it without
+-- to turn `IO` into `Task` types without needing to pass it in as an argument,
+-- in the context of this test helper.
+{-# NOINLINE testDoAnything #-}
+testDoAnything :: Platform.DoAnythingHandler
+testDoAnything = System.IO.Unsafe.unsafePerformIO Platform.doAnythingHandler
