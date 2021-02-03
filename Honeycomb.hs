@@ -11,7 +11,6 @@
 -- * Enriches child spans with data to help track problems
 --   * Server (Pod, in k8s' case) hostname
 --   * Http endpoint
---
 module Observability.Honeycomb
   ( report,
     handler,
