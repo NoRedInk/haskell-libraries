@@ -109,6 +109,7 @@ deriveSampleRate rootSpan fractionOfSuccessRequestsLogged' = do
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
   let probability =
         if isNonAppEndpoint
+          then --
           -- We have 2678400 seconds in a month
           -- We health-check once per second per Pod in Haskell
           -- We have 2-3 pods at idle per service
@@ -122,7 +123,7 @@ deriveSampleRate rootSpan fractionOfSuccessRequestsLogged' = do
           --
           -- High sample rates might make honeycomb make ridiculous assumptions
           -- about the actual request rate tho. Adjust if that's the case.
-          then 1 / 500
+            1 / 500
           else fractionOfSuccessRequestsLogged'
   roll <- Random.randomRIO (0, 1)
   Prelude.pure (roll > probability, round (1 / probability))
