@@ -83,7 +83,7 @@ report handler' requestId span = do
           requestId
           (Data.Text.pack hostname')
   let (_, events) = toBatchEvents commonFields sampleRate Nothing 0 span
-  let enrichedEvents = enrich events (getRootSpanEndpoint span)
+  let enrichedEvents = enrich events
   let body = Http.jsonBody enrichedEvents
   silentHandler' <- Platform.silentHandler
   let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
@@ -105,6 +105,13 @@ report handler' requestId span = do
 getRootSpanEndpoint :: Platform.TracingSpan -> Maybe Text
 getRootSpanEndpoint rootSpan =
   Platform.details rootSpan
+    |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
+
+getBatchEventEndpoint :: BatchEvent -> Maybe Text
+getBatchEventEndpoint event =
+  event
+    |> batchevent_data
+    |> details
     |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
 
 deriveSampleRate :: Platform.TracingSpan -> Float -> Prelude.IO (Bool, Int)
@@ -163,14 +170,15 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
     List.concat children
     )
 
-enrich :: [BatchEvent] -> Maybe Text -> [BatchEvent]
-enrich [] _ = []
-enrich [x] _ = [x]
+enrich :: [BatchEvent] -> [BatchEvent]
+enrich [] = []
+enrich [x] = [x]
 -- Ensure we have a root and a rest to enrich
-enrich (root : rest) maybeEndpoint =
-  -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
-  -- with the root's endpoint
-  let crunch x (acc, xs) =
+enrich (root : rest) =
+  let maybeEndpoint = getBatchEventEndpoint root
+      -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
+      -- with the root's endpoint
+      crunch x (acc, xs) =
         let duration = x |> batchevent_data |> durationMs
             updateFn (Just durations) = Just (duration : durations)
             updateFn Nothing = Just [duration]
