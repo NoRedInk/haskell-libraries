@@ -1,17 +1,17 @@
--- | Reporting to a file.
+-- | Honeycomb
 --
--- This reporter logs debugging information about completed requests to a file
--- or `stdout` (in that case, pass in `/dev/stdout` as the file to log to).
+-- This reporter logs execution to https://honeycomb.io.
 --
--- Every line this reporter logs is a JSON string. This 'structured logging'
--- output is optimized for external logging platforms that display these logs in
--- a pretty UI.
+-- It does some custom stuff compared to other reporters:
 --
--- This logger supports sampling of successful requests, to help us save money.
+-- * Sample requests based on
+--   * Response type
+--   * Endpoint (log fewer healthchecks)
+-- * Calculates statistics over child spans per type
+-- * Enriches child spans with data to help track problems
+--   * Server (Pod, in k8s' case) hostname
+--   * Http endpoint
 --
--- This reporter is based on Katip for historical reasons. Katip used to run all
--- of what is now called 'reporting' in our apps, not it's just the file logger.
--- We maybe be able to remove it entirely at this point.
 module Observability.Honeycomb
   ( report,
     handler,
