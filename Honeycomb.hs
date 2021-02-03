@@ -79,8 +79,9 @@ report handler' requestId span = do
           (handler_environment handler')
           requestId
           (Data.Text.pack hostname')
-  let (_, spans) = toBatchEvents commonFields sampleRate Nothing 0 span
-  let body = Http.jsonBody spans
+  let (_, events) = toBatchEvents commonFields sampleRate Nothing 0 span
+  let enrichedEvents = enrich events (getRootSpanEndpoint span)
+  let body = Http.jsonBody enrichedEvents
   silentHandler' <- Platform.silentHandler
   let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
   let url = batchApiEndpoint datasetName
@@ -147,6 +148,7 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
             durationMs = Prelude.fromIntegral duration / 1000,
             allocatedBytes = Platform.allocated span,
             hostname = common_hostname commonFields,
+            enrichedData = [],
             details = Platform.details span
           }
   ( lastSpanIndex,
@@ -157,6 +159,48 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
       } :
     List.concat children
     )
+
+enrich :: [BatchEvent] -> Maybe Text -> [BatchEvent]
+enrich [] _ = []
+enrich [x] _ = [x]
+-- Ensure we have a root and a rest to enrich
+enrich (root : rest) maybeEndpoint =
+  -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
+  -- with the root's endpoint
+  let crunch x (acc, xs) =
+        let duration = x |> batchevent_data |> durationMs
+            updateFn (Just durations) = Just (duration : durations)
+            updateFn Nothing = Just [duration]
+            span = batchevent_data x
+            key = name span
+            acc' = HashMap.alter updateFn key acc
+            x' = case maybeEndpoint of
+              Just endpoint ->
+                x
+                  { batchevent_data =
+                      span
+                        { enrichedData =
+                            ("details.endpoint", endpoint) : enrichedData span
+                        }
+                  }
+              Nothing -> x
+         in (acc', x' : xs)
+      -- chose foldr to preserve order, not super important tho
+      (durationsByName, newRest) = List.foldr crunch (HashMap.empty, []) rest
+      stats (name, durations) =
+        let total = List.sum durations
+            calls = List.length durations
+            average = total / Prelude.fromIntegral calls
+            saneName = name |> NriText.toLower |> NriText.replace " " "_"
+         in [ ("stats.total_time_ms." ++ saneName, NriText.fromFloat total),
+              ("stats.average_time_ms." ++ saneName, NriText.fromFloat average),
+              ("stats.count." ++ saneName, NriText.fromInt calls)
+            ]
+      perSpanNameStats = List.concatMap stats (HashMap.toList durationsByName)
+      rootSpan = batchevent_data root
+      rootSpanWithStats = rootSpan {enrichedData = perSpanNameStats}
+      newRoot = root {batchevent_data = rootSpanWithStats}
+   in newRoot : newRest
 
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
@@ -193,6 +237,7 @@ data Span = Span
     durationMs :: Float,
     allocatedBytes :: Int,
     hostname :: Text,
+    enrichedData :: [(Text, Text)],
     details :: Maybe Platform.SomeTracingSpanDetails
   }
   deriving (Generic)
@@ -218,7 +263,8 @@ instance Aeson.ToJSON Span where
             |> toHashMap
             |> HashMap.mapWithKey (\key value -> ("details." ++ key) .= value)
             |> HashMap.elems
-     in Aeson.object (basePairs ++ detailsPairs)
+        enrichedData' = map (\(key, value) -> key .= value) (enrichedData span)
+     in Aeson.object (basePairs ++ detailsPairs ++ enrichedData')
 
 newtype SpanId = SpanId Text
   deriving (Aeson.ToJSON)
