@@ -209,7 +209,8 @@ instance Aeson.ToJSON Span where
             "trace.trace_id" .= traceId span,
             "service_name" .= serviceName span,
             "duration_ms" .= durationMs span,
-            "allocated_bytes" .= allocatedBytes span
+            "allocated_bytes" .= allocatedBytes span,
+            "hostname" .= hostname span
           ]
         detailsPairs =
           span
