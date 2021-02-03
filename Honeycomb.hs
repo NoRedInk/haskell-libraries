@@ -21,6 +21,8 @@ module Observability.Honeycomb
     -- for tests
     toBatchEvents,
     CommonFields (..),
+    BatchEvent (..),
+    Span (..),
   )
 where
 
