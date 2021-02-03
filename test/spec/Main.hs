@@ -212,18 +212,15 @@ getRedisHandlers :: Settings.Settings -> Conduit.Acquire [(Text, Handler)]
 getRedisHandlers settings = do
   let realHandler = Real.handler "tests" settings
   log <- Conduit.liftIO Platform.silentHandler
-  mockHandlerMaker <- Conduit.liftIO <| Mock.mkHandler "tests"
-  let mockHandler =
-        Task.perform log mockHandlerMaker
-          |> Conduit.liftIO
+  mockHandler <- Conduit.liftIO <| Mock.handlerIO
   redisAvailable <-
     Conduit.withAcquire realHandler (\h -> query h (get api "foo") |> Task.attempt log)
       |> NriPrelude.map (\_ -> True)
       |> Exception.handleAny (\_ -> pure False)
       |> Conduit.liftIO
   if redisAvailable
-    then NriPrelude.map2 (\real mock -> [("Real", real), ("Mock", mock)]) realHandler mockHandler
-    else NriPrelude.map (\mock -> [("Mock", mock)]) mockHandler
+    then NriPrelude.map2 (\real mock -> [("Real", real), ("Mock", mock)]) realHandler (pure mockHandler)
+    else NriPrelude.map (\mock -> [("Mock", mock)]) (pure mockHandler)
 
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
