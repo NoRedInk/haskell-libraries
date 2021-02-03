@@ -20,6 +20,7 @@ module Observability.Honeycomb
     decoder,
     -- for tests
     toBatchEvents,
+    enrich,
     CommonFields (..),
     BatchEvent (..),
     Span (..),
