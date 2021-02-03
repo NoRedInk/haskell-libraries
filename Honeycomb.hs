@@ -98,13 +98,15 @@ report handler' requestId span = do
     |> map (\_ -> ())
     |> unless skipLogging
 
+getRootSpanEndpoint :: Platform.TracingSpan -> Maybe Text
+getRootSpanEndpoint rootSpan =
+  Platform.details rootSpan
+    |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
+
 deriveSampleRate :: Platform.TracingSpan -> Float -> Prelude.IO (Bool, Int)
 deriveSampleRate rootSpan fractionOfSuccessRequestsLogged' = do
-  let maybeEndpoint =
-        Platform.details rootSpan
-          |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
   let isNonAppEndpoint =
-        case maybeEndpoint of
+        case getRootSpanEndpoint rootSpan of
           Nothing -> False
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
   let probability =
