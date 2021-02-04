@@ -2,7 +2,6 @@ module Main (main) where
 
 import qualified Conduit
 import qualified Control.Concurrent.MVar as MVar
-import qualified Control.Exception.Safe as Exception
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Debug
 import qualified Dict
@@ -31,19 +30,9 @@ tests :: TestHandlers -> Test.Test
 tests TestHandlers {realHandler, mockHandler} =
   Test.describe
     "Redis Library"
-    [ Test.describe "using mock handler" (queryTests mockHandler),
-      Test.describe
-        "using real handler"
-        ( case realHandler of
-            Nothing -> [] -- No real redis running, so we skip these tests
-            Just real -> queryTests real
-        ),
-      Test.describe
-        "observability tests"
-        ( case realHandler of
-            Nothing -> [] -- No real redis running, so we skip these tests
-            Just real -> observabilityTests real
-        )
+    [ Test.describe "query tests using mock handler" (queryTests mockHandler),
+      Test.describe "query tests using real handler" (queryTests realHandler),
+      Test.describe "observability tests" (observabilityTests realHandler)
     ]
 
 observabilityTests :: Redis.Handler -> List Test.Test
@@ -266,23 +255,15 @@ queryTests redisHandler =
 
 data TestHandlers = TestHandlers
   { mockHandler :: Redis.Handler,
-    realHandler :: Maybe Redis.Handler
+    realHandler :: Redis.Handler
   }
 
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
   let realHandler = Real.handler "tests" settings {Settings.defaultExpiry = Settings.ExpireKeysAfterSeconds 1}
-  log <- Conduit.liftIO Platform.silentHandler
   mockHandler <- Conduit.liftIO <| Mock.handlerIO
-  redisAvailable <-
-    Conduit.withAcquire realHandler (\h -> Redis.query h (Redis.get api "foo") |> Task.attempt log)
-      |> NriPrelude.map (\_ -> True)
-      |> Exception.handleAny (\_ -> Prelude.pure False)
-      |> Conduit.liftIO
-  if redisAvailable
-    then NriPrelude.map (TestHandlers mockHandler << Just) realHandler
-    else Prelude.pure (TestHandlers mockHandler Nothing)
+  NriPrelude.map (TestHandlers mockHandler) realHandler
 
 addNamespace :: Text -> Redis.Handler -> Redis.Handler
 addNamespace namespace handler' =

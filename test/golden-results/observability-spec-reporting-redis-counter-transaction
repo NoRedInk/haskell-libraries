@@ -9,9 +9,9 @@ TracingSpan
             { srcLocPackage = "main"
             , srcLocModule = "Main"
             , srcLocFile = "test/spec/Main.hs"
-            , srcLocStartLine = 310
+            , srcLocStartLine = 291
             , srcLocStartCol = 5
-            , srcLocEndLine = 314
+            , srcLocEndLine = 295
             , srcLocEndCol = 38
             }
         )
@@ -30,9 +30,9 @@ TracingSpan
                     { srcLocPackage = "main"
                     , srcLocModule = "Main"
                     , srcLocFile = "test/spec/Main.hs"
-                    , srcLocStartLine = 94
+                    , srcLocStartLine = 83
                     , srcLocStartCol = 7
-                    , srcLocEndLine = 94
+                    , srcLocEndLine = 83
                     , srcLocEndCol = 72
                     }
                 )
