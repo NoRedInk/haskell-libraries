@@ -35,6 +35,14 @@ tests TestHandlers {realHandler, mockHandler} =
       Test.describe "observability tests" (observabilityTests realHandler)
     ]
 
+-- We want to test all of our potential makeApi alternatives because it's easy
+-- to break. Right now they all share code but if we change that, we would
+-- break the observability usability without noticing.
+--
+-- All the `srcLocFile` fields in the golden result files should contain the
+-- value "test/Main.hs". If it points to one of the src files of the redis
+-- library it means stack frames for redis query in bugsnag, newrelic, etc will
+-- not point to the application code making the query!
 observabilityTests :: Redis.Handler -> List Test.Test
 observabilityTests handler =
   [ Test.task "Redis.query reports the span data we expect" <| do
