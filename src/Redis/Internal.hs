@@ -11,6 +11,7 @@ import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
+import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude hiding (map, map2)
 import qualified Set
@@ -135,32 +136,32 @@ sequence =
   List.foldr (map2 (:)) (Pure [])
 
 data Handler = Handler
-  { doQuery :: forall a. Query a -> Task Error a,
-    doTransaction :: forall a. Query a -> Task Error a,
+  { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
+    doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doWatch :: [Text] -> Task Error (),
     namespace :: Text
   }
 
 -- | Run a redis Query.
-query :: Handler -> Query a -> Task Error a
+query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
-    |> doQuery handler
+    |> Stack.withFrozenCallStack doQuery handler
 
 timeoutAfterMilliseconds :: Float -> Handler -> Handler
 timeoutAfterMilliseconds milliseconds handler =
   handler
-    { doQuery = doQuery handler >> Task.timeout milliseconds TimeoutError,
-      doTransaction = doTransaction handler >> Task.timeout milliseconds TimeoutError
+    { doQuery = Stack.withFrozenCallStack doQuery handler >> Task.timeout milliseconds TimeoutError,
+      doTransaction = Stack.withFrozenCallStack doTransaction handler >> Task.timeout milliseconds TimeoutError
     }
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
 -- requests won't be able change values in between.
-transaction :: Handler -> Query a -> Task Error a
+transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
-    |> doTransaction handler
+    |> Stack.withFrozenCallStack doTransaction handler
 
 -- Runs the redis `WATCH` command. This isn't one of the `Query`
 -- constructors because we're not able to run `WATCH` in a transaction,
@@ -200,15 +201,15 @@ namespaceQuery prefix query' =
 
 defaultExpiryKeysAfterSeconds :: Int -> Handler -> Handler
 defaultExpiryKeysAfterSeconds secs handler =
-  let doQuery :: Query a -> Task Error a
+  let doQuery :: Stack.HasCallStack => Query a -> Task Error a
       doQuery query' =
         keysTouchedByQuery query'
           |> Set.toList
           |> List.map (\key -> Expire key secs)
           |> sequence
           |> map2 (\res _ -> res) query'
-          |> doTransaction handler
-   in handler {doQuery = doQuery, doTransaction = doQuery}
+          |> Stack.withFrozenCallStack doTransaction handler
+   in handler {doQuery = Stack.withFrozenCallStack doQuery, doTransaction = Stack.withFrozenCallStack doQuery}
 
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =

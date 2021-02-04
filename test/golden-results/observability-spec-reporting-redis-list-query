@@ -25,15 +25,15 @@ TracingSpan
           , finished = MonotonicTime { inMicroseconds = 0 }
           , frame =
               Just
-                ( "tracingSpan"
+                ( "query"
                 , SrcLoc
                     { srcLocPackage = "main"
-                    , srcLocModule = "Redis.Real"
-                    , srcLocFile = "src/Redis/Real.hs"
-                    , srcLocStartLine = 260
+                    , srcLocModule = "Main"
+                    , srcLocFile = "test/spec/Main.hs"
+                    , srcLocStartLine = 76
                     , srcLocStartCol = 7
-                    , srcLocEndLine = 262
-                    , srcLocEndCol = 70
+                    , srcLocEndLine = 76
+                    , srcLocEndCol = 57
                     }
                 )
           , details =
