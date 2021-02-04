@@ -1,0 +1,47 @@
+TracingSpan
+  { name = "test-root"
+  , started = MonotonicTime { inMicroseconds = 0 }
+  , finished = MonotonicTime { inMicroseconds = 0 }
+  , frame =
+      Just
+        ( "rootTracingSpanIO"
+        , SrcLoc
+            { srcLocPackage = "main"
+            , srcLocModule = "Main"
+            , srcLocFile = "test/spec/Main.hs"
+            , srcLocStartLine = 310
+            , srcLocStartCol = 5
+            , srcLocEndLine = 314
+            , srcLocEndCol = 38
+            }
+        )
+  , details = Nothing
+  , succeeded = Succeeded
+  , allocated = 0
+  , children =
+      [ TracingSpan
+          { name = "Redis Query"
+          , started = MonotonicTime { inMicroseconds = 0 }
+          , finished = MonotonicTime { inMicroseconds = 0 }
+          , frame =
+              Just
+                ( "tracingSpan"
+                , SrcLoc
+                    { srcLocPackage = "main"
+                    , srcLocModule = "Redis.Real"
+                    , srcLocFile = "src/Redis/Real.hs"
+                    , srcLocStartLine = 260
+                    , srcLocStartCol = 7
+                    , srcLocEndLine = 262
+                    , srcLocEndCol = 70
+                    }
+                )
+          , details =
+              Just
+                "{\"infoCommands\":[\"PING\"],\"infoHost\":\"localhost\",\"infoPort\":\"6379\"}"
+          , succeeded = Succeeded
+          , allocated = 0
+          , children = []
+          }
+      ]
+  }

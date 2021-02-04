@@ -1,8 +1,10 @@
 module Main (main) where
 
 import qualified Conduit
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Debug
 import qualified Dict
 import qualified Environment
 import qualified Expect
@@ -11,6 +13,8 @@ import qualified NonEmptyDict
 import NriPrelude
 import qualified Platform
 import qualified Redis
+import qualified Redis.Counter
+import qualified Redis.Hash
 import qualified Redis.Internal as Internal
 import qualified Redis.List
 import qualified Redis.Mock as Mock
@@ -33,8 +37,66 @@ tests TestHandlers {realHandler, mockHandler} =
         ( case realHandler of
             Nothing -> [] -- No real redis running, so we skip these tests
             Just real -> queryTests real
+        ),
+      Test.describe
+        "observability tests"
+        ( case realHandler of
+            Nothing -> [] -- No real redis running, so we skip these tests
+            Just real -> observabilityTests real
         )
     ]
+
+observabilityTests :: Redis.Handler -> List Test.Test
+observabilityTests handler =
+  [ Test.task "Redis.query reports the span data we expect" <| do
+      Redis.query handler (Redis.ping api)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-query")
+        |> Expect.Task.check,
+    Test.task "Redis.transaction reports the span data we expect" <| do
+      Redis.transaction handler (Redis.ping api)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-transaction")
+        |> Expect.Task.check,
+    Test.task "Redis.Hash.query reports the span data we expect" <| do
+      Redis.Hash.query handler (Redis.Hash.ping hashApi)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-query")
+        |> Expect.Task.check,
+    Test.task "Redis.Hash.transaction reports the span data we expect" <| do
+      Redis.Hash.transaction handler (Redis.Hash.ping hashApi)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-transaction")
+        |> Expect.Task.check,
+    Test.task "Redis.List.query reports the span data we expect" <| do
+      Redis.List.query handler (Redis.List.ping listApi)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-query")
+        |> Expect.Task.check,
+    Test.task "Redis.List.transaction reports the span data we expect" <| do
+      Redis.List.transaction handler (Redis.List.ping listApi)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-transaction")
+        |> Expect.Task.check,
+    Test.task "Redis.Counter.query reports the span data we expect" <| do
+      Redis.Counter.query handler (Redis.Counter.ping counterApi)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-query")
+        |> Expect.Task.check,
+    Test.task "Redis.Counter.transaction reports the span data we expect" <| do
+      Redis.Counter.transaction handler (Redis.Counter.ping counterApi)
+        |> Expect.Task.succeeds
+        |> spanForTask
+        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-transaction")
+        |> Expect.Task.check
+  ]
 
 queryTests :: Redis.Handler -> List Test.Test
 queryTests redisHandler =
@@ -229,8 +291,44 @@ addNamespace namespace handler' =
 api :: Redis.Api Text Text
 api = Redis.textApi identity
 
+hashApi :: Redis.Hash.Api Text Text Text
+hashApi = Redis.Hash.textApi identity identity Just
+
 listApi :: Redis.List.Api Text Text
 listApi = Redis.List.textApi identity
 
+counterApi :: Redis.Counter.Api Text
+counterApi = Redis.Counter.makeApi identity
+
 jsonApi' :: Redis.Api Text [Int]
 jsonApi' = Redis.jsonApi identity
+
+spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
+spanForTask task = do
+  spanVar <- MVar.newEmptyMVar
+  res <-
+    Platform.rootTracingSpanIO
+      "test-request"
+      (MVar.putMVar spanVar)
+      "test-root"
+      (\log -> Task.attempt log task)
+  case res of
+    Err err -> Prelude.fail (Prelude.show err)
+    Ok _ ->
+      MVar.takeMVar spanVar
+        |> NriPrelude.map constantValuesForVariableFields
+
+-- | Timestamps recorded in spans would make each test result different from the
+-- last. This helper sets all timestamps to zero to prevent this.
+--
+-- Similarly the db URI changes in each test, because we create temporary test
+-- database. To prevent this from failing tests we set the URI to a standard
+-- value.
+constantValuesForVariableFields :: Platform.TracingSpan -> Platform.TracingSpan
+constantValuesForVariableFields span =
+  span
+    { Platform.started = 0,
+      Platform.finished = 0,
+      Platform.allocated = 0,
+      Platform.children = map constantValuesForVariableFields (Platform.children span)
+    }
