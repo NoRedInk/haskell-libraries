@@ -272,7 +272,7 @@ data TestHandlers = TestHandlers
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
-  let realHandler = Real.handler "tests" settings
+  let realHandler = Real.handler "tests" settings {Settings.defaultExpiry = Settings.ExpireKeysAfterSeconds 1}
   log <- Conduit.liftIO Platform.silentHandler
   mockHandler <- Conduit.liftIO <| Mock.handlerIO
   redisAvailable <-
