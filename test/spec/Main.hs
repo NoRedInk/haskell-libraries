@@ -8,10 +8,9 @@ import qualified Environment
 import qualified Expect
 import qualified Expect.Task
 import qualified NonEmptyDict
-import NriPrelude hiding (map)
-import qualified NriPrelude
+import NriPrelude
 import qualified Platform
-import Redis hiding (map2)
+import qualified Redis
 import qualified Redis.Internal as Internal
 import qualified Redis.List
 import qualified Redis.Mock as Mock
@@ -37,20 +36,20 @@ tests TestHandlers {realHandler, mockHandler} =
         )
     ]
 
-queryTests :: Handler -> List Test.Test
+queryTests :: Redis.Handler -> List Test.Test
 queryTests redisHandler =
   [ Test.task "get and set" <| do
-      set api "bob" "hello!" |> query testNS |> Expect.Task.succeeds
-      result <- get api "bob" |> query testNS |> Expect.Task.succeeds
+      Redis.set api "bob" "hello!" |> Redis.query testNS |> Expect.Task.succeeds
+      result <- Redis.get api "bob" |> Redis.query testNS |> Expect.Task.succeeds
       Expect.equal result (Just "hello!")
         |> Expect.Task.check,
     Test.task "namespaces namespace" <| do
       let nsHandler1 = addNamespace "NS1" redisHandler
       let nsHandler2 = addNamespace "NS2" redisHandler
-      set api "bob" "hello!" |> query nsHandler1 |> Expect.Task.succeeds
-      set api "bob" "goodbye" |> query nsHandler2 |> Expect.Task.succeeds
-      result1 <- get api "bob" |> query nsHandler1 |> Expect.Task.succeeds
-      result2 <- get api "bob" |> query nsHandler2 |> Expect.Task.succeeds
+      Redis.set api "bob" "hello!" |> Redis.query nsHandler1 |> Expect.Task.succeeds
+      Redis.set api "bob" "goodbye" |> Redis.query nsHandler2 |> Expect.Task.succeeds
+      result1 <- Redis.get api "bob" |> Redis.query nsHandler1 |> Expect.Task.succeeds
+      result2 <- Redis.get api "bob" |> Redis.query nsHandler2 |> Expect.Task.succeeds
       Expect.all
         [ \() -> Expect.notEqual result1 result2,
           \() -> Expect.equal (Just "hello!") result1,
@@ -59,9 +58,9 @@ queryTests redisHandler =
         ()
         |> Expect.Task.check,
     Test.task "getset" <| do
-      set api "getset" "1" |> query testNS |> Expect.Task.succeeds
-      result1 <- getset api "getset" "2" |> query testNS |> Expect.Task.succeeds
-      result2 <- get api "getset" |> query testNS |> Expect.Task.succeeds
+      Redis.set api "getset" "1" |> Redis.query testNS |> Expect.Task.succeeds
+      result1 <- Redis.getset api "getset" "2" |> Redis.query testNS |> Expect.Task.succeeds
+      result2 <- Redis.get api "getset" |> Redis.query testNS |> Expect.Task.succeeds
       Expect.all
         [ \() -> Expect.equal (Just "1") result1,
           \() -> Expect.equal (Just "2") result2
@@ -69,24 +68,24 @@ queryTests redisHandler =
         ()
         |> Expect.Task.check,
     Test.task "del dels" <| do
-      set api "del" "mistake..." |> query testNS |> Expect.Task.succeeds
-      _ <- del api ("del" :| []) |> query testNS |> Expect.Task.succeeds
-      result <- get api "del" |> query testNS |> Expect.Task.succeeds
+      Redis.set api "del" "mistake..." |> Redis.query testNS |> Expect.Task.succeeds
+      _ <- Redis.del api ("del" :| []) |> Redis.query testNS |> Expect.Task.succeeds
+      result <- Redis.get api "del" |> Redis.query testNS |> Expect.Task.succeeds
       Expect.equal Nothing result |> Expect.Task.check,
     Test.task "del counts" <| do
-      set api "delCount" "A thing" |> query testNS |> Expect.Task.succeeds
-      result <- del api ("delCount" :| ["key that doesn't exist"]) |> query testNS |> Expect.Task.succeeds
+      Redis.set api "delCount" "A thing" |> Redis.query testNS |> Expect.Task.succeeds
+      result <- Redis.del api ("delCount" :| ["key that doesn't exist"]) |> Redis.query testNS |> Expect.Task.succeeds
       Expect.equal 1 result |> Expect.Task.check,
     Test.task "json roundtrip" <| do
       let testData :: [Int] = [1, 2, 3]
-      set jsonApi' "JSON list" testData |> query testNS |> Expect.Task.succeeds
-      result <- get jsonApi' "JSON list" |> query testNS |> Expect.Task.succeeds
+      Redis.set jsonApi' "JSON list" testData |> Redis.query testNS |> Expect.Task.succeeds
+      result <- Redis.get jsonApi' "JSON list" |> Redis.query testNS |> Expect.Task.succeeds
       Expect.equal (Just testData) result |> Expect.Task.check,
     Test.task "atomic modify with no value" <| do
-      _ <- del api ("Empty Atom" :| []) |> query testNS |> Expect.Task.succeeds
+      _ <- Redis.del api ("Empty Atom" :| []) |> Redis.query testNS |> Expect.Task.succeeds
       result <-
-        atomicModify
-          (experimental api)
+        Redis.atomicModify
+          (Redis.experimental api)
           testNS
           "Empty Atom"
           ( \v -> case v of
@@ -96,21 +95,21 @@ queryTests redisHandler =
           |> Expect.Task.succeeds
       Expect.equal "Nothing" result |> Expect.Task.check,
     Test.task "mget retrieves a mapping of the requested keys and their corresponding values" <| do
-      set api "mgetTest::key1" "value 1" |> query testNS |> Expect.Task.succeeds
-      set api "mgetTest::key3" "value 3" |> query testNS |> Expect.Task.succeeds
+      Redis.set api "mgetTest::key1" "value 1" |> Redis.query testNS |> Expect.Task.succeeds
+      Redis.set api "mgetTest::key3" "value 3" |> Redis.query testNS |> Expect.Task.succeeds
       result <-
-        mget api ("mgetTest::key1" :| ["mgetTest::key2", "mgetTest::key3"]) |> query testNS
+        Redis.mget api ("mgetTest::key1" :| ["mgetTest::key2", "mgetTest::key3"]) |> Redis.query testNS
           |> Expect.Task.succeeds
       Expect.equal
         (Dict.toList result)
         [("mgetTest::key1", "value 1"), ("mgetTest::key3", "value 3")]
         |> Expect.Task.check,
     Test.task "mget json roundtrip" <| do
-      set jsonApi' "Json.mgetTest::key1" ([1, 2] :: [Int]) |> query testNS |> Expect.Task.succeeds
-      set jsonApi' "Json.mgetTest::key2" ([3, 4] :: [Int]) |> query testNS |> Expect.Task.succeeds
+      Redis.set jsonApi' "Json.mgetTest::key1" ([1, 2] :: [Int]) |> Redis.query testNS |> Expect.Task.succeeds
+      Redis.set jsonApi' "Json.mgetTest::key2" ([3, 4] :: [Int]) |> Redis.query testNS |> Expect.Task.succeeds
       result <-
-        mget jsonApi' ("Json.mgetTest::key1" :| ["Json.mgetTest::key2"])
-          |> query testNS
+        Redis.mget jsonApi' ("Json.mgetTest::key1" :| ["Json.mgetTest::key2"])
+          |> Redis.query testNS
           |> Expect.Task.succeeds
       Expect.equal
         (Dict.toList result)
@@ -123,23 +122,23 @@ queryTests redisHandler =
       let firstValue = "value 1"
       let nonEmptyDict = NonEmptyDict.init firstKey firstValue (Dict.fromList [("msetTest::key2", "value 2")])
       let dict = NonEmptyDict.toDict nonEmptyDict
-      mset api nonEmptyDict |> query testNS |> Expect.Task.succeeds
-      result <- mget api (firstKey :| Dict.keys dict) |> query testNS |> Expect.Task.succeeds
+      Redis.mset api nonEmptyDict |> Redis.query testNS |> Expect.Task.succeeds
+      result <- Redis.mget api (firstKey :| Dict.keys dict) |> Redis.query testNS |> Expect.Task.succeeds
       Expect.equal result dict |> Expect.Task.check,
     Test.task "Json.mset allows setting multiple JSON values at once" <| do
       let firstKey = "Json.msetTest::key1"
       let firstValue = [1, 2]
       let nonEmptyDict = NonEmptyDict.init firstKey firstValue (Dict.fromList [("Json.msetTest::key2", [3, 4] :: [Int])])
       let dict = NonEmptyDict.toDict nonEmptyDict
-      mset jsonApi' nonEmptyDict |> query testNS |> Expect.Task.succeeds
-      result <- mget jsonApi' (firstKey :| Dict.keys dict) |> query testNS |> Expect.Task.succeeds
+      Redis.mset jsonApi' nonEmptyDict |> Redis.query testNS |> Expect.Task.succeeds
+      result <- Redis.mget jsonApi' (firstKey :| Dict.keys dict) |> Redis.query testNS |> Expect.Task.succeeds
       Expect.equal result dict |> Expect.Task.check,
     Test.task "atomic modify with value" <| do
-      _ <- del api ("Full Atom" :| []) |> query testNS |> Expect.Task.succeeds
-      set api "Full Atom" "Something" |> query testNS |> Expect.Task.succeeds
+      _ <- Redis.del api ("Full Atom" :| []) |> Redis.query testNS |> Expect.Task.succeeds
+      Redis.set api "Full Atom" "Something" |> Redis.query testNS |> Expect.Task.succeeds
       result <-
-        atomicModify
-          (experimental api)
+        Redis.atomicModify
+          (Redis.experimental api)
           testNS
           "Full Atom"
           ( \v -> case v of
@@ -149,10 +148,10 @@ queryTests redisHandler =
           |> Expect.Task.succeeds
       Expect.equal "Prefix:Something" result |> Expect.Task.check,
     Test.task "atomicModifyWithContext works empty" <| do
-      _ <- del api ("Atom With Context" :| []) |> query testNS |> Expect.Task.succeeds
+      _ <- Redis.del api ("Atom With Context" :| []) |> Redis.query testNS |> Expect.Task.succeeds
       result <-
-        atomicModifyWithContext
-          (experimental api)
+        Redis.atomicModifyWithContext
+          (Redis.experimental api)
           testNS
           "Atom With Context"
           ( \v -> case v of
@@ -162,10 +161,10 @@ queryTests redisHandler =
           |> Expect.Task.succeeds
       Expect.equal ("after", "Nothing") result |> Expect.Task.check,
     Test.task "atomicModifyWithContext works full" <| do
-      set api "Atom With Context (full)" "A piece of text" |> query testNS |> Expect.Task.succeeds
+      Redis.set api "Atom With Context (full)" "A piece of text" |> Redis.query testNS |> Expect.Task.succeeds
       result <-
-        atomicModifyWithContext
-          (experimental api)
+        Redis.atomicModifyWithContext
+          (Redis.experimental api)
           testNS
           "Atom With Context (full)"
           ( \v -> case v of
@@ -175,10 +174,10 @@ queryTests redisHandler =
           |> Expect.Task.succeeds
       Expect.equal ("after", "Just") result |> Expect.Task.check,
     Test.task "Json.atomicModifyWithContext works" <| do
-      _ <- del api ("JSON Atom With Context" :| []) |> query testNS |> Expect.Task.succeeds
+      _ <- Redis.del api ("JSON Atom With Context" :| []) |> Redis.query testNS |> Expect.Task.succeeds
       result <-
-        atomicModifyWithContext
-          (experimental jsonApi')
+        Redis.atomicModifyWithContext
+          (Redis.experimental jsonApi')
           testNS
           "JSON Atom With Context"
           ( \v -> case v of
@@ -195,17 +194,17 @@ queryTests redisHandler =
         ]
         |> Redis.sequence
         |> map (\_ -> ())
-        |> transaction testNS
+        |> Redis.transaction testNS
         |> Expect.Task.succeeds
-      result <- Redis.List.lrange listApi "order" 0 (-1) |> query testNS |> Expect.Task.succeeds
+      result <- Redis.List.lrange listApi "order" 0 (-1) |> Redis.query testNS |> Expect.Task.succeeds
       Expect.equal result ["1", "2", "3"] |> Expect.Task.check
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
 
 data TestHandlers = TestHandlers
-  { mockHandler :: Handler,
-    realHandler :: Maybe Handler
+  { mockHandler :: Redis.Handler,
+    realHandler :: Maybe Redis.Handler
   }
 
 getHandlers :: Conduit.Acquire TestHandlers
@@ -215,7 +214,7 @@ getHandlers = do
   log <- Conduit.liftIO Platform.silentHandler
   mockHandler <- Conduit.liftIO <| Mock.handlerIO
   redisAvailable <-
-    Conduit.withAcquire realHandler (\h -> query h (get api "foo") |> Task.attempt log)
+    Conduit.withAcquire realHandler (\h -> Redis.query h (Redis.get api "foo") |> Task.attempt log)
       |> NriPrelude.map (\_ -> True)
       |> Exception.handleAny (\_ -> Prelude.pure False)
       |> Conduit.liftIO
@@ -223,15 +222,15 @@ getHandlers = do
     then NriPrelude.map (TestHandlers mockHandler << Just) realHandler
     else Prelude.pure (TestHandlers mockHandler Nothing)
 
-addNamespace :: Text -> Handler -> Handler
+addNamespace :: Text -> Redis.Handler -> Redis.Handler
 addNamespace namespace handler' =
   handler' {Internal.namespace = Internal.namespace handler' ++ ":" ++ namespace}
 
-api :: Api Text Text
-api = textApi identity
+api :: Redis.Api Text Text
+api = Redis.textApi identity
 
 listApi :: Redis.List.Api Text Text
 listApi = Redis.List.textApi identity
 
-jsonApi' :: Api Text [Int]
-jsonApi' = jsonApi identity
+jsonApi' :: Redis.Api Text [Int]
+jsonApi' = Redis.jsonApi identity
