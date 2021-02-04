@@ -4,7 +4,6 @@ import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Debug
-import Dict (Dict)
 import qualified Dict
 import qualified Environment
 import qualified Expect
@@ -20,18 +19,18 @@ import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Task
-import Test
+import qualified Test
 import Prelude (IO, pure, uncurry)
 
-buildSpecs :: TestHandlers -> Test
+buildSpecs :: TestHandlers -> Test.Test
 buildSpecs TestHandlers {logHandler, redisHandlers} =
   redisHandlers
     |> List.map (uncurry (specs logHandler))
-    |> describe "Redis Library"
+    |> Test.describe "Redis Library"
 
-specs :: Platform.LogHandler -> Text -> Handler -> Test
+specs :: Platform.LogHandler -> Text -> Handler -> Test.Test
 specs logHandler whichHandler redisHandler =
-  describe
+  Test.describe
     (whichHandler ++ " Redis")
     [ redisTest "get and set" <| do
         set api "bob" "hello!" |> query testNS
@@ -101,7 +100,7 @@ specs logHandler whichHandler redisHandler =
         set jsonApi' "Json.mgetTest::key2" ([3, 4] :: [Int]) |> query testNS
         result <-
           mget jsonApi' ("Json.mgetTest::key1" :| ["Json.mgetTest::key2"]) |> query testNS ::
-            Task Error (Dict Text [Int])
+            Task Error (Dict.Dict Text [Int])
         pure
           ( Expect.equal
               (Dict.toList result)
@@ -189,7 +188,7 @@ specs logHandler whichHandler redisHandler =
   where
     testNS = addNamespace "testNamespace" redisHandler
     redisTest name test' =
-      test name <| \() ->
+      Test.test name <| \() ->
         Task.attempt logHandler test'
           |> Expect.withIO
             ( \res ->
@@ -201,7 +200,7 @@ specs logHandler whichHandler redisHandler =
 main :: IO ()
 main =
   Conduit.withAcquire getHandlers <| \testHandlers ->
-    run <| buildSpecs testHandlers
+    Test.run <| buildSpecs testHandlers
 
 data TestHandlers = TestHandlers
   { logHandler :: Platform.LogHandler,
