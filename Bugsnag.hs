@@ -238,8 +238,17 @@ doBreadcrumb timer span =
         Bugsnag.defaultBreadcrumb
           { Bugsnag.breadcrumb_name = Platform.name span,
             Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
-            Bugsnag.breadcrumb_timestamp = Timer.toISO8601 timer (Platform.started span)
+            Bugsnag.breadcrumb_timestamp = Timer.toISO8601 timer (Platform.started span),
+            Bugsnag.breadcrumb_metaData = metadata
           }
+      metadata =
+        case Platform.frame span of
+          Nothing -> Nothing
+          Just (_, frame) ->
+            Stack.srcLocFile frame ++ ":" ++ Prelude.show (Stack.srcLocStartLine frame)
+              |> Data.Text.pack
+              |> HashMap.singleton "stack frame"
+              |> Just
    in case Platform.details span of
         Nothing -> defaultBreadcrumb
         Just details -> customizeBreadcrumb span details defaultBreadcrumb
@@ -261,28 +270,32 @@ outgoingHttpRequestAsBreadcrumb :: Bugsnag.Breadcrumb -> Http.Info -> Bugsnag.Br
 outgoingHttpRequestAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
+      Bugsnag.breadcrumb_metaData =
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Observability.Helpers.toHashMap details)
     }
 
 mysqlQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> MySQL.Info -> Bugsnag.Breadcrumb
 mysqlQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
+      Bugsnag.breadcrumb_metaData =
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Observability.Helpers.toHashMap details)
     }
 
 postgresQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> Postgres.Info -> Bugsnag.Breadcrumb
 postgresQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
+      Bugsnag.breadcrumb_metaData =
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Observability.Helpers.toHashMap details)
     }
 
 redisQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> Redis.Info -> Bugsnag.Breadcrumb
 redisQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
+      Bugsnag.breadcrumb_metaData =
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Observability.Helpers.toHashMap details)
     }
 
 logAsBreadcrumb :: Platform.TracingSpan -> Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
@@ -292,14 +305,16 @@ logAsBreadcrumb span breadcrumb details =
         if List.isEmpty (Platform.children span)
           then Bugsnag.logBreadcrumbType
           else Bugsnag.processBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
+      Bugsnag.breadcrumb_metaData =
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Observability.Helpers.toHashMap details)
     }
 
 unknownAsBreadcrumb :: Bugsnag.Breadcrumb -> Platform.SomeTracingSpanDetails -> Bugsnag.Breadcrumb
 unknownAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
-      Bugsnag.breadcrumb_metaData = Just (Observability.Helpers.toHashMap details)
+      Bugsnag.breadcrumb_metaData =
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Observability.Helpers.toHashMap details)
     }
 
 decorateEventWithTracingSpanData :: Text -> Platform.TracingSpan -> Bugsnag.Event -> Bugsnag.Event
