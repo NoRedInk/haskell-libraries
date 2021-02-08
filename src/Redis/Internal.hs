@@ -81,6 +81,7 @@ cmds query'' =
     Ping -> ["PING"]
     Rpush key vals -> [unwords ("RPUSH" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
     Set key _ -> [unwords ["SET", key, "*****"]]
+    Setex key seconds _ -> [unwords ["SETEX", key, Text.fromInt seconds, "*****"]]
     Setnx key _ -> [unwords ["SETNX", key, "*****"]]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
@@ -110,6 +111,7 @@ data Query a where
   Ping :: Query Database.Redis.Status
   Rpush :: Text -> NonEmpty ByteString -> Query Int
   Set :: Text -> ByteString -> Query ()
+  Setex :: Text -> Int -> ByteString -> Query ()
   Setnx :: Text -> ByteString -> Query Bool
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
@@ -178,6 +180,7 @@ namespaceQuery prefix query' =
     Ping -> Ping
     Get key -> Get (prefix ++ key)
     Set key value -> Set (prefix ++ key) value
+    Setex key seconds value -> Setex (prefix ++ key) seconds value
     Setnx key value -> Setnx (prefix ++ key) value
     Getset key value -> Getset (prefix ++ key) value
     Mget keys -> Mget (NonEmpty.map (\k -> prefix ++ k) keys)
@@ -219,6 +222,7 @@ keysTouchedByQuery query' =
     Ping -> Set.empty
     Get key -> Set.singleton key
     Set key _ -> Set.singleton key
+    Setex key _ _ -> Set.singleton key
     Setnx key _ -> Set.singleton key
     Getset key _ -> Set.singleton key
     Mget keys -> Set.fromList (NonEmpty.toList keys)

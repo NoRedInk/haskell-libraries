@@ -122,6 +122,10 @@ doRawQuery query =
       Database.Redis.set (toB key) val
         |> PreparedQuery
         |> map (\_ -> Ok ())
+    Internal.Setex key seconds val ->
+      Database.Redis.setex (toB key) (Prelude.fromIntegral seconds) val
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
     Internal.Setnx key val ->
       Database.Redis.setnx (toB key) val
         |> PreparedQuery
