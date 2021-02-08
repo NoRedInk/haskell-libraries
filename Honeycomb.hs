@@ -222,7 +222,7 @@ data BatchEvent = BatchEvent
     batchevent_data :: Span,
     batchevent_samplerate :: Int
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 options :: Aeson.Options
 options =
@@ -256,7 +256,7 @@ data Span = Span
     enrichedData :: [(Text, Text)],
     details :: Maybe Platform.SomeTracingSpanDetails
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Aeson.ToJSON Span where
   toJSON span =
@@ -284,7 +284,7 @@ instance Aeson.ToJSON Span where
      in Aeson.object (basePairs ++ detailsPairs ++ enrichedData')
 
 newtype SpanId = SpanId Text
-  deriving (Aeson.ToJSON)
+  deriving (Aeson.ToJSON, Show)
 
 data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
