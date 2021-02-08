@@ -27,6 +27,8 @@ module Observability.Honeycomb
 where
 
 import qualified Conduit
+import qualified Data.UUID
+import qualified Data.UUID.V4
 import Control.Monad (unless)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -54,7 +56,7 @@ batchApiEndpoint :: Text -> Text
 batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetName
 
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
-report handler' requestId span = do
+report handler' _requestId span = do
   -- This is an initial implementation of sampling, based on
   -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
   -- using Dynamic Sampling based on whether the request was successful or not.
@@ -74,12 +76,16 @@ report handler' requestId span = do
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
   hostname' <- Network.HostName.getHostName
+  uuid <- Data.UUID.V4.nextRandom
   let commonFields =
         CommonFields
           (handler_timer handler')
           (handler_serviceName handler')
           (handler_environment handler')
-          requestId
+          -- Don't use requestId if we don't do Distributed Tracing
+          -- Else, it will create traces with no parent sharing the same TraceId
+          -- Which makes Honeycomb's UI confused
+          (Data.UUID.toText uuid)
           (Data.Text.pack hostname')
   let (_, events) = toBatchEvents commonFields sampleRate Nothing 0 span
   let enrichedEvents = enrich events
