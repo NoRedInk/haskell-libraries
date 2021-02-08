@@ -181,7 +181,7 @@ enrich [x] = [x]
 enrich (root : rest) =
   let maybeEndpoint = getBatchEventEndpoint root
       -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
-      -- with the root's endpoint
+      -- with the root's endpoint, and shaving some excess columns in `details`
       crunch x (acc, xs) =
         let duration = x |> batchevent_data |> durationMs
             updateFn (Just durations) = Just (duration : durations)
@@ -195,10 +195,15 @@ enrich (root : rest) =
                   { batchevent_data =
                       span
                         { enrichedData =
-                            ("details.endpoint", endpoint) : enrichedData span
+                            ("details.endpoint", endpoint) : enrichedData span,
+                          details = span |> details |> deNoise
                         }
                   }
-              Nothing -> x
+              Nothing ->
+                x
+                  { batchevent_data =
+                      span {details = span |> details |> deNoise}
+                  }
          in (acc', x' : xs)
       -- chose foldr to preserve order, not super important tho
       (durationsByName, newRest) = List.foldr crunch (HashMap.empty, []) rest
@@ -216,6 +221,52 @@ enrich (root : rest) =
       rootSpanWithStats = rootSpan {enrichedData = perSpanNameStats}
       newRoot = root {batchevent_data = rootSpanWithStats}
    in newRoot : newRest
+
+-- Some of our TracingSpanDetails instances create a lot of noise in the column
+-- space of Honeycomb.
+--
+-- If we ever hit 10k unique column names (and we were past the thousands when
+-- this code was introduced) Honeycomb will stop accepting traces from us.
+--
+-- "Unique column names" means different column names that Honeycomb has seen us
+-- report on a span.
+--
+-- It is manual labor, but we must ensure our TracingSpanDetails don't serialize
+-- to an unbounded number of column names.
+deNoise :: Maybe Platform.SomeTracingSpanDetails -> Maybe Platform.SomeTracingSpanDetails
+deNoise details =
+  details
+    |> Maybe.andThen
+      ( Platform.renderTracingSpanDetails
+          [ Platform.Renderer deNoiseLog
+          ]
+      )
+
+-- LogContext is an unbounded list of key value pairs with possibly nested
+-- stuff in them. Aeson flatens the nesting, so:
+--
+-- {error: [{quiz: [{"some-quiz-id": "some context"}]}]}
+--
+-- becomes
+--
+-- {"error.0.quiz.0.some-quiz-id": "some context"}
+--
+-- - With "some-quiz-id" in the example above, we have an unbounded number of
+--   unique columns.
+-- - With long lists, the `.0` parts helps boost our unique column name growth.
+--
+-- We don't need Honeycomb to collect rich error information.
+-- That's what we pay Bugsnag for.
+deNoiseLog :: Log.LogContexts -> Platform.SomeTracingSpanDetails
+deNoiseLog _ =
+  Platform.toTracingSpanDetails (GenericTracingSpanDetails HashMap.empty)
+
+newtype GenericTracingSpanDetails = GenericTracingSpanDetails (HashMap.HashMap Text Text)
+  deriving (Generic)
+
+instance Aeson.ToJSON GenericTracingSpanDetails
+
+instance Platform.TracingSpanDetails GenericTracingSpanDetails
 
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
