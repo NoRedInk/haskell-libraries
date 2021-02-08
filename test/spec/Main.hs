@@ -274,7 +274,14 @@ queryTests redisHandler =
         |> Redis.transaction testNS
         |> Expect.Task.succeeds
       result <- Redis.List.lrange listApi "order" 0 (-1) |> Redis.query testNS |> Expect.Task.succeeds
-      Expect.equal result ["1", "2", "3"] |> Expect.Task.check
+      Expect.equal result ["1", "2", "3"] |> Expect.Task.check,
+    Test.task "sequence is happy doing nothing"
+      <| ( [ Redis.sequence [] |> Redis.transaction testNS,
+             Redis.sequence [] |> Redis.query testNS
+           ]
+             |> Task.sequence
+             |> Expect.Task.succeeds
+         )
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
