@@ -26,6 +26,24 @@ import qualified Prelude
 main :: Prelude.IO ()
 main = Conduit.withAcquire getHandlers (Test.run << tests)
 
+-- put this at the top of the file so that adding tests doesn't push
+-- the line number of the source location of this file down, which would
+-- change golden test results
+spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
+spanForTask task = do
+  spanVar <- MVar.newEmptyMVar
+  res <-
+    Platform.rootTracingSpanIO
+      "test-request"
+      (MVar.putMVar spanVar)
+      "test-root"
+      (\log -> Task.attempt log task)
+  case res of
+    Err err -> Prelude.fail (Prelude.show err)
+    Ok _ ->
+      MVar.takeMVar spanVar
+        |> NriPrelude.map constantValuesForVariableFields
+
 tests :: TestHandlers -> Test.Test
 tests TestHandlers {realHandler, mockHandler} =
   Test.describe
@@ -291,21 +309,6 @@ counterApi = Redis.Counter.makeApi identity
 
 jsonApi' :: Redis.Api Text [Int]
 jsonApi' = Redis.jsonApi identity
-
-spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
-spanForTask task = do
-  spanVar <- MVar.newEmptyMVar
-  res <-
-    Platform.rootTracingSpanIO
-      "test-request"
-      (MVar.putMVar spanVar)
-      "test-root"
-      (\log -> Task.attempt log task)
-  case res of
-    Err err -> Prelude.fail (Prelude.show err)
-    Ok _ ->
-      MVar.takeMVar spanVar
-        |> NriPrelude.map constantValuesForVariableFields
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.
