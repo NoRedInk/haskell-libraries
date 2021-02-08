@@ -27,8 +27,6 @@ module Observability.Honeycomb
 where
 
 import qualified Conduit
-import qualified Data.UUID
-import qualified Data.UUID.V4
 import Control.Monad (unless)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
@@ -36,6 +34,8 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Text
 import qualified Data.Text.Encoding as Encoding
+import qualified Data.UUID
+import qualified Data.UUID.V4
 import qualified Environment
 import qualified Http
 import qualified List
