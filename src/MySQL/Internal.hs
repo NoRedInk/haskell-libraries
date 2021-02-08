@@ -541,9 +541,9 @@ sqlYearly :: QQ.QuasiQuoter
 sqlYearly =
   QQ.QuasiQuoter
     { QQ.quoteExp = qqSQLYearly,
-      QQ.quoteType = Prelude.fail "sql not supported in types",
-      QQ.quotePat = Prelude.fail "sql not supported in patterns",
-      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
+      QQ.quoteType = Prelude.error "sql not supported in types",
+      QQ.quotePat = Prelude.error "sql not supported in patterns",
+      QQ.quoteDec = Prelude.error "sql not supported in declarations"
     }
 
 qqSQLYearly :: Prelude.String -> TH.ExpQ
@@ -579,9 +579,9 @@ sql :: QQ.QuasiQuoter
 sql =
   QQ.QuasiQuoter
     { QQ.quoteExp = QQ.quoteExp Query.sql,
-      QQ.quoteType = Prelude.fail "sql not supported in types",
-      QQ.quotePat = Prelude.fail "sql not supported in patterns",
-      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
+      QQ.quoteType = Prelude.error "sql not supported in types",
+      QQ.quotePat = Prelude.error "sql not supported in patterns",
+      QQ.quoteDec = Prelude.error "sql not supported in declarations"
     }
 
 instance PGTypes.PGColumn "boolean" Data.Int.Int16 where

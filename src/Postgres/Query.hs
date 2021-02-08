@@ -19,7 +19,7 @@ module Postgres.Query
   )
 where
 
-import Control.Monad (fail, void)
+import Control.Monad (void)
 import qualified Data.Aeson as Aeson
 import Data.String (String)
 import qualified Data.Text
@@ -45,6 +45,7 @@ import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
 import Prelude (IO)
+import qualified Prelude
 
 -- |
 -- A wrapper around a `postgresql-typed` query. This type has a number of
@@ -102,9 +103,9 @@ sql :: QuasiQuoter
 sql =
   QuasiQuoter
     { quoteExp = qqSQL,
-      quoteType = fail "sql not supported in types",
-      quotePat = fail "sql not supported in patterns",
-      quoteDec = fail "sql not supported in declarations"
+      quoteType = Prelude.error "sql not supported in types",
+      quotePat = Prelude.error "sql not supported in patterns",
+      quoteDec = Prelude.error "sql not supported in declarations"
     }
 
 format :: Query row -> Text.Text

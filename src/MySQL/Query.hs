@@ -218,9 +218,9 @@ sql :: QQ.QuasiQuoter
 sql =
   QQ.QuasiQuoter
     { QQ.quoteExp = qqSQL,
-      QQ.quoteType = Prelude.fail "sql not supported in types",
-      QQ.quotePat = Prelude.fail "sql not supported in patterns",
-      QQ.quoteDec = Prelude.fail "sql not supported in declarations"
+      QQ.quoteType = Prelude.error "sql not supported in types",
+      QQ.quotePat = Prelude.error "sql not supported in patterns",
+      QQ.quoteDec = Prelude.error "sql not supported in declarations"
     }
 
 --

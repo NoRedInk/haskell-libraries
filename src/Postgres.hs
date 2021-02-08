@@ -285,13 +285,6 @@ toConnectionLogContext db =
       Query.TcpSocket (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
     Right (SockAddrUnix sockPath) ->
       Query.UnixSocket (Data.Text.pack sockPath) databaseName
-    Right somethingElse ->
-      -- There's a deprecated `SockAddr` constructor called `SockAddrCan`.
-      error
-        ( "Failed to convert PostgreSQL database address; no idea what a "
-            ++ show somethingElse
-            ++ " is."
-        )
   where
     databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8
 
