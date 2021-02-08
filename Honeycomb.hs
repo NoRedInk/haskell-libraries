@@ -1,3 +1,5 @@
+{-# LANGUAGE TransformListComp #-}
+
 -- | Honeycomb
 --
 -- This reporter logs execution to https://honeycomb.io.
@@ -35,6 +37,7 @@ import qualified Data.List
 import qualified Data.Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Environment
+import GHC.Exts (groupWith, the)
 import qualified Http
 import qualified List
 import qualified Log
@@ -45,6 +48,7 @@ import NriPrelude
 import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
+import qualified Redis
 import qualified System.Random as Random
 import qualified Task
 import qualified Text as NriText
@@ -238,7 +242,8 @@ deNoise details =
   details
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
-          [ Platform.Renderer deNoiseLog
+          [ Platform.Renderer deNoiseLog,
+            Platform.Renderer deNoiseRedis
           ]
       )
 
@@ -260,6 +265,30 @@ deNoise details =
 deNoiseLog :: Log.LogContexts -> Platform.SomeTracingSpanDetails
 deNoiseLog _ =
   Platform.toTracingSpanDetails (GenericTracingSpanDetails HashMap.empty)
+
+-- Redis creates one column per command for batches
+-- Let's trace what matters:
+-- - How many of each command
+-- - The full blob in a single column
+-- - The rest of our Info record
+deNoiseRedis :: Redis.Info -> Platform.SomeTracingSpanDetails
+deNoiseRedis redisInfo =
+  let commandsCount =
+        redisInfo
+          |> Redis.infoCommands
+          |> List.filterMap (NriText.words >> List.head)
+          |> (\x -> [(the key ++ ".count", key |> List.length |> NriText.fromInt) | key <- x, then group by key using groupWith])
+      fullBlob =
+        redisInfo
+          |> Redis.infoCommands
+          |> NriText.join "\n"
+   in HashMap.fromList
+        ( ("commands", fullBlob) :
+          ("infoHost", Redis.infoHost redisInfo) :
+          ("infoPort", Redis.infoPort redisInfo) : commandsCount
+        )
+        |> GenericTracingSpanDetails
+        |> Platform.toTracingSpanDetails
 
 newtype GenericTracingSpanDetails = GenericTracingSpanDetails (HashMap.HashMap Text Text)
   deriving (Generic)
