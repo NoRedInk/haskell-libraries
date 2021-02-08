@@ -52,10 +52,10 @@ where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
-import qualified Data.Flat as Flat
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
+import qualified Flat
 import qualified Health
 import qualified NonEmptyDict
 import NriPrelude
