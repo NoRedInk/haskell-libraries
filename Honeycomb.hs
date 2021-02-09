@@ -1,3 +1,5 @@
+{-# LANGUAGE TransformListComp #-}
+
 -- | Honeycomb
 --
 -- This reporter logs execution to https://honeycomb.io.
@@ -37,6 +39,7 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified Environment
+import GHC.Exts (groupWith, the)
 import qualified Http
 import qualified List
 import qualified Log
@@ -47,6 +50,7 @@ import NriPrelude
 import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform
+import qualified Redis
 import qualified System.Random as Random
 import qualified Task
 import qualified Text as NriText
@@ -187,7 +191,7 @@ enrich [x] = [x]
 enrich (root : rest) =
   let maybeEndpoint = getBatchEventEndpoint root
       -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
-      -- with the root's endpoint
+      -- with the root's endpoint, and shaving some excess columns in `details`
       crunch x (acc, xs) =
         let duration = x |> batchevent_data |> durationMs
             updateFn (Just durations) = Just (duration : durations)
@@ -201,10 +205,15 @@ enrich (root : rest) =
                   { batchevent_data =
                       span
                         { enrichedData =
-                            ("details.endpoint", endpoint) : enrichedData span
+                            ("details.endpoint", endpoint) : enrichedData span,
+                          details = span |> details |> deNoise
                         }
                   }
-              Nothing -> x
+              Nothing ->
+                x
+                  { batchevent_data =
+                      span {details = span |> details |> deNoise}
+                  }
          in (acc', x' : xs)
       -- chose foldr to preserve order, not super important tho
       (durationsByName, newRest) = List.foldr crunch (HashMap.empty, []) rest
@@ -223,12 +232,83 @@ enrich (root : rest) =
       newRoot = root {batchevent_data = rootSpanWithStats}
    in newRoot : newRest
 
+-- Some of our TracingSpanDetails instances create a lot of noise in the column
+-- space of Honeycomb.
+--
+-- If we ever hit 10k unique column names (and we were past the thousands when
+-- this code was introduced) Honeycomb will stop accepting traces from us.
+--
+-- "Unique column names" means different column names that Honeycomb has seen us
+-- report on a span.
+--
+-- It is manual labor, but we must ensure our TracingSpanDetails don't serialize
+-- to an unbounded number of column names.
+deNoise :: Maybe Platform.SomeTracingSpanDetails -> Maybe Platform.SomeTracingSpanDetails
+deNoise details =
+  details
+    |> Maybe.andThen
+      ( Platform.renderTracingSpanDetails
+          [ Platform.Renderer deNoiseLog,
+            Platform.Renderer deNoiseRedis
+          ]
+      )
+
+-- LogContext is an unbounded list of key value pairs with possibly nested
+-- stuff in them. Aeson flatens the nesting, so:
+--
+-- {error: [{quiz: [{"some-quiz-id": "some context"}]}]}
+--
+-- becomes
+--
+-- {"error.0.quiz.0.some-quiz-id": "some context"}
+--
+-- - With "some-quiz-id" in the example above, we have an unbounded number of
+--   unique columns.
+-- - With long lists, the `.0` parts helps boost our unique column name growth.
+--
+-- We don't need Honeycomb to collect rich error information.
+-- That's what we pay Bugsnag for.
+deNoiseLog :: Log.LogContexts -> Platform.SomeTracingSpanDetails
+deNoiseLog _ =
+  Platform.toTracingSpanDetails (GenericTracingSpanDetails HashMap.empty)
+
+-- Redis creates one column per command for batches
+-- Let's trace what matters:
+-- - How many of each command
+-- - The full blob in a single column
+-- - The rest of our Info record
+deNoiseRedis :: Redis.Info -> Platform.SomeTracingSpanDetails
+deNoiseRedis redisInfo =
+  let commandsCount =
+        redisInfo
+          |> Redis.infoCommands
+          |> List.filterMap (NriText.words >> List.head)
+          |> (\x -> [(the key ++ ".count", key |> List.length |> NriText.fromInt) | key <- x, then group by key using groupWith])
+      fullBlob =
+        redisInfo
+          |> Redis.infoCommands
+          |> NriText.join "\n"
+   in HashMap.fromList
+        ( ("commands", fullBlob) :
+          ("infoHost", Redis.infoHost redisInfo) :
+          ("infoPort", Redis.infoPort redisInfo) : commandsCount
+        )
+        |> GenericTracingSpanDetails
+        |> Platform.toTracingSpanDetails
+
+newtype GenericTracingSpanDetails = GenericTracingSpanDetails (HashMap.HashMap Text Text)
+  deriving (Generic)
+
+instance Aeson.ToJSON GenericTracingSpanDetails
+
+instance Platform.TracingSpanDetails GenericTracingSpanDetails
+
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
     batchevent_data :: Span,
     batchevent_samplerate :: Int
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 options :: Aeson.Options
 options =
@@ -262,7 +342,7 @@ data Span = Span
     enrichedData :: [(Text, Text)],
     details :: Maybe Platform.SomeTracingSpanDetails
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Aeson.ToJSON Span where
   toJSON span =
@@ -290,7 +370,7 @@ instance Aeson.ToJSON Span where
      in Aeson.object (basePairs ++ detailsPairs ++ enrichedData')
 
 newtype SpanId = SpanId Text
-  deriving (Aeson.ToJSON)
+  deriving (Aeson.ToJSON, Show)
 
 data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
