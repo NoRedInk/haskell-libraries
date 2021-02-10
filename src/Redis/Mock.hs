@@ -161,6 +161,10 @@ doQuery query hm =
       ( HM.insert key (RedisByteString value) hm,
         Ok ()
       )
+    Internal.Setex key _ value ->
+      ( HM.insert key (RedisByteString value) hm,
+        Ok ()
+      )
     Internal.Setnx key value ->
       if HM.member key hm
         then (hm, Ok False)
