@@ -35,8 +35,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Text
-import qualified Data.Text.Lazy as LazyText
 import qualified Data.Text.Encoding as Encoding
+import qualified Data.Text.Lazy as LazyText
 import qualified Data.Text.Lazy.Encoding as Lazy.Encoding
 import qualified Data.UUID
 import qualified Data.UUID.V4
@@ -280,15 +280,16 @@ deNoise maybeDetails =
 deNoiseLog :: Log.LogContexts -> Platform.SomeTracingSpanDetails
 deNoiseLog context@(Log.LogContexts contexts) =
   let tojson thing = case thing |> Aeson.toJSON of
-                      Aeson.String txt -> txt
-                      value -> value |> Aeson.encode |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict
-      deets = if List.length contexts > 5 then
-                HashMap.singleton "context" (tojson context)
-              else
-                contexts
-                |> map (\(Log.Context key val) -> (key, tojson val))
-                |> HashMap.fromList
-  in Platform.toTracingSpanDetails (GenericTracingSpanDetails deets)
+        Aeson.String txt -> txt
+        value -> value |> Aeson.encode |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict
+      deets =
+        if List.length contexts > 5
+          then HashMap.singleton "context" (tojson context)
+          else
+            contexts
+              |> map (\(Log.Context key val) -> (key, tojson val))
+              |> HashMap.fromList
+   in Platform.toTracingSpanDetails (GenericTracingSpanDetails deets)
 
 -- Redis creates one column per command for batches
 -- Let's trace what matters:
