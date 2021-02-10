@@ -246,14 +246,21 @@ enrich (root : rest) =
 -- It is manual labor, but we must ensure our TracingSpanDetails don't serialize
 -- to an unbounded number of column names.
 deNoise :: Maybe Platform.SomeTracingSpanDetails -> Maybe Platform.SomeTracingSpanDetails
-deNoise details =
-  details
-    |> Maybe.andThen
-      ( Platform.renderTracingSpanDetails
+deNoise maybeDetails =
+  case maybeDetails of
+    Just originalDetails ->
+      originalDetails
+        |> Platform.renderTracingSpanDetails
           [ Platform.Renderer deNoiseLog,
             Platform.Renderer deNoiseRedis
           ]
-      )
+        -- `renderTracingSpanDetails` returns Nothing when type of details
+        -- doesn't match any in our list of functions above.
+        --
+        -- Default to the original details then so we don't lose data
+        |> Maybe.withDefault originalDetails
+        |> Just
+    Nothing -> Nothing
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
 -- stuff in them. Aeson flatens the nesting, so:
