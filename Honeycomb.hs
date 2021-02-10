@@ -272,7 +272,9 @@ deNoise details =
 -- That's what we pay Bugsnag for.
 deNoiseLog :: Log.LogContexts -> Platform.SomeTracingSpanDetails
 deNoiseLog context@(Log.LogContexts contexts) =
-  let tojson thing = thing |> Aeson.encode |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict
+  let tojson thing = case thing |> Aeson.toJSON of
+                      Aeson.String txt -> txt
+                      value -> value |> Aeson.encode |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict
       deets = if List.length contexts > 5 then
                 HashMap.singleton "context" (tojson context)
               else
