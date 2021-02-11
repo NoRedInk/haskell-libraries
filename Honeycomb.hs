@@ -42,6 +42,7 @@ import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified Environment
 import GHC.Exts (groupWith, the)
+import qualified GHC.Stack as Stack
 import qualified Http
 import qualified List
 import qualified Log
@@ -55,6 +56,7 @@ import qualified Platform
 import qualified Redis
 import qualified System.Random as Random
 import qualified Task
+import qualified Text
 import qualified Text as NriText
 import qualified Prelude
 
@@ -158,6 +160,14 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
   let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration = Platform.finished span - Platform.started span |> Platform.inMicroseconds
   let timestamp = toISO8601 (common_timer commonFields) (Platform.started span)
+  let sourceLocation =
+        Platform.frame span
+          |> Maybe.map
+            ( \(_, frame) ->
+                Data.Text.pack (Stack.srcLocFile frame)
+                  ++ ":"
+                  ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine frame))
+            )
   let isError = case Platform.succeeded span of
         Platform.Succeeded -> False
         Platform.Failed -> True
@@ -174,6 +184,7 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
             allocatedBytes = Platform.allocated span,
             hostname = common_hostname commonFields,
             failed = isError,
+            sourceLocation = sourceLocation,
             enrichedData = [],
             details = Platform.details span
           }
@@ -358,6 +369,7 @@ data Span = Span
     allocatedBytes :: Int,
     hostname :: Text,
     failed :: Bool,
+    sourceLocation :: Maybe Text,
     enrichedData :: [(Text, Text)],
     details :: Maybe Platform.SomeTracingSpanDetails
   }
@@ -376,6 +388,7 @@ instance Aeson.ToJSON Span where
             "service_name" .= serviceName span,
             "duration_ms" .= durationMs span,
             "allocated_bytes" .= allocatedBytes span,
+            "source_location" .= sourceLocation span,
             "hostname" .= hostname span,
             "failed" .= failed span
           ]
