@@ -196,6 +196,9 @@ queryFromText text =
       Query.queriedRelation = ""
     }
 
+lastInsertId :: Query.Query Int
+lastInsertId = queryFromText "SELECT last_insert_id()"
+
 --
 -- EXECUTE QUERIES
 --
