@@ -53,6 +53,7 @@ module MySQL
     onDuplicateDoNothing,
     sqlYearly,
     replace,
+    lastInsertId,
   )
 where
 
