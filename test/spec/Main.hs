@@ -281,7 +281,46 @@ queryTests redisHandler =
            ]
              |> Task.sequence
              |> Expect.Task.succeeds
-         )
+         ),
+    Test.task "hmset inserts at least one field" <| do
+      Redis.Hash.hmset hashApi "test-key" (NonEmptyDict.init "field" "val" Dict.empty)
+        |> Redis.query redisHandler
+        |> Expect.Task.succeeds
+      Redis.Hash.hget hashApi "test-key" "field"
+        |> Redis.query redisHandler
+        |> Task.map (Expect.equal (Just "val"))
+        |> Expect.Task.succeeds
+        |> Task.andThen Expect.Task.check,
+    Test.task "hmset overwrites at least existing field" <| do
+      Redis.Hash.hset hashApi "test-key" "field" "old-val"
+        |> Redis.query redisHandler
+        |> Expect.Task.succeeds
+      Redis.Hash.hmset hashApi "test-key" (NonEmptyDict.init "field" "val" Dict.empty)
+        |> Redis.query redisHandler
+        |> Expect.Task.succeeds
+      Redis.Hash.hget hashApi "test-key" "field"
+        |> Redis.query redisHandler
+        |> Task.map (Expect.equal (Just "val"))
+        |> Expect.Task.succeeds
+        |> Task.andThen Expect.Task.check,
+    Test.task "hmset inserts multiple fields" <| do
+      NonEmptyDict.init
+        "field"
+        "val"
+        (Dict.fromList [("field2", "val2")])
+        |> Redis.Hash.hmset hashApi "test-key"
+        |> Redis.query redisHandler
+        |> Expect.Task.succeeds
+      Redis.Hash.hget hashApi "test-key" "field"
+        |> Redis.query redisHandler
+        |> Task.map (Expect.equal (Just "val"))
+        |> Expect.Task.succeeds
+        |> Task.andThen Expect.Task.check
+      Redis.Hash.hget hashApi "test-key" "field2"
+        |> Redis.query redisHandler
+        |> Task.map (Expect.equal (Just "val2"))
+        |> Expect.Task.succeeds
+        |> Task.andThen Expect.Task.check
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler

@@ -255,7 +255,7 @@ doQuery query hm =
                 Ok ()
               )
             Just (RedisHash hm') ->
-              ( HM.insert key (RedisHash (hm' ++ HM.fromList vals)) hm,
+              ( HM.insert key (RedisHash (HM.fromList vals ++ hm')) hm,
                 Ok ()
               )
             Just _ ->
