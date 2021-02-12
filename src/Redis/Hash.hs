@@ -26,6 +26,7 @@ module Redis.Hash
     hdel,
     hget,
     hgetall,
+    hkeys,
     hmget,
     hmset,
     hset,
@@ -102,6 +103,11 @@ data Api key field a = Api
     --
     -- https://redis.io/commands/hgetall
     hgetall :: key -> Internal.Query (Dict.Dict field a),
+    -- | Returns all field names in the hash stored at key.
+    -- Empty list means key doesn't exist
+    --
+    -- https://redis.io/commands/hkeys
+    hkeys :: key -> Internal.Query (List field),
     -- | Returns the values associated with the specified fields in the hash stored at key.--
     --
     -- equivalent to modern hget
@@ -164,6 +170,15 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey toField fromF
       hdel = \key fields -> Internal.Hdel (toKey key) (NonEmpty.map toField fields),
       hget = \key field -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Hget (toKey key) (toField field)),
       hgetall = Internal.WithResult (toDict fromField codecDecoder) << Internal.Hgetall << toKey,
+      hkeys = \key ->
+        Internal.Hkeys (toKey key)
+          |> Internal.WithResult
+            ( Prelude.traverse
+                ( \field -> case fromField field of
+                    Just field' -> Result.Ok field'
+                    Nothing -> Result.Err (Internal.DecodingFieldError field)
+                )
+            ),
       hmget = \key fields ->
         fields
           |> NonEmpty.map toField
