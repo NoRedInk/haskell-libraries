@@ -135,6 +135,12 @@ deriveSampleRate rootSpan handler' =
         case getRootSpanEndpoint rootSpan of
           Nothing -> False
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
+      baseRate = handler_fractionOfSuccessRequestsLogged handler'
+      requestDurationUs =
+        Platform.finished rootSpan - Platform.started rootSpan
+          |> Platform.inMicroseconds
+          |> Prelude.fromIntegral
+      apdexTUs = Prelude.fromIntegral (handler_apdexTimeUs handler')
    in if isNonAppEndpoint
         then --
         -- We have 2678400 seconds in a month
@@ -151,7 +157,13 @@ deriveSampleRate rootSpan handler' =
         -- High sample rates might make honeycomb make ridiculous assumptions
         -- about the actual request rate tho. Adjust if that's the case.
           1 / 500
-        else handler_fractionOfSuccessRequestsLogged handler'
+        else --
+        -- A linear increase, starting with a value of `baseRate` if the request
+        -- duration is smaller than `apdexTUs` and ending with a value of 1 if
+        -- `baseRate` is higher than 4 times `apdexTUs`.
+
+          baseRate + ((1 - baseRate) * (requestDurationUs - apdexTUs) / (3 * apdexTUs))
+            |> clamp baseRate 1
 
 toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
@@ -411,7 +423,8 @@ data Handler = Handler
     handler_serviceName :: Text,
     handler_environment :: Text,
     handler_honeycombApiKey :: Log.Secret Text,
-    handler_fractionOfSuccessRequestsLogged :: Float
+    handler_fractionOfSuccessRequestsLogged :: Float,
+    handler_apdexTimeUs :: Int
   }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
@@ -424,14 +437,16 @@ handler timer settings = do
         handler_serviceName = appName settings,
         handler_environment = appEnvironment settings,
         handler_honeycombApiKey = honeycombApiKey settings,
-        handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings
+        handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings,
+        handler_apdexTimeUs = appdexTimeUs settings
       }
 
 data Settings = Settings
   { appName :: Text,
     appEnvironment :: Text,
     honeycombApiKey :: Log.Secret Text,
-    fractionOfSuccessRequestsLogged :: Float
+    fractionOfSuccessRequestsLogged :: Float,
+    appdexTimeUs :: Int
   }
 
 decoder :: Environment.Decoder Settings
@@ -441,6 +456,7 @@ decoder =
     |> andMap appEnvironmentDecoder
     |> andMap honeycombApiKeyDecoder
     |> andMap fractionOfSuccessRequestsLoggedDecoder
+    |> andMap apdexTimeUsDecoder
 
 honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret Text)
 honeycombApiKeyDecoder =
@@ -481,3 +497,13 @@ fractionOfSuccessRequestsLoggedDecoder =
         Environment.defaultValue = "1"
       }
     Environment.float
+
+apdexTimeUsDecoder :: Environment.Decoder Int
+apdexTimeUsDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "HONEYCOMB_APDEX_TIME_IN_MICROSECONDS",
+        Environment.description = "The T value in the apdex, the time in microseconds in which a health request should complete.",
+        Environment.defaultValue = "100000" {- 100 ms -}
+      }
+    Environment.int
