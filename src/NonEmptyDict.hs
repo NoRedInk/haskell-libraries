@@ -14,6 +14,7 @@ import NriPrelude
 
 data NonEmptyDict k v
   = NonEmptyDict (k, v) (Dict.Dict k v)
+  deriving (Show)
 
 fromDict :: Ord k => Dict.Dict k v -> Maybe (NonEmptyDict k v)
 fromDict dict =
