@@ -80,7 +80,9 @@ report handler' _requestId span = do
   (skipLogging, sampleRate) <-
     case Platform.succeeded span of
       Platform.Succeeded -> do
-        deriveSampleRate span (handler_fractionOfSuccessRequestsLogged handler')
+        let probability = deriveSampleRate span handler'
+        roll <- Random.randomRIO (0, 1)
+        Prelude.pure (roll > probability, round (1 / probability))
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
   hostname' <- Network.HostName.getHostName
@@ -127,32 +129,29 @@ getBatchEventEndpoint event =
     |> details
     |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
 
-deriveSampleRate :: Platform.TracingSpan -> Float -> Prelude.IO (Bool, Int)
-deriveSampleRate rootSpan fractionOfSuccessRequestsLogged' = do
+deriveSampleRate :: Platform.TracingSpan -> Handler -> Float
+deriveSampleRate rootSpan handler' =
   let isNonAppEndpoint =
         case getRootSpanEndpoint rootSpan of
           Nothing -> False
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
-  let probability =
-        if isNonAppEndpoint
-          then --
-          -- We have 2678400 seconds in a month
-          -- We health-check once per second per Pod in Haskell
-          -- We have 2-3 pods at idle per service
-          -- We have some 5 services
-          -- We have up to 4 environments (staging, prod, demo, backyard)
-          --
-          -- Healthchecks would be 107,136,000 / sampleRate traces per month
-          --
-          -- But we also don't wanna never log them, who knows, they might cause
-          -- problems
-          --
-          -- High sample rates might make honeycomb make ridiculous assumptions
-          -- about the actual request rate tho. Adjust if that's the case.
-            1 / 500
-          else fractionOfSuccessRequestsLogged'
-  roll <- Random.randomRIO (0, 1)
-  Prelude.pure (roll > probability, round (1 / probability))
+   in if isNonAppEndpoint
+        then --
+        -- We have 2678400 seconds in a month
+        -- We health-check once per second per Pod in Haskell
+        -- We have 2-3 pods at idle per service
+        -- We have some 5 services
+        -- We have up to 4 environments (staging, prod, demo, backyard)
+        --
+        -- Healthchecks would be 107,136,000 / sampleRate traces per month
+        --
+        -- But we also don't wanna never log them, who knows, they might cause
+        -- problems
+        --
+        -- High sample rates might make honeycomb make ridiculous assumptions
+        -- about the actual request rate tho. Adjust if that's the case.
+          1 / 500
+        else handler_fractionOfSuccessRequestsLogged handler'
 
 toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
