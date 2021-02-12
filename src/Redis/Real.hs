@@ -106,46 +106,36 @@ instance (Prelude.Applicative m, Prelude.Applicative f) => Prelude.Applicative (
 doRawQuery :: (Prelude.Applicative f, Database.Redis.RedisCtx m f) => Internal.Query result -> PreparedQuery m f (Result Internal.Error result)
 doRawQuery query =
   case query of
+    Internal.Apply f x ->
+      map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
+    Internal.Del keys ->
+      Database.Redis.del (NonEmpty.toList (map toB keys))
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
     Internal.Exists key ->
       Database.Redis.exists (toB key)
         |> PreparedQuery
         |> map Ok
-    Internal.Ping ->
-      Database.Redis.ping
+    Internal.Expire key secs ->
+      Database.Redis.expire (toB key) (fromIntegral secs)
         |> PreparedQuery
-        |> map Ok
+        |> map (\_ -> Ok ())
     Internal.Get key ->
       Database.Redis.get (toB key)
-        |> PreparedQuery
-        |> map Ok
-    Internal.Set key val ->
-      Database.Redis.set (toB key) val
-        |> PreparedQuery
-        |> map (\_ -> Ok ())
-    Internal.Setex key seconds val ->
-      Database.Redis.setex (toB key) (Prelude.fromIntegral seconds) val
-        |> PreparedQuery
-        |> map (\_ -> Ok ())
-    Internal.Setnx key val ->
-      Database.Redis.setnx (toB key) val
         |> PreparedQuery
         |> map Ok
     Internal.Getset key val ->
       Database.Redis.getset (toB key) val
         |> PreparedQuery
         |> map Ok
-    Internal.Mget keys ->
-      Database.Redis.mget (NonEmpty.toList (map toB keys))
-        |> PreparedQuery
-        |> map Ok
-    Internal.Mset vals ->
-      Database.Redis.mset (NonEmpty.toList (NonEmpty.map (\(key, val) -> (toB key, val)) vals))
-        |> PreparedQuery
-        |> map (\_ -> Ok ())
-    Internal.Del keys ->
-      Database.Redis.del (NonEmpty.toList (map toB keys))
+    Internal.Hdel key fields ->
+      Database.Redis.hdel (toB key) (NonEmpty.toList (map toB fields))
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
+    Internal.Hget key field ->
+      Database.Redis.hget (toB key) (toB field)
+        |> PreparedQuery
+        |> map Ok
     Internal.Hgetall key ->
       Database.Redis.hgetall (toB key)
         |> PreparedQuery
@@ -159,16 +149,18 @@ doRawQuery query =
                         Prelude.Left _ -> Err (Internal.LibraryError "key exists but not parsable text")
                   )
           )
-    Internal.Hset key field val ->
-      Database.Redis.hset (toB key) (toB field) val
+    Internal.Hkeys key ->
+      Database.Redis.hkeys (toB key)
         |> PreparedQuery
-        |> map (\_ -> Ok ())
+        |> map
+          ( Prelude.traverse
+              ( \byteKey -> case Data.Text.Encoding.decodeUtf8' byteKey of
+                  Prelude.Right textKey -> Ok textKey
+                  Prelude.Left _ -> Err (Internal.LibraryError "key exists but not parsable text")
+              )
+          )
     Internal.Hsetnx key field val ->
       Database.Redis.hsetnx (toB key) (toB field) val
-        |> PreparedQuery
-        |> map Ok
-    Internal.Hget key field ->
-      Database.Redis.hget (toB key) (toB field)
         |> PreparedQuery
         |> map Ok
     Internal.Hmget key fields ->
@@ -179,10 +171,10 @@ doRawQuery query =
       Database.Redis.hmset (toB key) (map (\(field, val) -> (toB field, val)) (NonEmpty.toList vals))
         |> PreparedQuery
         |> map (\_ -> Ok ())
-    Internal.Hdel key fields ->
-      Database.Redis.hdel (toB key) (NonEmpty.toList (map toB fields))
+    Internal.Hset key field val ->
+      Database.Redis.hset (toB key) (toB field) val
         |> PreparedQuery
-        |> map (Ok << Prelude.fromIntegral)
+        |> map (\_ -> Ok ())
     Internal.Incr key ->
       Database.Redis.incr (toB key)
         |> PreparedQuery
@@ -191,22 +183,40 @@ doRawQuery query =
       Database.Redis.incrby (toB key) (fromIntegral amount)
         |> PreparedQuery
         |> map (Ok << fromIntegral)
-    Internal.Expire key secs ->
-      Database.Redis.expire (toB key) (fromIntegral secs)
-        |> PreparedQuery
-        |> map (\_ -> Ok ())
     Internal.Lrange key lower upper ->
       Database.Redis.lrange (toB key) (fromIntegral lower) (fromIntegral upper)
         |> PreparedQuery
         |> map Ok
+    Internal.Mget keys ->
+      Database.Redis.mget (NonEmpty.toList (map toB keys))
+        |> PreparedQuery
+        |> map Ok
+    Internal.Mset vals ->
+      Database.Redis.mset (NonEmpty.toList (NonEmpty.map (\(key, val) -> (toB key, val)) vals))
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Ping ->
+      Database.Redis.ping
+        |> PreparedQuery
+        |> map Ok
+    Internal.Pure x ->
+      pure (Ok x)
     Internal.Rpush key vals ->
       Database.Redis.rpush (toB key) (NonEmpty.toList vals)
         |> PreparedQuery
         |> map (Ok << fromIntegral)
-    Internal.Pure x ->
-      pure (Ok x)
-    Internal.Apply f x ->
-      map2 (map2 (<|)) (doRawQuery f) (doRawQuery x)
+    Internal.Set key val ->
+      Database.Redis.set (toB key) val
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Setex key seconds val ->
+      Database.Redis.setex (toB key) (Prelude.fromIntegral seconds) val
+        |> PreparedQuery
+        |> map (\_ -> Ok ())
+    Internal.Setnx key val ->
+      Database.Redis.setnx (toB key) val
+        |> PreparedQuery
+        |> map Ok
     Internal.WithResult f q ->
       let PreparedQuery redisCtx = doRawQuery q
        in PreparedQuery

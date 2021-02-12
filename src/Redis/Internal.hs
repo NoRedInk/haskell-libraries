@@ -63,6 +63,7 @@ cmds query'' =
     Hdel key fields -> [unwords ("HDEL" : key : NonEmpty.toList fields)]
     Hgetall key -> [unwords ["HGETALL", key]]
     Hget key field -> [unwords ["HGET", key, field]]
+    Hkeys key -> [unwords ["HKEY", key]]
     Hmget key fields -> [unwords ("HMGET" : key : NonEmpty.toList fields)]
     Hmset key pairs ->
       [ unwords
@@ -99,6 +100,7 @@ data Query a where
   Hdel :: Text -> NonEmpty Text -> Query Int
   Hgetall :: Text -> Query [(Text, ByteString)]
   Hget :: Text -> Text -> Query (Maybe ByteString)
+  Hkeys :: Text -> Query [Text]
   Hmget :: Text -> NonEmpty Text -> Query [Maybe ByteString]
   Hmset :: Text -> NonEmpty (Text, ByteString) -> Query ()
   Hset :: Text -> Text -> ByteString -> Query ()
@@ -187,6 +189,7 @@ namespaceQuery prefix query' =
     Mset assocs -> Mset (NonEmpty.map (\(k, v) -> (prefix ++ k, v)) assocs)
     Del keys -> Del (NonEmpty.map (prefix ++) keys)
     Hgetall key -> Hgetall (prefix ++ key)
+    Hkeys key -> Hkeys (prefix ++ key)
     Hmget key fields -> Hmget (prefix ++ key) fields
     Hget key field -> Hget (prefix ++ key) field
     Hset key field val -> Hset (prefix ++ key) field val
@@ -217,33 +220,34 @@ defaultExpiryKeysAfterSeconds secs handler =
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
   case query' of
+    Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)
     Del keys -> Set.fromList (NonEmpty.toList keys)
     Exists key -> Set.singleton key
-    Ping -> Set.empty
-    Get key -> Set.singleton key
-    Set key _ -> Set.singleton key
-    Setex key _ _ -> Set.singleton key
-    Setnx key _ -> Set.singleton key
-    Getset key _ -> Set.singleton key
-    Mget keys -> Set.fromList (NonEmpty.toList keys)
-    Hdel key _ -> Set.singleton key
-    Incr key -> Set.singleton key
-    Incrby key _ -> Set.singleton key
-    Mset assocs -> Set.fromList (NonEmpty.toList (NonEmpty.map Tuple.first assocs))
-    Hgetall key -> Set.singleton key
-    Hmget key _ -> Set.singleton key
-    Hget key _ -> Set.singleton key
-    Hset key _ _ -> Set.singleton key
-    Hsetnx key _ _ -> Set.singleton key
-    Hmset key _ -> Set.singleton key
-    Lrange key _ _ -> Set.singleton key
-    Rpush key _ -> Set.singleton key
-    Pure _ -> Set.empty
-    Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)
-    WithResult _ q -> keysTouchedByQuery q
     -- We use this function to collect keys we need to expire. If the user is
     -- explicitly setting an expiry we don't want to overwrite that.
     Expire _key _ -> Set.empty
+    Get key -> Set.singleton key
+    Getset key _ -> Set.singleton key
+    Hdel key _ -> Set.singleton key
+    Hget key _ -> Set.singleton key
+    Hgetall key -> Set.singleton key
+    Hkeys key -> Set.singleton key
+    Hmget key _ -> Set.singleton key
+    Hmset key _ -> Set.singleton key
+    Hset key _ _ -> Set.singleton key
+    Hsetnx key _ _ -> Set.singleton key
+    Incr key -> Set.singleton key
+    Incrby key _ -> Set.singleton key
+    Lrange key _ _ -> Set.singleton key
+    Mget keys -> Set.fromList (NonEmpty.toList keys)
+    Mset assocs -> Set.fromList (NonEmpty.toList (NonEmpty.map Tuple.first assocs))
+    Ping -> Set.empty
+    Pure _ -> Set.empty
+    Rpush key _ -> Set.singleton key
+    Set key _ -> Set.singleton key
+    Setex key _ _ -> Set.singleton key
+    Setnx key _ -> Set.singleton key
+    WithResult _ q -> keysTouchedByQuery q
 
 toB :: Text -> ByteString
 toB = Data.Text.Encoding.encodeUtf8

@@ -144,49 +144,10 @@ doQuery ::
   (HM.HashMap Text RedisType, Result Internal.Error a)
 doQuery query hm =
   case query of
-    Internal.Exists key ->
-      ( hm,
-        Ok (HM.member key hm)
-      )
-    Internal.Ping ->
-      ( hm,
-        Ok Database.Redis.Pong
-      )
-    Internal.Get key ->
-      ( hm,
-        HM.lookup key hm
-          |> Prelude.traverse expectByteString
-      )
-    Internal.Set key value ->
-      ( HM.insert key (RedisByteString value) hm,
-        Ok ()
-      )
-    Internal.Setex key _ value ->
-      ( HM.insert key (RedisByteString value) hm,
-        Ok ()
-      )
-    Internal.Setnx key value ->
-      if HM.member key hm
-        then (hm, Ok False)
-        else (HM.insert key (RedisByteString value) hm, Ok True)
-    Internal.Getset key value ->
-      ( HM.insert key (RedisByteString value) hm,
-        HM.lookup key hm
-          |> Prelude.traverse expectByteString
-      )
-    Internal.Mget keys ->
-      ( hm,
-        Prelude.traverse
-          (\key -> HM.lookup key hm |> Prelude.traverse expectByteString)
-          (NonEmpty.toList keys)
-      )
-    Internal.Mset assocs ->
-      ( List.foldl
-          (\(key, val) hm' -> HM.insert key val hm')
-          hm
-          (List.map (\(k, v) -> (k, RedisByteString v)) (NonEmpty.toList assocs)),
-        Ok ()
-      )
+    Internal.Apply fQuery xQuery ->
+      let (hm1, f) = doQuery fQuery hm
+          (hm2, x) = doQuery xQuery hm1
+       in (hm2, map2 (\f' x' -> f' x') f x)
     Internal.Del keys ->
       List.foldl
         ( \key (hm', count) ->
@@ -197,46 +158,38 @@ doQuery query hm =
         (hm, 0 :: Int)
         (NonEmpty.toList keys)
         |> Tuple.mapSecond Ok
-    Internal.Hgetall key ->
+    Internal.Exists key ->
+      ( hm,
+        Ok (HM.member key hm)
+      )
+    Internal.Expire _ _ ->
+      -- Expiring is an intentional no-op in `Redis.Mock`. Implementing it would
+      -- likely be a lot of effort, and only support writing slow tests.
+      ( hm,
+        Ok ()
+      )
+    Internal.Get key ->
       ( hm,
         HM.lookup key hm
-          |> Prelude.traverse expectHash
-          |> map
-            ( \res ->
-                case res of
-                  Just hm' -> HM.toList hm'
-                  Nothing -> []
-            )
+          |> Prelude.traverse expectByteString
       )
-    Internal.Hset key field val ->
+    Internal.Getset key value ->
+      ( HM.insert key (RedisByteString value) hm,
+        HM.lookup key hm
+          |> Prelude.traverse expectByteString
+      )
+    Internal.Hdel key fields ->
       case HM.lookup key hm of
         Nothing ->
-          ( HM.insert key (RedisHash (HM.singleton field val)) hm,
-            Ok ()
-          )
-        Just (RedisHash hm') ->
-          ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
-            Ok ()
-          )
-        Just _ ->
           ( hm,
-            Err wrongTypeErr
-          )
-    Internal.Hsetnx key field val ->
-      case HM.lookup key hm of
-        Nothing ->
-          ( HM.insert key (RedisHash (HM.singleton field val)) hm,
-            Ok True
+            Ok 0
           )
         Just (RedisHash hm') ->
-          if HM.member field hm'
-            then
-              ( hm,
-                Ok False
-              )
-            else
-              ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
-                Ok True
+          let hmAfterDeletions = Prelude.foldr HM.delete hm' fields
+           in ( HM.insert key (RedisHash hmAfterDeletions) hm,
+                HM.size hm' - HM.size hmAfterDeletions
+                  |> Prelude.fromIntegral
+                  |> Ok
               )
         Just _ ->
           ( hm,
@@ -256,6 +209,28 @@ doQuery query hm =
           ( hm,
             Err wrongTypeErr
           )
+    Internal.Hgetall key ->
+      ( hm,
+        HM.lookup key hm
+          |> Prelude.traverse expectHash
+          |> map
+            ( \res ->
+                case res of
+                  Just hm' -> HM.toList hm'
+                  Nothing -> []
+            )
+      )
+    Internal.Hkeys key ->
+      ( hm,
+        HM.lookup key hm
+          |> Prelude.traverse expectHash
+          |> map
+            ( \res ->
+                case res of
+                  Just hm' -> HM.keys hm'
+                  Nothing -> []
+            )
+      )
     Internal.Hmget key fields ->
       case HM.lookup key hm of
         Nothing ->
@@ -287,18 +262,35 @@ doQuery query hm =
               ( hm,
                 Err wrongTypeErr
               )
-    Internal.Hdel key fields ->
+    Internal.Hset key field val ->
       case HM.lookup key hm of
         Nothing ->
-          ( hm,
-            Ok 0
+          ( HM.insert key (RedisHash (HM.singleton field val)) hm,
+            Ok ()
           )
         Just (RedisHash hm') ->
-          let hmAfterDeletions = Prelude.foldr HM.delete hm' fields
-           in ( HM.insert key (RedisHash hmAfterDeletions) hm,
-                HM.size hm' - HM.size hmAfterDeletions
-                  |> Prelude.fromIntegral
-                  |> Ok
+          ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
+            Ok ()
+          )
+        Just _ ->
+          ( hm,
+            Err wrongTypeErr
+          )
+    Internal.Hsetnx key field val ->
+      case HM.lookup key hm of
+        Nothing ->
+          ( HM.insert key (RedisHash (HM.singleton field val)) hm,
+            Ok True
+          )
+        Just (RedisHash hm') ->
+          if HM.member field hm'
+            then
+              ( hm,
+                Ok False
+              )
+            else
+              ( HM.insert key (RedisHash (HM.insert field val hm')) hm,
+                Ok True
               )
         Just _ ->
           ( hm,
@@ -337,6 +329,24 @@ doQuery query hm =
           Just _ ->
             Err wrongTypeErr
       )
+    Internal.Mget keys ->
+      ( hm,
+        Prelude.traverse
+          (\key -> HM.lookup key hm |> Prelude.traverse expectByteString)
+          (NonEmpty.toList keys)
+      )
+    Internal.Mset assocs ->
+      ( List.foldl
+          (\(key, val) hm' -> HM.insert key val hm')
+          hm
+          (List.map (\(k, v) -> (k, RedisByteString v)) (NonEmpty.toList assocs)),
+        Ok ()
+      )
+    Internal.Ping ->
+      ( hm,
+        Ok Database.Redis.Pong
+      )
+    Internal.Pure x -> (hm, Ok x)
     Internal.Rpush key vals' ->
       let vals = NonEmpty.toList vals'
        in case HM.lookup key hm of
@@ -353,17 +363,18 @@ doQuery query hm =
               ( hm,
                 Err wrongTypeErr
               )
-    Internal.Expire _ _ ->
-      -- Expiring is an intentional no-op in `Redis.Mock`. Implementing it would
-      -- likely be a lot of effort, and only support writing slow tests.
-      ( hm,
+    Internal.Set key value ->
+      ( HM.insert key (RedisByteString value) hm,
         Ok ()
       )
-    Internal.Pure x -> (hm, Ok x)
-    Internal.Apply fQuery xQuery ->
-      let (hm1, f) = doQuery fQuery hm
-          (hm2, x) = doQuery xQuery hm1
-       in (hm2, map2 (\f' x' -> f' x') f x)
+    Internal.Setex key _ value ->
+      ( HM.insert key (RedisByteString value) hm,
+        Ok ()
+      )
+    Internal.Setnx key value ->
+      if HM.member key hm
+        then (hm, Ok False)
+        else (HM.insert key (RedisByteString value) hm, Ok True)
     Internal.WithResult f q ->
       doQuery q hm
         |> map
