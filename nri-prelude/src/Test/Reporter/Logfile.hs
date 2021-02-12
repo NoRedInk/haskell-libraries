@@ -1,0 +1,54 @@
+module Test.Reporter.Logfile
+  ( report,
+  )
+where
+
+import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy
+import qualified GHC.Clock as Clock
+import qualified List
+import qualified Maybe
+import NriPrelude
+import qualified Platform.Internal as Platform
+import qualified System.Directory
+import System.FilePath ((</>))
+import qualified Test.Internal as Internal
+import qualified Tuple
+import qualified Prelude
+
+report :: Internal.SuiteResult -> Prelude.IO ()
+report results = do
+  tmpDir <- System.Directory.getTemporaryDirectory
+  let logFile = tmpDir </> "nri-prelude-logs"
+  let testSpans = spans results
+  clock <- Clock.getMonotonicTimeNSec
+  let rootSpan =
+        Platform.TracingSpan
+          { Platform.name = "test run",
+            Platform.started =
+              List.minimum (List.map Platform.started testSpans)
+                |> Maybe.withDefault (Platform.MonotonicTime clock),
+            Platform.finished =
+              List.maximum (List.map Platform.finished testSpans)
+                |> Maybe.withDefault (Platform.MonotonicTime clock),
+            Platform.frame = Nothing,
+            Platform.details = Nothing,
+            Platform.succeeded = case results of
+              Internal.AllPassed _ -> Platform.Succeeded
+              _ -> Platform.Failed,
+            Platform.allocated = 0,
+            Platform.children = testSpans
+          }
+  Aeson.encode rootSpan ++ "\n"
+    |> Data.ByteString.Lazy.appendFile (logFile)
+
+spans :: Internal.SuiteResult -> [Platform.TracingSpan]
+spans results =
+  case results of
+    Internal.AllPassed tests -> List.map Internal.body tests
+    Internal.OnlysPassed tests _ -> List.map Internal.body tests
+    Internal.PassedWithSkipped tests _ -> List.map Internal.body tests
+    Internal.TestsFailed passed _ failed ->
+      List.map Internal.body passed
+        ++ List.map (Tuple.first << Internal.body) failed
+    Internal.NoTestsInSuite -> []

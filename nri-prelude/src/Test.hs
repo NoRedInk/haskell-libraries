@@ -30,6 +30,7 @@ import qualified Task
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
 import qualified Test.Reporter.Junit
+import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Prelude
 
@@ -47,6 +48,7 @@ run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
   Test.Reporter.Stdout.report System.IO.stdout results
+  Test.Reporter.Logfile.report results
   args <- System.Environment.getArgs
   case getPath args of
     Nothing -> Prelude.pure ()
