@@ -28,23 +28,32 @@ import qualified System.Directory
 import System.FilePath ((</>))
 import qualified System.IO
 import qualified Text
+import qualified Tuple
 import qualified Zipper
 import qualified Prelude
 
 data Model
   = Model
       { currentTime :: Time.UTCTime,
-        loglines :: Maybe (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan))
+        loglines :: Maybe (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan)),
+        selectedRootSpan :: Maybe Platform.TracingSpan
       }
 
 data Msg
   = AddLogline ByteString.ByteString
   | DownOne
   | UpOne
+  | ShowDetails
+  | Exit
   | SetCurrentTime Time.UTCTime
 
 init :: Time.UTCTime -> Model
-init now = Model {currentTime = now, loglines = Nothing}
+init now =
+  Model
+    { currentTime = now,
+      loglines = Nothing,
+      selectedRootSpan = Nothing
+    }
 
 update :: Model -> Msg -> Brick.EventM () (Brick.Next Model)
 update model msg =
@@ -73,23 +82,52 @@ update model msg =
         { loglines = Maybe.map Zipper.prev (loglines model)
         }
         |> Brick.continue
+    ShowDetails ->
+      model
+        { selectedRootSpan =
+            Maybe.map
+              (Zipper.current >> Tuple.second)
+              (loglines model)
+        }
+        |> Brick.continue
+    Exit ->
+      model
+        { selectedRootSpan = Nothing
+        }
+        |> Brick.continue
 
 view :: Model -> [Brick.Widget ()]
 view model =
-  [ Brick.vBox
-      [ viewContents model,
-        viewKey model
+  let page = toPage model
+   in [ Brick.vBox
+          [ viewContents page,
+            viewKey page
+          ]
       ]
-  ]
 
-viewKey :: Model -> Brick.Widget ()
-viewKey model =
+data Page
+  = NoLogsFound
+  | SpanList Time.UTCTime (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan))
+  | SpanDetails Platform.TracingSpan
+
+toPage :: Model -> Page
+toPage model =
+  case (selectedRootSpan model, loglines model) of
+    (Just selected, _) -> SpanDetails selected
+    (Nothing, Just spans) -> SpanList (currentTime model) spans
+    (Nothing, Nothing) -> NoLogsFound
+
+viewKey :: Page -> Brick.Widget ()
+viewKey page =
   let exit = "q: exit"
-      updown = "↑↓: select log"
+      updown = "↑↓: select"
+      select = "enter: show details"
+      unselect = "backspace: unselect"
       shortcuts =
-        case loglines model of
-          Nothing -> [exit]
-          Just _ -> [exit, updown]
+        case page of
+          NoLogsFound -> [exit]
+          SpanList _ _ -> [exit, updown, select]
+          SpanDetails _ -> [exit, unselect]
    in Brick.vBox
         [ Brick.padTop Brick.Max Border.hBorder,
           shortcuts
@@ -98,18 +136,18 @@ viewKey model =
             |> Center.hCenter
         ]
 
-viewContents :: Model -> Brick.Widget ()
-viewContents model =
-  case loglines model of
-    Nothing ->
+viewContents :: Page -> Brick.Widget ()
+viewContents page =
+  case page of
+    NoLogsFound ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
         |> Center.hCenter
-    Just logs ->
+    SpanList now logs ->
       logs
         |> Zipper.indexedMap
           ( \i (time, span) ->
               Brick.hBox
-                [ Brick.txt (howFarBack time (currentTime model))
+                [ Brick.txt (howFarBack time now)
                     |> Brick.padLeft Brick.Max
                     |> Brick.hLimit 20,
                   Brick.txt "   ",
@@ -124,6 +162,12 @@ viewContents model =
         |> Zipper.toList
         |> Brick.vBox
         |> Brick.padLeftRight 1
+    SpanDetails span ->
+      Brick.vBox
+        [ Brick.txt (Platform.name span)
+            |> Center.hCenter,
+          Border.hBorder
+        ]
 
 howFarBack :: Time.UTCTime -> Time.UTCTime -> Text
 howFarBack date1 date2
@@ -195,7 +239,7 @@ handleEvent pushMsg model event =
     (Brick.VtyEvent vtyEvent) ->
       case vtyEvent of
         -- Quiting
-        Vty.EvKey (Vty.KChar 'q') [] -> Brick.halt model
+        Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
         Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
         Vty.EvKey (Vty.KChar 'd') [Vty.MCtrl] -> Brick.halt model
         -- Navigation
@@ -210,6 +254,18 @@ handleEvent pushMsg model event =
           Brick.continue model
         Vty.EvKey (Vty.KChar 'k') [] -> do
           liftIO (pushMsg UpOne)
+          Brick.continue model
+        Vty.EvKey Vty.KEnter [] -> do
+          liftIO (pushMsg ShowDetails)
+          Brick.continue model
+        Vty.EvKey (Vty.KChar 'l') [] -> do
+          liftIO (pushMsg ShowDetails)
+          Brick.continue model
+        Vty.EvKey Vty.KBS [] -> do
+          liftIO (pushMsg Exit)
+          Brick.continue model
+        Vty.EvKey (Vty.KChar 'h') [] -> do
+          liftIO (pushMsg Exit)
           Brick.continue model
         -- Fallback
         _ -> Brick.continue model
