@@ -7,6 +7,7 @@ import qualified Brick.Widgets.Center as Center
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as ByteString.Lazy
@@ -16,6 +17,7 @@ import qualified Graphics.Vty as Vty
 import qualified List
 import qualified Maybe
 import NriPrelude
+import qualified Platform
 import qualified System.Directory
 import System.FilePath ((</>))
 import qualified System.IO
@@ -25,7 +27,7 @@ import qualified Prelude
 
 data Model
   = Model
-      { loglines :: Maybe (Zipper.Zipper ByteString.ByteString)
+      { loglines :: Maybe (Zipper.Zipper Platform.TracingSpan)
       }
 
 data Msg
@@ -40,12 +42,16 @@ update :: Model -> Msg -> Brick.EventM () (Brick.Next Model)
 update model msg =
   case msg of
     AddLogline line ->
-      model
-        { loglines = case loglines model of
-            Nothing -> Just (Zipper.singleton line)
-            Just zipper -> Just (Zipper.prepend [line] zipper)
-        }
-        |> Brick.continue
+      case Aeson.decodeStrict' line of
+        Nothing ->
+          Brick.continue model
+        Just span ->
+          model
+            { loglines = case loglines model of
+                Nothing -> Just (Zipper.singleton span)
+                Just zipper -> Just (Zipper.prepend [span] zipper)
+            }
+            |> Brick.continue
     DownOne ->
       model
         { loglines = Maybe.map Zipper.next (loglines model)
@@ -90,8 +96,8 @@ viewContents model =
     Just logs ->
       logs
         |> Zipper.indexedMap
-          ( \i el ->
-              Brick.str (Prelude.show el)
+          ( \i span ->
+              Brick.txt (Platform.name span)
                 |> Center.hCenter
                 |> if i == 0
                   then Brick.withAttr "selected"
