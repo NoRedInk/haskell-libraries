@@ -236,10 +236,12 @@ viewContents page =
             |> Center.hCenter,
           Border.hBorder,
           Brick.hBox
-            [ viewSpanList logline spans,
+            [ viewSpanList logline spans
+                |> Brick.hLimitPercent 50,
               viewSpanDetails (Zipper.current spans)
+                |> Brick.padRight Brick.Max
+                |> Brick.hLimitPercent 50
             ]
-            |> Brick.padLeftRight 1
         ]
 
 viewSpanList :: Logline -> Zipper.Zipper Span -> Brick.Widget Name
@@ -250,6 +252,7 @@ viewSpanList Logline {logId} spans =
           Brick.hBox
             [ Brick.txt (Platform.name (original span))
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
+                |> Brick.padRight Brick.Max
             ]
             |> if i == 0
               then Brick.withAttr "selected" >> Brick.visible
@@ -258,6 +261,7 @@ viewSpanList Logline {logId} spans =
     |> Zipper.toList
     |> Brick.vBox
     |> Brick.viewport (SpanDetailsListViewport logId) Brick.Vertical
+    |> Brick.padLeftRight 1
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
