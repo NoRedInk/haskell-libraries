@@ -11,14 +11,17 @@ import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
+import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.IORef as IORef
+import qualified Data.Text
 import qualified Data.Time as Time
 import qualified GHC.IO.Encoding
+import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
 import qualified List
 import NriPrelude
@@ -188,8 +191,8 @@ viewKey :: Page -> Brick.Widget Name
 viewKey page =
   let exit = "q: exit"
       updown = "↑↓: select"
-      select = "enter: show details"
-      unselect = "backspace: unselect"
+      select = "enter: details"
+      unselect = "backspace: back"
       shortcuts =
         case page of
           NoLogsFound -> [exit]
@@ -225,14 +228,18 @@ viewContents page =
           )
         |> Zipper.toList
         |> Brick.vBox
-        |> Brick.padLeftRight 1
         |> Brick.viewport RootSpanListViewport Brick.Vertical
+        |> Brick.padLeftRight 1
     SpanDetails logline spans ->
       Brick.vBox
         [ Brick.txt (Platform.name (logSpan logline))
             |> Center.hCenter,
           Border.hBorder,
-          viewSpanList logline spans
+          Brick.hBox
+            [ viewSpanList logline spans,
+              viewSpanDetails (Zipper.current spans)
+            ]
+            |> Brick.padLeftRight 1
         ]
 
 viewSpanList :: Logline -> Zipper.Zipper Span -> Brick.Widget Name
@@ -250,8 +257,41 @@ viewSpanList Logline {logId} spans =
       )
     |> Zipper.toList
     |> Brick.vBox
-    |> Brick.padLeftRight 1
     |> Brick.viewport (SpanDetailsListViewport logId) Brick.Vertical
+
+viewSpanDetails :: Span -> Brick.Widget Name
+viewSpanDetails Span {original} =
+  Brick.vBox
+    [ Brick.txt
+        ( "duration: "
+            ++ ( Platform.finished original - Platform.started original
+                   |> Platform.inMicroseconds
+                   |> Prelude.fromIntegral
+                   |> (\n -> n `Prelude.div` 1000)
+                   |> Text.fromInt
+               )
+            ++ " ms"
+        ),
+      case Platform.frame original of
+        Nothing -> Brick.emptyWidget
+        Just (_, srcLoc) ->
+          Brick.txt
+            ( "source: "
+                ++ Data.Text.pack (Stack.srcLocFile srcLoc)
+                ++ ":"
+                ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
+            ),
+      case Platform.succeeded original of
+        Platform.Succeeded -> Brick.txt "succeeded"
+        Platform.Failed -> Brick.txt "failed"
+        Platform.FailedWith exception ->
+          Brick.vBox
+            [ Brick.txt "failed with:",
+              Exception.displayException exception
+                |> Brick.strWrap
+                |> Brick.padLeft (Brick.Pad 2)
+            ]
+    ]
 
 howFarBack :: Time.UTCTime -> Time.UTCTime -> Text
 howFarBack date1 date2
