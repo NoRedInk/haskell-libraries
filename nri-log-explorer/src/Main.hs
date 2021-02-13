@@ -1,4 +1,9 @@
-module Main (main) where
+{-# LANGUAGE NumericUnderscores #-}
+
+module Main
+  ( main,
+  )
+where
 
 import qualified Brick
 import qualified Brick.BChan
@@ -12,6 +17,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.IORef as IORef
+import qualified Data.Time as Time
 import qualified GHC.IO.Encoding
 import qualified Graphics.Vty as Vty
 import qualified List
@@ -27,20 +33,25 @@ import qualified Prelude
 
 data Model
   = Model
-      { loglines :: Maybe (Zipper.Zipper Platform.TracingSpan)
+      { currentTime :: Time.UTCTime,
+        loglines :: Maybe (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan))
       }
 
 data Msg
   = AddLogline ByteString.ByteString
   | DownOne
   | UpOne
+  | SetCurrentTime Time.UTCTime
 
-init :: Model
-init = Model {loglines = Nothing}
+init :: Time.UTCTime -> Model
+init now = Model {currentTime = now, loglines = Nothing}
 
 update :: Model -> Msg -> Brick.EventM () (Brick.Next Model)
 update model msg =
   case msg of
+    SetCurrentTime time ->
+      model {currentTime = time}
+        |> Brick.continue
     AddLogline line ->
       case Aeson.decodeStrict' line of
         Nothing ->
@@ -96,8 +107,15 @@ viewContents model =
     Just logs ->
       logs
         |> Zipper.indexedMap
-          ( \i span ->
-              Brick.txt (Platform.name span)
+          ( \i (time, span) ->
+              Brick.hBox
+                [ Brick.txt (howFarBack time (currentTime model))
+                    |> Brick.padLeft Brick.Max
+                    |> Brick.hLimit 20,
+                  Brick.txt "   ",
+                  Brick.txt (Platform.name span)
+                    |> Brick.padRight Brick.Max
+                ]
                 |> Center.hCenter
                 |> if i == 0
                   then Brick.withAttr "selected"
@@ -105,6 +123,19 @@ viewContents model =
           )
         |> Zipper.toList
         |> Brick.vBox
+        |> Brick.padLeftRight 1
+
+howFarBack :: Time.UTCTime -> Time.UTCTime -> Text
+howFarBack date1 date2
+  | diff < 60 = "seconds ago"
+  | diff < 60 * 60 = Text.fromInt (diff `Prelude.div` 60) ++ " minutes ago"
+  | diff < 60 * 60 * 24 = Text.fromInt (diff `Prelude.div` (60 * 60)) ++ " hours ago"
+  | Prelude.otherwise = Text.fromInt (diff `Prelude.div` (60 * 60 * 24)) ++ " days ago"
+  where
+    diff =
+      Time.diffUTCTime date1 date2
+        |> Prelude.round
+        |> abs
 
 -- Brick App boilerplate
 
@@ -119,13 +150,23 @@ main = do
   let buildVty = Vty.mkVty Vty.defaultConfig
   initialVty <- buildVty
   let pushMsg = Brick.BChan.writeBChan eventChan
+  now <- Time.getCurrentTime
   Async.race_
-    ( System.IO.withFile
-        logFile
-        System.IO.ReadMode
-        (tailLines partOfLine (AddLogline >> pushMsg))
+    ( Async.race_
+        ( System.IO.withFile
+            logFile
+            System.IO.ReadMode
+            (tailLines partOfLine (AddLogline >> pushMsg))
+        )
+        (updateTime (SetCurrentTime >> pushMsg))
     )
-    (Brick.customMain initialVty buildVty (Just eventChan) (app pushMsg) init)
+    ( Brick.customMain
+        initialVty
+        buildVty
+        (Just eventChan)
+        (app pushMsg)
+        (init now)
+    )
 
 app :: (Msg -> Prelude.IO ()) -> Brick.App Model Msg ()
 app pushMsg =
@@ -176,6 +217,13 @@ handleEvent pushMsg model event =
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
 
+updateTime :: (Time.UTCTime -> Prelude.IO ()) -> Prelude.IO ()
+updateTime withTime = do
+  time <- Time.getCurrentTime
+  withTime time
+  Control.Concurrent.threadDelay 10_000_000 {- 10 s -}
+  updateTime withTime
+
 -- Tail a file handle, calling a callback function every time a new line is
 -- read. This function will intentionally hang, waiting for additional input to
 -- the handle it's reading from.
@@ -185,13 +233,13 @@ tailLines ::
   System.IO.Handle ->
   Prelude.IO ()
 tailLines partOfLine withLine handle = do
-  chunk <- ByteString.hGetSome handle 10000
+  chunk <- ByteString.hGetSome handle 10_000 {- 10 kb -}
   case ByteString.split 10 {- \n -} chunk of
     [] -> do
-      Control.Concurrent.threadDelay 100000 {- 100 ms -}
+      Control.Concurrent.threadDelay 100_000 {- 100 ms -}
       tailLines partOfLine withLine handle
     [""] -> do
-      Control.Concurrent.threadDelay 100000 {- 100 ms -}
+      Control.Concurrent.threadDelay 100_000 {- 100 ms -}
       tailLines partOfLine withLine handle
     [segment] -> do
       IORef.modifyIORef' partOfLine (\acc -> acc ++ Builder.byteString segment)

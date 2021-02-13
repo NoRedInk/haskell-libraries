@@ -5,6 +5,7 @@ where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
+import qualified Data.Time as Time
 import qualified GHC.Clock as Clock
 import qualified List
 import qualified Maybe
@@ -22,6 +23,7 @@ report results = do
   let logFile = tmpDir </> "nri-prelude-logs"
   let testSpans = spans results
   clock <- Clock.getMonotonicTimeNSec
+  now <- Time.getCurrentTime
   let rootSpan =
         Platform.TracingSpan
           { Platform.name = "test run",
@@ -39,7 +41,7 @@ report results = do
             Platform.allocated = 0,
             Platform.children = testSpans
           }
-  Aeson.encode rootSpan ++ "\n"
+  Aeson.encode (now, rootSpan) ++ "\n"
     |> Data.ByteString.Lazy.appendFile (logFile)
 
 spans :: Internal.SuiteResult -> [Platform.TracingSpan]
