@@ -53,8 +53,8 @@ data Span
 
 data Msg
   = AddLogline ByteString.ByteString
-  | DownOne
-  | UpOne
+  | DownBy Int
+  | UpBy Int
   | ShowDetails
   | Exit
   | SetCurrentTime Time.UTCTime
@@ -95,21 +95,21 @@ update model msg =
                   lastId = newId
                 }
                 |> Brick.continue
-    DownOne ->
+    DownBy n ->
       ( \page ->
           case page of
             NoLogsFound -> NoLogsFound
-            SpanList time spans -> SpanList time (Zipper.next spans)
-            SpanDetails root spans -> SpanDetails root (Zipper.next spans)
+            SpanList time spans -> SpanList time (repeat n Zipper.next spans)
+            SpanDetails root spans -> SpanDetails root (repeat n Zipper.next spans)
       )
         |> withPage model
         |> Brick.continue
-    UpOne ->
+    UpBy n ->
       ( \page ->
           case page of
             NoLogsFound -> NoLogsFound
-            SpanList time spans -> SpanList time (Zipper.prev spans)
-            SpanDetails root spans -> SpanDetails root (Zipper.prev spans)
+            SpanList time spans -> SpanList time (repeat n Zipper.prev spans)
+            SpanDetails root spans -> SpanDetails root (repeat n Zipper.prev spans)
       )
         |> withPage model
         |> Brick.continue
@@ -130,6 +130,12 @@ update model msg =
         { selectedRootSpan = Nothing
         }
         |> Brick.continue
+
+repeat :: Int -> (a -> a) -> a -> a
+repeat n f x =
+  if n <= 0
+    then x
+    else f x |> repeat (n - 1) f
 
 toFlatList :: Platform.TracingSpan -> Zipper.Zipper Span
 toFlatList span =
@@ -315,19 +321,24 @@ handleEvent pushMsg model event =
         -- Quiting
         Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
         Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
-        Vty.EvKey (Vty.KChar 'd') [Vty.MCtrl] -> Brick.halt model
         -- Navigation
         Vty.EvKey Vty.KDown [] -> do
-          liftIO (pushMsg DownOne)
+          liftIO (pushMsg (DownBy 1))
           Brick.continue model
         Vty.EvKey (Vty.KChar 'j') [] -> do
-          liftIO (pushMsg DownOne)
+          liftIO (pushMsg (DownBy 1))
+          Brick.continue model
+        Vty.EvKey (Vty.KChar 'd') [Vty.MCtrl] -> do
+          liftIO (pushMsg (DownBy 10))
           Brick.continue model
         Vty.EvKey Vty.KUp [] -> do
-          liftIO (pushMsg UpOne)
+          liftIO (pushMsg (UpBy 1))
           Brick.continue model
         Vty.EvKey (Vty.KChar 'k') [] -> do
-          liftIO (pushMsg UpOne)
+          liftIO (pushMsg (UpBy 1))
+          Brick.continue model
+        Vty.EvKey (Vty.KChar 'u') [Vty.MCtrl] -> do
+          liftIO (pushMsg (UpBy 10))
           Brick.continue model
         Vty.EvKey Vty.KEnter [] -> do
           liftIO (pushMsg ShowDetails)
