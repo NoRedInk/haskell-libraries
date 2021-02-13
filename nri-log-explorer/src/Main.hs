@@ -28,15 +28,22 @@ import qualified System.Directory
 import System.FilePath ((</>))
 import qualified System.IO
 import qualified Text
-import qualified Tuple
 import qualified Zipper
 import qualified Prelude
 
 data Model
   = Model
       { currentTime :: Time.UTCTime,
-        loglines :: Maybe (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan)),
-        selectedRootSpan :: Maybe (Zipper.Zipper Span)
+        loglines :: Maybe (Zipper.Zipper Logline),
+        selectedRootSpan :: Maybe (Zipper.Zipper Span),
+        lastId :: Id
+      }
+
+data Logline
+  = Logline
+      { logId :: Id,
+        logTime :: Time.UTCTime,
+        logSpan :: Platform.TracingSpan
       }
 
 data Span
@@ -53,15 +60,23 @@ data Msg
   | Exit
   | SetCurrentTime Time.UTCTime
 
+newtype Id = Id Int deriving (Prelude.Num, Eq, Ord)
+
+data Name
+  = RootSpanListViewport
+  | SpanDetailsListViewport Id
+  deriving (Eq, Ord)
+
 init :: Time.UTCTime -> Model
 init now =
   Model
     { currentTime = now,
       loglines = Nothing,
-      selectedRootSpan = Nothing
+      selectedRootSpan = Nothing,
+      lastId = 0
     }
 
-update :: Model -> Msg -> Brick.EventM () (Brick.Next Model)
+update :: Model -> Msg -> Brick.EventM Name (Brick.Next Model)
 update model msg =
   case msg of
     SetCurrentTime time ->
@@ -71,13 +86,16 @@ update model msg =
       case Aeson.decodeStrict' line of
         Nothing ->
           Brick.continue model
-        Just span ->
-          model
-            { loglines = case loglines model of
-                Nothing -> Just (Zipper.singleton span)
-                Just zipper -> Just (Zipper.prepend [span] zipper)
-            }
-            |> Brick.continue
+        Just (date, span) ->
+          let newId = lastId model + 1
+              logline = Logline newId date span
+           in model
+                { loglines = case loglines model of
+                    Nothing -> Just (Zipper.singleton logline)
+                    Just zipper -> Just (Zipper.prepend [logline] zipper),
+                  lastId = newId
+                }
+                |> Brick.continue
     DownOne ->
       ( \page ->
           case page of
@@ -100,7 +118,7 @@ update model msg =
       model
         { selectedRootSpan =
             Maybe.map
-              (Zipper.current >> Tuple.second >> toFlatList)
+              (Zipper.current >> logSpan >> toFlatList)
               (loglines model)
         }
         |> Brick.continue
@@ -129,7 +147,7 @@ toFlatListHelper nesting span =
     }
     : List.concatMap (toFlatListHelper (nesting + 1)) (Platform.children span)
 
-view :: Model -> [Brick.Widget ()]
+view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
@@ -140,16 +158,13 @@ view model =
 
 data Page
   = NoLogsFound
-  | SpanList Time.UTCTime (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan))
-  | SpanDetails Platform.TracingSpan (Zipper.Zipper Span)
+  | SpanList Time.UTCTime (Zipper.Zipper Logline)
+  | SpanDetails Logline (Zipper.Zipper Span)
 
 toPage :: Model -> Page
 toPage model =
   case (selectedRootSpan model, loglines model) of
-    (Just selected, Just spans) ->
-      SpanDetails
-        (Tuple.second (Zipper.current spans))
-        selected
+    (Just selected, Just spans) -> SpanDetails (Zipper.current spans) selected
     (Nothing, Just spans) -> SpanList (currentTime model) spans
     (_, Nothing) -> NoLogsFound
 
@@ -160,7 +175,7 @@ withPage model fn =
     SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
     SpanDetails _ zipper -> model {selectedRootSpan = Just zipper}
 
-viewKey :: Page -> Brick.Widget ()
+viewKey :: Page -> Brick.Widget Name
 viewKey page =
   let exit = "q: exit"
       updown = "↑↓: select"
@@ -179,7 +194,7 @@ viewKey page =
             |> Center.hCenter
         ]
 
-viewContents :: Page -> Brick.Widget ()
+viewContents :: Page -> Brick.Widget Name
 viewContents page =
   case page of
     NoLogsFound ->
@@ -188,13 +203,13 @@ viewContents page =
     SpanList now logs ->
       logs
         |> Zipper.indexedMap
-          ( \i (time, span) ->
+          ( \i Logline {logSpan, logTime} ->
               Brick.hBox
-                [ Brick.txt (howFarBack time now)
+                [ Brick.txt (howFarBack logTime now)
                     |> Brick.padLeft Brick.Max
                     |> Brick.hLimit 20,
                   Brick.txt "   ",
-                  Brick.txt (Platform.name span)
+                  Brick.txt (Platform.name logSpan)
                     |> Brick.padRight Brick.Max
                 ]
                 |> Center.hCenter
@@ -205,9 +220,9 @@ viewContents page =
         |> Zipper.toList
         |> Brick.vBox
         |> Brick.padLeftRight 1
-    SpanDetails rootSpan spans ->
+    SpanDetails Logline {logSpan} spans ->
       Brick.vBox
-        [ Brick.txt (Platform.name rootSpan)
+        [ Brick.txt (Platform.name logSpan)
             |> Center.hCenter,
           Border.hBorder,
           spans
@@ -269,7 +284,7 @@ main = do
         (init now)
     )
 
-app :: (Msg -> Prelude.IO ()) -> Brick.App Model Msg ()
+app :: (Msg -> Prelude.IO ()) -> Brick.App Model Msg Name
 app pushMsg =
   Brick.App
     { Brick.appDraw = view,
@@ -289,8 +304,8 @@ attrMap =
 handleEvent ::
   (Msg -> Prelude.IO ()) ->
   Model ->
-  Brick.BrickEvent () Msg ->
-  Brick.EventM () (Brick.Next Model)
+  Brick.BrickEvent Name Msg ->
+  Brick.EventM Name (Brick.Next Model)
 handleEvent pushMsg model event =
   case event of
     (Brick.VtyEvent vtyEvent) ->
