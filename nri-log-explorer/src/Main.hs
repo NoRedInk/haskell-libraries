@@ -227,27 +227,31 @@ viewContents page =
         |> Brick.vBox
         |> Brick.padLeftRight 1
         |> Brick.viewport RootSpanListViewport Brick.Vertical
-    SpanDetails Logline {logSpan, logId} spans ->
+    SpanDetails logline spans ->
       Brick.vBox
-        [ Brick.txt (Platform.name logSpan)
+        [ Brick.txt (Platform.name (logSpan logline))
             |> Center.hCenter,
           Border.hBorder,
-          spans
-            |> Zipper.indexedMap
-              ( \i span ->
-                  Brick.hBox
-                    [ Brick.txt (Platform.name (original span))
-                        |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
-                    ]
-                    |> if i == 0
-                      then Brick.withAttr "selected" >> Brick.visible
-                      else identity
-              )
-            |> Zipper.toList
-            |> Brick.vBox
-            |> Brick.padLeftRight 1
-            |> Brick.viewport (SpanDetailsListViewport logId) Brick.Vertical
+          viewSpanList logline spans
         ]
+
+viewSpanList :: Logline -> Zipper.Zipper Span -> Brick.Widget Name
+viewSpanList Logline {logId} spans =
+  spans
+    |> Zipper.indexedMap
+      ( \i span ->
+          Brick.hBox
+            [ Brick.txt (Platform.name (original span))
+                |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
+            ]
+            |> if i == 0
+              then Brick.withAttr "selected" >> Brick.visible
+              else identity
+      )
+    |> Zipper.toList
+    |> Brick.vBox
+    |> Brick.padLeftRight 1
+    |> Brick.viewport (SpanDetailsListViewport logId) Brick.Vertical
 
 howFarBack :: Time.UTCTime -> Time.UTCTime -> Text
 howFarBack date1 date2
