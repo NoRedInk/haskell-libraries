@@ -21,7 +21,6 @@ import qualified Data.Time as Time
 import qualified GHC.IO.Encoding
 import qualified Graphics.Vty as Vty
 import qualified List
-import qualified Maybe
 import NriPrelude
 import qualified Platform
 import qualified System.Directory
@@ -60,12 +59,12 @@ data Msg
   | Exit
   | SetCurrentTime Time.UTCTime
 
-newtype Id = Id Int deriving (Prelude.Num, Eq, Ord)
+newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
 
 data Name
   = RootSpanListViewport
   | SpanDetailsListViewport Id
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 init :: Time.UTCTime -> Model
 init now =
@@ -115,12 +114,16 @@ update model msg =
         |> withPage model
         |> Brick.continue
     ShowDetails ->
-      model
-        { selectedRootSpan =
-            Maybe.map
-              (Zipper.current >> logSpan >> toFlatList)
-              (loglines model)
-        }
+      ( \page ->
+          case page of
+            NoLogsFound -> NoLogsFound
+            SpanList _ spans ->
+              SpanDetails
+                (Zipper.current spans)
+                (Zipper.current spans |> logSpan |> toFlatList)
+            SpanDetails root spans -> SpanDetails root spans
+      )
+        |> withPage model
         |> Brick.continue
     Exit ->
       model
@@ -185,14 +188,11 @@ viewKey page =
         case page of
           NoLogsFound -> [exit]
           SpanList _ _ -> [exit, updown, select]
-          SpanDetails _ _ -> [exit, unselect]
-   in Brick.vBox
-        [ Brick.padTop Brick.Max Border.hBorder,
-          shortcuts
-            |> Text.join "   "
-            |> Brick.txt
-            |> Center.hCenter
-        ]
+          SpanDetails _ _ -> [exit, updown, unselect]
+   in shortcuts
+        |> Text.join "   "
+        |> Brick.txt
+        |> Center.hCenter
 
 viewContents :: Page -> Brick.Widget Name
 viewContents page =
@@ -214,13 +214,14 @@ viewContents page =
                 ]
                 |> Center.hCenter
                 |> if i == 0
-                  then Brick.withAttr "selected"
+                  then Brick.withAttr "selected" >> Brick.visible
                   else identity
           )
         |> Zipper.toList
         |> Brick.vBox
         |> Brick.padLeftRight 1
-    SpanDetails Logline {logSpan} spans ->
+        |> Brick.viewport RootSpanListViewport Brick.Vertical
+    SpanDetails Logline {logSpan, logId} spans ->
       Brick.vBox
         [ Brick.txt (Platform.name logSpan)
             |> Center.hCenter,
@@ -233,12 +234,13 @@ viewContents page =
                         |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
                     ]
                     |> if i == 0
-                      then Brick.withAttr "selected"
+                      then Brick.withAttr "selected" >> Brick.visible
                       else identity
               )
             |> Zipper.toList
             |> Brick.vBox
             |> Brick.padLeftRight 1
+            |> Brick.viewport (SpanDetailsListViewport logId) Brick.Vertical
         ]
 
 howFarBack :: Time.UTCTime -> Time.UTCTime -> Text
