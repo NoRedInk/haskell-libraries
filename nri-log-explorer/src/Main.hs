@@ -2,6 +2,7 @@ module Main (main) where
 
 import qualified Brick
 import qualified Brick.BChan
+import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
@@ -18,6 +19,7 @@ import NriPrelude
 import qualified System.Directory
 import System.FilePath ((</>))
 import qualified System.IO
+import qualified Text
 import qualified Zipper
 import qualified Prelude
 
@@ -57,24 +59,46 @@ update model msg =
 
 view :: Model -> [Brick.Widget ()]
 view model =
+  [ Brick.vBox
+      [ viewContents model,
+        viewKey model
+      ]
+  ]
+
+viewKey :: Model -> Brick.Widget ()
+viewKey model =
+  let exit = "q: exit"
+      updown = "↑↓: select log"
+      shortcuts =
+        case loglines model of
+          Nothing -> [exit]
+          Just _ -> [exit, updown]
+   in Brick.vBox
+        [ Brick.padTop Brick.Max Border.hBorder,
+          shortcuts
+            |> Text.join "   "
+            |> Brick.txt
+            |> Center.hCenter
+        ]
+
+viewContents :: Model -> Brick.Widget ()
+viewContents model =
   case loglines model of
     Nothing ->
-      [ Brick.txt "Waiting for logs...\n\nGo run some tests!"
-          |> Center.center
-      ]
+      Brick.txt "Waiting for logs...\n\nGo run some tests!"
+        |> Center.hCenter
     Just logs ->
-      [ logs
-          |> Zipper.indexedMap
-            ( \i el ->
-                Brick.str (Prelude.show el)
-                  |> Center.hCenter
-                  |> if i == 0
-                    then Brick.withAttr "selected"
-                    else identity
-            )
-          |> Zipper.toList
-          |> Brick.vBox
-      ]
+      logs
+        |> Zipper.indexedMap
+          ( \i el ->
+              Brick.str (Prelude.show el)
+                |> Center.hCenter
+                |> if i == 0
+                  then Brick.withAttr "selected"
+                  else identity
+          )
+        |> Zipper.toList
+        |> Brick.vBox
 
 -- Brick App boilerplate
 
