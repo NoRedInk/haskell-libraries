@@ -36,7 +36,13 @@ data Model
   = Model
       { currentTime :: Time.UTCTime,
         loglines :: Maybe (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan)),
-        selectedRootSpan :: Maybe Platform.TracingSpan
+        selectedRootSpan :: Maybe (Zipper.Zipper Span)
+      }
+
+data Span
+  = Span
+      { nesting :: Int,
+        original :: Platform.TracingSpan
       }
 
 data Msg
@@ -73,20 +79,28 @@ update model msg =
             }
             |> Brick.continue
     DownOne ->
-      model
-        { loglines = Maybe.map Zipper.next (loglines model)
-        }
+      ( \page ->
+          case page of
+            NoLogsFound -> NoLogsFound
+            SpanList time spans -> SpanList time (Zipper.next spans)
+            SpanDetails root spans -> SpanDetails root (Zipper.next spans)
+      )
+        |> withPage model
         |> Brick.continue
     UpOne ->
-      model
-        { loglines = Maybe.map Zipper.prev (loglines model)
-        }
+      ( \page ->
+          case page of
+            NoLogsFound -> NoLogsFound
+            SpanList time spans -> SpanList time (Zipper.prev spans)
+            SpanDetails root spans -> SpanDetails root (Zipper.prev spans)
+      )
+        |> withPage model
         |> Brick.continue
     ShowDetails ->
       model
         { selectedRootSpan =
             Maybe.map
-              (Zipper.current >> Tuple.second)
+              (Zipper.current >> Tuple.second >> toFlatList)
               (loglines model)
         }
         |> Brick.continue
@@ -95,6 +109,25 @@ update model msg =
         { selectedRootSpan = Nothing
         }
         |> Brick.continue
+
+toFlatList :: Platform.TracingSpan -> Zipper.Zipper Span
+toFlatList span =
+  case Zipper.fromList (toFlatListHelper 0 span) of
+    Just zipper -> zipper
+    Nothing ->
+      Zipper.singleton
+        Span
+          { nesting = 0,
+            original = span
+          }
+
+toFlatListHelper :: Int -> Platform.TracingSpan -> [Span]
+toFlatListHelper nesting span =
+  Span
+    { nesting = nesting,
+      original = span
+    }
+    : List.concatMap (toFlatListHelper (nesting + 1)) (Platform.children span)
 
 view :: Model -> [Brick.Widget ()]
 view model =
@@ -108,14 +141,24 @@ view model =
 data Page
   = NoLogsFound
   | SpanList Time.UTCTime (Zipper.Zipper (Time.UTCTime, Platform.TracingSpan))
-  | SpanDetails Platform.TracingSpan
+  | SpanDetails Platform.TracingSpan (Zipper.Zipper Span)
 
 toPage :: Model -> Page
 toPage model =
   case (selectedRootSpan model, loglines model) of
-    (Just selected, _) -> SpanDetails selected
+    (Just selected, Just spans) ->
+      SpanDetails
+        (Tuple.second (Zipper.current spans))
+        selected
     (Nothing, Just spans) -> SpanList (currentTime model) spans
-    (Nothing, Nothing) -> NoLogsFound
+    (_, Nothing) -> NoLogsFound
+
+withPage :: Model -> (Page -> Page) -> Model
+withPage model fn =
+  case fn (toPage model) of
+    NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
+    SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
+    SpanDetails _ zipper -> model {selectedRootSpan = Just zipper}
 
 viewKey :: Page -> Brick.Widget ()
 viewKey page =
@@ -127,7 +170,7 @@ viewKey page =
         case page of
           NoLogsFound -> [exit]
           SpanList _ _ -> [exit, updown, select]
-          SpanDetails _ -> [exit, unselect]
+          SpanDetails _ _ -> [exit, unselect]
    in Brick.vBox
         [ Brick.padTop Brick.Max Border.hBorder,
           shortcuts
@@ -162,11 +205,25 @@ viewContents page =
         |> Zipper.toList
         |> Brick.vBox
         |> Brick.padLeftRight 1
-    SpanDetails span ->
+    SpanDetails rootSpan spans ->
       Brick.vBox
-        [ Brick.txt (Platform.name span)
+        [ Brick.txt (Platform.name rootSpan)
             |> Center.hCenter,
-          Border.hBorder
+          Border.hBorder,
+          spans
+            |> Zipper.indexedMap
+              ( \i span ->
+                  Brick.hBox
+                    [ Brick.txt (Platform.name (original span))
+                        |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
+                    ]
+                    |> if i == 0
+                      then Brick.withAttr "selected"
+                      else identity
+              )
+            |> Zipper.toList
+            |> Brick.vBox
+            |> Brick.padLeftRight 1
         ]
 
 howFarBack :: Time.UTCTime -> Time.UTCTime -> Text
