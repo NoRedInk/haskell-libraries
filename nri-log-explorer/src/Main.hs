@@ -227,8 +227,8 @@ viewContents page =
           ( \i Logline {logSpan, logTime} ->
               Brick.hBox
                 [ Brick.txt (howFarBack logTime now)
-                    |> Brick.padLeft Brick.Max
-                    |> Brick.hLimit 20,
+                    |> Brick.padRight Brick.Max
+                    |> Brick.hLimit 15,
                   Brick.txt "   ",
                   Brick.txt (spanSummary logSpan)
                     |> Brick.padRight Brick.Max
