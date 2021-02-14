@@ -412,7 +412,7 @@ runSingle test' =
           Platform.Internal.rootTracingSpanIO
             ""
             (MVar.putMVar spanVar)
-            "run single test"
+            "test"
             ( \log ->
                 body test'
                   |> unExpectation
@@ -420,7 +420,12 @@ runSingle test' =
                   |> map Ok
                   |> Task.perform log
             )
-        span <- MVar.takeMVar spanVar
+        span' <- MVar.takeMVar spanVar
+        let span =
+              span'
+                { Platform.Internal.summary = Just (name test'),
+                  Platform.Internal.frame = map (\loc -> ("", loc)) (loc test')
+                }
         res
           |> map (\res' -> test' {body = (span, res')})
           |> Prelude.pure
