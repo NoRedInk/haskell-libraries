@@ -21,6 +21,7 @@ module Test
   )
 where
 
+import qualified Control.Concurrent.Async as Async
 import NriPrelude
 import qualified Platform
 import qualified System.Directory
@@ -49,20 +50,37 @@ run :: Internal.Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
-  Test.Reporter.Stdout.report System.IO.stdout results
-  tmpDir <- System.Directory.getTemporaryDirectory
-  let logFile = tmpDir </> "nri-prelude-logs"
-  System.IO.withFile
-    logFile
-    System.IO.AppendMode
-    ( \handle ->
-        Test.Reporter.Logfile.report handle results
-    )
-  args <- System.Environment.getArgs
-  case getPath args of
-    Nothing -> Prelude.pure ()
-    Just path -> Test.Reporter.Junit.report path results
+  Async.mapConcurrently_
+    identity
+    [ reportStdout results,
+      reportLogfile results,
+      reportJunit results
+    ]
   Test.Reporter.ExitCode.report results
+
+reportStdout :: Internal.SuiteResult -> Prelude.IO ()
+reportStdout results =
+  Test.Reporter.Stdout.report System.IO.stdout results
+
+reportLogfile :: Internal.SuiteResult -> Prelude.IO ()
+reportLogfile results =
+  do
+    tmpDir <- System.Directory.getTemporaryDirectory
+    let logFile = tmpDir </> "nri-prelude-logs"
+    System.IO.withFile
+      logFile
+      System.IO.AppendMode
+      ( \handle ->
+          Test.Reporter.Logfile.report handle results
+      )
+
+reportJunit :: Internal.SuiteResult -> Prelude.IO ()
+reportJunit results =
+  do
+    args <- System.Environment.getArgs
+    case getPath args of
+      Nothing -> Prelude.pure ()
+      Just path -> Test.Reporter.Junit.report path results
 
 getPath :: [Prelude.String] -> Maybe FilePath.FilePath
 getPath args =
