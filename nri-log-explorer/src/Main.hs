@@ -251,8 +251,8 @@ viewContents page =
             [ viewSpanList logline spans
                 |> Brick.hLimitPercent 50,
               viewSpanDetails (Zipper.current spans)
+                |> Brick.padRight (Brick.Pad 1)
                 |> Brick.padRight Brick.Max
-                |> Brick.hLimitPercent 50
             ]
         ]
 
@@ -278,39 +278,47 @@ viewSpanList Logline {logId} spans =
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
   Brick.vBox
-    [ Brick.txt ("name: " ++ Platform.name original),
+    [ detailEntry "name" (Platform.name original),
       case Platform.summary original of
         Nothing -> Brick.emptyWidget
-        Just summary -> Brick.txt ("summary: " ++ summary),
-      Brick.txt
-        ( "duration: "
-            ++ ( Platform.finished original - Platform.started original
-                   |> Platform.inMicroseconds
-                   |> Prelude.fromIntegral
-                   |> (\n -> n `Prelude.div` 1000)
-                   |> Text.fromInt
-               )
+        Just summary -> detailEntry "summary" summary,
+      detailEntry
+        "duration"
+        ( ( Platform.finished original - Platform.started original
+              |> Platform.inMicroseconds
+              |> Prelude.fromIntegral
+              |> (\n -> n `Prelude.div` 1000)
+              |> Text.fromInt
+          )
             ++ " ms"
         ),
       case Platform.frame original of
         Nothing -> Brick.emptyWidget
         Just (_, srcLoc) ->
-          Brick.txt
-            ( "source: "
-                ++ Data.Text.pack (Stack.srcLocFile srcLoc)
+          detailEntry
+            "source"
+            ( Data.Text.pack (Stack.srcLocFile srcLoc)
                 ++ ":"
                 ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
             ),
       case Platform.succeeded original of
-        Platform.Succeeded -> Brick.txt "result: succeeded"
-        Platform.Failed -> Brick.txt "result: failed"
+        Platform.Succeeded -> detailEntry "result" "succeeded"
+        Platform.Failed -> detailEntry "result" "failed"
         Platform.FailedWith exception ->
-          Brick.vBox
-            [ Brick.txt "failed with:",
-              Exception.displayException exception
-                |> Brick.strWrap
-                |> Brick.padLeft (Brick.Pad 2)
-            ]
+          detailEntry
+            "failed with"
+            ( Exception.displayException exception
+                |> Data.Text.pack
+            )
+    ]
+
+detailEntry :: Text -> Text -> Brick.Widget Name
+detailEntry label val =
+  Brick.hBox
+    [ Brick.txt (label ++ ": ")
+        |> Brick.padLeft Brick.Max
+        |> Brick.hLimit 15,
+      Brick.txtWrap val
     ]
 
 howFarBack :: Time.UTCTime -> Time.UTCTime -> Text
