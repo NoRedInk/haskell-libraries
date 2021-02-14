@@ -14,12 +14,16 @@ import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as ByteString.Lazy
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IORef as IORef
 import qualified Data.List
 import qualified Data.Text
+import qualified Data.Text.Lazy
+import qualified Data.Text.Lazy.Builder
 import qualified Data.Time as Time
 import qualified Data.Version as Version
 import qualified GHC.IO.Encoding
@@ -309,7 +313,36 @@ viewSpanDetails Span {original} =
             "failed with"
             ( Exception.displayException exception
                 |> Data.Text.pack
+            ),
+      case map Aeson.toJSON (Platform.details original) of
+        Nothing -> Brick.emptyWidget
+        Just Aeson.Null -> Brick.emptyWidget
+        Just (Aeson.String str) -> detailEntry "details" str
+        Just (Aeson.Number number) ->
+          Data.Text.pack (Prelude.show number)
+            |> detailEntry "details"
+        Just (Aeson.Bool bool) ->
+          Data.Text.pack (Prelude.show bool)
+            |> detailEntry "details"
+        Just (Aeson.Array array) ->
+          detailEntry
+            "details"
+            ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder array
+                |> Data.Text.Lazy.Builder.toLazyText
+                |> Data.Text.Lazy.toStrict
             )
+        Just (Aeson.Object object) ->
+          HashMap.toList object
+            |> List.map
+              ( \(name, val) ->
+                  detailEntry
+                    name
+                    ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder val
+                        |> Data.Text.Lazy.Builder.toLazyText
+                        |> Data.Text.Lazy.toStrict
+                    )
+              )
+            |> Brick.vBox
     ]
 
 detailEntry :: Text -> Text -> Brick.Widget Name
