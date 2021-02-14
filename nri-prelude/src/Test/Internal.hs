@@ -420,14 +420,23 @@ runSingle test' =
                   |> map Ok
                   |> Task.perform log
             )
+        let testRest =
+              case res of
+                Ok x -> x
+                Err err -> never err
         span' <- MVar.takeMVar spanVar
         let span =
               span'
                 { Platform.Internal.summary = Just (name test'),
-                  Platform.Internal.frame = map (\loc -> ("", loc)) (loc test')
+                  Platform.Internal.frame = map (\loc -> ("", loc)) (loc test'),
+                  Platform.Internal.succeeded = case testRest of
+                    Succeeded -> Platform.Internal.Succeeded
+                    Failed failure ->
+                      Exception.toException failure
+                        |> Platform.Internal.FailedWith
                 }
-        res
-          |> map (\res' -> test' {body = (span, res')})
+        test' {body = (span, testRest)}
+          |> Ok
           |> Prelude.pure
     )
 

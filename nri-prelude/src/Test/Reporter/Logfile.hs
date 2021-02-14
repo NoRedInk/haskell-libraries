@@ -7,6 +7,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Time as Time
+import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified List
 import qualified Maybe
@@ -57,11 +58,69 @@ report now handle results = do
 
 spans :: Internal.SuiteResult -> [Platform.TracingSpan]
 spans results =
+  spansAndNamespaces results
+    |> groupIntoNamespaces
+
+spansAndNamespaces :: Internal.SuiteResult -> [([Text], Platform.TracingSpan)]
+spansAndNamespaces results =
   case results of
-    Internal.AllPassed tests -> List.map Internal.body tests
-    Internal.OnlysPassed tests _ -> List.map Internal.body tests
-    Internal.PassedWithSkipped tests _ -> List.map Internal.body tests
+    Internal.AllPassed tests -> List.map bodyAndDescribes tests
+    Internal.OnlysPassed tests _ -> List.map bodyAndDescribes tests
+    Internal.PassedWithSkipped tests _ -> List.map bodyAndDescribes tests
     Internal.TestsFailed passed _ failed ->
-      List.map Internal.body passed
-        ++ List.map (Tuple.first << Internal.body) failed
+      List.map bodyAndDescribes passed
+        ++ List.map (Tuple.mapSecond Tuple.first << bodyAndDescribes) failed
     Internal.NoTestsInSuite -> []
+  where
+    bodyAndDescribes :: Internal.SingleTest body -> ([Text], body)
+    bodyAndDescribes test = (Internal.describes test, Internal.body test)
+
+groupIntoNamespaces :: [([Text], Platform.TracingSpan)] -> [Platform.TracingSpan]
+groupIntoNamespaces namespacedSpans =
+  namespacedSpans
+    |> groupBy (List.head << Tuple.first)
+    |> Dict.toList
+    |> List.concatMap
+      ( \(headNamespace, namespacedSpanGroup) ->
+          let spans' = List.map Tuple.second namespacedSpanGroup
+           in case headNamespace of
+                Nothing -> spans'
+                Just namespace ->
+                  [ Platform.TracingSpan
+                      { Platform.name = "describe",
+                        Platform.started =
+                          List.minimum (List.map Platform.started spans')
+                            |> Maybe.withDefault (Platform.MonotonicTime 0),
+                        Platform.finished =
+                          List.maximum (List.map Platform.finished spans')
+                            |> Maybe.withDefault (Platform.MonotonicTime 0),
+                        Platform.frame = Nothing,
+                        Platform.details = Nothing,
+                        Platform.summary = Just namespace,
+                        Platform.succeeded =
+                          Prelude.mconcat (List.map Platform.succeeded spans'),
+                        Platform.allocated = 0,
+                        Platform.children =
+                          namespacedSpanGroup
+                            |> List.filterMap
+                              ( \(namespaces, span) ->
+                                  case namespaces of
+                                    [] -> Nothing
+                                    _ : rest -> Just (rest, span)
+                              )
+                            |> groupIntoNamespaces
+                      }
+                  ]
+      )
+
+groupBy :: Ord b => (a -> b) -> List a -> Dict.Dict b (List a)
+groupBy f list =
+  List.foldr
+    ( \x ->
+        Dict.update (f x) <| \val ->
+          case val of
+            Nothing -> Just [x]
+            Just xs -> Just (x : xs)
+    )
+    Dict.empty
+    list
