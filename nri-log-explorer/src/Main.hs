@@ -278,7 +278,11 @@ viewSpanList Logline {logId} spans =
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
   Brick.vBox
-    [ Brick.txt
+    [ Brick.txt ("name: " ++ Platform.name original),
+      case Platform.summary original of
+        Nothing -> Brick.emptyWidget
+        Just summary -> Brick.txt ("summary: " ++ summary),
+      Brick.txt
         ( "duration: "
             ++ ( Platform.finished original - Platform.started original
                    |> Platform.inMicroseconds
@@ -298,8 +302,8 @@ viewSpanDetails Span {original} =
                 ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
             ),
       case Platform.succeeded original of
-        Platform.Succeeded -> Brick.txt "succeeded"
-        Platform.Failed -> Brick.txt "failed"
+        Platform.Succeeded -> Brick.txt "result: succeeded"
+        Platform.Failed -> Brick.txt "result: failed"
         Platform.FailedWith exception ->
           Brick.vBox
             [ Brick.txt "failed with:",
