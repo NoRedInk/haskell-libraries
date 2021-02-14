@@ -5,19 +5,34 @@ where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
+import qualified Data.Text
 import qualified Data.Time as Time
+import qualified GHC.Stack as Stack
 import qualified List
 import qualified Maybe
 import NriPrelude
 import qualified Platform.Internal as Platform
+import qualified System.Directory as Directory
+import qualified System.FilePath as FilePath
 import qualified System.IO
 import qualified Test.Internal as Internal
 import qualified Tuple
 import qualified Prelude
 
-report :: Time.UTCTime -> System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
+report ::
+  Stack.HasCallStack =>
+  Time.UTCTime ->
+  System.IO.Handle ->
+  Internal.SuiteResult ->
+  Prelude.IO ()
 report now handle results = do
+  projectDir <- map FilePath.takeBaseName Directory.getCurrentDirectory
   let testSpans = spans results
+  let maybeFrame =
+        Stack.callStack
+          |> Stack.getCallStack
+          |> List.head
+          |> map (Tuple.mapFirst Data.Text.pack)
   let rootSpan =
         Platform.TracingSpan
           { Platform.name = "test run",
@@ -27,9 +42,9 @@ report now handle results = do
             Platform.finished =
               List.maximum (List.map Platform.finished testSpans)
                 |> Maybe.withDefault (Platform.MonotonicTime 0),
-            Platform.frame = Nothing,
+            Platform.frame = maybeFrame,
             Platform.details = Nothing,
-            Platform.summary = Nothing,
+            Platform.summary = Just (Data.Text.pack projectDir),
             Platform.succeeded = case results of
               Internal.AllPassed _ -> Platform.Succeeded
               _ -> Platform.Failed,

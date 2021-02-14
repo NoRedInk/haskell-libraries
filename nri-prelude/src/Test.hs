@@ -23,6 +23,7 @@ where
 
 import qualified Control.Concurrent.Async as Async
 import qualified Data.Time as Time
+import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
 import qualified System.Directory
@@ -47,14 +48,14 @@ import qualified Prelude
 -- >
 -- > main :: IO ()
 -- > main = Test.run (Test.todo "write your tests here!")
-run :: Internal.Test -> Prelude.IO ()
+run :: Stack.HasCallStack => Internal.Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
   Async.mapConcurrently_
     identity
     [ reportStdout results,
-      reportLogfile results,
+      Stack.withFrozenCallStack reportLogfile results,
       reportJunit results
     ]
   Test.Reporter.ExitCode.report results
@@ -63,7 +64,7 @@ reportStdout :: Internal.SuiteResult -> Prelude.IO ()
 reportStdout results =
   Test.Reporter.Stdout.report System.IO.stdout results
 
-reportLogfile :: Internal.SuiteResult -> Prelude.IO ()
+reportLogfile :: Stack.HasCallStack => Internal.SuiteResult -> Prelude.IO ()
 reportLogfile results =
   do
     tmpDir <- System.Directory.getTemporaryDirectory
@@ -73,7 +74,11 @@ reportLogfile results =
       logFile
       System.IO.AppendMode
       ( \handle ->
-          Test.Reporter.Logfile.report now handle results
+          Stack.withFrozenCallStack
+            Test.Reporter.Logfile.report
+            now
+            handle
+            results
       )
 
 reportJunit :: Internal.SuiteResult -> Prelude.IO ()
