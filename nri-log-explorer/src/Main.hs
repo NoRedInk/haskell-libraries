@@ -323,10 +323,17 @@ howFarBack date1 date2
 
 spanSummary :: Platform.TracingSpan -> Text
 spanSummary span =
-  Platform.name span
-    ++ case Platform.summary span of
-      Nothing -> ""
-      Just summary -> ": " ++ summary
+  Text.join
+    ""
+    [ case Platform.succeeded span of
+        Platform.Succeeded -> "  "
+        Platform.Failed -> "✖ "
+        Platform.FailedWith _ -> "✖ ",
+      Platform.name span,
+      case Platform.summary span of
+        Nothing -> ""
+        Just summary -> ": " ++ summary
+    ]
 
 -- Brick App boilerplate
 
