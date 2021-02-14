@@ -218,7 +218,7 @@ viewContents page =
                     |> Brick.padLeft Brick.Max
                     |> Brick.hLimit 20,
                   Brick.txt "   ",
-                  Brick.txt (Platform.name logSpan)
+                  Brick.txt (spanSummary logSpan)
                     |> Brick.padRight Brick.Max
                 ]
                 |> Center.hCenter
@@ -232,7 +232,7 @@ viewContents page =
         |> Brick.padLeftRight 1
     SpanDetails logline spans ->
       Brick.vBox
-        [ Brick.txt (Platform.name (logSpan logline))
+        [ Brick.txt (spanSummary (logSpan logline))
             |> Center.hCenter,
           Border.hBorder,
           Brick.hBox
@@ -250,7 +250,7 @@ viewSpanList Logline {logId} spans =
     |> Zipper.indexedMap
       ( \i span ->
           Brick.hBox
-            [ Brick.txt (Platform.name (original span))
+            [ Brick.txt (spanSummary (original span))
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
                 |> Brick.padRight Brick.Max
             ]
@@ -308,6 +308,13 @@ howFarBack date1 date2
       Time.diffUTCTime date1 date2
         |> Prelude.round
         |> abs
+
+spanSummary :: Platform.TracingSpan -> Text
+spanSummary span =
+  Platform.name span
+    ++ case Platform.summary span of
+      Nothing -> ""
+      Just summary -> ": " ++ summary
 
 -- Brick App boilerplate
 
