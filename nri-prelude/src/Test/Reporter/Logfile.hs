@@ -11,16 +11,13 @@ import qualified List
 import qualified Maybe
 import NriPrelude
 import qualified Platform.Internal as Platform
-import qualified System.Directory
-import System.FilePath ((</>))
+import qualified System.IO
 import qualified Test.Internal as Internal
 import qualified Tuple
 import qualified Prelude
 
-report :: Internal.SuiteResult -> Prelude.IO ()
-report results = do
-  tmpDir <- System.Directory.getTemporaryDirectory
-  let logFile = tmpDir </> "nri-prelude-logs"
+report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
+report handle results = do
   let testSpans = spans results
   clock <- Clock.getMonotonicTimeNSec
   now <- Time.getCurrentTime
@@ -41,8 +38,9 @@ report results = do
             Platform.allocated = 0,
             Platform.children = testSpans
           }
-  Aeson.encode (now, rootSpan) ++ "\n"
-    |> Data.ByteString.Lazy.appendFile (logFile)
+  Aeson.encode (now, rootSpan)
+    |> Data.ByteString.Lazy.hPut handle
+  Data.ByteString.Lazy.hPut handle "\n"
 
 spans :: Internal.SuiteResult -> [Platform.TracingSpan]
 spans results =

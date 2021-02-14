@@ -23,8 +23,10 @@ where
 
 import NriPrelude
 import qualified Platform
+import qualified System.Directory
 import qualified System.Environment
 import qualified System.FilePath as FilePath
+import System.FilePath ((</>))
 import qualified System.IO
 import qualified Task
 import qualified Test.Internal as Internal
@@ -48,7 +50,14 @@ run suite = do
   log <- Platform.silentHandler
   results <- Task.perform log (Internal.run suite)
   Test.Reporter.Stdout.report System.IO.stdout results
-  Test.Reporter.Logfile.report results
+  tmpDir <- System.Directory.getTemporaryDirectory
+  let logFile = tmpDir </> "nri-prelude-logs"
+  System.IO.withFile
+    logFile
+    System.IO.AppendMode
+    ( \handle ->
+        Test.Reporter.Logfile.report handle results
+    )
   args <- System.Environment.getArgs
   case getPath args of
     Nothing -> Prelude.pure ()
