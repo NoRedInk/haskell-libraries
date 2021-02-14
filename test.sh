@@ -15,5 +15,6 @@ fi
 # Run Haskell tests
 hpack nri-prelude
 hpack nri-env-parser
+hpack nri-log-explorer
 cabal update
 cabal test all
