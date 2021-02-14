@@ -22,6 +22,7 @@ module Test
 where
 
 import qualified Control.Concurrent.Async as Async
+import qualified Data.Time as Time
 import NriPrelude
 import qualified Platform
 import qualified System.Directory
@@ -67,11 +68,12 @@ reportLogfile results =
   do
     tmpDir <- System.Directory.getTemporaryDirectory
     let logFile = tmpDir </> "nri-prelude-logs"
+    now <- Time.getCurrentTime
     System.IO.withFile
       logFile
       System.IO.AppendMode
       ( \handle ->
-          Test.Reporter.Logfile.report handle results
+          Test.Reporter.Logfile.report now handle results
       )
 
 reportJunit :: Internal.SuiteResult -> Prelude.IO ()

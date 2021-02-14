@@ -3,6 +3,8 @@ module TestSpec (tests) where
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Text
 import qualified Data.Text.IO
+import qualified Data.Time as Time
+import qualified Data.Time.Clock.POSIX
 import qualified Expect
 import qualified Expect.Task
 import qualified Fuzz
@@ -277,7 +279,7 @@ logfileReporter =
                   [ mockTest "test 1" mockTracingSpan,
                     mockTest "test 2" mockTracingSpan
                   ]
-                  |> Test.Reporter.Logfile.report handle
+                  |> Test.Reporter.Logfile.report now handle
             )
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-all-passed"
@@ -293,7 +295,7 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  |> Test.Reporter.Logfile.report handle
+                  |> Test.Reporter.Logfile.report now handle
             )
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-onlys-passed"
@@ -309,7 +311,7 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  |> Test.Reporter.Logfile.report handle
+                  |> Test.Reporter.Logfile.report now handle
             )
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-passed-with-skipped"
@@ -319,7 +321,7 @@ logfileReporter =
           withTempFile
             ( \_ handle ->
                 Internal.NoTestsInSuite
-                  |> Test.Reporter.Logfile.report handle
+                  |> Test.Reporter.Logfile.report now handle
             )
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-no-tests-in-suite"
@@ -340,12 +342,15 @@ logfileReporter =
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
                   ]
-                  |> Test.Reporter.Logfile.report handle
+                  |> Test.Reporter.Logfile.report now handle
             )
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-tests-failed"
           |> Expect.Task.check
     ]
+
+now :: Time.UTCTime
+now = Data.Time.Clock.POSIX.posixSecondsToUTCTime 0
 
 -- | Provide a temporary file for a test to do some work in, then return the
 -- contents of the file when the test is done with it.

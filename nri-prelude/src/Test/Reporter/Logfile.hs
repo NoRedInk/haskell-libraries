@@ -6,7 +6,6 @@ where
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
 import qualified Data.Time as Time
-import qualified GHC.Clock as Clock
 import qualified List
 import qualified Maybe
 import NriPrelude
@@ -16,20 +15,18 @@ import qualified Test.Internal as Internal
 import qualified Tuple
 import qualified Prelude
 
-report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
-report handle results = do
+report :: Time.UTCTime -> System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
+report now handle results = do
   let testSpans = spans results
-  clock <- Clock.getMonotonicTimeNSec
-  now <- Time.getCurrentTime
   let rootSpan =
         Platform.TracingSpan
           { Platform.name = "test run",
             Platform.started =
               List.minimum (List.map Platform.started testSpans)
-                |> Maybe.withDefault (Platform.MonotonicTime clock),
+                |> Maybe.withDefault (Platform.MonotonicTime 0),
             Platform.finished =
               List.maximum (List.map Platform.finished testSpans)
-                |> Maybe.withDefault (Platform.MonotonicTime clock),
+                |> Maybe.withDefault (Platform.MonotonicTime 0),
             Platform.frame = Nothing,
             Platform.details = Nothing,
             Platform.succeeded = case results of
