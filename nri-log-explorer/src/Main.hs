@@ -38,6 +38,7 @@ import qualified System.Environment
 import qualified System.Exit
 import System.FilePath ((</>))
 import qualified System.IO
+import qualified System.Process
 import qualified Text
 import qualified Zipper
 import qualified Prelude
@@ -45,6 +46,7 @@ import qualified Prelude
 data Model
   = Model
       { currentTime :: Time.UTCTime,
+        clipboardCommand :: Maybe Text,
         loglines :: Maybe (Zipper.Zipper Logline),
         selectedRootSpan :: Maybe (Zipper.Zipper Span),
         userDidSomething :: Bool,
@@ -71,6 +73,7 @@ data Msg
   | ShowDetails
   | Exit
   | SetCurrentTime Time.UTCTime
+  | CopyDetails
 
 newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
 
@@ -79,10 +82,11 @@ data Name
   | SpanDetailsListViewport Id
   deriving (Eq, Ord, Show)
 
-init :: Time.UTCTime -> Model
-init now =
+init :: Maybe Text -> Time.UTCTime -> Model
+init clipboardCommand now =
   Model
     { currentTime = now,
+      clipboardCommand = clipboardCommand,
       loglines = Nothing,
       selectedRootSpan = Nothing,
       userDidSomething = False,
@@ -117,7 +121,7 @@ update model msg =
           case page of
             NoLogsFound -> NoLogsFound
             SpanList time spans -> SpanList time (repeat n Zipper.next spans)
-            SpanDetails root spans -> SpanDetails root (repeat n Zipper.next spans)
+            SpanDetails cmd root spans -> SpanDetails cmd root (repeat n Zipper.next spans)
       )
         |> withPage model
         |> Brick.continue
@@ -126,7 +130,7 @@ update model msg =
           case page of
             NoLogsFound -> NoLogsFound
             SpanList time spans -> SpanList time (repeat n Zipper.prev spans)
-            SpanDetails root spans -> SpanDetails root (repeat n Zipper.prev spans)
+            SpanDetails cmd root spans -> SpanDetails cmd root (repeat n Zipper.prev spans)
       )
         |> withPage model
         |> Brick.continue
@@ -136,9 +140,10 @@ update model msg =
             NoLogsFound -> NoLogsFound
             SpanList _ spans ->
               SpanDetails
+                (clipboardCommand model)
                 (Zipper.current spans)
                 (Zipper.current spans |> logSpan |> toFlatList)
-            SpanDetails root spans -> SpanDetails root spans
+            SpanDetails cmd root spans -> SpanDetails cmd root spans
       )
         |> withPage model
         |> Brick.continue
@@ -147,6 +152,16 @@ update model msg =
         { selectedRootSpan = Nothing
         }
         |> Brick.continue
+    CopyDetails -> do
+      case toPage model of
+        NoLogsFound -> Prelude.pure ()
+        SpanList _ _ -> Prelude.pure ()
+        SpanDetails Nothing _ _ -> Prelude.pure ()
+        SpanDetails (Just cmd) _ spans ->
+          original (Zipper.current spans)
+            |> spanToClipboard cmd
+            |> liftIO
+      Brick.continue model
 
 repeat :: Int -> (a -> a) -> a -> a
 repeat n f x =
@@ -185,12 +200,16 @@ view model =
 data Page
   = NoLogsFound
   | SpanList Time.UTCTime (Zipper.Zipper Logline)
-  | SpanDetails Logline (Zipper.Zipper Span)
+  | SpanDetails (Maybe Text) Logline (Zipper.Zipper Span)
 
 toPage :: Model -> Page
 toPage model =
   case (selectedRootSpan model, loglines model) of
-    (Just selected, Just spans) -> SpanDetails (Zipper.current spans) selected
+    (Just selected, Just spans) ->
+      SpanDetails
+        (clipboardCommand model)
+        (Zipper.current spans)
+        selected
     (Nothing, Just spans) -> SpanList (currentTime model) spans
     (_, Nothing) -> NoLogsFound
 
@@ -200,7 +219,7 @@ withPage model fn =
         case fn (toPage model) of
           NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
           SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
-          SpanDetails _ zipper -> model {selectedRootSpan = Just zipper}
+          SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
    in newModel {userDidSomething = True}
 
 viewKey :: Page -> Brick.Widget Name
@@ -209,11 +228,17 @@ viewKey page =
       updown = "↑↓: select"
       select = "enter: details"
       unselect = "backspace: back"
+      copy = "y: copy details"
       shortcuts =
         case page of
           NoLogsFound -> [exit]
           SpanList _ _ -> [exit, updown, select]
-          SpanDetails _ _ -> [exit, updown, unselect]
+          SpanDetails clipboardCommand _ _ ->
+            [exit, updown, unselect]
+              ++ ( case clipboardCommand of
+                     Nothing -> []
+                     Just _ -> [copy]
+                 )
    in shortcuts
         |> Text.join "   "
         |> Brick.txt
@@ -246,7 +271,7 @@ viewContents page =
         |> Brick.vBox
         |> Brick.viewport RootSpanListViewport Brick.Vertical
         |> Brick.padLeftRight 1
-    SpanDetails logline spans ->
+    SpanDetails _ logline spans ->
       Brick.vBox
         [ Brick.txt (spanSummary (logSpan logline))
             |> Center.hCenter,
@@ -418,6 +443,7 @@ run = do
   initialVty <- buildVty
   let pushMsg = Brick.BChan.writeBChan eventChan
   now <- Time.getCurrentTime
+  clipboardCommand <- chooseCommand copyCommands
   Async.race_
     ( Async.race_
         ( System.IO.withFile
@@ -432,7 +458,7 @@ run = do
         buildVty
         (Just eventChan)
         (app pushMsg)
-        (init now)
+        (init clipboardCommand now)
     )
 
 app :: (Msg -> Prelude.IO ()) -> Brick.App Model Msg Name
@@ -495,6 +521,10 @@ handleEvent pushMsg model event =
         Vty.EvKey (Vty.KChar 'h') [] -> do
           liftIO (pushMsg Exit)
           Brick.continue model
+        -- Clipboard
+        Vty.EvKey (Vty.KChar 'y') [] -> do
+          liftIO (pushMsg CopyDetails)
+          Brick.continue model
         -- Fallback
         _ -> Brick.continue model
     (Brick.MouseDown _ _ _ _) -> Brick.continue model
@@ -543,3 +573,44 @@ tailLines partOfLine withLine handle = do
               : Prelude.init rest
       _ <- Prelude.traverse withLine fullLines
       tailLines partOfLine withLine handle
+
+-- Clipboard management
+
+chooseCommand :: [Text] -> Prelude.IO (Maybe Text)
+chooseCommand [] = Prelude.pure Nothing
+chooseCommand (first : rest) = do
+  firstAvailable <-
+    Data.Text.takeWhile (/= ' ') first
+      |> isAppAvailable
+  if firstAvailable
+    then Prelude.pure (Just first)
+    else chooseCommand rest
+
+copyCommands :: [Text]
+copyCommands =
+  [ "wl-copy",
+    "pbcopy",
+    "xclip -selection c",
+    "xsel -b -i"
+  ]
+
+isAppAvailable :: Text -> Prelude.IO Bool
+isAppAvailable cmd = do
+  (exitCode, _, _) <-
+    System.Process.readProcessWithExitCode "which" [Data.Text.unpack cmd] ""
+  Prelude.pure (exitCode == System.Exit.ExitSuccess)
+
+spanToClipboard :: Text -> Platform.TracingSpan -> Prelude.IO ()
+spanToClipboard cmdAndArgs span =
+  case Text.split " " cmdAndArgs of
+    [] -> Prelude.pure ()
+    cmd : args ->
+      span {Platform.children = []}
+        |> Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder
+        |> Data.Text.Lazy.Builder.toLazyText
+        |> Data.Text.Lazy.unpack
+        |> System.Process.readProcessWithExitCode
+          (Data.Text.unpack cmd)
+          (List.map Data.Text.unpack args)
+        |> liftIO
+        |> map (\_ -> ())
