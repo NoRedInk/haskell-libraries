@@ -18,15 +18,20 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.IORef as IORef
+import qualified Data.List
 import qualified Data.Text
 import qualified Data.Time as Time
+import qualified Data.Version as Version
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
 import qualified List
 import NriPrelude
+import qualified Paths_nri_log_explorer as Paths
 import qualified Platform
 import qualified System.Directory
+import qualified System.Environment
+import qualified System.Exit
 import System.FilePath ((</>))
 import qualified System.IO
 import qualified Text
@@ -320,6 +325,30 @@ spanSummary span =
 
 main :: Prelude.IO ()
 main = do
+  args <- System.Environment.getArgs
+  case args of
+    [] -> run
+    ["--help"] ->
+      [ "Usage:",
+        "  log-explorer",
+        "",
+        "  --help         show this help message",
+        "  --version      show application version",
+        "",
+        "log-explorer is a tool for exploring traces produced by the nri-prelude set of libraries."
+      ]
+        |> Prelude.unlines
+        |> Prelude.putStrLn
+    ["--version"] ->
+      let version =
+            Version.versionBranch Paths.version
+              |> map Prelude.show
+              |> Data.List.intercalate "."
+       in Prelude.putStrLn ("log-explorer " ++ version)
+    _ -> System.Exit.die "log-explorer was called with unknown arguments"
+
+run :: Prelude.IO ()
+run = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   partOfLine <- IORef.newIORef Prelude.mempty
   tmpDir <- System.Directory.getTemporaryDirectory
