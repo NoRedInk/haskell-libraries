@@ -31,6 +31,7 @@ module Platform
     Internal.finished,
     Internal.frame,
     Internal.details,
+    Internal.summary,
     Internal.succeeded,
     Internal.allocated,
     Internal.children,

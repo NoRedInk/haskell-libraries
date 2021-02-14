@@ -137,6 +137,9 @@ data TracingSpan
         frame :: Maybe (Text, Stack.SrcLoc),
         -- | Unique information for this tracingSpan.
         details :: Maybe SomeTracingSpanDetails,
+        -- | A short blurb describing the details of this span, for use in
+        -- tooling for inspecting these spans.
+        summary :: Maybe Text,
         -- | Whether this tracingSpan succeeded. If any of the children of this
         -- tracingSpan failed, so will this tracingSpan. This will create a
         -- path to the tracingSpan closest to the failure from the root
@@ -164,6 +167,7 @@ instance Aeson.ToJSON TracingSpan where
         "finished" .= finished span,
         "frame" .= map SrcLocForEncoding (frame span),
         "details" .= details span,
+        "summary" .= summary span,
         "succeeded" .= succeeded span,
         "allocated" .= allocated span,
         "children" .= children span
@@ -175,6 +179,7 @@ instance Aeson.ToJSON TracingSpan where
           ++ "finished" .= finished span
           ++ "frame" .= map SrcLocForEncoding (frame span)
           ++ "details" .= details span
+          ++ "summary" .= summary span
           ++ "succeeded" .= succeeded span
           ++ "allocated" .= allocated span
           ++ "children" .= children span
@@ -190,6 +195,7 @@ instance Aeson.FromJSON TracingSpan where
           finished <- object .: "finished"
           frame <- map (map unSrcLocForEncoding) (object .:? "frame")
           details <- object .:? "details"
+          summary <- object .:? "summary"
           succeeded <- object .: "succeeded"
           allocated <- object .: "allocated"
           children <- object .: "children"
@@ -200,6 +206,7 @@ instance Aeson.FromJSON TracingSpan where
                 finished,
                 frame,
                 details,
+                summary,
                 succeeded,
                 allocated,
                 children
@@ -273,6 +280,7 @@ emptyTracingSpan =
       finished = 0,
       frame = Nothing,
       details = Nothing,
+      summary = Nothing,
       succeeded = Succeeded,
       allocated = 0,
       children = []
@@ -656,6 +664,7 @@ startTracingSpan clock name = do
             |> List.head
             |> Shortcut.map (Tuple.mapFirst Data.Text.pack),
         details = Nothing,
+        summary = Nothing,
         succeeded = Succeeded,
         allocated = 0,
         children = []

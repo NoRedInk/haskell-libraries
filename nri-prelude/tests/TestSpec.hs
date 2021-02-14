@@ -384,6 +384,7 @@ mockTracingSpan =
       Platform.Internal.finished = Platform.Internal.MonotonicTime 0,
       Platform.Internal.frame = Nothing,
       Platform.Internal.details = Nothing,
+      Platform.Internal.summary = Nothing,
       Platform.Internal.succeeded = Platform.Internal.Succeeded,
       Platform.Internal.allocated = 1,
       Platform.Internal.children = []

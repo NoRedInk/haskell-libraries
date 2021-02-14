@@ -29,6 +29,7 @@ report now handle results = do
                 |> Maybe.withDefault (Platform.MonotonicTime 0),
             Platform.frame = Nothing,
             Platform.details = Nothing,
+            Platform.summary = Nothing,
             Platform.succeeded = case results of
               Internal.AllPassed _ -> Platform.Succeeded
               _ -> Platform.Failed,
