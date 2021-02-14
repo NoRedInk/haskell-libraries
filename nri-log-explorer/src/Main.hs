@@ -43,6 +43,7 @@ data Model
       { currentTime :: Time.UTCTime,
         loglines :: Maybe (Zipper.Zipper Logline),
         selectedRootSpan :: Maybe (Zipper.Zipper Span),
+        userDidSomething :: Bool,
         lastId :: Id
       }
 
@@ -80,6 +81,7 @@ init now =
     { currentTime = now,
       loglines = Nothing,
       selectedRootSpan = Nothing,
+      userDidSomething = False,
       lastId = 0
     }
 
@@ -97,9 +99,12 @@ update model msg =
           let newId = lastId model + 1
               logline = Logline newId date span
            in model
-                { loglines = case loglines model of
-                    Nothing -> Just (Zipper.singleton logline)
-                    Just zipper -> Just (Zipper.prepend [logline] zipper),
+                { loglines =
+                    case loglines model of
+                      Nothing -> Zipper.singleton logline
+                      Just zipper -> Zipper.prepend [logline] zipper
+                      |> (if userDidSomething model then identity else Zipper.first)
+                      |> Just,
                   lastId = newId
                 }
                 |> Brick.continue
@@ -187,10 +192,12 @@ toPage model =
 
 withPage :: Model -> (Page -> Page) -> Model
 withPage model fn =
-  case fn (toPage model) of
-    NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
-    SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
-    SpanDetails _ zipper -> model {selectedRootSpan = Just zipper}
+  let newModel =
+        case fn (toPage model) of
+          NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
+          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
+          SpanDetails _ zipper -> model {selectedRootSpan = Just zipper}
+   in newModel {userDidSomething = True}
 
 viewKey :: Page -> Brick.Widget Name
 viewKey page =
