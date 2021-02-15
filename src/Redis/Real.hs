@@ -11,15 +11,24 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
+import qualified Data.ByteString.Builder
+import qualified Data.ByteString.Lazy
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text
 import qualified Data.Text.Encoding
+import qualified Data.Text.Encoding as Encoding
+import qualified Data.UUID as UUID
+import qualified Data.UUID.V4
 import qualified Database.Redis
+import qualified Debug
 import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
+import qualified Process
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
+import qualified Task
+import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 import qualified Prelude
 
@@ -79,6 +88,7 @@ acquireHandler namespace settings = do
             Database.Redis.watch (map toB keys)
               |> map (map (\_ -> Ok ()))
               |> Stack.withFrozenCallStack platformRedis (Internal.TracedQuery (Internal.Pure ())) connection anything,
+          Internal.doLock = lock connection anything,
           Internal.namespace = namespace
         },
       connection
@@ -298,3 +308,110 @@ toResult reply =
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
+
+-- This implements the locking algorithm described at the bottom of the redis
+-- documentation for the SET command: https://redis.io/commands/set
+--
+-- The documentation makes a point that this lock isn't entirely safe. When
+-- Redis nodes fail and are replaced it's possible for two processes to obtain
+-- the same lock. The documentation recommends using the redlock algorithm to
+-- protect against that.
+--
+-- For now we are satisfied with the trade-off of this simpler lock. It's the
+-- same algorithm as the one used by the redis-mutex library in the monolith, so
+-- if it's good enough there it's good enough here too.
+lock ::
+  Connection ->
+  Platform.DoAnythingHandler ->
+  Internal.Lock e ->
+  Task e a ->
+  Task e a
+lock conn doAnything config task = do
+  -- Create a random value to store in the locking key. We use this to ensure
+  -- during cleanup that we only delete the locking key if it was set by us. If
+  -- by some race condition another process wrote to the lock before we get to
+  -- clean it up then we don't touch it.
+  uuid <-
+    Data.UUID.V4.nextRandom
+      |> map Ok
+      |> Platform.doAnything doAnything
+  Platform.bracketWithError
+    (acquireLock conn doAnything config uuid)
+    (\_ _ -> releaseLock conn doAnything config uuid)
+    ( \_ ->
+        -- Our code has to finish before the lock expires.
+        Task.timeout
+          (Internal.lockTimeoutInMs config)
+          (Internal.lockMapError config Internal.TimeoutError)
+          task
+    )
+
+acquireLock ::
+  Connection ->
+  Platform.DoAnythingHandler ->
+  Internal.Lock e ->
+  UUID.UUID ->
+  Task e ()
+acquireLock conn doAnything config uuid =
+  if Internal.lockMaxTries config <= 0
+    then Task.fail (Internal.lockMapError config Internal.ExhaustedRetriesWhileAcquiringLock)
+    else do
+      result <-
+        -- We only want to write to the lock key if it's not set yet, and if we
+        -- write we want to set an expiry time. The only way to do this is using
+        -- the REDIS set command in combination with some options, but hedis
+        -- doesn't support these yet, so we use a lower level function to build
+        -- the correct redis command ourselves.
+        Database.Redis.sendRequest
+          [ "SET",
+            Encoding.encodeUtf8 (Internal.lockKey config),
+            UUID.toASCIIBytes uuid,
+            "NX",
+            "PX",
+            Text.fromInt (round (Internal.lockTimeoutInMs config))
+              |> Encoding.encodeUtf8
+          ]
+          |> map (map Ok)
+          |> platformRedis (Debug.todo "") conn doAnything
+          |> Task.mapError (Internal.lockMapError config)
+      case result of
+        Database.Redis.Ok -> Task.succeed ()
+        _ -> do
+          Process.sleep (Internal.lockTimeoutInMs config)
+          acquireLock
+            conn
+            doAnything
+            config {Internal.lockMaxTries = Internal.lockMaxTries config - 1}
+            uuid
+
+releaseLock ::
+  Connection ->
+  Platform.DoAnythingHandler ->
+  Internal.Lock e ->
+  UUID.UUID ->
+  Task e ()
+releaseLock conn doAnything config uuid =
+  -- We could use evalsha here, but the script we send is not that much larger
+  -- than a sha would be so we save ourselves the trouble. Redis documentation
+  -- on the EVALSHA command makes clear that other than bandwidt there's no
+  -- performance penalty to using EVAL.
+  Database.Redis.eval
+    deleteKeyIfValueMatchesScript
+    [Encoding.encodeUtf8 (Internal.lockKey config)]
+    [UUID.toASCIIBytes uuid]
+    |> map (map Ok)
+    |> platformRedis (Debug.todo "") conn doAnything
+    |> Task.mapError (Internal.lockMapError config)
+    |> map (\(_ :: Database.Redis.Status) -> ())
+
+-- This script is copied verbatim from https://redis.io/commands/set.
+deleteKeyIfValueMatchesScript :: Data.ByteString.ByteString
+deleteKeyIfValueMatchesScript =
+  "if redis.call(\"get\",KEYS[1]) == ARGV[1]\n"
+    ++ "then\n"
+    ++ "    return redis.call(\"del\",KEYS[1])\n"
+    ++ "else\n"
+    ++ "    return 0\n"
+    ++ "end"
+    |> Data.ByteString.Builder.toLazyByteString
+    |> Data.ByteString.Lazy.toStrict

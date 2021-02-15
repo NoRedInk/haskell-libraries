@@ -17,6 +17,7 @@ library:
   - safe-exceptions
   - text
   - unordered-containers
+  - uuid
   exposed-modules:
   - NonEmptyDict
   - Redis
