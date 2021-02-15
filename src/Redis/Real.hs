@@ -71,7 +71,7 @@ acquireHandler namespace settings = do
     ( Internal.Handler
         { Internal.doQuery = \query ->
             let PreparedQuery {redisCtx} = doRawQuery query
-             in Stack.withFrozenCallStack platformRedis (Internal.TracedQuery query) connection anything redisCtx,
+             in Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything redisCtx,
           Internal.doTransaction = \query ->
             let PreparedQuery {redisCtx} = doRawQuery query
                 redisCmd = Database.Redis.multiExec redisCtx
@@ -83,11 +83,11 @@ acquireHandler namespace settings = do
                           Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
                     )
-                  |> Stack.withFrozenCallStack platformRedis (Internal.TracedQuery query) connection anything,
+                  |> Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything,
           Internal.doWatch = \keys ->
             Database.Redis.watch (map toB keys)
               |> map (map (\_ -> Ok ()))
-              |> Stack.withFrozenCallStack platformRedis (Internal.TracedQuery (Internal.Pure ())) connection anything,
+              |> Stack.withFrozenCallStack platformRedis (Internal.cmds (Internal.Pure ())) connection anything,
           Internal.doLock = lock connection anything,
           Internal.namespace = namespace
         },
@@ -249,12 +249,12 @@ data Connection = Connection
 
 platformRedis ::
   Stack.HasCallStack =>
-  Internal.TracedQuery ->
+  [Text] ->
   Connection ->
   Platform.DoAnythingHandler ->
   Database.Redis.Redis (Either Database.Redis.Reply (Result Internal.Error a)) ->
   Task Internal.Error a
-platformRedis query connection anything action =
+platformRedis cmds connection anything action =
   Database.Redis.runRedis (connectionHedis connection) action
     |> map toResult
     |> map
@@ -273,13 +273,13 @@ platformRedis query connection anything action =
             |> pure
       )
     |> Platform.doAnything anything
-    |> Stack.withFrozenCallStack traceQuery query connection
+    |> Stack.withFrozenCallStack traceQuery cmds connection
 
-traceQuery :: Stack.HasCallStack => Internal.TracedQuery -> Connection -> Task e a -> Task e a
-traceQuery (Internal.TracedQuery query) connection task =
+traceQuery :: Stack.HasCallStack => [Text] -> Connection -> Task e a -> Task e a
+traceQuery cmds connection task =
   let info =
         Info
-          { infoCommands = Internal.cmds query,
+          { infoCommands = cmds,
             infoHost = connectionHost connection,
             infoPort = connectionPort connection
           }

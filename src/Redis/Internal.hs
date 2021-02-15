@@ -36,9 +36,6 @@ instance Aeson.ToJSON Error where
 instance Show Error where
   show = errorForHumans >> Data.Text.unpack
 
-data TracedQuery where
-  TracedQuery :: Query a -> TracedQuery
-
 errorForHumans :: Error -> Text
 errorForHumans topError =
   case topError of
