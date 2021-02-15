@@ -254,5 +254,5 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
 unparsableKeyError :: Internal.Error
 unparsableKeyError = Internal.LibraryError "key exists but not parsable json"
 
-lock :: Internal.Handler -> Internal.Lock e -> Task e a -> Task e a
+lock :: Internal.Handler -> Internal.Lock e a -> Task e a -> Task e a
 lock = Internal.doLock

@@ -142,7 +142,7 @@ data Handler = Handler
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doWatch :: [Text] -> Task Error (),
-    doLock :: forall e a. Lock e -> Task e a -> Task e a,
+    doLock :: forall e a. Lock e a -> Task e a -> Task e a,
     namespace :: Text
   }
 
@@ -263,9 +263,9 @@ maybesToDict keys values =
       )
     |> Dict.fromList
 
-data Lock e = Lock
+data Lock e a = Lock
   { lockKey :: Text,
     lockTimeoutInMs :: Float,
     lockMaxTries :: Int,
-    lockMapError :: Error -> e
+    lockHandleError :: Error -> Task e a
   }

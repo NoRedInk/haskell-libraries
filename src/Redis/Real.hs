@@ -257,7 +257,7 @@ platformRedis cmds connection anything action =
   Database.Redis.runRedis (connectionHedis connection) action
     |> map toResult
     |> map
-      ( \result -> -- Result Internal.Error (Result Internal.Error a) -> Result Internal.Error a
+      ( \result ->
           case result of
             Ok a -> a
             Err err -> Err err
@@ -322,7 +322,7 @@ toB = Data.Text.Encoding.encodeUtf8
 lock ::
   Connection ->
   Platform.DoAnythingHandler ->
-  Internal.Lock e ->
+  Internal.Lock e a ->
   Task e a ->
   Task e a
 lock conn doAnything config task = do
@@ -335,25 +335,35 @@ lock conn doAnything config task = do
       |> map Ok
       |> Platform.doAnything doAnything
   Platform.bracketWithError
-    (acquireLock conn doAnything config uuid)
-    (\_ _ -> releaseLock conn doAnything config uuid)
+    (acquireLock conn doAnything config uuid |> Task.mapError RedisError)
+    (\_ _ -> releaseLock conn doAnything config uuid |> Task.mapError RedisError)
     ( \_ ->
         -- Our code has to finish before the lock expires.
-        Task.timeout
-          (Internal.lockTimeoutInMs config)
-          (Internal.lockMapError config Internal.TimeoutError)
-          task
+        Task.mapError OtherError task
+          |> Task.timeout
+            (Internal.lockTimeoutInMs config)
+            (RedisError Internal.TimeoutError)
     )
+    |> Task.onError
+      ( \err ->
+          case err of
+            RedisError redisErr -> Internal.lockHandleError config redisErr
+            OtherError otherErr -> Task.fail otherErr
+      )
+
+data LockError e
+  = RedisError Internal.Error
+  | OtherError e
 
 acquireLock ::
   Connection ->
   Platform.DoAnythingHandler ->
-  Internal.Lock e ->
+  Internal.Lock e a ->
   UUID.UUID ->
-  Task e ()
+  Task Internal.Error ()
 acquireLock conn doAnything config uuid =
   if Internal.lockMaxTries config <= 0
-    then Task.fail (Internal.lockMapError config Internal.ExhaustedRetriesWhileAcquiringLock)
+    then Task.fail Internal.ExhaustedRetriesWhileAcquiringLock
     else do
       result <- do
         let cmdChunks =
@@ -376,7 +386,6 @@ acquireLock conn doAnything config uuid =
         Database.Redis.sendRequest cmdChunks
           |> map (map Ok)
           |> platformRedis [tracingCmd] conn doAnything
-          |> Task.mapError (Internal.lockMapError config)
       case result of
         Database.Redis.Ok -> Task.succeed ()
         _ -> do
@@ -390,9 +399,9 @@ acquireLock conn doAnything config uuid =
 releaseLock ::
   Connection ->
   Platform.DoAnythingHandler ->
-  Internal.Lock e ->
+  Internal.Lock e a ->
   UUID.UUID ->
-  Task e ()
+  Task Internal.Error ()
 releaseLock conn doAnything config uuid = do
   -- We could use evalsha here, but the script we send is not that much larger
   -- than a sha would be so we save ourselves the trouble. Redis documentation
@@ -411,7 +420,6 @@ releaseLock conn doAnything config uuid = do
     [UUID.toASCIIBytes uuid]
     |> map (map Ok)
     |> platformRedis [tracingCmd] conn doAnything
-    |> Task.mapError (Internal.lockMapError config)
     |> map (\(_ :: Database.Redis.Status) -> ())
 
 -- This script is copied verbatim from https://redis.io/commands/set.
