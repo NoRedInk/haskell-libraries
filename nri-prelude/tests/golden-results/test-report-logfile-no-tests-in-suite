@@ -1,1 +1,20 @@
-["1970-01-01T00:00:00Z",{"name":"test run","started":0,"finished":0,"frame":{"name":"report","package":"main","module":"TestSpec","file":"tests/TestSpec.hs","startLine":324,"startCol":22,"endLine":324,"endCol":61},"details":null,"summary":"nri-prelude","succeeded":"Failed","allocated":0,"children":[]}]
+{
+    "summary": "nri-prelude",
+    "children": [],
+    "allocated": 0,
+    "name": "test run",
+    "details": null,
+    "finished": 0,
+    "frame": {
+        "startLine": 324,
+        "endLine": 324,
+        "name": "report",
+        "endCol": 69,
+        "module": "TestSpec",
+        "package": "main",
+        "startCol": 22,
+        "file": "tests/TestSpec.hs"
+    },
+    "succeeded": "Failed",
+    "started": 0
+}

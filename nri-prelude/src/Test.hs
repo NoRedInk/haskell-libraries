@@ -22,10 +22,10 @@ module Test
 where
 
 import qualified Control.Concurrent.Async as Async
-import qualified Data.Time as Time
 import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
+import qualified Platform.DevLog
 import qualified System.Environment
 import qualified System.IO
 import qualified Task
@@ -62,19 +62,11 @@ reportStdout results =
   Test.Reporter.Stdout.report System.IO.stdout results
 
 reportLogfile :: Stack.HasCallStack => Internal.SuiteResult -> Prelude.IO ()
-reportLogfile results = do
-  let logFile = "/tmp/nri-prelude-logs"
-  now <- Time.getCurrentTime
-  System.IO.withFile
-    logFile
-    System.IO.AppendMode
-    ( \handle ->
-        Stack.withFrozenCallStack
-          Test.Reporter.Logfile.report
-          now
-          handle
-          results
-    )
+reportLogfile results =
+  Stack.withFrozenCallStack
+    Test.Reporter.Logfile.report
+    Platform.DevLog.writeSpanToDevLog
+    results
 
 reportJunit :: Internal.SuiteResult -> Prelude.IO ()
 reportJunit results =

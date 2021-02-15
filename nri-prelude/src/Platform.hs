@@ -43,6 +43,9 @@ module Platform
     Internal.MonotonicTime,
     Internal.inMicroseconds,
 
+    -- * Reporting spans to development tooling
+    Platform.DevLog.writeSpanToDevLog,
+
     -- * Ensuring cleanup logic gets ran in case of exceptions.
     bracketWithError,
     finally,
@@ -58,6 +61,7 @@ import qualified Control.Monad.Catch as Catch
 import qualified Data.Text
 import qualified GHC.Stack as Stack
 import NriPrelude
+import qualified Platform.DevLog
 import qualified Platform.DoAnything as DoAnything
 import qualified Platform.Internal as Internal
 import qualified Task

@@ -3,10 +3,7 @@ module Test.Reporter.Logfile
   )
 where
 
-import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy
 import qualified Data.Text
-import qualified Data.Time as Time
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified List
@@ -15,18 +12,16 @@ import NriPrelude
 import qualified Platform.Internal as Platform
 import qualified System.Directory as Directory
 import qualified System.FilePath as FilePath
-import qualified System.IO
 import qualified Test.Internal as Internal
 import qualified Tuple
 import qualified Prelude
 
 report ::
   Stack.HasCallStack =>
-  Time.UTCTime ->
-  System.IO.Handle ->
+  (Platform.TracingSpan -> Prelude.IO ()) ->
   Internal.SuiteResult ->
   Prelude.IO ()
-report now handle results = do
+report writeSpan results = do
   projectDir <- map FilePath.takeBaseName Directory.getCurrentDirectory
   let testSpans = spans results
   let maybeFrame =
@@ -52,9 +47,7 @@ report now handle results = do
             Platform.allocated = 0,
             Platform.children = testSpans
           }
-  Aeson.encode (now, rootSpan)
-    |> Data.ByteString.Lazy.hPut handle
-  Data.ByteString.Lazy.hPut handle "\n"
+  writeSpan rootSpan
 
 spans :: Internal.SuiteResult -> [Platform.TracingSpan]
 spans results =
