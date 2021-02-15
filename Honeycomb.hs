@@ -25,6 +25,7 @@ module Observability.Honeycomb
     CommonFields (..),
     BatchEvent (..),
     Span (..),
+    linear,
   )
 where
 
@@ -157,13 +158,15 @@ deriveSampleRate rootSpan handler' =
         -- High sample rates might make honeycomb make ridiculous assumptions
         -- about the actual request rate tho. Adjust if that's the case.
           baseRate / 500
-        else --
-        -- A linear increase, starting with a value of `baseRate` if the request
-        -- duration is smaller than `apdexTUs` and ending with a value of 1 if
-        -- `baseRate` is higher than 4 times `apdexTUs`.
-
-          baseRate + ((1 - baseRate) * (requestDurationUs - apdexTUs) / (3 * apdexTUs))
+        else
+          linear (baseRate, apdexTUs) (1, 4 * apdexTUs) requestDurationUs
             |> clamp baseRate 1
+
+-- | Pass two (x,y) coordinates, get back a function descriving the straight
+-- line passing through both points.
+linear :: (Float, Float) -> (Float, Float) -> (Float -> Float)
+linear (x1, y1) (x2, y2) x =
+  y1 + ((x - x1) / (x2 - x1)) * (y2 - y1)
 
 toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
