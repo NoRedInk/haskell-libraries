@@ -98,6 +98,7 @@ report handler' _requestId span = do
           -- Which makes Honeycomb's UI confused
           (Data.UUID.toText uuid)
           (Data.Text.pack hostname')
+          (calculateApdex handler' span)
   let (_, events) = toBatchEvents commonFields sampleRate Nothing 0 span
   let enrichedEvents = enrich events
   let body = Http.jsonBody enrichedEvents
@@ -168,6 +169,24 @@ linear :: (Float, Float) -> (Float, Float) -> (Float -> Float)
 linear (x1, y1) (x2, y2) x =
   y1 + ((x - x1) / (x2 - x1)) * (y2 - y1)
 
+calculateApdex :: Handler -> Platform.TracingSpan -> Float
+calculateApdex handler' span =
+  case Platform.succeeded span of
+    Platform.Failed -> 0
+    Platform.FailedWith _ -> 0
+    Platform.Succeeded ->
+      let duration =
+            Platform.finished span - Platform.started span
+              |> Platform.inMicroseconds
+              |> Prelude.fromIntegral
+          apdexTUs = handler_apdexTimeUs handler'
+       in if duration < apdexTUs
+            then 1
+            else
+              if duration < (4 * apdexTUs)
+                then 0.5
+                else 0
+
 toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
@@ -199,6 +218,7 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
             hostname = common_hostname commonFields,
             failed = isError,
             sourceLocation = sourceLocation,
+            apdex = common_apdex commonFields,
             enrichedData = [],
             details = Platform.details span
           }
@@ -369,7 +389,8 @@ data CommonFields = CommonFields
     common_serviceName :: Text,
     common_environment :: Text,
     common_requestId :: Text,
-    common_hostname :: Text
+    common_hostname :: Text,
+    common_apdex :: Float
   }
 
 data Span = Span
@@ -384,6 +405,7 @@ data Span = Span
     hostname :: Text,
     failed :: Bool,
     sourceLocation :: Maybe Text,
+    apdex :: Float,
     enrichedData :: [(Text, Text)],
     details :: Maybe Platform.SomeTracingSpanDetails
   }
@@ -404,7 +426,8 @@ instance Aeson.ToJSON Span where
             "allocated_bytes" .= allocatedBytes span,
             "source_location" .= sourceLocation span,
             "hostname" .= hostname span,
-            "failed" .= failed span
+            "failed" .= failed span,
+            "apdex" .= apdex span
           ]
         detailsPairs =
           span
