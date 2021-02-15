@@ -468,6 +468,8 @@ app pushMsg =
       Brick.appAttrMap = \_ -> attrMap
     }
 
+-- This is like a CSS stylesheet, mapping 'attribute names' (i.e. classes) to
+-- styles.
 attrMap :: Brick.AttrMap
 attrMap =
   Brick.attrMap
@@ -544,7 +546,16 @@ tailLines ::
   System.IO.Handle ->
   Prelude.IO ()
 tailLines partOfLine withLine handle = do
+  -- We're using the relatively primitive operation `hGetSome` because it's one
+  -- of the few that doesn't automatically close the file handle if the
+  -- end-of-file is reached (this would be bad because we want to tail the file,
+  -- wait for additional content to appear). The downside of this is that we
+  -- need to split on newlines ourselves.
   chunk <- ByteString.hGetSome handle 10_000 {- 10 kb -}
+
+  -- Splitting a bytestring on the newline symbol is safe, because UTF8
+  -- guarantees the byte-encodings of ASCII characters (which include \n) never
+  -- appear anywhere in multi-byte character encoders.
   case ByteString.split 10 {- \n -} chunk of
     [] -> do
       Control.Concurrent.threadDelay 100_000 {- 100 ms -}
