@@ -142,7 +142,7 @@ deriveSampleRate rootSpan handler' =
         Platform.finished rootSpan - Platform.started rootSpan
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
-      apdexTUs = Prelude.fromIntegral (handler_apdexTimeUs handler')
+      apdexTUs = 1000 * Prelude.fromIntegral (handler_apdexTimeMs handler')
    in if isNonAppEndpoint
         then --
         -- We have 2678400 seconds in a month
@@ -179,7 +179,7 @@ calculateApdex handler' span =
             Platform.finished span - Platform.started span
               |> Platform.inMicroseconds
               |> Prelude.fromIntegral
-          apdexTUs = handler_apdexTimeUs handler'
+          apdexTUs = 1000 * handler_apdexTimeMs handler'
        in if duration < apdexTUs
             then 1
             else
@@ -450,7 +450,7 @@ data Handler = Handler
     handler_environment :: Text,
     handler_honeycombApiKey :: Log.Secret Text,
     handler_fractionOfSuccessRequestsLogged :: Float,
-    handler_apdexTimeUs :: Int
+    handler_apdexTimeMs :: Int
   }
 
 handler :: Timer -> Settings -> Conduit.Acquire Handler
@@ -464,7 +464,7 @@ handler timer settings = do
         handler_environment = appEnvironment settings,
         handler_honeycombApiKey = honeycombApiKey settings,
         handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings,
-        handler_apdexTimeUs = appdexTimeUs settings
+        handler_apdexTimeMs = appdexTimeMs settings
       }
 
 data Settings = Settings
@@ -472,7 +472,7 @@ data Settings = Settings
     appEnvironment :: Text,
     honeycombApiKey :: Log.Secret Text,
     fractionOfSuccessRequestsLogged :: Float,
-    appdexTimeUs :: Int
+    appdexTimeMs :: Int
   }
 
 decoder :: Environment.Decoder Settings
@@ -482,7 +482,7 @@ decoder =
     |> andMap appEnvironmentDecoder
     |> andMap honeycombApiKeyDecoder
     |> andMap fractionOfSuccessRequestsLoggedDecoder
-    |> andMap apdexTimeUsDecoder
+    |> andMap apdexTimeMsDecoder
 
 honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret Text)
 honeycombApiKeyDecoder =
@@ -524,12 +524,12 @@ fractionOfSuccessRequestsLoggedDecoder =
       }
     Environment.float
 
-apdexTimeUsDecoder :: Environment.Decoder Int
-apdexTimeUsDecoder =
+apdexTimeMsDecoder :: Environment.Decoder Int
+apdexTimeMsDecoder =
   Environment.variable
     Environment.Variable
-      { Environment.name = "HONEYCOMB_APDEX_TIME_IN_MICROSECONDS",
+      { Environment.name = "HONEYCOMB_APDEX_TIME_IN_MILLISECONDS",
         Environment.description = "The T value in the apdex, the time in microseconds in which a health request should complete.",
-        Environment.defaultValue = "100000" {- 100 ms -}
+        Environment.defaultValue = "100"
       }
     Environment.int
