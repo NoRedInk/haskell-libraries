@@ -20,7 +20,6 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Data.UUID as UUID
 import qualified Data.UUID.V4
 import qualified Database.Redis
-import qualified Debug
 import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
@@ -356,23 +355,27 @@ acquireLock conn doAnything config uuid =
   if Internal.lockMaxTries config <= 0
     then Task.fail (Internal.lockMapError config Internal.ExhaustedRetriesWhileAcquiringLock)
     else do
-      result <-
+      result <- do
+        let cmdChunks =
+              [ "SET",
+                Encoding.encodeUtf8 (Internal.lockKey config),
+                UUID.toASCIIBytes uuid,
+                "NX",
+                "PX",
+                Text.fromInt (round (Internal.lockTimeoutInMs config))
+                  |> Encoding.encodeUtf8
+              ]
+        let tracingCmd =
+              Data.ByteString.intercalate " " cmdChunks
+                |> Encoding.decodeUtf8
         -- We only want to write to the lock key if it's not set yet, and if we
         -- write we want to set an expiry time. The only way to do this is using
         -- the REDIS set command in combination with some options, but hedis
         -- doesn't support these yet, so we use a lower level function to build
         -- the correct redis command ourselves.
-        Database.Redis.sendRequest
-          [ "SET",
-            Encoding.encodeUtf8 (Internal.lockKey config),
-            UUID.toASCIIBytes uuid,
-            "NX",
-            "PX",
-            Text.fromInt (round (Internal.lockTimeoutInMs config))
-              |> Encoding.encodeUtf8
-          ]
+        Database.Redis.sendRequest cmdChunks
           |> map (map Ok)
-          |> platformRedis (Debug.todo "") conn doAnything
+          |> platformRedis [tracingCmd] conn doAnything
           |> Task.mapError (Internal.lockMapError config)
       case result of
         Database.Redis.Ok -> Task.succeed ()
@@ -390,17 +393,24 @@ releaseLock ::
   Internal.Lock e ->
   UUID.UUID ->
   Task e ()
-releaseLock conn doAnything config uuid =
+releaseLock conn doAnything config uuid = do
   -- We could use evalsha here, but the script we send is not that much larger
   -- than a sha would be so we save ourselves the trouble. Redis documentation
   -- on the EVALSHA command makes clear that other than bandwidt there's no
   -- performance penalty to using EVAL.
+  let tracingCmd =
+        Text.join
+          " "
+          [ "EVAL <delete key if value matches script> 1",
+            Internal.lockKey config,
+            UUID.toText uuid
+          ]
   Database.Redis.eval
     deleteKeyIfValueMatchesScript
     [Encoding.encodeUtf8 (Internal.lockKey config)]
     [UUID.toASCIIBytes uuid]
     |> map (map Ok)
-    |> platformRedis (Debug.todo "") conn doAnything
+    |> platformRedis [tracingCmd] conn doAnything
     |> Task.mapError (Internal.lockMapError config)
     |> map (\(_ :: Database.Redis.Status) -> ())
 
