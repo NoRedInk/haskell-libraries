@@ -26,10 +26,7 @@ import qualified Data.Time as Time
 import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
-import qualified System.Directory
 import qualified System.Environment
-import qualified System.FilePath as FilePath
-import System.FilePath ((</>))
 import qualified System.IO
 import qualified Task
 import qualified Test.Internal as Internal
@@ -65,21 +62,19 @@ reportStdout results =
   Test.Reporter.Stdout.report System.IO.stdout results
 
 reportLogfile :: Stack.HasCallStack => Internal.SuiteResult -> Prelude.IO ()
-reportLogfile results =
-  do
-    tmpDir <- System.Directory.getTemporaryDirectory
-    let logFile = tmpDir </> "nri-prelude-logs"
-    now <- Time.getCurrentTime
-    System.IO.withFile
-      logFile
-      System.IO.AppendMode
-      ( \handle ->
-          Stack.withFrozenCallStack
-            Test.Reporter.Logfile.report
-            now
-            handle
-            results
-      )
+reportLogfile results = do
+  let logFile = "/tmp/nri-prelude-logs"
+  now <- Time.getCurrentTime
+  System.IO.withFile
+    logFile
+    System.IO.AppendMode
+    ( \handle ->
+        Stack.withFrozenCallStack
+          Test.Reporter.Logfile.report
+          now
+          handle
+          results
+    )
 
 reportJunit :: Internal.SuiteResult -> Prelude.IO ()
 reportJunit results =
@@ -89,7 +84,7 @@ reportJunit results =
       Nothing -> Prelude.pure ()
       Just path -> Test.Reporter.Junit.report path results
 
-getPath :: [Prelude.String] -> Maybe FilePath.FilePath
+getPath :: [Prelude.String] -> Maybe Prelude.String
 getPath args =
   case args of
     [] -> Nothing

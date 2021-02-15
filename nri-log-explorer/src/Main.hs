@@ -33,10 +33,8 @@ import qualified List
 import NriPrelude
 import qualified Paths_nri_log_explorer as Paths
 import qualified Platform
-import qualified System.Directory
 import qualified System.Environment
 import qualified System.Exit
-import System.FilePath ((</>))
 import qualified System.IO
 import qualified System.Process
 import qualified Text
@@ -435,8 +433,7 @@ run :: Prelude.IO ()
 run = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   partOfLine <- IORef.newIORef Prelude.mempty
-  tmpDir <- System.Directory.getTemporaryDirectory
-  let logFile = tmpDir </> "nri-prelude-logs"
+  let logFile = "/tmp/nri-prelude-logs"
   System.IO.appendFile logFile "" -- touch file to ensure it exists
   eventChan <- Brick.BChan.newBChan 10
   let buildVty = Vty.mkVty Vty.defaultConfig
