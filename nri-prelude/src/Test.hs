@@ -27,7 +27,9 @@ import NriPrelude
 import qualified Platform
 import qualified Platform.DevLog
 import qualified System.Environment
+import qualified System.Exit
 import qualified System.IO
+import qualified System.Process
 import qualified Task
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
@@ -48,13 +50,19 @@ import qualified Prelude
 run :: Stack.HasCallStack => Internal.Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
-  results <- Task.perform log (Internal.run suite)
+  (results, logExplorerAvailable) <-
+    Async.concurrently
+      (Task.perform log (Internal.run suite))
+      isLogExplorerAvailable
   Async.mapConcurrently_
     identity
     [ reportStdout results,
       Stack.withFrozenCallStack reportLogfile results,
       reportJunit results
     ]
+  if logExplorerAvailable
+    then Prelude.putStrLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
+    else Prelude.putStrLn "\nInstall the log-explorer tool to inspect logs collected during test runs. Find it at github.com/NoRedInk/haskell-libraries."
   Test.Reporter.ExitCode.report results
 
 reportStdout :: Internal.SuiteResult -> Prelude.IO ()
@@ -82,3 +90,9 @@ getPath args =
     [] -> Nothing
     "--xml" : path : _ -> Just path
     _ : rest -> getPath rest
+
+isLogExplorerAvailable :: Prelude.IO Bool
+isLogExplorerAvailable = do
+  (exitCode, _, _) <-
+    System.Process.readProcessWithExitCode "which" ["log-explorer"] ""
+  Prelude.pure (exitCode == System.Exit.ExitSuccess)
