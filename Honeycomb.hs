@@ -163,7 +163,7 @@ deriveSampleRate rootSpan handler' =
           linear (baseRate, apdexTUs) (1, 4 * apdexTUs) requestDurationUs
             |> clamp baseRate 1
 
--- | Pass two (x,y) coordinates, get back a function descriving the straight
+-- | Pass two (x,y) coordinates, get back a function describing the straight
 -- line passing through both points.
 linear :: (Float, Float) -> (Float, Float) -> (Float -> Float)
 linear (x1, y1) (x2, y2) x =
@@ -529,7 +529,7 @@ apdexTimeMsDecoder =
   Environment.variable
     Environment.Variable
       { Environment.name = "HONEYCOMB_APDEX_TIME_IN_MILLISECONDS",
-        Environment.description = "The T value in the apdex, the time in microseconds in which a health request should complete.",
+        Environment.description = "The T value in the apdex, the time in milliseconds in which a health request should complete.",
         Environment.defaultValue = "100"
       }
     Environment.int
