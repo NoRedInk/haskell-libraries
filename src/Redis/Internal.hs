@@ -28,15 +28,13 @@ data Error
   | LibraryError Text
   | TransactionAborted
   | TimeoutError
+  | ExhaustedRetriesWhileAcquiringLock
 
 instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
 
 instance Show Error where
   show = errorForHumans >> Data.Text.unpack
-
-data TracedQuery where
-  TracedQuery :: Query a -> TracedQuery
 
 errorForHumans :: Error -> Text
 errorForHumans topError =
@@ -48,6 +46,7 @@ errorForHumans topError =
     DecodingFieldError err -> "Could not decode field of hash: " ++ err
     TransactionAborted -> "Transaction aborted. Watched key has changed."
     TimeoutError -> "Redis query took too long."
+    ExhaustedRetriesWhileAcquiringLock -> "Exhaused retries while attempting to acquire lock."
 
 -- | Render the commands a query is going to run for monitoring and debugging
 -- purposes. Values we write are replaced with "*****" because they might
@@ -143,6 +142,7 @@ data Handler = Handler
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doWatch :: [Text] -> Task Error (),
+    doLock :: forall e a. Lock e a -> Task e a -> Task e a,
     namespace :: Text
   }
 
@@ -262,3 +262,10 @@ maybesToDict keys values =
             Just v -> Just (key, v)
       )
     |> Dict.fromList
+
+data Lock e a = Lock
+  { lockKey :: Text,
+    lockTimeoutInMs :: Float,
+    lockMaxTries :: Int,
+    lockHandleError :: Error -> Task e a
+  }
