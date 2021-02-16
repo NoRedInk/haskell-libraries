@@ -4,11 +4,13 @@
 -- use in development.
 module Observability.Dev
   ( report,
-    logTracingSpanRecursively,
     Handler,
     handler,
     Settings,
     decoder,
+
+    -- * Exported for tests
+    mkLog,
   )
 where
 
@@ -22,17 +24,13 @@ import qualified Data.Text.Prettyprint.Doc.Internal as Doc.Internal
 import qualified Data.Text.Prettyprint.Doc.Render.Terminal as Terminal
 import qualified Data.Time.Format as Format
 import qualified Environment
-import qualified GHC.Stack as Stack
 import qualified List
-import qualified Log
 import qualified Maybe
 import qualified Monitoring
-import qualified MySQL
 import NriPrelude
 import qualified Observability.Helpers
 import qualified Observability.Timer as Timer
 import qualified Platform
-import qualified Postgres
 import qualified System.IO
 import qualified Text
 import qualified Prelude
@@ -40,63 +38,23 @@ import qualified Prelude
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span = do
   Platform.writeSpanToDevLog span
-  MVar.putMVar (writeLock handler') (logTracingSpanRecursively (timer handler') span)
+  MVar.putMVar (writeLock handler') (mkLog (timer handler') span)
 
 type Doc = Doc.Doc Terminal.AnsiStyle
 
-logTracingSpanRecursively :: Timer.Timer -> Platform.TracingSpan -> Doc
-logTracingSpanRecursively timer' span =
-  let (beforeChildren, afterChildren) = logSingleTracingSpan timer' span
-   in vcat
-        [ Doc.hang 2 beforeChildren,
-          Platform.children span
-            |> List.reverse
-            |> Prelude.map (logTracingSpanRecursively timer')
-            |> vcat,
-          case afterChildren of
-            Nothing -> Doc.emptyDoc
-            Just after -> Doc.hang 2 after
-        ]
-
-logSingleTracingSpan :: Timer.Timer -> Platform.TracingSpan -> (Doc, Maybe Doc)
-logSingleTracingSpan timer' span =
-  if List.isEmpty (Platform.children span)
-    then
-      ( vsep
-          [ hsep
-              [ time timer' (Platform.started span),
-                name span,
-                failed span
-              ],
-            trace span,
-            exception span,
-            duration span,
-            details span
-          ],
-        Nothing
-      )
-    else
-      ( vsep
-          [ hsep
-              [ time timer' (Platform.started span),
-                label "Started:",
-                name span
-              ],
-            trace span,
-            details span
-          ],
-        vsep
-          [ hsep
-              [ time timer' (Platform.finished span),
-                label "Finished:",
-                name span,
-                failed span
-              ],
-            exception span,
-            duration span
-          ]
-          |> Just
-      )
+mkLog :: Timer.Timer -> Platform.TracingSpan -> Doc
+mkLog timer' span =
+  vsep
+    [ hsep
+        [ time timer' (Platform.started span),
+          name span,
+          failed span
+        ],
+      exception span,
+      duration span,
+      details span
+    ]
+    |> Doc.hang 2
 
 label :: Doc -> Doc
 label text =
@@ -115,29 +73,12 @@ flattenDetails details' =
       -- Some spans contain information that isn't as useful in a development
       -- setting. We have the opportunity below to pick useful data for specific
       -- span types.
-      [ Platform.Renderer mysqlQueryToDetails,
-        Platform.Renderer postgresQueryToDetails,
-        Platform.Renderer incomingRequestToDetails
+      [ Platform.Renderer incomingRequestToDetails
       ]
     |> Maybe.withDefault (Observability.Helpers.toHashMap details')
     |> HashMap.toList
     |> Prelude.map (\(key, val) -> hsep [label (Doc.pretty key ++ ":"), Doc.pretty val])
     |> vsep
-
-mysqlQueryToDetails :: MySQL.Info -> HashMap.HashMap Text Text
-mysqlQueryToDetails info =
-  HashMap.fromList
-    [("query", MySQL.infoQuery info)]
-
-postgresQueryToDetails :: Postgres.Info -> HashMap.HashMap Text Text
-postgresQueryToDetails info =
-  HashMap.fromList
-    [ ( "query",
-        -- This is a development logger, and so we're not concerned about
-        -- logging sensitive data here.
-        Log.unSecret (Postgres.infoQuery info)
-      )
-    ]
 
 incomingRequestToDetails :: Monitoring.RequestDetails -> HashMap.HashMap Text Text
 incomingRequestToDetails info =
@@ -158,20 +99,6 @@ exception span =
           Exception.displayException err
             |> Doc.pretty
             |> Doc.annotate (Terminal.color Terminal.Red)
-        ]
-
-trace :: Platform.TracingSpan -> Doc
-trace span =
-  case Platform.frame span of
-    Nothing -> Doc.emptyDoc
-    Just (_, frame) ->
-      hsep
-        [ label "source:",
-          Doc.pretty (Stack.srcLocFile frame),
-          label "line:",
-          Doc.pretty (Stack.srcLocStartLine frame),
-          label "column:",
-          Doc.pretty (Stack.srcLocStartCol frame)
         ]
 
 name :: Platform.TracingSpan -> Doc
@@ -252,9 +179,6 @@ vsep = removeEmpties >> Doc.vsep
 
 hsep :: [Doc] -> Doc
 hsep = removeEmpties >> Doc.hsep
-
-vcat :: [Doc] -> Doc
-vcat = removeEmpties >> Doc.vcat
 
 removeEmpties :: [Doc] -> [Doc]
 removeEmpties = List.filter (not << isEmpty)
