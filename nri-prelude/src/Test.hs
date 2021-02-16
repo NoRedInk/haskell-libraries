@@ -26,10 +26,9 @@ import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
 import qualified Platform.DevLog
+import qualified System.Directory
 import qualified System.Environment
-import qualified System.Exit
 import qualified System.IO
-import qualified System.Process
 import qualified Task
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
@@ -93,6 +92,5 @@ getPath args =
 
 isLogExplorerAvailable :: Prelude.IO Bool
 isLogExplorerAvailable = do
-  (exitCode, _, _) <-
-    System.Process.readProcessWithExitCode "which" ["log-explorer"] ""
-  Prelude.pure (exitCode == System.Exit.ExitSuccess)
+  System.Directory.findExecutable "log-explorer"
+    |> map (/= Nothing)

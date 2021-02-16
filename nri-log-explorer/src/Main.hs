@@ -33,6 +33,7 @@ import qualified List
 import NriPrelude
 import qualified Paths_nri_log_explorer as Paths
 import qualified Platform
+import qualified System.Directory
 import qualified System.Environment
 import qualified System.Exit
 import qualified System.IO
@@ -604,9 +605,8 @@ copyCommands =
 
 isAppAvailable :: Text -> Prelude.IO Bool
 isAppAvailable cmd = do
-  (exitCode, _, _) <-
-    System.Process.readProcessWithExitCode "which" [Data.Text.unpack cmd] ""
-  Prelude.pure (exitCode == System.Exit.ExitSuccess)
+  System.Directory.findExecutable (Data.Text.unpack cmd)
+    |> map (/= Nothing)
 
 spanToClipboard :: Text -> Platform.TracingSpan -> Prelude.IO ()
 spanToClipboard cmdAndArgs span =
