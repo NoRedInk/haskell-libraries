@@ -320,7 +320,17 @@ queryTests redisHandler =
         |> Redis.query redisHandler
         |> Task.map (Expect.equal (Just "val2"))
         |> Expect.Task.succeeds
-        |> Task.andThen Expect.Task.check
+        |> Task.andThen Expect.Task.check,
+    Test.task "lock works without errors"
+      <| let lock =
+               Redis.Lock
+                 { Redis.lockKey = "test-lock-key",
+                   Redis.lockTimeoutInMs = 100,
+                   Redis.lockMaxTries = 1,
+                   Redis.lockHandleError = Task.fail
+                 }
+          in Redis.lock redisHandler lock (Task.succeed ())
+               |> Expect.Task.succeeds
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler

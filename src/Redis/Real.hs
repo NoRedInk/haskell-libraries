@@ -302,7 +302,7 @@ toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
 toResult reply =
   case reply of
     Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
-    Left _ -> Err (Internal.RedisError "The Redis library said this was an error but returned no error message.")
+    Left err -> Err (Internal.RedisError ("Redis library got back a value with a type it didn't expect: " ++ Data.Text.pack (Prelude.show err)))
     Right r -> Ok r
 
 toB :: Text -> Data.ByteString.ByteString
@@ -420,7 +420,7 @@ releaseLock conn doAnything config uuid = do
     [UUID.toASCIIBytes uuid]
     |> map (map Ok)
     |> platformRedis [tracingCmd] conn doAnything
-    |> map (\(_ :: Database.Redis.Status) -> ())
+    |> map (\(_ :: Prelude.Integer) -> ())
 
 -- This script is copied verbatim from https://redis.io/commands/set.
 deleteKeyIfValueMatchesScript :: Data.ByteString.ByteString
