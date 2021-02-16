@@ -16,7 +16,7 @@ TracingSpan
             }
         )
   , details = Nothing
-  , summary = Nothing
+  , summary = Just "mock-uri"
   , succeeded = Succeeded
   , allocated = 0
   , children =
@@ -39,7 +39,7 @@ TracingSpan
                 )
           , details =
               Just "{\"uri\":\"mock-uri\",\"request method\":\"GET\"}"
-          , summary = Just "GET http://localhost:55137/"
+          , summary = Just "mock-uri"
           , succeeded = Succeeded
           , allocated = 0
           , children = []

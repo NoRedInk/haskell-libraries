@@ -155,5 +155,6 @@ constantValuesForVariableFields span =
                     ]
             ),
       Platform.allocated = 0,
+      Platform.summary = Just "mock-uri",
       Platform.children = map constantValuesForVariableFields (Platform.children span)
     }
