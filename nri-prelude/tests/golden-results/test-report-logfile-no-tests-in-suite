@@ -1,0 +1,20 @@
+{
+    "summary": "nri-prelude",
+    "children": [],
+    "allocated": 0,
+    "name": "test run",
+    "details": null,
+    "finished": 0,
+    "frame": {
+        "startLine": 324,
+        "endLine": 324,
+        "name": "report",
+        "endCol": 69,
+        "module": "TestSpec",
+        "package": "main",
+        "startCol": 22,
+        "file": "tests/TestSpec.hs"
+    },
+    "succeeded": "Failed",
+    "started": 0
+}

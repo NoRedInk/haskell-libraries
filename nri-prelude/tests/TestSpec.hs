@@ -1,6 +1,8 @@
 module TestSpec (tests) where
 
 import qualified Control.Exception.Safe as Exception
+import qualified Data.Aeson.Encode.Pretty
+import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Expect
@@ -13,6 +15,7 @@ import qualified Platform.Internal
 import qualified System.IO
 import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, task, test, todo)
 import qualified Test.Internal as Internal
+import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Prelude
 
@@ -21,7 +24,8 @@ tests =
   describe
     "Test"
     [ api,
-      stdoutReporter
+      stdoutReporter,
+      logfileReporter
     ]
 
 api :: Test
@@ -263,6 +267,94 @@ stdoutReporter =
           |> Expect.Task.check
     ]
 
+logfileReporter :: Test
+logfileReporter =
+  describe
+    "Logfile Reporter"
+    [ task "all passed" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.AllPassed
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  |> Test.Reporter.Logfile.report (writeSpan handle)
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-all-passed"
+          |> Expect.Task.check,
+      task "onlys passed" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.OnlysPassed
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  [ mockTest "test 3" Internal.NotRan,
+                    mockTest "test 4" Internal.NotRan
+                  ]
+                  |> Test.Reporter.Logfile.report (writeSpan handle)
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-onlys-passed"
+          |> Expect.Task.check,
+      task "passed with skipped" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.PassedWithSkipped
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  [ mockTest "test 3" Internal.NotRan,
+                    mockTest "test 4" Internal.NotRan
+                  ]
+                  |> Test.Reporter.Logfile.report (writeSpan handle)
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-passed-with-skipped"
+          |> Expect.Task.check,
+      task "no tests in suite" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.NoTestsInSuite
+                  |> Test.Reporter.Logfile.report (writeSpan handle)
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-no-tests-in-suite"
+          |> Expect.Task.check,
+      task "tests failed" <| do
+        contents <-
+          withTempFile
+            ( \_ handle ->
+                Internal.TestsFailed
+                  [ mockTest "test 1" mockTracingSpan,
+                    mockTest "test 2" mockTracingSpan
+                  ]
+                  [ mockTest "test 3" Internal.NotRan,
+                    mockTest "test 4" Internal.NotRan
+                  ]
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error"),
+                    mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
+                    mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
+                    mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
+                  ]
+                  |> Test.Reporter.Logfile.report (writeSpan handle)
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-tests-failed"
+          |> Expect.Task.check
+    ]
+
+writeSpan :: System.IO.Handle -> Platform.Internal.TracingSpan -> Prelude.IO ()
+writeSpan handle span =
+  do
+    Data.Aeson.Encode.Pretty.encodePretty span
+    |> Data.ByteString.Lazy.hPut handle
+
 -- | Provide a temporary file for a test to do some work in, then return the
 -- contents of the file when the test is done with it.
 withTempFile :: (System.IO.FilePath -> System.IO.Handle -> Prelude.IO ()) -> Task e Text
@@ -295,6 +387,7 @@ mockTracingSpan =
       Platform.Internal.finished = Platform.Internal.MonotonicTime 0,
       Platform.Internal.frame = Nothing,
       Platform.Internal.details = Nothing,
+      Platform.Internal.summary = Nothing,
       Platform.Internal.succeeded = Platform.Internal.Succeeded,
       Platform.Internal.allocated = 1,
       Platform.Internal.children = []

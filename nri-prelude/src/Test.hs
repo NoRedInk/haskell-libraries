@@ -21,15 +21,19 @@ module Test
   )
 where
 
+import qualified Control.Concurrent.Async as Async
+import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
+import qualified Platform.DevLog
+import qualified System.Directory
 import qualified System.Environment
-import qualified System.FilePath as FilePath
 import qualified System.IO
 import qualified Task
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
 import qualified Test.Reporter.Junit
+import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Prelude
 
@@ -42,20 +46,51 @@ import qualified Prelude
 -- >
 -- > main :: IO ()
 -- > main = Test.run (Test.todo "write your tests here!")
-run :: Internal.Test -> Prelude.IO ()
+run :: Stack.HasCallStack => Internal.Test -> Prelude.IO ()
 run suite = do
   log <- Platform.silentHandler
-  results <- Task.perform log (Internal.run suite)
-  Test.Reporter.Stdout.report System.IO.stdout results
-  args <- System.Environment.getArgs
-  case getPath args of
-    Nothing -> Prelude.pure ()
-    Just path -> Test.Reporter.Junit.report path results
+  (results, logExplorerAvailable) <-
+    Async.concurrently
+      (Task.perform log (Internal.run suite))
+      isLogExplorerAvailable
+  Async.mapConcurrently_
+    identity
+    [ reportStdout results,
+      Stack.withFrozenCallStack reportLogfile results,
+      reportJunit results
+    ]
+  if logExplorerAvailable
+    then Prelude.putStrLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
+    else Prelude.putStrLn "\nInstall the log-explorer tool to inspect logs collected during test runs. Find it at github.com/NoRedInk/haskell-libraries."
   Test.Reporter.ExitCode.report results
 
-getPath :: [Prelude.String] -> Maybe FilePath.FilePath
+reportStdout :: Internal.SuiteResult -> Prelude.IO ()
+reportStdout results =
+  Test.Reporter.Stdout.report System.IO.stdout results
+
+reportLogfile :: Stack.HasCallStack => Internal.SuiteResult -> Prelude.IO ()
+reportLogfile results =
+  Stack.withFrozenCallStack
+    Test.Reporter.Logfile.report
+    Platform.DevLog.writeSpanToDevLog
+    results
+
+reportJunit :: Internal.SuiteResult -> Prelude.IO ()
+reportJunit results =
+  do
+    args <- System.Environment.getArgs
+    case getPath args of
+      Nothing -> Prelude.pure ()
+      Just path -> Test.Reporter.Junit.report path results
+
+getPath :: [Prelude.String] -> Maybe Prelude.String
 getPath args =
   case args of
     [] -> Nothing
     "--xml" : path : _ -> Just path
     _ : rest -> getPath rest
+
+isLogExplorerAvailable :: Prelude.IO Bool
+isLogExplorerAvailable = do
+  System.Directory.findExecutable "log-explorer"
+    |> map (/= Nothing)

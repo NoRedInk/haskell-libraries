@@ -8,11 +8,14 @@ import Basics
 import Control.Applicative ((<|>))
 import qualified Control.AutoUpdate as AutoUpdate
 import qualified Control.Exception.Safe as Exception
+import Data.Aeson ((.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encoding as Aeson.Encoding
 import qualified Data.IORef as IORef
 import qualified Data.Text
 import qualified Data.Typeable as Typeable
 import qualified GHC.Clock as Clock
+import GHC.Generics (Generic)
 import qualified GHC.Stack as Stack
 import qualified GHC.Word
 import qualified Internal.Shortcut as Shortcut
@@ -134,6 +137,9 @@ data TracingSpan
         frame :: Maybe (Text, Stack.SrcLoc),
         -- | Unique information for this tracingSpan.
         details :: Maybe SomeTracingSpanDetails,
+        -- | A short blurb describing the details of this span, for use in
+        -- tooling for inspecting these spans.
+        summary :: Maybe Text,
         -- | Whether this tracingSpan succeeded. If any of the children of this
         -- tracingSpan failed, so will this tracingSpan. This will create a
         -- path to the tracingSpan closest to the failure from the root
@@ -151,7 +157,116 @@ data TracingSpan
         -- of the list.
         children :: [TracingSpan]
       }
-  deriving (Prelude.Show)
+  deriving (Prelude.Show, Generic)
+
+instance Aeson.ToJSON TracingSpan where
+  toJSON span =
+    Aeson.object
+      [ "name" .= name span,
+        "started" .= started span,
+        "finished" .= finished span,
+        "frame" .= map SrcLocForEncoding (frame span),
+        "details" .= details span,
+        "summary" .= summary span,
+        "succeeded" .= succeeded span,
+        "allocated" .= allocated span,
+        "children" .= children span
+      ]
+  toEncoding span =
+    Aeson.pairs
+      ( "name" .= name span
+          ++ "started" .= started span
+          ++ "finished" .= finished span
+          ++ "frame" .= map SrcLocForEncoding (frame span)
+          ++ "details" .= details span
+          ++ "summary" .= summary span
+          ++ "succeeded" .= succeeded span
+          ++ "allocated" .= allocated span
+          ++ "children" .= children span
+      )
+
+instance Aeson.FromJSON TracingSpan where
+  parseJSON =
+    Aeson.withObject
+      "TracingSpan"
+      ( \object -> do
+          name <- object .: "name"
+          started <- object .: "started"
+          finished <- object .: "finished"
+          frame <- map (map unSrcLocForEncoding) (object .:? "frame")
+          details <- object .:? "details"
+          summary <- object .:? "summary"
+          succeeded <- object .: "succeeded"
+          allocated <- object .: "allocated"
+          children <- object .: "children"
+          Prelude.pure
+            TracingSpan
+              { name,
+                started,
+                finished,
+                frame,
+                details,
+                summary,
+                succeeded,
+                allocated,
+                children
+              }
+      )
+
+newtype SrcLocForEncoding = SrcLocForEncoding {unSrcLocForEncoding :: (Text, Stack.SrcLoc)}
+
+instance Aeson.ToJSON SrcLocForEncoding where
+  toJSON (SrcLocForEncoding (name, loc)) =
+    Aeson.object
+      [ "name" .= name,
+        "package" .= Stack.srcLocPackage loc,
+        "module" .= Stack.srcLocModule loc,
+        "file" .= Stack.srcLocFile loc,
+        "startLine" .= Stack.srcLocStartLine loc,
+        "startCol" .= Stack.srcLocStartCol loc,
+        "endLine" .= Stack.srcLocEndLine loc,
+        "endCol" .= Stack.srcLocEndCol loc
+      ]
+  toEncoding (SrcLocForEncoding (name, loc)) =
+    Aeson.pairs
+      ( "name" .= name
+          ++ "package" .= Stack.srcLocPackage loc
+          ++ "module" .= Stack.srcLocModule loc
+          ++ "file" .= Stack.srcLocFile loc
+          ++ "startLine" .= Stack.srcLocStartLine loc
+          ++ "startCol" .= Stack.srcLocStartCol loc
+          ++ "endLine" .= Stack.srcLocEndLine loc
+          ++ "endCol" .= Stack.srcLocEndCol loc
+      )
+
+instance Aeson.FromJSON SrcLocForEncoding where
+  parseJSON =
+    Aeson.withObject
+      "SrcLocForEncoding"
+      ( \object -> do
+          name <- object .: "name"
+          srcLocPackage <- object .: "package"
+          srcLocModule <- object .: "module"
+          srcLocFile <- object .: "file"
+          srcLocStartLine <- object .: "startLine"
+          srcLocStartCol <- object .: "startCol"
+          srcLocEndLine <- object .: "endLine"
+          srcLocEndCol <- object .: "endCol"
+          Prelude.pure
+            ( SrcLocForEncoding
+                ( name,
+                  Stack.SrcLoc
+                    { Stack.srcLocPackage,
+                      Stack.srcLocModule,
+                      Stack.srcLocFile,
+                      Stack.srcLocStartLine,
+                      Stack.srcLocStartCol,
+                      Stack.srcLocEndLine,
+                      Stack.srcLocEndCol
+                    }
+                )
+            )
+      )
 
 -- | A tracing span containing default empty values for all fields. Usually we
 -- don't need this because TracingSpans get created for us when we evaluate
@@ -165,6 +280,7 @@ emptyTracingSpan =
       finished = 0,
       frame = Nothing,
       details = Nothing,
+      summary = Nothing,
       succeeded = Succeeded,
       allocated = 0,
       children = []
@@ -187,6 +303,46 @@ data Succeeded
     -- Haskell runtime or a library.
     FailedWith Exception.SomeException
   deriving (Prelude.Show)
+
+instance Aeson.ToJSON Succeeded where
+  toJSON Succeeded = Aeson.String "Succeeded"
+  toJSON Failed = Aeson.String "Failed"
+  toJSON (FailedWith exception) =
+    Exception.displayException exception
+      |> Data.Text.pack
+      |> Aeson.String
+  toEncoding Succeeded = Aeson.Encoding.text "Succeeded"
+  toEncoding Failed = Aeson.Encoding.text "Failed"
+  toEncoding (FailedWith exception) =
+    Exception.displayException exception
+      |> Aeson.Encoding.string
+
+instance Aeson.FromJSON Succeeded where
+  parseJSON =
+    Aeson.withText
+      "Succeeded"
+      ( \text ->
+          case text of
+            "Succeeded" -> Prelude.pure Succeeded
+            "Failed" -> Prelude.pure Failed
+            _ ->
+              ParsedException text
+                |> Exception.toException
+                |> FailedWith
+                |> Prelude.pure
+      )
+
+-- Helper type for when we're decoding a TracingSpan. SomeException doesn't have
+-- aeson instances for encoding or decoding. For encoding a SomeException we can
+-- make something up, but we can never decode it back into the original
+-- exception type. Hence this ParsedException for decoding into instead.
+newtype ParsedException = ParsedException Text
+  deriving (Aeson.ToJSON)
+
+instance Prelude.Show ParsedException where
+  show (ParsedException text) = Data.Text.unpack text
+
+instance Exception.Exception ParsedException
 
 -- | If the first bit of code succeeded and the second failed, the combination
 -- of the two has failed as well. The @SemiGroup@ and @Monoid@ type instances
@@ -260,6 +416,12 @@ instance Aeson.ToJSON SomeTracingSpanDetails where
 
   toEncoding (SomeTracingSpanDetails details) = Aeson.toEncoding details
 
+instance Aeson.FromJSON SomeTracingSpanDetails where
+  parseJSON x =
+    Aeson.parseJSON x
+      |> Prelude.fmap
+        (toTracingSpanDetails << ParsedTracingSpandetails)
+
 instance TracingSpanDetails SomeTracingSpanDetails where
   toTracingSpanDetails details = details
 
@@ -269,6 +431,17 @@ instance Prelude.Show SomeTracingSpanDetails where
   show (SomeTracingSpanDetails details) =
     Aeson.encode details
       |> Prelude.show
+
+-- | A container for tracing span details if we parsed them back from JSON.
+-- We don't require users of this library to define FromJSON instances of their
+-- own tracing span details because it's not necessary for logging, but to
+-- support tooling reading data structures produced by this lib we'd still like
+-- to be able to parse tracing spans from JSON. This helper type allows us to do
+-- so.
+newtype ParsedTracingSpandetails = ParsedTracingSpandetails Aeson.Value
+  deriving (Aeson.ToJSON)
+
+instance TracingSpanDetails ParsedTracingSpandetails
 
 -- | Every type we want to use as tracingSpan metadata needs a
 -- @TracingSpanDetails@ instance.  The @TracingSpanDetails@ class fulfills
@@ -491,6 +664,7 @@ startTracingSpan clock name = do
             |> List.head
             |> Shortcut.map (Tuple.mapFirst Data.Text.pack),
         details = Nothing,
+        summary = Nothing,
         succeeded = Succeeded,
         allocated = 0,
         children = []
@@ -628,4 +802,4 @@ newtype MonotonicTime
         -- constant moment in the past.
         inMicroseconds :: GHC.Word.Word64
       }
-  deriving (Prelude.Show, Prelude.Num, Prelude.Eq, Prelude.Ord)
+  deriving (Prelude.Show, Prelude.Num, Prelude.Eq, Prelude.Ord, Aeson.ToJSON, Aeson.FromJSON)

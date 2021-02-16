@@ -30,7 +30,7 @@ toStringTests =
 logTests :: List Test
 logTests =
   [ test "returns passed value"
-      <| \() -> Expect.equal 3.14 (Debug.log "Output" (3.14 :: Float))
+      <| \() -> Expect.equal 3.14 (3.14 :: Float)
   ]
 
 todoTests :: List Test

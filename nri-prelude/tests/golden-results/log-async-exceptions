@@ -16,6 +16,7 @@
               }
           )
     , details = Just "{\"number\":825}"
+    , summary = Nothing
     , succeeded = FailedWith TestException
     , allocated = 0
     , children =
@@ -37,6 +38,7 @@
                       }
                   )
             , details = Just "{\"word\":\"sabbatical\"}"
+            , summary = Nothing
             , succeeded = FailedWith TestException
             , allocated = 0
             , children = []

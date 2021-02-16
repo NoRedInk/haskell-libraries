@@ -1,0 +1,67 @@
+{
+    "summary": "nri-prelude",
+    "children": [
+        {
+            "summary": "suite",
+            "children": [
+                {
+                    "summary": "sub suite",
+                    "children": [
+                        {
+                            "summary": null,
+                            "children": [],
+                            "allocated": 1,
+                            "name": "name",
+                            "details": null,
+                            "finished": 0,
+                            "frame": null,
+                            "succeeded": "Succeeded",
+                            "started": 0
+                        },
+                        {
+                            "summary": null,
+                            "children": [],
+                            "allocated": 1,
+                            "name": "name",
+                            "details": null,
+                            "finished": 0,
+                            "frame": null,
+                            "succeeded": "Succeeded",
+                            "started": 0
+                        }
+                    ],
+                    "allocated": 0,
+                    "name": "describe",
+                    "details": null,
+                    "finished": 0,
+                    "frame": null,
+                    "succeeded": "Succeeded",
+                    "started": 0
+                }
+            ],
+            "allocated": 0,
+            "name": "describe",
+            "details": null,
+            "finished": 0,
+            "frame": null,
+            "succeeded": "Succeeded",
+            "started": 0
+        }
+    ],
+    "allocated": 0,
+    "name": "test run",
+    "details": null,
+    "finished": 0,
+    "frame": {
+        "startLine": 298,
+        "endLine": 298,
+        "name": "report",
+        "endCol": 69,
+        "module": "TestSpec",
+        "package": "main",
+        "startCol": 22,
+        "file": "tests/TestSpec.hs"
+    },
+    "succeeded": "Failed",
+    "started": 0
+}

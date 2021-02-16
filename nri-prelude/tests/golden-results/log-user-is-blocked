@@ -18,6 +18,7 @@
     , details =
         Just
           "{\"triage\":{\"advisory\":\"find key\",\"impact\":\"User is blocked from performing an action.\"},\"house number\":5}"
+    , summary = Nothing
     , succeeded = Failed
     , allocated = 0
     , children = []

@@ -1,3 +1,10 @@
+# 0.3.1.0
+
+Enhancements:
+
+- `Platform.summary` can be used to decorate tracing spans with a text summary for use in dev tooling.
+- `Platform.writeSpanToDevLog` can be used to write a span for consumption by the new `log-explorer` tool.
+
 # 0.3.0.0
 
 Breaking changs:

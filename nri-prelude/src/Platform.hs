@@ -31,6 +31,7 @@ module Platform
     Internal.finished,
     Internal.frame,
     Internal.details,
+    Internal.summary,
     Internal.succeeded,
     Internal.allocated,
     Internal.children,
@@ -41,6 +42,9 @@ module Platform
     Internal.renderTracingSpanDetails,
     Internal.MonotonicTime,
     Internal.inMicroseconds,
+
+    -- * Reporting spans to development tooling
+    Platform.DevLog.writeSpanToDevLog,
 
     -- * Ensuring cleanup logic gets ran in case of exceptions.
     bracketWithError,
@@ -57,6 +61,7 @@ import qualified Control.Monad.Catch as Catch
 import qualified Data.Text
 import qualified GHC.Stack as Stack
 import NriPrelude
+import qualified Platform.DevLog
 import qualified Platform.DoAnything as DoAnything
 import qualified Platform.Internal as Internal
 import qualified Task
