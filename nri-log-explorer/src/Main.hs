@@ -249,6 +249,7 @@ viewContents page =
     NoLogsFound ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
         |> Center.hCenter
+        |> Brick.padBottom Brick.Max
     SpanList now logs ->
       logs
         |> Zipper.indexedMap
@@ -425,6 +426,7 @@ main = do
         "",
         "  --help         show this help message",
         "  --version      show application version",
+        "  --clear        clear old log entries before starting",
         "",
         "log-explorer is a tool for exploring traces produced by the nri-prelude set of libraries."
       ]
@@ -436,13 +438,18 @@ main = do
               |> map Prelude.show
               |> Data.List.intercalate "."
        in Prelude.putStrLn ("log-explorer " ++ version)
+    ["--clear"] -> do
+      System.Directory.removeFile logFile
+      run
     _ -> System.Exit.die "log-explorer was called with unknown arguments"
+
+logFile :: Prelude.String
+logFile = "/tmp/nri-prelude-logs"
 
 run :: Prelude.IO ()
 run = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   partOfLine <- IORef.newIORef Prelude.mempty
-  let logFile = "/tmp/nri-prelude-logs"
   System.IO.appendFile logFile "" -- touch file to ensure it exists
   eventChan <- Brick.BChan.newBChan 10
   let buildVty = Vty.mkVty Vty.defaultConfig
