@@ -539,6 +539,10 @@ data LogHandler
         -- become known as the tracingSpan runs, for example the response code
         -- of an HTTP request.
         setTracingSpanDetailsIO :: forall d. TracingSpanDetails d => d -> IO (),
+        -- | Set a summary for the current tracingSpan. This is shown in tools
+        -- used to inspect spans as a stand-in for the full tracingSpan details
+        -- in places where we only have room to show a little text.
+        setTracingSpanSummaryIO :: Text -> IO (),
         -- | Mark the current tracingSpan as failed. Some reporting backends
         -- will use this to decide whether a particular request is worth
         -- reporting on.
@@ -578,6 +582,10 @@ mkHandler requestId clock onFinish name' = do
           updateIORef
             tracingSpanRef
             (\tracingSpan' -> tracingSpan' {details = Just (toTracingSpanDetails details')}),
+        setTracingSpanSummaryIO = \text ->
+          updateIORef
+            tracingSpanRef
+            (\tracingSpan' -> tracingSpan' {summary = Just text}),
         markTracingSpanFailedIO =
           updateIORef
             tracingSpanRef
@@ -612,17 +620,29 @@ setTracingSpanDetails details =
           |> map Ok
     )
 
+-- | Set a summary for the tracingSpan created with the @tracingSpan@ function.
+-- Like @tracingSpan@ this is intended for use in writing libraries that define
+-- custom types of effects, such as database queries or http requests.
+--
+-- The summary is shown in tools used to inspect spans as a stand-in for the
+-- full tracingSpan details in places where we only have room to show a little
+-- text.
+setTracingSpanSummary :: Text -> Task e ()
+setTracingSpanSummary text =
+  Task
+    ( \handler ->
+        setTracingSpanSummaryIO handler text
+          |> map Ok
+    )
+
 -- | Mark a tracingSpan created with the @tracingSpan@ function as failed. Like
 -- @tracingSpan@ this is intended for use in writing libraries that define
 -- custom types of effects, such as database queries or http requests.
 --
---     tracingSpan "plane spotting" do
---       spotPlanes
---         |> Task.onError
---              (\GlobalPandemicError -> do
---                  markTracingSpanFailed
---                  Task.fail GlobalPandemicError
---              )
+--     tracingSpan "holiday" do
+--       Platform.finally
+--         (readBook bookPick)
+--         (setTracingSpanSummary "The Stone Sky")
 markTracingSpanFailed :: Task e ()
 markTracingSpanFailed =
   Task (map Ok << markTracingSpanFailedIO)

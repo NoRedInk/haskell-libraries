@@ -16,7 +16,7 @@
               }
           )
     , details = Just "{\"number\":825}"
-    , summary = Nothing
+    , summary = Just "outer span"
     , succeeded = Succeeded
     , allocated = 0
     , children =
@@ -38,7 +38,7 @@
                       }
                   )
             , details = Just "{\"word\":\"sabbatical\"}"
-            , summary = Nothing
+            , summary = Just "inner span"
             , succeeded = Succeeded
             , allocated = 0
             , children =
