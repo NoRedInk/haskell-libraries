@@ -285,7 +285,18 @@ traceQuery cmds connection task =
    in Stack.withFrozenCallStack
         Platform.tracingSpan
         "Redis Query"
-        (Platform.finally task (Platform.setTracingSpanDetails info))
+        ( Platform.finally
+            task
+            ( do
+                Platform.setTracingSpanDetails info
+                Platform.setTracingSpanSummary
+                  ( case cmds of
+                      [] -> ""
+                      [cmd] -> cmd
+                      cmd : _ -> cmd ++ " (+ more)"
+                  )
+            )
+        )
 
 data Info = Info
   { infoCommands :: List Text,

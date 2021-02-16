@@ -16,6 +16,7 @@ TracingSpan
             }
         )
   , details = Nothing
+  , summary = Nothing
   , succeeded = Succeeded
   , allocated = 0
   , children =
@@ -39,6 +40,7 @@ TracingSpan
           , details =
               Just
                 "{\"infoCommands\":[\"PING\"],\"infoHost\":\"localhost\",\"infoPort\":\"6379\"}"
+          , summary = Just "PING"
           , succeeded = Succeeded
           , allocated = 0
           , children = []
