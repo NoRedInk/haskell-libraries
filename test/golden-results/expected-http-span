@@ -16,6 +16,7 @@ TracingSpan
             }
         )
   , details = Nothing
+  , summary = Nothing
   , succeeded = Succeeded
   , allocated = 0
   , children =
@@ -32,12 +33,13 @@ TracingSpan
                     , srcLocFile = "src/Http.hs"
                     , srcLocStartLine = 311
                     , srcLocStartCol = 11
-                    , srcLocEndLine = 318
+                    , srcLocEndLine = 326
                     , srcLocEndCol = 14
                     }
                 )
           , details =
               Just "{\"uri\":\"mock-uri\",\"request method\":\"GET\"}"
+          , summary = Just "GET http://localhost:53547/"
           , succeeded = Succeeded
           , allocated = 0
           , children = []

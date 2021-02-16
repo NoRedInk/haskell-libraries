@@ -314,7 +314,15 @@ prepareManagerForRequest manager = do
             ( \log' ->
                 Exception.finally
                   io
-                  (Platform.setTracingSpanDetailsIO log' spanDetails)
+                  ( do
+                      Platform.setTracingSpanDetailsIO log' spanDetails
+                      Platform.setTracingSpanSummaryIO
+                        log'
+                        ( infoRequestMethod spanDetails
+                            ++ " "
+                            ++ infoUri spanDetails
+                        )
+                  )
             )
 
 data Info = Info
