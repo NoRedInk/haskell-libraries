@@ -38,7 +38,8 @@ import qualified Text
 import qualified Prelude
 
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
-report handler' _requestId span =
+report handler' _requestId span = do
+  Platform.writeSpanToDevLog span
   MVar.putMVar (writeLock handler') (logTracingSpanRecursively (timer handler') span)
 
 type Doc = Doc.Doc Terminal.AnsiStyle
