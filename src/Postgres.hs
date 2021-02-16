@@ -219,7 +219,17 @@ doQuery conn query handleResponse =
     -- context values like the query string.
     |> ( \task ->
            withFrozenCallStack Platform.tracingSpan "Postgresql Query" <| do
-             res <- Platform.finally task (Platform.setTracingSpanDetails queryInfo)
+             res <-
+               Platform.finally
+                 task
+                 ( do
+                     Platform.setTracingSpanDetails queryInfo
+                     Platform.setTracingSpanSummary
+                       ( Query.infoSqlOperation queryInfo
+                           ++ " "
+                           ++ Query.infoQueriedRelation queryInfo
+                       )
+                 )
              -- If we end up here it means the query succeeded. Overwrite the tracing
              -- details to contain the amount of selected rows. This information can be
              -- useful when debugging slow queries.
