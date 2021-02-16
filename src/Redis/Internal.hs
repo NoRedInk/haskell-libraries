@@ -14,6 +14,7 @@ import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude hiding (map, map2)
+import qualified Platform
 import qualified Set
 import qualified Task
 import qualified Text
@@ -269,3 +270,38 @@ data Lock e a = Lock
     lockMaxTries :: Int,
     lockHandleError :: Error -> Task e a
   }
+
+traceQuery :: Stack.HasCallStack => [Text] -> Text -> Text -> Task e a -> Task e a
+traceQuery commands host port task =
+  let info =
+        Info
+          { infoCommands = commands,
+            infoHost = host,
+            infoPort = port
+          }
+   in Stack.withFrozenCallStack
+        Platform.tracingSpan
+        "Redis Query"
+        ( Platform.finally
+            task
+            ( do
+                Platform.setTracingSpanDetails info
+                Platform.setTracingSpanSummary
+                  ( case commands of
+                      [] -> ""
+                      [cmd] -> cmd
+                      cmd : _ -> cmd ++ " (+ more)"
+                  )
+            )
+        )
+
+data Info = Info
+  { infoCommands :: List Text,
+    infoHost :: Text,
+    infoPort :: Text
+  }
+  deriving (Generic)
+
+instance Aeson.ToJSON Info
+
+instance Platform.TracingSpanDetails Info

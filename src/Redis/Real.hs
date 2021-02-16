@@ -3,13 +3,11 @@
 
 module Redis.Real
   ( handler,
-    Info (..),
   )
 where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
-import qualified Data.Aeson as Aeson
 import qualified Data.ByteString
 import qualified Data.ByteString.Builder
 import qualified Data.ByteString.Lazy
@@ -272,42 +270,7 @@ platformRedis cmds connection anything action =
             |> pure
       )
     |> Platform.doAnything anything
-    |> Stack.withFrozenCallStack traceQuery cmds connection
-
-traceQuery :: Stack.HasCallStack => [Text] -> Connection -> Task e a -> Task e a
-traceQuery cmds connection task =
-  let info =
-        Info
-          { infoCommands = cmds,
-            infoHost = connectionHost connection,
-            infoPort = connectionPort connection
-          }
-   in Stack.withFrozenCallStack
-        Platform.tracingSpan
-        "Redis Query"
-        ( Platform.finally
-            task
-            ( do
-                Platform.setTracingSpanDetails info
-                Platform.setTracingSpanSummary
-                  ( case cmds of
-                      [] -> ""
-                      [cmd] -> cmd
-                      cmd : _ -> cmd ++ " (+ more)"
-                  )
-            )
-        )
-
-data Info = Info
-  { infoCommands :: List Text,
-    infoHost :: Text,
-    infoPort :: Text
-  }
-  deriving (Generic)
-
-instance Aeson.ToJSON Info
-
-instance Platform.TracingSpanDetails Info
+    |> Stack.withFrozenCallStack Internal.traceQuery cmds (connectionHost connection) (connectionPort connection)
 
 toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
 toResult reply =

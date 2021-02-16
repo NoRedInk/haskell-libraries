@@ -37,7 +37,7 @@ module Redis.Counter
     Internal.sequence,
 
     -- * Observability helpers
-    Real.Info (..),
+    Internal.Info (..),
     Redis.readiness,
   )
 where
