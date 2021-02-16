@@ -361,9 +361,17 @@ viewSpanDetails Span {original} =
               ( \(name, val) ->
                   detailEntry
                     name
-                    ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder val
-                        |> Data.Text.Lazy.Builder.toLazyText
-                        |> Data.Text.Lazy.toStrict
+                    ( case Aeson.toJSON val of
+                        Aeson.Null -> "Null"
+                        Aeson.String str -> str
+                        Aeson.Number number ->
+                          Data.Text.pack (Prelude.show number)
+                        Aeson.Bool bool ->
+                          Data.Text.pack (Prelude.show bool)
+                        other ->
+                          Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder other
+                            |> Data.Text.Lazy.Builder.toLazyText
+                            |> Data.Text.Lazy.toStrict
                     )
               )
             |> Brick.vBox
