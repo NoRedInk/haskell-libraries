@@ -25,7 +25,7 @@ module Observability.Honeycomb
     CommonFields (..),
     BatchEvent (..),
     Span (..),
-    linear,
+    sampleRateForDuration,
   )
 where
 
@@ -159,15 +159,14 @@ deriveSampleRate rootSpan handler' =
         -- High sample rates might make honeycomb make ridiculous assumptions
         -- about the actual request rate tho. Adjust if that's the case.
           baseRate / 500
-        else
-          linear (baseRate, apdexTUs) (1, 4 * apdexTUs) requestDurationUs
-            |> clamp baseRate 1
+        else sampleRateForDuration baseRate requestDurationUs apdexTUs
 
--- | Pass two (x,y) coordinates, get back a function describing the straight
--- line passing through both points.
-linear :: (Float, Float) -> (Float, Float) -> (Float -> Float)
-linear (x1, y1) (x2, y2) x =
-  y1 + ((x - x1) / (x2 - x1)) * (y2 - y1)
+-- For every increase of apdexTU in the request duration we double the chance of
+-- q request getting logged, up to a maximum of 1.
+sampleRateForDuration :: Float -> Float -> Float -> Float
+sampleRateForDuration baseRate requestDurationUs apdexTUs =
+  baseRate * (2 ^ ((requestDurationUs - apdexTUs) / apdexTUs))
+    |> clamp baseRate 1
 
 calculateApdex :: Handler -> Platform.TracingSpan -> Float
 calculateApdex handler' span =
