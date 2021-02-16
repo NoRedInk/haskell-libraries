@@ -185,7 +185,7 @@ toFlatListHelper nesting span =
     { nesting = nesting,
       original = span
     }
-    : List.concatMap (toFlatListHelper (nesting + 1)) (Platform.children span)
+    : List.concatMap (toFlatListHelper (nesting + 1)) (List.reverse (Platform.children span))
 
 view :: Model -> [Brick.Widget Name]
 view model =
