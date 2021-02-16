@@ -1,3 +1,5 @@
+{-# LANGUAGE NumericUnderscores #-}
+
 -- | Reporting for development
 --
 -- This reporter logs information about requests in a human-readable format, for
@@ -15,6 +17,7 @@ module Observability.Dev
 where
 
 import qualified Conduit
+import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
@@ -148,19 +151,30 @@ handler timer Settings =
   Conduit.mkAcquire
     ( do
         writeLock <- MVar.newEmptyMVar
-        loggingThread <- Async.async (logLoop writeLock)
+        counter <- MVar.newMVar 0
+        loggingThread <- Async.async (logLoop counter writeLock)
         Prelude.pure Handler {timer, writeLock, loggingThread}
     )
     (Async.cancel << loggingThread)
 
 -- | Waits for a log message to become available in the MVar, logs it, then
 -- waits for the next one. This is intended to be ran on a separate thread.
-logLoop :: MVar.MVar Doc -> Prelude.IO ()
-logLoop lock = do
+logLoop :: MVar.MVar Int -> MVar.MVar Doc -> Prelude.IO ()
+logLoop counter lock = do
   doc <- MVar.takeMVar lock
   Terminal.hPutDoc System.IO.stdout doc
   System.IO.putStrLn "\n"
-  logLoop lock
+  ownCount <- MVar.modifyMVar counter (\n -> Prelude.pure (n + 1, n + 1))
+  Async.concurrently_
+    (logLoop counter lock)
+    ( do
+        -- After a few seconds of inactivity, advertise for log-explorer.
+        Control.Concurrent.threadDelay 3_000_000 {- 3 seconds -}
+        currentCount <- MVar.readMVar counter
+        if ownCount == currentCount
+          then Prelude.putStrLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
+          else Prelude.pure ()
+    )
 
 data Settings = Settings
 
