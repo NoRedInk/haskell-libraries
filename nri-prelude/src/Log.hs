@@ -129,7 +129,10 @@ withContext name contexts task =
     name
     ( Platform.finally
         task
-        (Platform.setTracingSpanDetails (LogContexts contexts))
+        ( do
+            Platform.setTracingSpanDetails (LogContexts contexts)
+            Platform.setTracingSpanSummary name
+        )
     )
 
 --

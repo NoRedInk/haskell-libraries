@@ -20,6 +20,8 @@ module Platform
     Internal.rootTracingSpanIO,
     Internal.setTracingSpanDetails,
     Internal.setTracingSpanDetailsIO,
+    Internal.setTracingSpanSummary,
+    Internal.setTracingSpanSummaryIO,
     Internal.markTracingSpanFailed,
     Internal.markTracingSpanFailedIO,
 
