@@ -21,7 +21,7 @@ where
 import Data.Function ((&))
 import qualified Data.List
 import qualified GhcPlugins
-import HsSyn (hsmodImports, hsmodName, ideclName, ideclQualified, simpleImportDecl)
+import HsSyn (hsmodImports, hsmodName, ideclImplicit, ideclName, ideclQualified, simpleImportDecl)
 import qualified Set
 import Prelude
 
@@ -86,6 +86,7 @@ addImplicitImports _ _ parsed =
 
     unqualified name =
       GhcPlugins.noLoc (simpleImportDecl (GhcPlugins.mkModuleName name))
+        & fmap (\qual -> qual {ideclImplicit = True})
     qualified name =
       fmap (\qual -> qual {ideclQualified = True}) (unqualified name)
 
