@@ -9,8 +9,6 @@ dependencies:
 - attoparsec
 - base
 - bytestring
-- nri-prelude
-- nri-env-parser
 - exceptions
 - filepath
 - hashable
@@ -21,6 +19,8 @@ dependencies:
 - lens-regex-pcre
 - mysql-haskell
 - network
+- nri-env-parser
+- nri-prelude
 - oops
 - pcre-light
 - postgresql-simple
@@ -46,8 +46,8 @@ library:
 tests:
   spec:
     dependencies:
-    - hedgehog
     - database
+    - hedgehog
     - tasty
     - tasty-ant-xml
     - tasty-hedgehog
