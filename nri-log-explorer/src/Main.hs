@@ -44,20 +44,35 @@ import qualified Zipper
 import qualified Prelude
 
 data Model = Model
-  { currentTime :: Time.UTCTime,
+  { -- Used to calculate "2 minutes ago" type info for root spans.
+    currentTime :: Time.UTCTime,
+    -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
+    -- The actual data displayed. In a zipper because one is always selected.
     loglines :: Maybe (Zipper.Zipper Logline),
+    -- If we're in the detail view for a root span, this will contain a copy of
+    -- the data of that particular span in a format more suitable for this view.
     selectedRootSpan :: Maybe (Zipper.Zipper Span),
+    -- Loading in initial data happens piecemeal, starting with the oldest data
+    -- first, so visually filling the view from the bottom up. Until the user
+    -- interacts we're going to keep the focus on the last-loaded element, but
+    -- once the user starts controlling the app themselves we want to keep our
+    -- hands off the controls.
     userDidSomething :: Bool,
+    -- Incrementing number to give all the root spans a unique identifier.
     lastId :: Id
   }
 
+-- One log entry on the main page. The Platform.TracingSpan contains the data we
+-- parsed (it in turn contains nested child spans, and so on).
 data Logline = Logline
   { logId :: Id,
     logTime :: Time.UTCTime,
     logSpan :: Platform.TracingSpan
   }
 
+-- A single span in the detail view of a root span. The root span has nesting 0,
+-- its children nesting 1, and so on.
 data Span = Span
   { nesting :: Int,
     original :: Platform.TracingSpan
@@ -74,12 +89,45 @@ data Msg
 
 newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
 
+-- Brick's view elements have a Widget type, which is sort of the equivalent of
+-- the Html type in an Elm application. Unlike Elm those widgets can have their
+-- own state not stored in the main Model type above. Widgets that have state
+-- like that need a unique name which brick uses as a key for storage.
 data Name
   = RootSpanListViewport
   | RootSpanLine Id
   | SpanDetailsListViewport Id
   | SpanLine Id Int
   deriving (Eq, Ord, Show)
+
+-- An alternative data type containing part of the same data as above, in a
+-- format more convenient for some update and view functions.
+data Page
+  = NoLogsFound
+  | SpanList Time.UTCTime (Zipper.Zipper Logline)
+  | SpanDetails (Maybe Text) Logline (Zipper.Zipper Span)
+
+toPage :: Model -> Page
+toPage model =
+  case (selectedRootSpan model, loglines model) of
+    (Just selected, Just spans) ->
+      SpanDetails
+        (clipboardCommand model)
+        (Zipper.current spans)
+        selected
+    (Nothing, Just spans) -> SpanList (currentTime model) spans
+    (_, Nothing) -> NoLogsFound
+
+withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
+withPage model fn =
+  map
+    ( \newPage ->
+        case newPage of
+          NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
+          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
+          SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
+    )
+    (fn (toPage model))
 
 init :: Maybe Text -> Time.UTCTime -> Model
 init clipboardCommand now =
@@ -101,6 +149,7 @@ update model msg =
     AddLogline line ->
       case Aeson.decodeStrict' line of
         Nothing ->
+          -- If a line cannot be parsed we ignore it for now.
           Brick.continue model
         Just (date, span) -> do
           let newId = lastId model + 1
@@ -110,7 +159,10 @@ update model msg =
                   { loglines =
                       case loglines model of
                         Nothing -> Just (Zipper.singleton logline)
-                        Just zipper -> Just (Zipper.prepend [logline] zipper),
+                        Just zipper ->
+                          -- Each line we read represents a newer log entry then
+                          -- the ones before it, so we insert it at the top.
+                          Just (Zipper.prepend [logline] zipper),
                     lastId = newId
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
@@ -158,8 +210,17 @@ update model msg =
             |> liftIO
       continueAfterUserInteraction model
 
--- Change the focused element in a zipper in a way that invalidates any view
--- caches associated with its name.
+-- The root span and detail span pages can each come to maintain a lot of rows.
+-- To keep performance acceptable we make use of Brick's view caching
+-- functionality. That works well because the data we read is immutable.
+--
+-- The view for a row only changes when we move focus to it or away from it (at
+-- this point emphasis-styling gets applied), so whenever we move the focused
+-- element of a zipper we need to invalidate the cache for two entries. This
+-- function does so correctly.
+--
+-- The first argument is supposed to be a focus-changing zipper funtion, such as
+-- `Zipper.next` or `Zipper.first`.
 moveZipper ::
   (forall a. Zipper.Zipper a -> Zipper.Zipper a) ->
   Model ->
@@ -218,33 +279,6 @@ view model =
             viewKey page
           ]
       ]
-
-data Page
-  = NoLogsFound
-  | SpanList Time.UTCTime (Zipper.Zipper Logline)
-  | SpanDetails (Maybe Text) Logline (Zipper.Zipper Span)
-
-toPage :: Model -> Page
-toPage model =
-  case (selectedRootSpan model, loglines model) of
-    (Just selected, Just spans) ->
-      SpanDetails
-        (clipboardCommand model)
-        (Zipper.current spans)
-        selected
-    (Nothing, Just spans) -> SpanList (currentTime model) spans
-    (_, Nothing) -> NoLogsFound
-
-withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
-withPage model fn =
-  map
-    ( \newPage ->
-        case newPage of
-          NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
-          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
-          SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
-    )
-    (fn (toPage model))
 
 viewKey :: Page -> Brick.Widget Name
 viewKey page =
@@ -638,6 +672,7 @@ chooseCommand (first : rest) = do
     then Prelude.pure (Just first)
     else chooseCommand rest
 
+-- These are all commands that read stdin into the clipboard.
 copyCommands :: [Text]
 copyCommands =
   [ "wl-copy",
