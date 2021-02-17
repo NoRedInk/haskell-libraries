@@ -86,7 +86,7 @@ withIO fn io =
 -- >             Err err ->
 -- >                 Expect.fail err
 pass :: Expectation
-pass = Internal.Expectation (Task.succeed Internal.Succeeded)
+pass = Internal.Expectation (Task.succeed ())
 
 -- | Fails with the given message.
 --
@@ -107,8 +107,7 @@ fail :: Text -> Expectation
 fail msg =
   msg
     |> Internal.FailedAssertion
-    |> Internal.Failed
-    |> Task.succeed
+    |> Task.fail
     |> Internal.Expectation
 
 -- | If the given expectation fails, replace its failure message with a custom one.
@@ -119,11 +118,9 @@ fail msg =
 onFail :: Text -> Expectation -> Expectation
 onFail msg (Internal.Expectation task) =
   task
-    |> Task.map
-      ( \res ->
-          case res of
-            Internal.Succeeded -> Internal.Succeeded
-            Internal.Failed _ -> Internal.Failed (Internal.FailedAssertion msg)
+    |> Task.onError
+      ( \_ ->
+          Task.fail (Internal.FailedAssertion msg)
       )
     |> Internal.Expectation
 

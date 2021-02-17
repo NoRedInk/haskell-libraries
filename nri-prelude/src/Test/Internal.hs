@@ -70,7 +70,7 @@ data NotRan = NotRan
 newtype Test = Test {unTest :: [SingleTest Expectation]}
 
 -- |  The result of a single test run: either a 'pass' or a 'fail'.
-newtype Expectation = Expectation {unExpectation :: Task Never TestResult}
+newtype Expectation = Expectation {unExpectation :: Task Failure ()}
 
 -- | A @Fuzzer a@ knows how to produce random values of @a@ and how to "shrink"
 -- a value of @a@, that is turn a value into another that is slightly simpler.
@@ -130,7 +130,7 @@ todo name =
           name = name,
           loc = Stack.withFrozenCallStack getFrame,
           label = Todo,
-          body = Expectation (Task.succeed Succeeded)
+          body = Expectation (Task.succeed ())
         }
     ]
 
@@ -226,11 +226,13 @@ fuzzBody (Fuzzer gen) expectation =
                     expectation generated
                       |> handleUnexpectedErrors
                       |> unExpectation
+                      |> Task.map Ok
+                      |> Task.onError (Task.succeed << Err)
                       |> Task.perform log
                       |> Control.Monad.IO.Class.liftIO
                   case result of
-                    Succeeded -> Prelude.pure ()
-                    Failed failure -> do
+                    Ok () -> Prelude.pure ()
+                    Err failure -> do
                       IORef.writeIORef failureRef (Just failure)
                         |> Control.Monad.IO.Class.liftIO
                       Hedgehog.failure
@@ -242,20 +244,17 @@ fuzzBody (Fuzzer gen) expectation =
               case maybeFailure of
                 Nothing ->
                   TestRunnerMessedUp "I lost the error report of a failed fuzz test test."
-                    |> Failed
-                    |> Ok
+                    |> Err
                     |> Prelude.pure
                 Just failure ->
-                  Failed failure
-                    |> Ok
+                  Err failure
                     |> Prelude.pure
             Hedgehog.Internal.Report.GaveUp ->
               TestRunnerMessedUp "I couldn't generate any values for a fuzz test."
-                |> Failed
-                |> Ok
+                |> Err
                 |> Prelude.pure
             Hedgehog.Internal.Report.OK ->
-              Ok Succeeded
+              Ok ()
                 |> Prelude.pure
       )
 
@@ -339,8 +338,7 @@ task name expectation =
           label = None,
           body =
             expectation
-              |> Task.map (\_ -> Succeeded)
-              |> Task.onError (Task.succeed << Failed)
+              |> Task.map (\_ -> ())
               |> Expectation
               |> handleUnexpectedErrors
         }
@@ -400,10 +398,9 @@ data Summary = Summary
 handleUnexpectedErrors :: Expectation -> Expectation
 handleUnexpectedErrors (Expectation task') =
   task'
-    |> Task.mapError never
-    |> onException (Task.succeed << Failed << ThrewException)
+    |> onException (Task.fail << ThrewException)
     |> Task.timeout 10_000 TookTooLong
-    |> Task.onError (Task.succeed << Failed)
+    |> Task.onError Task.fail
     |> Expectation
 
 runSingle :: SingleTest Expectation -> Task e (SingleTest (TracingSpan, TestResult))
@@ -419,16 +416,16 @@ runSingle test' =
             ( \log ->
                 body test'
                   |> unExpectation
-                  |> Task.mapError never
-                  |> map Ok
+                  |> Task.map Ok
+                  |> Task.onError (Task.succeed << Err)
                   |> Task.perform log
             )
         let testRest =
               case res of
-                Ok x -> x
+                Ok () -> Succeeded
                 -- If you remove this branch, consider also removing the
                 -- -fno-warn-overlapping-patterns warning above.
-                Err err -> never err
+                Err err -> Failed err
         span' <- MVar.takeMVar spanVar
         let span =
               span'
@@ -484,11 +481,6 @@ groupBy key xs =
 
 append :: Expectation -> Expectation -> Expectation
 append (Expectation task1) (Expectation task2) =
-  task1
-    |> andThen
-      ( \result1 ->
-          case result1 of
-            Succeeded -> task2
-            Failed _ -> task1
-      )
-    |> Expectation
+  Expectation <| do
+    task1
+    task2

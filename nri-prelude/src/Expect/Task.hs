@@ -26,13 +26,8 @@ type Failure = Internal.Failure
 andCheck :: (a -> Expect.Expectation) -> Task Failure a -> Task Failure a
 andCheck expectation task = do
   x <- task
-  res <-
-    expectation x
-      |> Internal.unExpectation
-      |> Task.mapError never
-  case res of
-    Internal.Succeeded -> Task.succeed x
-    Internal.Failed failure -> Task.fail failure
+  Internal.unExpectation (expectation x)
+  Task.succeed x
 
 -- | Check an expectation in the middle of a @do@ block.
 --
