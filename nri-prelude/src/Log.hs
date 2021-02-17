@@ -33,7 +33,6 @@ where
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import GHC.Generics (Generic)
 import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform

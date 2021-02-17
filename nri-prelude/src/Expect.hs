@@ -48,7 +48,6 @@ where
 import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Debug
-import List (List)
 import qualified List
 import NriPrelude
 import qualified Platform.Internal
@@ -60,7 +59,7 @@ import qualified Task
 import Test.Internal (Expectation)
 import qualified Test.Internal as Internal
 import qualified Text.Show.Pretty
-import Prelude (Eq, IO, Ord, Show, show)
+import Prelude (IO, show)
 
 -- | Run some IO and assert the value it produces.
 --

@@ -46,7 +46,7 @@ import qualified Data.Map.Strict
 import List (List)
 import qualified List
 import Maybe (Maybe (..))
-import Prelude (Ord, fromIntegral, otherwise)
+import Prelude (fromIntegral, otherwise)
 
 -- DICTIONARIES
 
