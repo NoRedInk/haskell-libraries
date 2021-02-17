@@ -19,6 +19,7 @@ module NriPrelude
     GHC.Generics.Generic,
 
     -- * We're exposing these so users can define custom Functor, Applicative, and
+
     -- Monad instances. If you use them outside of type class instance definitions
     -- hlint should ask you to replace them with Elm-ish functions instead.
     fmap,
@@ -49,8 +50,8 @@ import qualified Platform.Internal
 import qualified Result
 import qualified Text
 import Prelude
-  ( (<*>),
+  ( fmap,
+    (<*>),
     (>>=),
-    fmap,
   )
 import qualified Prelude

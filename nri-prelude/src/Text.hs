@@ -71,22 +71,22 @@ module Text
 where
 
 import Basics
-  ( (+),
+  ( Bool,
+    Float,
+    Int,
+    clamp,
+    (+),
     (-),
     (<),
     (<<),
     (<=),
     (>>),
-    Bool,
-    Float,
-    Int,
-    clamp,
     (|>),
   )
 import Char (Char)
 import qualified Data.Text
-import qualified List
 import List (List)
+import qualified List
 import Maybe (Maybe)
 import qualified Text.Read
 import Prelude (otherwise)

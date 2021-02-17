@@ -52,7 +52,7 @@ module List
   )
 where
 
-import Basics ((-), (>>), Bool (..), Int, Num, Ord, Ordering (..))
+import Basics (Bool (..), Int, Num, Ord, Ordering (..), (-), (>>))
 import qualified Data.Foldable
 import qualified Data.List
 import qualified Data.Maybe

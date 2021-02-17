@@ -36,8 +36,8 @@ import qualified Internal.Shortcut as Shortcut
 import List (List)
 import qualified List
 import Maybe (Maybe (..))
-import qualified Platform.Internal as Internal
 import Platform.Internal (Task)
+import qualified Platform.Internal as Internal
 import Result (Result (..))
 import qualified System.Timeout
 import Prelude (IO)

@@ -48,8 +48,8 @@ where
 import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Debug
-import qualified List
 import List (List)
+import qualified List
 import NriPrelude
 import qualified Platform.Internal
 import qualified Pretty.Diff as Diff
@@ -57,8 +57,8 @@ import qualified System.Console.Terminal.Size as Terminal
 import qualified System.Directory as Directory
 import qualified System.FilePath as FilePath
 import qualified Task
-import qualified Test.Internal as Internal
 import Test.Internal (Expectation)
+import qualified Test.Internal as Internal
 import qualified Text.Show.Pretty
 import Prelude (Eq, IO, Ord, Show, show)
 
@@ -437,9 +437,10 @@ equalToContentsOf :: Text -> Text -> Expectation
 equalToContentsOf filepath' actual =
   Internal.Expectation <| do
     let filepath = Data.Text.unpack filepath'
-    exists <- fromIO <| do
-      Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
-      Directory.doesFileExist filepath
+    exists <-
+      fromIO <| do
+        Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
+        Directory.doesFileExist filepath
     if exists
       then do
         expected <- fromIO (Data.Text.IO.readFile filepath)
@@ -477,20 +478,21 @@ assert :: Show a => (a -> a -> Bool) -> Text -> a -> a -> Expectation
 assert pred funcName actual expected =
   if pred actual expected
     then pass
-    else Internal.Expectation <| do
-      window <- fromIO Terminal.size
-      let terminalWidth = case window of
-            Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
-            Nothing -> 80
-      Diff.pretty
-        Diff.Config
-          { Diff.separatorText = Just funcName,
-            Diff.wrapping = Diff.Wrap terminalWidth
-          }
-        (PrettyShow expected)
-        (PrettyShow actual)
-        |> fail
-        |> Internal.unExpectation
+    else
+      Internal.Expectation <| do
+        window <- fromIO Terminal.size
+        let terminalWidth = case window of
+              Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
+              Nothing -> 80
+        Diff.pretty
+          Diff.Config
+            { Diff.separatorText = Just funcName,
+              Diff.wrapping = Diff.Wrap terminalWidth
+            }
+          (PrettyShow expected)
+          (PrettyShow actual)
+          |> fail
+          |> Internal.unExpectation
 
 fromIO :: Prelude.IO a -> Task e a
 fromIO io = Platform.Internal.Task (\_ -> map Ok io)

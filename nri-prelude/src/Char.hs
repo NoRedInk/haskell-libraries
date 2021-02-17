@@ -30,11 +30,11 @@ module Char
 where
 
 import Basics
-  ( (&&),
+  ( Bool (..),
+    Int,
+    (&&),
     (<<),
     (<=),
-    Bool (..),
-    Int,
   )
 import qualified Data.Char
 import Prelude (Char, otherwise)

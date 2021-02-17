@@ -25,14 +25,13 @@ import qualified Task
 import qualified Tuple
 import qualified Prelude
 
-data SingleTest a
-  = SingleTest
-      { describes :: [Text],
-        name :: Text,
-        label :: Label,
-        loc :: Maybe Stack.SrcLoc,
-        body :: a
-      }
+data SingleTest a = SingleTest
+  { describes :: [Text],
+    name :: Text,
+    label :: Label,
+    loc :: Maybe Stack.SrcLoc,
+    body :: a
+  }
   deriving (Prelude.Functor)
 
 data Label = None | Skip | Only | Todo
@@ -386,13 +385,12 @@ run (Test all) = do
     Summary {noneSkipped = False} -> PassedWithSkipped passed notToRun
     Summary {} -> AllPassed passed
 
-data Summary
-  = Summary
-      { noTests :: Bool,
-        allPassed :: Bool,
-        anyOnlys :: Bool,
-        noneSkipped :: Bool
-      }
+data Summary = Summary
+  { noTests :: Bool,
+    allPassed :: Bool,
+    anyOnlys :: Bool,
+    noneSkipped :: Bool
+  }
 
 handleUnexpectedErrors :: Expectation -> Expectation
 handleUnexpectedErrors (Expectation task') =
