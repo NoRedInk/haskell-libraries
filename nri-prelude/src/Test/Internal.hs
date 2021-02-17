@@ -70,7 +70,10 @@ data NotRan = NotRan
 newtype Test = Test {unTest :: [SingleTest Expectation]}
 
 -- |  The result of a single test run: either a 'pass' or a 'fail'.
-newtype Expectation = Expectation {unExpectation :: Task Failure ()}
+type Expectation = Expectation' ()
+
+newtype Expectation' a = Expectation {unExpectation :: Task Failure a}
+  deriving (Prelude.Functor, Prelude.Applicative, Prelude.Monad)
 
 -- | A @Fuzzer a@ knows how to produce random values of @a@ and how to "shrink"
 -- a value of @a@, that is turn a value into another that is slightly simpler.
