@@ -1,4 +1,5 @@
 {-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Main
   ( main,
@@ -117,77 +118,35 @@ update model msg =
           -- read in oldest-first).
           if userDidSomething model
             then Brick.continue newModel
-            else do
-              case loglines newModel of
-                Nothing -> Brick.continue newModel
-                Just spans -> do
-                  newSpans <-
-                    moveZipper
-                      Zipper.first
-                      (RootSpanLine << logId << Zipper.current)
-                      spans
-                  Brick.continue newModel {loglines = Just newSpans}
+            else
+              moveZipper Zipper.first newModel
+                |> andThen Brick.continue
     DownBy n ->
-      withPage
-        model
-        ( \page ->
-            case page of
-              NoLogsFound -> Brick.continue NoLogsFound
-              SpanList time spans -> do
-                let newSpans = (repeat n Zipper.next spans)
-                Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current spans)))
-                Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current newSpans)))
-                SpanList time newSpans
-                  |> Brick.continue
-              SpanDetails cmd root spans -> do
-                let newSpans = (repeat n Zipper.next spans)
-                Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex spans))
-                Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex newSpans))
-                SpanDetails cmd root newSpans
-                  |> Brick.continue
-        )
+      moveZipper (repeat n Zipper.next) model
+        |> andThen continueAfterUserInteraction
     UpBy n ->
-      withPage
-        model
-        ( \page ->
-            case page of
-              NoLogsFound -> Brick.continue NoLogsFound
-              SpanList time spans -> do
-                newSpans <-
-                  moveZipper
-                    (repeat n Zipper.prev)
-                    (RootSpanLine << logId << Zipper.current)
-                    spans
-                SpanList time newSpans
-                  |> Brick.continue
-              SpanDetails cmd root spans -> do
-                newSpans <-
-                  moveZipper
-                    (repeat n Zipper.prev)
-                    (SpanLine (logId root) << Zipper.currentIndex)
-                    spans
-                SpanDetails cmd root newSpans
-                  |> Brick.continue
-        )
+      moveZipper (repeat n Zipper.prev) model
+        |> andThen continueAfterUserInteraction
     ShowDetails ->
       withPage
         model
         ( \page ->
-            Brick.continue
-              <| case page of
-                NoLogsFound -> NoLogsFound
-                SpanList _ spans ->
-                  SpanDetails
-                    (clipboardCommand model)
-                    (Zipper.current spans)
-                    (Zipper.current spans |> logSpan |> toFlatList)
-                SpanDetails cmd root spans -> SpanDetails cmd root spans
+            case page of
+              NoLogsFound -> Prelude.pure page
+              SpanDetails _ _ _ -> Prelude.pure page
+              SpanList _ spans ->
+                SpanDetails
+                  (clipboardCommand model)
+                  (Zipper.current spans)
+                  (Zipper.current spans |> logSpan |> toFlatList)
+                  |> Prelude.pure
         )
+        |> andThen continueAfterUserInteraction
     Exit ->
       model
         { selectedRootSpan = Nothing
         }
-        |> Brick.continue
+        |> continueAfterUserInteraction
     CopyDetails -> do
       case toPage model of
         NoLogsFound -> Prelude.pure ()
@@ -197,22 +156,28 @@ update model msg =
           original (Zipper.current spans)
             |> spanToClipboard cmd
             |> liftIO
-      Brick.continue model
+      continueAfterUserInteraction model
 
 -- Change the focused element in a zipper in a way that invalidates any view
 -- caches associated with its name.
 moveZipper ::
-  ( Zipper.Zipper a ->
-    Zipper.Zipper a
-  ) ->
-  (Zipper.Zipper a -> Name) ->
-  Zipper.Zipper a ->
-  Brick.EventM Name (Zipper.Zipper a)
-moveZipper move getName zipper = do
-  let newZipper = (move zipper)
-  Brick.invalidateCacheEntry (getName zipper)
-  Brick.invalidateCacheEntry (getName newZipper)
-  Prelude.pure newZipper
+  (forall a. Zipper.Zipper a -> Zipper.Zipper a) ->
+  Model ->
+  Brick.EventM Name Model
+moveZipper move model = do
+  withPage model <| \page ->
+    case page of
+      NoLogsFound -> Prelude.pure NoLogsFound
+      SpanList time spans -> do
+        let newSpans = move spans
+        Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current spans)))
+        Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current newSpans)))
+        Prelude.pure (SpanList time newSpans)
+      SpanDetails cmd root spans -> do
+        let newSpans = move spans
+        Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex spans))
+        Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex newSpans))
+        Prelude.pure (SpanDetails cmd root newSpans)
 
 repeat :: Int -> (a -> a) -> a -> a
 repeat n f x =
@@ -239,6 +204,12 @@ toFlatListHelper nesting span =
     } :
   List.concatMap (toFlatListHelper (nesting + 1)) (List.reverse (Platform.children span))
 
+continueAfterUserInteraction :: Model -> Brick.EventM Name (Brick.Next Model)
+continueAfterUserInteraction model =
+  Brick.continue model {userDidSomething = True}
+
+-- View functions
+
 view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
@@ -264,16 +235,14 @@ toPage model =
     (Nothing, Just spans) -> SpanList (currentTime model) spans
     (_, Nothing) -> NoLogsFound
 
-withPage :: Model -> (Page -> Brick.EventM Name (Brick.Next Page)) -> Brick.EventM Name (Brick.Next Model)
+withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
 withPage model fn =
-  (map << map)
+  map
     ( \newPage ->
-        let newModel =
-              case newPage of
-                NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
-                SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
-                SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
-         in newModel {userDidSomething = True}
+        case newPage of
+          NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
+          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
+          SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
     )
     (fn (toPage model))
 
