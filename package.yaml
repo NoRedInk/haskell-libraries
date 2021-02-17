@@ -37,6 +37,7 @@ library:
   - MySQL.Settings
   - MySQL.Test
   - Postgres
+  - Postgres.Test
   # Exposed for tests only
   - MySQL.Query
   - Internal.QueryParser

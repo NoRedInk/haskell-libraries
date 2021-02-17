@@ -33,6 +33,8 @@ module Postgres
     PGArray.PGArrayType,
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
+    -- tests only!
+    connectionIO,
   )
 where
 
@@ -97,33 +99,35 @@ data SingleOrPool c
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
-  Data.Acquire.mkAcquire acquire release
+  Data.Acquire.mkAcquire (connectionIO settings) release
   where
-    acquire = do
-      doAnything <- Platform.doAnythingHandler
-      pool <-
-        map Pool
-          <| Data.Pool.createPool
-            (pgConnect database `Exception.catch` handleError (toConnectionString database))
-            pgDisconnect
-            stripes
-            maxIdleTime
-            size
-      pure
-        ( Connection
-            doAnything
-            pool
-            (toConnectionLogContext database)
-            (Settings.pgQueryTimeout settings)
-        )
     release Connection {singleOrPool} =
       case singleOrPool of
         Pool pool -> Data.Pool.destroyAllResources pool
         Single single -> pgDisconnect single
-    stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral
-    maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings))
-    size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral
-    database = Settings.toPGDatabase settings
+
+connectionIO :: Settings.Settings -> IO Connection
+connectionIO settings = do
+  let database = Settings.toPGDatabase settings
+  let stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral
+  let maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings))
+  let size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral
+  doAnything <- Platform.doAnythingHandler
+  pool <-
+    map Pool
+      <| Data.Pool.createPool
+        (pgConnect database `Exception.catch` handleError (toConnectionString database))
+        pgDisconnect
+        stripes
+        maxIdleTime
+        size
+  pure
+    ( Connection
+        doAnything
+        pool
+        (toConnectionLogContext database)
+        (Settings.pgQueryTimeout settings)
+    )
 
 -- |
 -- Perform a database transaction.
