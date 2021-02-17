@@ -17,8 +17,11 @@ cabal build nri-prelude           # build the library
 cabal test nri-prelude            # run the tests
 hpack nri-prelude                 # generate nri-prelude.cabal from package.yaml
 ghcid -c "cabal repl nri-prelude" # start a code watcher
-ormolu -m inplace <file>          # Format a source file
+ormolu -i <file>                  # Format a source file
 cabal haddock nri-prelude         # Run documentation generation
+ormolu -i **/*.hs                 # Format everything
+cabal build all                   # build everything
+cabal test all                    # test everything
 ```
 
 We use [Ormolu][ormolu] for code formatting.

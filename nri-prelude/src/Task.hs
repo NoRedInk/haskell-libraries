@@ -1,3 +1,9 @@
+-- GHC wants us to remove `Err never` branches from case statements, because it
+-- knows we'll never end up in those branches. We like them though, because
+-- missing such a branch in a case statement looks like a problem and so is
+-- distracting.
+{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
+
 -- | Tasks make it easy to describe asynchronous operations that may fail, like
 -- HTTP requests or writing to a database.
 module Task
@@ -57,6 +63,8 @@ perform :: Internal.LogHandler -> Task Never a -> IO a
 perform output task =
   let onResult result =
         case result of
+          -- If you remove this branch, consider also removing the
+          -- -fno-warn-overlapping-patterns warning above.
           Err err -> never err
           Ok x -> x
    in attempt output task
