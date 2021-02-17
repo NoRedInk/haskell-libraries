@@ -75,7 +75,9 @@ newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
 
 data Name
   = RootSpanListViewport
+  | RootSpanLine Id
   | SpanDetailsListViewport Id
+  | SpanLine Id Int
   deriving (Eq, Ord, Show)
 
 init :: Maybe Text -> Time.UTCTime -> Model
@@ -99,50 +101,88 @@ update model msg =
       case Aeson.decodeStrict' line of
         Nothing ->
           Brick.continue model
-        Just (date, span) ->
+        Just (date, span) -> do
           let newId = lastId model + 1
               logline = Logline newId date span
-           in model
-                { loglines =
-                    case loglines model of
-                      Nothing -> Zipper.singleton logline
-                      Just zipper -> Zipper.prepend [logline] zipper
-                      |> (if userDidSomething model then identity else Zipper.first)
-                      |> Just,
-                  lastId = newId
-                }
-                |> Brick.continue
+              newModel =
+                model
+                  { loglines =
+                      case loglines model of
+                        Nothing -> Just (Zipper.singleton logline)
+                        Just zipper -> Just (Zipper.prepend [logline] zipper),
+                    lastId = newId
+                  }
+          -- If the user hasn't interacted yet keep the focus on the top span,
+          -- so we don't start the user off at the bottom of the page (spans are
+          -- read in oldest-first).
+          if userDidSomething model
+            then Brick.continue newModel
+            else do
+              case loglines newModel of
+                Nothing -> Brick.continue newModel
+                Just spans -> do
+                  newSpans <-
+                    moveZipper
+                      Zipper.first
+                      (RootSpanLine << logId << Zipper.current)
+                      spans
+                  Brick.continue newModel {loglines = Just newSpans}
     DownBy n ->
-      ( \page ->
-          case page of
-            NoLogsFound -> NoLogsFound
-            SpanList time spans -> SpanList time (repeat n Zipper.next spans)
-            SpanDetails cmd root spans -> SpanDetails cmd root (repeat n Zipper.next spans)
-      )
-        |> withPage model
-        |> Brick.continue
+      withPage
+        model
+        ( \page ->
+            case page of
+              NoLogsFound -> Brick.continue NoLogsFound
+              SpanList time spans -> do
+                let newSpans = (repeat n Zipper.next spans)
+                Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current spans)))
+                Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current newSpans)))
+                SpanList time newSpans
+                  |> Brick.continue
+              SpanDetails cmd root spans -> do
+                let newSpans = (repeat n Zipper.next spans)
+                Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex spans))
+                Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex newSpans))
+                SpanDetails cmd root newSpans
+                  |> Brick.continue
+        )
     UpBy n ->
-      ( \page ->
-          case page of
-            NoLogsFound -> NoLogsFound
-            SpanList time spans -> SpanList time (repeat n Zipper.prev spans)
-            SpanDetails cmd root spans -> SpanDetails cmd root (repeat n Zipper.prev spans)
-      )
-        |> withPage model
-        |> Brick.continue
+      withPage
+        model
+        ( \page ->
+            case page of
+              NoLogsFound -> Brick.continue NoLogsFound
+              SpanList time spans -> do
+                newSpans <-
+                  moveZipper
+                    (repeat n Zipper.prev)
+                    (RootSpanLine << logId << Zipper.current)
+                    spans
+                SpanList time newSpans
+                  |> Brick.continue
+              SpanDetails cmd root spans -> do
+                newSpans <-
+                  moveZipper
+                    (repeat n Zipper.prev)
+                    (SpanLine (logId root) << Zipper.currentIndex)
+                    spans
+                SpanDetails cmd root newSpans
+                  |> Brick.continue
+        )
     ShowDetails ->
-      ( \page ->
-          case page of
-            NoLogsFound -> NoLogsFound
-            SpanList _ spans ->
-              SpanDetails
-                (clipboardCommand model)
-                (Zipper.current spans)
-                (Zipper.current spans |> logSpan |> toFlatList)
-            SpanDetails cmd root spans -> SpanDetails cmd root spans
-      )
-        |> withPage model
-        |> Brick.continue
+      withPage
+        model
+        ( \page ->
+            Brick.continue
+              <| case page of
+                NoLogsFound -> NoLogsFound
+                SpanList _ spans ->
+                  SpanDetails
+                    (clipboardCommand model)
+                    (Zipper.current spans)
+                    (Zipper.current spans |> logSpan |> toFlatList)
+                SpanDetails cmd root spans -> SpanDetails cmd root spans
+        )
     Exit ->
       model
         { selectedRootSpan = Nothing
@@ -158,6 +198,21 @@ update model msg =
             |> spanToClipboard cmd
             |> liftIO
       Brick.continue model
+
+-- Change the focused element in a zipper in a way that invalidates any view
+-- caches associated with its name.
+moveZipper ::
+  ( Zipper.Zipper a ->
+    Zipper.Zipper a
+  ) ->
+  (Zipper.Zipper a -> Name) ->
+  Zipper.Zipper a ->
+  Brick.EventM Name (Zipper.Zipper a)
+moveZipper move getName zipper = do
+  let newZipper = (move zipper)
+  Brick.invalidateCacheEntry (getName zipper)
+  Brick.invalidateCacheEntry (getName newZipper)
+  Prelude.pure newZipper
 
 repeat :: Int -> (a -> a) -> a -> a
 repeat n f x =
@@ -209,14 +264,18 @@ toPage model =
     (Nothing, Just spans) -> SpanList (currentTime model) spans
     (_, Nothing) -> NoLogsFound
 
-withPage :: Model -> (Page -> Page) -> Model
+withPage :: Model -> (Page -> Brick.EventM Name (Brick.Next Page)) -> Brick.EventM Name (Brick.Next Model)
 withPage model fn =
-  let newModel =
-        case fn (toPage model) of
-          NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
-          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
-          SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
-   in newModel {userDidSomething = True}
+  (map << map)
+    ( \newPage ->
+        let newModel =
+              case newPage of
+                NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
+                SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
+                SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
+         in newModel {userDidSomething = True}
+    )
+    (fn (toPage model))
 
 viewKey :: Page -> Brick.Widget Name
 viewKey page =
@@ -250,7 +309,7 @@ viewContents page =
     SpanList now logs ->
       logs
         |> Zipper.indexedMap
-          ( \i Logline {logSpan, logTime} ->
+          ( \i Logline {logId, logSpan, logTime} ->
               Brick.hBox
                 [ Brick.txt (howFarBack logTime now)
                     |> Brick.padRight Brick.Max
@@ -260,6 +319,7 @@ viewContents page =
                     |> Brick.padRight Brick.Max
                 ]
                 |> Center.hCenter
+                |> Brick.cached (RootSpanLine logId)
                 |> if i == 0
                   then Brick.withAttr "selected" >> Brick.visible
                   else identity
@@ -292,6 +352,7 @@ viewSpanList Logline {logId} spans =
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
                 |> Brick.padRight Brick.Max
             ]
+            |> Brick.cached (SpanLine logId (i + Zipper.currentIndex spans))
             |> if i == 0
               then Brick.withAttr "selected" >> Brick.visible
               else identity
@@ -452,6 +513,7 @@ run = do
   let buildVty = Vty.mkVty Vty.defaultConfig
   initialVty <- buildVty
   let pushMsg = Brick.BChan.writeBChan eventChan
+  let pushMsgNonBlocking = Brick.BChan.writeBChanNonBlocking eventChan >> map (\_ -> ())
   now <- Time.getCurrentTime
   clipboardCommand <- chooseCommand copyCommands
   Async.race_
@@ -461,13 +523,13 @@ run = do
             System.IO.ReadMode
             (tailLines partOfLine (AddLogline >> pushMsg))
         )
-        (updateTime (SetCurrentTime >> pushMsg))
+        (updateTime (SetCurrentTime >> pushMsgNonBlocking))
     )
     ( Brick.customMain
         initialVty
         buildVty
         (Just eventChan)
-        (app pushMsg)
+        (app pushMsgNonBlocking)
         (init clipboardCommand now)
     )
 

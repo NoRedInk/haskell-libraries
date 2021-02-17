@@ -15,6 +15,7 @@ module Zipper
 
     -- * Querying
     current,
+    currentIndex,
     length,
     toList,
 
@@ -81,6 +82,9 @@ last zipper =
 
 current :: Zipper a -> a
 current (Zipper _ current' _) = current'
+
+currentIndex :: Zipper a -> Int
+currentIndex (Zipper before _ _) = List.length before
 
 length :: Zipper a -> Int
 length (Zipper before _ after) = 1 + List.length before + List.length after
