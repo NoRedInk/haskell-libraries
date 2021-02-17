@@ -18,9 +18,11 @@ where
 -- instead. We'll need to handle this, maybe using some CPP-powered conditional
 -- imports.
 
+import Data.Function ((&))
 import qualified Data.List
 import qualified GhcPlugins
-import HsSyn (hsmodImports, hsmodName, ideclQualified, simpleImportDecl)
+import HsSyn (hsmodImports, hsmodName, ideclName, ideclQualified, simpleImportDecl)
+import qualified Set
 import Prelude
 
 plugin :: GhcPlugins.Plugin
@@ -46,32 +48,67 @@ addImplicitImports _ _ parsed =
       }
   where
     addImportsWhenNotPath hsModule =
-      case hsmodName hsModule of
+      case fmap unLocate (hsmodName hsModule) of
         Nothing -> addImports hsModule
-        Just (GhcPlugins.L _ modName) ->
-          if Data.List.isPrefixOf "Paths_" (GhcPlugins.moduleNameString modName)
+        Just modName ->
+          if Data.List.isPrefixOf "Paths_" modName
             then hsModule
             else addImports hsModule
 
     addImports hsModule =
-      hsModule {hsmodImports = hsmodImports hsModule ++ extraImports}
-    -- taken from https://package.elm-lang.org/packages/elm/core/latest/
-    extraImports =
-      [ unqualified "NriPrelude", -- Elm exports types from withi these modules. We re-export them from NriPrelude. Same effect.
-        qualified "Basics",
-        qualified "Char",
-        qualified "Debug",
-        qualified "List",
-        qualified "Maybe",
-        qualified "Platform",
-        qualified "Result",
-        qualified "Text", -- equivalent to Elm's String
-        qualified "Tuple",
-        -- Additionally Task and Log because we use them everywhere
-        qualified "Log",
-        qualified "Task"
-      ]
+      hsModule
+        { hsmodImports =
+            -- Add default Elm-like imports when the user hasn't imported them
+            -- explicitly yet, in order to avoid duplicate import warnings.
+            hsmodImports hsModule
+              ++ ( Set.diff extraImports (existingImports hsModule)
+                     & Set.toList
+                     & fmap
+                       ( \imp ->
+                           case imp of
+                             Unqualified name -> unqualified name
+                             Qualified name -> qualified name
+                       )
+                 )
+        }
+
+    existingImports hsModule =
+      hsmodImports hsModule
+        & fmap
+          ( \(GhcPlugins.L _ imp) ->
+              case (ideclQualified imp, unLocate (ideclName imp)) of
+                (True, name) -> Qualified name
+                (False, name) -> Unqualified name
+          )
+        & Set.fromList
+
+    unLocate (GhcPlugins.L _ x) = GhcPlugins.moduleNameString x
+
     unqualified name =
       GhcPlugins.noLoc (simpleImportDecl (GhcPlugins.mkModuleName name))
     qualified name =
       fmap (\qual -> qual {ideclQualified = True}) (unqualified name)
+
+data Import
+  = Unqualified String
+  | Qualified String
+  deriving (Eq, Ord)
+
+-- taken from https://package.elm-lang.org/packages/elm/core/latest/
+extraImports :: Set.Set Import
+extraImports =
+  Set.fromList
+    [ Unqualified "NriPrelude", -- Elm exports types from withi these modules. We re-export them from NriPrelude. Same effect.
+      Qualified "Basics",
+      Qualified "Char",
+      Qualified "Debug",
+      Qualified "List",
+      Qualified "Maybe",
+      Qualified "Platform",
+      Qualified "Result",
+      Qualified "Text", -- equivalent to Elm's String
+      Qualified "Tuple",
+      -- Additionally Task and Log because we use them everywhere
+      Qualified "Log",
+      Qualified "Task"
+    ]
