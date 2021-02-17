@@ -63,8 +63,14 @@ succeeds task =
 -- > task "chemistry experiment" <| do
 -- >     mixRedAndGreenLiquids
 -- >         |> fails
-fails :: Text -> Task Failure a
-fails msg =
-  msg
-    |> Internal.FailedAssertion
-    |> Task.fail
+fails :: Show a => Task err a -> Task Failure ()
+fails task =
+  task
+    |> Task.map Err
+    |> Task.onError (\err -> Task.succeed (Ok err))
+    |> Task.andThen
+      ( \res ->
+          case res of
+            Ok _ -> Expect.pass |> Expect.Task.check
+            Err err -> Task.fail (Internal.FailedAssertion (Debug.toString err))
+      )
