@@ -71,9 +71,10 @@ fails task =
     |> Task.onError (\err -> Task.succeed (Ok err))
     |> Task.andThen fromResult
 
-failWith :: Text -> Task Failure a
+failWith :: Show b => b -> Task Failure a
 failWith msg =
   msg
+    |> Debug.toString
     |> Internal.FailedAssertion
     |> Task.fail
 
@@ -91,6 +92,6 @@ succeedWith payload =
 --     [x] -> Ok x
 --     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
 --   |> Expect.Task.fromResult
-fromResult :: Result Text a -> Task Failure a
+fromResult :: Show b => Result b a -> Task Failure a
 fromResult (Ok a) = succeedWith a
 fromResult (Err msg) = failWith msg
