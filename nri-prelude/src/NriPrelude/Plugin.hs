@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-record-updates #-}
 
 -- | A compiler plugin that imports the equivalents of modules that Elm will
