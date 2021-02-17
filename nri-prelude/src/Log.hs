@@ -33,7 +33,6 @@ where
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import GHC.Generics (Generic)
 import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
@@ -220,11 +219,10 @@ instance Aeson.ToJSON (Secret a) where
 -- | A logged message for log levels warning and above. Because these levels
 -- indicate a (potential) problem we want to provide some additional data that
 -- would help a triager figure out what next steps to take.
-data TriageInfo
-  = TriageInfo
-      { impact :: Impact,
-        advisory :: Text
-      }
+data TriageInfo = TriageInfo
+  { impact :: Impact,
+    advisory :: Text
+  }
   deriving (Generic)
 
 instance Aeson.ToJSON TriageInfo

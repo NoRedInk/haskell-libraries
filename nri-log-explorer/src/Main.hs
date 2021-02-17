@@ -42,28 +42,25 @@ import qualified Text
 import qualified Zipper
 import qualified Prelude
 
-data Model
-  = Model
-      { currentTime :: Time.UTCTime,
-        clipboardCommand :: Maybe Text,
-        loglines :: Maybe (Zipper.Zipper Logline),
-        selectedRootSpan :: Maybe (Zipper.Zipper Span),
-        userDidSomething :: Bool,
-        lastId :: Id
-      }
+data Model = Model
+  { currentTime :: Time.UTCTime,
+    clipboardCommand :: Maybe Text,
+    loglines :: Maybe (Zipper.Zipper Logline),
+    selectedRootSpan :: Maybe (Zipper.Zipper Span),
+    userDidSomething :: Bool,
+    lastId :: Id
+  }
 
-data Logline
-  = Logline
-      { logId :: Id,
-        logTime :: Time.UTCTime,
-        logSpan :: Platform.TracingSpan
-      }
+data Logline = Logline
+  { logId :: Id,
+    logTime :: Time.UTCTime,
+    logSpan :: Platform.TracingSpan
+  }
 
-data Span
-  = Span
-      { nesting :: Int,
-        original :: Platform.TracingSpan
-      }
+data Span = Span
+  { nesting :: Int,
+    original :: Platform.TracingSpan
+  }
 
 data Msg
   = AddLogline ByteString.ByteString
@@ -184,8 +181,8 @@ toFlatListHelper nesting span =
   Span
     { nesting = nesting,
       original = span
-    }
-    : List.concatMap (toFlatListHelper (nesting + 1)) (List.reverse (Platform.children span))
+    } :
+  List.concatMap (toFlatListHelper (nesting + 1)) (List.reverse (Platform.children span))
 
 view :: Model -> [Brick.Widget Name]
 view model =
@@ -593,8 +590,8 @@ tailLines partOfLine withLine handle = do
               |> Builder.toLazyByteString
               |> ByteString.Lazy.toStrict
       let fullLines =
-            firstFullLine
-              : Prelude.init rest
+            firstFullLine :
+            Prelude.init rest
       _ <- Prelude.traverse withLine fullLines
       tailLines partOfLine withLine handle
 

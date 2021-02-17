@@ -17,7 +17,7 @@ module Internal.Shortcut
   )
 where
 
-import Prelude ((<*>), (>>=), Applicative, Functor, Monad, Monad, fmap, pure)
+import Prelude (Applicative, Functor, Monad, fmap, pure, (<*>), (>>=))
 
 -- |
 andThen :: Monad m => (a -> m b) -> m a -> m b

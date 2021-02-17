@@ -1,8 +1,4 @@
 language: nix
 
-cache:
-  directories:
-    - $HOME/.cabal
-
 script:
   - nix-shell --run "./test.sh"

@@ -43,10 +43,10 @@ where
 
 import Basics
 import qualified Data.Map.Strict
-import qualified List
 import List (List)
+import qualified List
 import Maybe (Maybe (..))
-import Prelude (Ord, fromIntegral, otherwise)
+import Prelude (fromIntegral, otherwise)
 
 -- DICTIONARIES
 

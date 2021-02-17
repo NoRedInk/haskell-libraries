@@ -18,8 +18,8 @@ import qualified GHC.Clock as Clock
 import GHC.Generics (Generic)
 import qualified GHC.Stack as Stack
 import qualified GHC.Word
-import qualified Internal.Shortcut as Shortcut
 import Internal.Shortcut (andThen, map)
+import qualified Internal.Shortcut as Shortcut
 import qualified List
 import Maybe (Maybe (..))
 import Result (Result (Err, Ok))
@@ -27,7 +27,7 @@ import qualified System.Mem
 import Text (Text)
 import qualified Tuple
 import Prelude
-  ( Applicative ((<*>), pure),
+  ( Applicative (pure, (<*>)),
     Functor,
     IO,
     Monad ((>>=)),
@@ -54,8 +54,7 @@ import qualified Prelude
 -- list. Or like a grocery list. Or like GitHub issues. So saying "the task is
 -- to tell me the current POSIX time" does not complete the task! You need
 -- 'perform' tasks or 'attempt' tasks.
-newtype Task x a
-  = Task {_run :: LogHandler -> IO (Result x a)}
+newtype Task x a = Task {_run :: LogHandler -> IO (Result x a)}
   deriving (Functor)
 
 instance Applicative (Task a) where
@@ -122,41 +121,40 @@ instance Monad (Task a) where
 --
 -- So whether we're looking for tracing data, logs, or metrics, tracingSpans
 -- got us covered.
-data TracingSpan
-  = TracingSpan
-      { -- | A description of this tracingSpan. This should not contain any
-        -- dynamically generated strings to make grouping tracingSpans easy.
-        -- Any contextual info should go into 'details'.
-        name :: Text,
-        -- | The time this tracingSpan started.
-        started :: MonotonicTime,
-        -- | The time this tracingSpan finished.
-        finished :: MonotonicTime,
-        -- | The source code location of this tracingSpan. The first @Text@ is
-        -- the name of the function getting called.
-        frame :: Maybe (Text, Stack.SrcLoc),
-        -- | Unique information for this tracingSpan.
-        details :: Maybe SomeTracingSpanDetails,
-        -- | A short blurb describing the details of this span, for use in
-        -- tooling for inspecting these spans.
-        summary :: Maybe Text,
-        -- | Whether this tracingSpan succeeded. If any of the children of this
-        -- tracingSpan failed, so will this tracingSpan. This will create a
-        -- path to the tracingSpan closest to the failure from the root
-        -- tracingSpan.
-        succeeded :: Succeeded,
-        -- | The amount of bytes were allocated on the current thread while this
-        -- span was running. This is a proxy for the amount of work done. If
-        -- this number is low but the span took a long time to complete this
-        -- indicates the thread was blocked for some time, or that work was done
-        -- on other threads.
-        allocated :: Int,
-        -- | Any subtracingSpans nested inside this tracingSpan. These are
-        -- ordered in reverse chronological order, so most recent tracingSpan
-        -- first, because it's cheaper to append new tracingSpans onto the left
-        -- of the list.
-        children :: [TracingSpan]
-      }
+data TracingSpan = TracingSpan
+  { -- | A description of this tracingSpan. This should not contain any
+    -- dynamically generated strings to make grouping tracingSpans easy.
+    -- Any contextual info should go into 'details'.
+    name :: Text,
+    -- | The time this tracingSpan started.
+    started :: MonotonicTime,
+    -- | The time this tracingSpan finished.
+    finished :: MonotonicTime,
+    -- | The source code location of this tracingSpan. The first @Text@ is
+    -- the name of the function getting called.
+    frame :: Maybe (Text, Stack.SrcLoc),
+    -- | Unique information for this tracingSpan.
+    details :: Maybe SomeTracingSpanDetails,
+    -- | A short blurb describing the details of this span, for use in
+    -- tooling for inspecting these spans.
+    summary :: Maybe Text,
+    -- | Whether this tracingSpan succeeded. If any of the children of this
+    -- tracingSpan failed, so will this tracingSpan. This will create a
+    -- path to the tracingSpan closest to the failure from the root
+    -- tracingSpan.
+    succeeded :: Succeeded,
+    -- | The amount of bytes were allocated on the current thread while this
+    -- span was running. This is a proxy for the amount of work done. If
+    -- this number is low but the span took a long time to complete this
+    -- indicates the thread was blocked for some time, or that work was done
+    -- on other threads.
+    allocated :: Int,
+    -- | Any subtracingSpans nested inside this tracingSpan. These are
+    -- ordered in reverse chronological order, so most recent tracingSpan
+    -- first, because it's cheaper to append new tracingSpans onto the left
+    -- of the list.
+    children :: [TracingSpan]
+  }
   deriving (Prelude.Show, Generic)
 
 instance Aeson.ToJSON TracingSpan where
@@ -516,47 +514,46 @@ renderTracingSpanDetails rs s =
 -- without loosing important signal. We'll only know whether a request succeeds
 -- after it completes though, so we have to hold off on any reporting for a
 -- request until it's done.
-data LogHandler
-  = LogHandler
-      { -- | We're making the assumption that every task we run is ran because
-        -- of some sort of request, and that this request has a unique
-        -- identifier.  We take this identifier from the incoming request and
-        -- pass it on when we call external services. If something goes wrong
-        -- we'll be able to collect all information related to a single request
-        -- from all the components in our architecture that did work for it.
-        requestId :: Text,
-        -- | Every tracingSpan gets its own handler. That way if we record
-        -- debugging information using a handler we'll know which tracingSpan
-        -- the information belongs to. This function creates a new handler for
-        -- a child tracingSpan of the current handler.
-        startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
-        -- | There's common fields all tracingSpans have such as a name and
-        -- start and finish times. On top of that each tracingSpan can define a
-        -- custom type containing useful custom data. This function allows us
-        -- to set this custom data for the current tracingSpan. We could design
-        -- it so this data is passed in as an extra argument when we create the
-        -- tracingSpan, but then we'd miss out on useful details that only
-        -- become known as the tracingSpan runs, for example the response code
-        -- of an HTTP request.
-        setTracingSpanDetailsIO :: forall d. TracingSpanDetails d => d -> IO (),
-        -- | Set a summary for the current tracingSpan. This is shown in tools
-        -- used to inspect spans as a stand-in for the full tracingSpan details
-        -- in places where we only have room to show a little text.
-        setTracingSpanSummaryIO :: Text -> IO (),
-        -- | Mark the current tracingSpan as failed. Some reporting backends
-        -- will use this to decide whether a particular request is worth
-        -- reporting on.
-        markTracingSpanFailedIO :: IO (),
-        -- | Mark the current tracingSpan as finished, which will set the
-        -- @finished@ timestamp. What this function does depends on the
-        -- tracingSpan. Once we're done collecting data for the root
-        -- tracingSpan we'll want to pass the tracingSpan "out", to some code
-        -- that will report the debugging data to whatever observability
-        -- platform(s) are used. Once we're done collecting data for child
-        -- tracingSpans we'll want to add the "completed" child tracingSpan to
-        -- its parent.
-        finishTracingSpan :: Maybe Exception.SomeException -> IO ()
-      }
+data LogHandler = LogHandler
+  { -- | We're making the assumption that every task we run is ran because
+    -- of some sort of request, and that this request has a unique
+    -- identifier.  We take this identifier from the incoming request and
+    -- pass it on when we call external services. If something goes wrong
+    -- we'll be able to collect all information related to a single request
+    -- from all the components in our architecture that did work for it.
+    requestId :: Text,
+    -- | Every tracingSpan gets its own handler. That way if we record
+    -- debugging information using a handler we'll know which tracingSpan
+    -- the information belongs to. This function creates a new handler for
+    -- a child tracingSpan of the current handler.
+    startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
+    -- | There's common fields all tracingSpans have such as a name and
+    -- start and finish times. On top of that each tracingSpan can define a
+    -- custom type containing useful custom data. This function allows us
+    -- to set this custom data for the current tracingSpan. We could design
+    -- it so this data is passed in as an extra argument when we create the
+    -- tracingSpan, but then we'd miss out on useful details that only
+    -- become known as the tracingSpan runs, for example the response code
+    -- of an HTTP request.
+    setTracingSpanDetailsIO :: forall d. TracingSpanDetails d => d -> IO (),
+    -- | Set a summary for the current tracingSpan. This is shown in tools
+    -- used to inspect spans as a stand-in for the full tracingSpan details
+    -- in places where we only have room to show a little text.
+    setTracingSpanSummaryIO :: Text -> IO (),
+    -- | Mark the current tracingSpan as failed. Some reporting backends
+    -- will use this to decide whether a particular request is worth
+    -- reporting on.
+    markTracingSpanFailedIO :: IO (),
+    -- | Mark the current tracingSpan as finished, which will set the
+    -- @finished@ timestamp. What this function does depends on the
+    -- tracingSpan. Once we're done collecting data for the root
+    -- tracingSpan we'll want to pass the tracingSpan "out", to some code
+    -- that will report the debugging data to whatever observability
+    -- platform(s) are used. Once we're done collecting data for child
+    -- tracingSpans we'll want to add the "completed" child tracingSpan to
+    -- its parent.
+    finishTracingSpan :: Maybe Exception.SomeException -> IO ()
+  }
 
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
@@ -706,12 +703,13 @@ finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef maybeExceptio
         -- to see if any errors occurred), and to make it easy to trace the
         -- source of a problem from the root tracingSpan upward by following
         -- the failing child tracingSpans.
-        succeeded = succeeded tracingSpan'
-          ++ case maybeException of
-            Just exception -> FailedWith exception
-            Nothing ->
-              map Platform.Internal.succeeded (children tracingSpan')
-                |> Prelude.mconcat,
+        succeeded =
+          succeeded tracingSpan'
+            ++ case maybeException of
+              Just exception -> FailedWith exception
+              Nothing ->
+                map Platform.Internal.succeeded (children tracingSpan')
+                  |> Prelude.mconcat,
         -- The allocation counter counts down as it allocations bytest. We
         -- subtract in this order to get a positive number.
         allocated = allocationCounterStartVal - allocationCounterEndVal
@@ -816,10 +814,9 @@ mkClock =
 -- here though, we just store these monotonic times and let code that reporters
 -- that use these tracingSpans convert the monotonic times into whatever format
 -- they need.
-newtype MonotonicTime
-  = MonotonicTime
-      { -- | The number of microseconds that have passed since an arbitrary but
-        -- constant moment in the past.
-        inMicroseconds :: GHC.Word.Word64
-      }
+newtype MonotonicTime = MonotonicTime
+  { -- | The number of microseconds that have passed since an arbitrary but
+    -- constant moment in the past.
+    inMicroseconds :: GHC.Word.Word64
+  }
   deriving (Prelude.Show, Prelude.Num, Prelude.Eq, Prelude.Ord, Aeson.ToJSON, Aeson.FromJSON)

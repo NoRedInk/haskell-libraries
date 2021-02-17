@@ -173,12 +173,11 @@ custom (Parser base) fn = Parser (\val -> base val |> andThen fn)
 -- | An environment decoder knows how to read an app's configuration from
 -- environment variables. Check out the @variable@ function to see how you can
 -- begin building decoders.
-data Decoder config
-  = Decoder
-      { -- | The list of @Variable@s that this decoder will read when ran.
-        consumes :: [Variable],
-        readFromEnvironment :: Dict.Dict Text Text -> Result [ParseError] config
-      }
+data Decoder config = Decoder
+  { -- | The list of @Variable@s that this decoder will read when ran.
+    consumes :: [Variable],
+    readFromEnvironment :: Dict.Dict Text Text -> Result [ParseError] config
+  }
   deriving (Functor)
 
 instance Applicative Decoder where
@@ -206,30 +205,27 @@ instance Applicative Decoder where
             fr <*> xr
 
 -- | An environment variable with a description of what it is used for.
-data Variable
-  = Variable
-      { name :: Text,
-        description :: Text,
-        defaultValue :: Text
-      }
+data Variable = Variable
+  { name :: Text,
+    description :: Text,
+    defaultValue :: Text
+  }
   deriving (Show)
 
-data ParseError
-  = ParseError
-      { failingVariable :: Variable,
-        failingReason :: Text
-      }
+data ParseError = ParseError
+  { failingVariable :: Variable,
+    failingReason :: Text
+  }
   deriving (Show)
 
 -- | Describe a decoded variable for informational purposes.
-data DecodedVariable
-  = DecodedVariable
-      { decodedVariable :: Variable,
-        decodedCurrent :: Maybe Text,
-        -- A single environment variable can be decoded by multiple decoders,
-        -- each with their own constraints.
-        decodedErrors :: List Text
-      }
+data DecodedVariable = DecodedVariable
+  { decodedVariable :: Variable,
+    decodedCurrent :: Maybe Text,
+    -- A single environment variable can be decoded by multiple decoders,
+    -- each with their own constraints.
+    decodedErrors :: List Text
+  }
   deriving (Show)
 
 -- | Produce a configuration from a single environment veriable. Usually you

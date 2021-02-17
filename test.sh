@@ -16,5 +16,5 @@ fi
 hpack nri-prelude
 hpack nri-env-parser
 hpack nri-log-explorer
-cabal update
+cabal build all
 cabal test all

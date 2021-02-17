@@ -34,20 +34,20 @@ module Array
 where
 
 import Basics
-  ( (&&),
+  ( Bool,
+    Int,
+    clamp,
+    (&&),
     (+),
     (-),
     (<),
     (<=),
     (<|),
     (>>),
-    Bool,
-    Int,
-    clamp,
   )
 import qualified Data.Foldable
-import qualified Data.Vector
 import Data.Vector ((!?), (++), (//))
+import qualified Data.Vector
 import List (List)
 import qualified List
 import Maybe (Maybe (..))

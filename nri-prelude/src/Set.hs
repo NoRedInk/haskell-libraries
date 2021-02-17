@@ -36,7 +36,7 @@ module Set
   )
 where
 
-import Basics ((>>), Bool, Int, Ord)
+import Basics (Bool, Int, Ord, (>>))
 import qualified Data.Set
 import List (List)
 import qualified Prelude
