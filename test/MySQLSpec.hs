@@ -6,7 +6,6 @@ module MySQLSpec
 where
 
 import qualified Control.Exception.Safe as Exception
-import qualified Debug
 import qualified Expect
 import qualified Expect.Task
 import qualified Log
@@ -14,10 +13,8 @@ import qualified MySQL
 import MySQL.Query (Query (..))
 import qualified MySQL.Test
 import NriPrelude
-import qualified Task
 import Test (Test, describe, test)
 import qualified Text
-import qualified Prelude
 
 tests :: Test
 tests =
@@ -54,11 +51,11 @@ queriesWithQuestionMarks =
           MySQL.doQuery
             conn
             [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES (${x}, 5)|]
-            resultToTask
+            Expect.Task.fromResult
         MySQL.doQuery
           conn
           [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = ${x}|]
-          resultToTask
+          Expect.Task.fromResult
           |> Expect.Task.andCheck (Expect.equal [("?", 5) :: (Text, Int)])
     ]
 
@@ -75,25 +72,20 @@ exceptionTests =
                 -- this test. Don't fail on that.
                 |> MySQL.onDuplicateDoNothing
             )
-            resultToTask
+            Expect.Task.fromResult
         MySQL.doQuery
           conn
           [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
           ( \res ->
               case res of
-                Err err -> Task.succeed err
-                Ok (_ :: Int) -> Expect.Task.fails ("Expected an error, but none was returned." :: Text)
+                Err err -> Ok err
+                Ok (_ :: Int) -> Err ("Expected an error, but none was returned." :: Text)
+                |> Expect.Task.fromResult
           )
           |> Expect.Task.andCheck
             ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Exception.displayException
             )
     ]
-
-resultToTask :: Prelude.Show e => Result e a -> Task Expect.Task.Failure a
-resultToTask res =
-  case res of
-    Ok x -> Task.succeed x
-    Err x -> Expect.Task.fails (Debug.toString x)
 
 mockQuery :: Text -> Query a
 mockQuery sqlString =
