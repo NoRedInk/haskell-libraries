@@ -1,6 +1,11 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NumericUnderscores #-}
+-- GHC wants us to remove `Err never` branches from case statements, because it
+-- knows we'll never end up in those branches. We like them though, because
+-- missing such a branch in a case statement looks like a problem and so is
+-- distracting.
+{-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
 
 module Test.Internal where
 
@@ -421,6 +426,8 @@ runSingle test' =
         let testRest =
               case res of
                 Ok x -> x
+                -- If you remove this branch, consider also removing the
+                -- -fno-warn-overlapping-patterns warning above.
                 Err err -> never err
         span' <- MVar.takeMVar spanVar
         let span =
