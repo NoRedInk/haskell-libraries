@@ -14,11 +14,13 @@ module NriPrelude.Plugin
   )
 where
 
-import qualified GhcPlugins
 -- In GHC 8.10 and higher the imports below will come from the GHC.Hs module
 -- instead. We'll need to handle this, maybe using some CPP-powered conditional
 -- imports.
-import HsSyn (hsmodImports, ideclQualified, simpleImportDecl)
+
+import qualified Data.List
+import qualified GhcPlugins
+import HsSyn (hsmodImports, hsmodName, ideclQualified, simpleImportDecl)
 import Prelude
 
 plugin :: GhcPlugins.Plugin
@@ -40,9 +42,17 @@ addImplicitImports _ _ parsed =
   Prelude.pure
     parsed
       { GhcPlugins.hpm_module =
-          fmap addImports (GhcPlugins.hpm_module parsed)
+          fmap addImportsWhenNotPath (GhcPlugins.hpm_module parsed)
       }
   where
+    addImportsWhenNotPath hsModule =
+      case hsmodName hsModule of
+        Nothing -> addImports hsModule
+        Just (GhcPlugins.L _ modName) ->
+          if Data.List.isPrefixOf "Paths_" (GhcPlugins.moduleNameString modName)
+            then hsModule
+            else addImports hsModule
+
     addImports hsModule =
       hsModule {hsmodImports = hsmodImports hsModule ++ extraImports}
     -- taken from https://package.elm-lang.org/packages/elm/core/latest/
