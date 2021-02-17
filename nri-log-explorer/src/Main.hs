@@ -513,6 +513,7 @@ run = do
   let buildVty = Vty.mkVty Vty.defaultConfig
   initialVty <- buildVty
   let pushMsg = Brick.BChan.writeBChan eventChan
+  let pushMsgNonBlocking = Brick.BChan.writeBChanNonBlocking eventChan >> map (\_ -> ())
   now <- Time.getCurrentTime
   clipboardCommand <- chooseCommand copyCommands
   Async.race_
@@ -522,13 +523,13 @@ run = do
             System.IO.ReadMode
             (tailLines partOfLine (AddLogline >> pushMsg))
         )
-        (updateTime (SetCurrentTime >> pushMsg))
+        (updateTime (SetCurrentTime >> pushMsgNonBlocking))
     )
     ( Brick.customMain
         initialVty
         buildVty
         (Just eventChan)
-        (app pushMsg)
+        (app pushMsgNonBlocking)
         (init clipboardCommand now)
     )
 
