@@ -4,6 +4,7 @@ module Expect.Task
     andCheck,
     succeeds,
     fails,
+    fromResult,
     Failure,
   )
 where
@@ -63,8 +64,34 @@ succeeds task =
 -- > task "chemistry experiment" <| do
 -- >     mixRedAndGreenLiquids
 -- >         |> fails
-fails :: Text -> Task Failure a
-fails msg =
+fails :: Show a => Task err a -> Task Failure err
+fails task =
+  task
+    |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
+    |> Task.onError (\err -> Task.succeed (Ok err))
+    |> Task.andThen fromResult
+
+failWith :: Show b => b -> Task Failure a
+failWith msg =
   msg
+    |> Debug.toString
     |> Internal.FailedAssertion
     |> Task.fail
+
+succeedWith :: a -> Task Failure a
+succeedWith payload =
+  Task.succeed payload
+    |> Task.mapError (\_ -> ())
+    |> succeeds
+
+-- | Used for making matchers
+-- expectOneItem :: Task Expect.Task.Failure [a] -> Task Expect.Task.Failure a
+-- expectOneItem t = do
+--   xs <- t
+--   case xs of
+--     [x] -> Ok x
+--     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
+--   |> Expect.Task.fromResult
+fromResult :: Show b => Result b a -> Task Failure a
+fromResult (Ok a) = succeedWith a
+fromResult (Err msg) = failWith msg
