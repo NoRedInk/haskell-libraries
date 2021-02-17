@@ -329,24 +329,6 @@ only :: Test -> Test
 only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
--- | Run a test that executes a task. The test passes if the task returns a
--- success value.
-task :: Stack.HasCallStack => Text -> Task Failure a -> Test
-task name expectation =
-  Test
-    [ SingleTest
-        { describes = [],
-          name = name,
-          loc = Stack.withFrozenCallStack getFrame,
-          label = None,
-          body =
-            expectation
-              |> Task.map (\_ -> ())
-              |> Expectation
-              |> handleUnexpectedErrors
-        }
-    ]
-
 run :: Test -> Task e SuiteResult
 run (Test all) = do
   let grouped = groupBy label all

@@ -13,7 +13,7 @@ import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform.Internal
 import qualified System.IO
-import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, task, test, todo)
+import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, test, todo)
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
@@ -32,62 +32,57 @@ api :: Test
 api =
   describe
     "Api"
-    [ task "suite result is 'AllPassed' when all tests passed" <| do
+    [ test "suite result is 'AllPassed' when all tests passed" <| \_ -> do
         let suite =
               describe
                 "suite"
                 [ test "test 1" (\_ -> Expect.pass),
                   test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Internal.run suite
+        result <- Expect.Task.succeeds <| Internal.run suite
         result
           |> simplify
-          |> Expect.equal (AllPassed ["test 1", "test 2"])
-          |> Expect.Task.check,
-      task "suite result is 'OnlysPassed' when containing an `only`" <| do
+          |> Expect.equal (AllPassed ["test 1", "test 2"]),
+      test "suite result is 'OnlysPassed' when containing an `only`" <| \_ -> do
         let suite =
               describe
                 "suite"
                 [ test "test 1" (\_ -> Expect.pass),
                   only <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Internal.run suite
+        result <- Expect.Task.succeeds <| Internal.run suite
         result
           |> simplify
-          |> Expect.equal (OnlysPassed ["test 2"] ["test 1"])
-          |> Expect.Task.check,
-      task "suite result is 'PassedWithSkipped' when containing  skipped test" <| do
+          |> Expect.equal (OnlysPassed ["test 2"] ["test 1"]),
+      test "suite result is 'PassedWithSkipped' when containing  skipped test" <| \_ -> do
         let suite =
               describe
                 "suite"
                 [ test "test 1" (\_ -> Expect.pass),
                   skip <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Internal.run suite
+        result <- Expect.Task.succeeds <| Internal.run suite
         result
           |> simplify
-          |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"])
-          |> Expect.Task.check,
-      task "suite result is 'PassedWithSkipped' when containing a todo test" <| do
+          |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
+      test "suite result is 'PassedWithSkipped' when containing a todo test" <| \_ -> do
         let suite =
               describe
                 "suite"
                 [ test "test 1" (\_ -> Expect.pass),
                   todo "test 2"
                 ]
-        result <- Internal.run suite
+        result <- Expect.Task.succeeds <| Internal.run suite
         result
           |> simplify
-          |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"])
-          |> Expect.Task.check,
-      task "suite result is 'NoTestsInSuite' when it contains no tests" <| do
+          |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
+      test "suite result is 'NoTestsInSuite' when it contains no tests" <| \_ -> do
         let suite = describe "suite" []
-        result <- Internal.run suite
+        result <- Expect.Task.succeeds <| Internal.run suite
         result
           |> simplify
-          |> Expect.equal NoTestsInSuite
-          |> Expect.Task.check,
-      task "suite result is 'TestsFailed' when it contains a failing test" <| do
+          |> Expect.equal NoTestsInSuite,
+      test "suite result is 'TestsFailed' when it contains a failing test" <| \_ -> do
         let suite =
               describe
                 "suite"
@@ -95,11 +90,10 @@ api =
                   skip <| test "test 2" (\_ -> Expect.pass),
                   test "test 3" (\_ -> Expect.fail "oops")
                 ]
-        result <- Internal.run suite
+        result <- Expect.Task.succeeds <| Internal.run suite
         result
           |> simplify
-          |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"])
-          |> Expect.Task.check,
+          |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"]),
       test "nested describes are exposed on each test" <| \_ ->
         let suite =
               describe
@@ -120,9 +114,6 @@ api =
           |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
       test "source location of `todo` are the file in which the test is defined" <| \_ ->
         todo "test 1"
-          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
-      test "source location of `task` are the file in which the test is defined" <| \_ ->
-        task "test 1" (Expect.Task.check Expect.pass)
           |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
       test "source location of `fuzz` are the file in which the test is defined" <| \_ ->
         fuzz Fuzz.int "test 1" (\_ -> Expect.pass)
@@ -189,7 +180,7 @@ stdoutReporter :: Test
 stdoutReporter =
   describe
     "Stdout Reporter"
-    [ task "all passed" <| do
+    [ test "all passed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -200,9 +191,8 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-all-passed"
-          |> Expect.Task.check,
-      task "onlys passed" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-all-passed",
+      test "onlys passed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -216,9 +206,8 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-onlys-passed"
-          |> Expect.Task.check,
-      task "passed with skipped" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-onlys-passed",
+      test "passed with skipped" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -232,9 +221,8 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-passed-with-skipped"
-          |> Expect.Task.check,
-      task "no tests in suite" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-passed-with-skipped",
+      test "no tests in suite" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -242,9 +230,8 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-no-tests-in-suite"
-          |> Expect.Task.check,
-      task "tests failed" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-no-tests-in-suite",
+      test "tests failed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -264,14 +251,13 @@ stdoutReporter =
             )
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed"
-          |> Expect.Task.check
     ]
 
 logfileReporter :: Test
 logfileReporter =
   describe
     "Logfile Reporter"
-    [ task "all passed" <| do
+    [ test "all passed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -282,9 +268,8 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-all-passed"
-          |> Expect.Task.check,
-      task "onlys passed" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-all-passed",
+      test "onlys passed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -298,9 +283,8 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-onlys-passed"
-          |> Expect.Task.check,
-      task "passed with skipped" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-onlys-passed",
+      test "passed with skipped" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -314,9 +298,8 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-passed-with-skipped"
-          |> Expect.Task.check,
-      task "no tests in suite" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-passed-with-skipped",
+      test "no tests in suite" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -324,9 +307,8 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-no-tests-in-suite"
-          |> Expect.Task.check,
-      task "tests failed" <| do
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-no-tests-in-suite",
+      test "tests failed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
@@ -346,7 +328,6 @@ logfileReporter =
             )
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-tests-failed"
-          |> Expect.Task.check
     ]
 
 writeSpan :: System.IO.Handle -> Platform.Internal.TracingSpan -> Prelude.IO ()
@@ -357,7 +338,7 @@ writeSpan handle span =
 
 -- | Provide a temporary file for a test to do some work in, then return the
 -- contents of the file when the test is done with it.
-withTempFile :: (System.IO.FilePath -> System.IO.Handle -> Prelude.IO ()) -> Task e Text
+withTempFile :: (System.IO.FilePath -> System.IO.Handle -> Prelude.IO ()) -> Expect.Expectation' Text
 withTempFile go = do
   Platform.Internal.Task
     ( \_ -> do
@@ -368,6 +349,7 @@ withTempFile go = do
         Data.Text.IO.readFile path
           |> map Ok
     )
+    |> Expect.Task.succeeds
 
 mockTest :: Text -> body -> Internal.SingleTest body
 mockTest name body =

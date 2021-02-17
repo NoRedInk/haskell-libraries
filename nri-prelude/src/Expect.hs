@@ -42,6 +42,7 @@ module Expect
     -- * Fancy Expectations
     equalToContentsOf,
     withIO,
+    Internal.Expectation',
   )
 where
 

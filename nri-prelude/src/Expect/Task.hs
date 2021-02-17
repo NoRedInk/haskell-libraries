@@ -1,7 +1,6 @@
 -- | A library to create @Expecation@s for @Task@s.
 module Expect.Task
-  ( check,
-    andCheck,
+  ( andCheck,
     succeeds,
     fails,
     fromResult,
@@ -14,6 +13,7 @@ import qualified Expect
 import NriPrelude
 import qualified Task
 import qualified Test.Internal as Internal
+import qualified Prelude
 
 -- | Error generated when a test expectation is not met.
 type Failure = Internal.Failure
@@ -23,57 +23,48 @@ type Failure = Internal.Failure
 -- > task "Greetings are friendly" <| do
 -- >     getGreeting
 -- >         |> andCheck (Expect.equal "Hi!")
-andCheck :: (a -> Expect.Expectation) -> Task Failure a -> Task Failure a
+andCheck :: (a -> Expect.Expectation) -> Task err a -> Internal.Expectation' a
 andCheck expectation task = do
-  x <- task
-  Internal.unExpectation (expectation x)
-  Task.succeed x
-
--- | Check an expectation in the middle of a @do@ block.
---
--- > task "Laundry gets done" <| do
--- >     weightInKgs <- clothesInWasher
--- >     check (weightInKgs |> Expect.atMost 8)
--- >     soapInWasher
--- >     startMachine
-check :: Expect.Expectation -> Task Failure ()
-check expectation =
-  Task.succeed ()
-    |> andCheck (\() -> expectation)
+  x <- succeeds task
+  expectation x
+  Prelude.pure x
 
 -- | Check a task succeeds.
 --
 -- > task "solve rubicskube" <| do
 -- >     solveRubicsKube
 -- >         |> succeeds
-succeeds :: Show err => Task err a -> Task Failure a
+succeeds :: Task err a -> Internal.Expectation' a
 succeeds task =
   Task.mapError
-    ( \message ->
-        Internal.FailedAssertion (Debug.toString message)
+    ( \_message ->
+        Internal.FailedAssertion "Expected task to succeed, but it failed"
     )
     task
+    |> Internal.Expectation
 
 -- | Check a task fails.
 --
 -- > task "chemistry experiment" <| do
 -- >     mixRedAndGreenLiquids
 -- >         |> fails
-fails :: Show a => Task err a -> Task Failure err
+fails :: Show a => Task err a -> Internal.Expectation' err
 fails task =
   task
     |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
     |> Task.onError (\err -> Task.succeed (Ok err))
-    |> Task.andThen fromResult
+    |> Task.andThen (Internal.unExpectation << fromResult)
+    |> Internal.Expectation
 
-failWith :: Show b => b -> Task Failure a
+failWith :: Show b => b -> Internal.Expectation' a
 failWith msg =
   msg
     |> Debug.toString
     |> Internal.FailedAssertion
     |> Task.fail
+    |> Internal.Expectation
 
-succeedWith :: a -> Task Failure a
+succeedWith :: a -> Internal.Expectation' a
 succeedWith payload =
   Task.succeed payload
     |> Task.mapError (\_ -> ())
@@ -87,6 +78,6 @@ succeedWith payload =
 --     [x] -> Ok x
 --     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
 --   |> Expect.Task.fromResult
-fromResult :: Show b => Result b a -> Task Failure a
+fromResult :: Show b => Result b a -> Internal.Expectation' a
 fromResult (Ok a) = succeedWith a
 fromResult (Err msg) = failWith msg
