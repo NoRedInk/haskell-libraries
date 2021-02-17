@@ -273,7 +273,17 @@ traceQuery :: Stack.HasCallStack => Connection -> Maybe (a -> Int) -> Query.Quer
 traceQuery conn maybeCountRows query task =
   let infoForContext = Query.mkInfo query (logContext conn)
    in Stack.withFrozenCallStack Platform.tracingSpan "MySQL Query" <| do
-        res <- Platform.finally task (Platform.setTracingSpanDetails infoForContext)
+        res <-
+          Platform.finally
+            task
+            ( do
+                Platform.setTracingSpanDetails infoForContext
+                Platform.setTracingSpanSummary
+                  ( Query.infoSqlOperation infoForContext
+                      ++ " "
+                      ++ Query.infoQueriedRelation infoForContext
+                  )
+            )
         -- If we end up here it means the query succeeded. Overwrite the tracing
         -- details to contain the amount of selected rows. This information can be
         -- useful when debugging slow queries.

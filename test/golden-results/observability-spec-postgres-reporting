@@ -16,6 +16,7 @@ TracingSpan
             }
         )
   , details = Nothing
+  , summary = Nothing
   , succeeded = Succeeded
   , allocated = 0
   , children =
@@ -39,6 +40,7 @@ TracingSpan
           , details =
               Just
                 "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"queried relation\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"connection\":\"/mock/db/path.sock:mock-db-name\",\"rows returned\":1}"
+          , summary = Just "UNKNOWN !SELECT 1"
           , succeeded = Succeeded
           , allocated = 0
           , children =
@@ -53,13 +55,14 @@ TracingSpan
                             { srcLocPackage = "database-1.0.0.0-inplace"
                             , srcLocModule = "Postgres"
                             , srcLocFile = "src/Postgres.hs"
-                            , srcLocStartLine = 346
+                            , srcLocStartLine = 356
                             , srcLocStartCol = 9
-                            , srcLocEndLine = 346
+                            , srcLocEndLine = 356
                             , srcLocEndCol = 69
                             }
                         )
                   , details = Just "{}"
+                  , summary = Just "acquiring Postgres connection from pool"
                   , succeeded = Succeeded
                   , allocated = 0
                   , children = []

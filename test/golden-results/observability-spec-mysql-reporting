@@ -16,6 +16,7 @@ TracingSpan
             }
         )
   , details = Nothing
+  , summary = Nothing
   , succeeded = Succeeded
   , allocated = 0
   , children =
@@ -39,6 +40,7 @@ TracingSpan
           , details =
               Just
                 "{\"query\":\"SELECT 1\",\"query template\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"SELECT 1\",\"connection\":\"127.0.0.1:3306/noredink_test\",\"rows returned\":1}"
+          , summary = Just "UNKNOWN SELECT 1"
           , succeeded = Succeeded
           , allocated = 0
           , children = []
