@@ -45,3 +45,4 @@ ghc-options:
 - -Wredundant-constraints
 - -Wincomplete-uni-patterns
 - -fplugin=NriPrelude.Plugin
+- -fno-warn-unused-imports
