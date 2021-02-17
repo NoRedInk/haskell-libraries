@@ -76,6 +76,7 @@ newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
 data Name
   = RootSpanListViewport
   | SpanDetailsListViewport Id
+  | SpanLine Id Int
   deriving (Eq, Ord, Show)
 
 init :: Maybe Text -> Time.UTCTime -> Model
@@ -292,6 +293,7 @@ viewSpanList Logline {logId} spans =
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
                 |> Brick.padRight Brick.Max
             ]
+            |> Brick.cached (SpanLine logId i)
             |> if i == 0
               then Brick.withAttr "selected" >> Brick.visible
               else identity
