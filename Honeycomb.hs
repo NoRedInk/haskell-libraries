@@ -162,12 +162,13 @@ deriveSampleRate rootSpan handler' =
         else sampleRateForDuration baseRate requestDurationUs apdexTUs
 
 -- For every increase of apdexTU in the request duration we double the chance of
--- q request getting logged, up to a maximum of 1.
+-- a request getting logged, up to a maximum of 1.
 --
 -- An example plot of this function, for:
--- * apdex 30ms
--- * baseRate 1/1000
--- * from 1ms to 300ms
+--  * apdex 30ms
+--  * baseRate 1/1000
+--  * from 1ms to 300ms
+
 -- https://www.wolframalpha.com/input/?i=plot+1%2Fmax%281%2F1000%2C+min%281%2C+%281%2F1000%29+*+%282+%5E+%28%28x+-+30%29+%2F+30%29%29%29%29+from+x%3D1+to+x%3D300
 sampleRateForDuration :: Float -> Float -> Float -> Float
 sampleRateForDuration baseRate requestDurationUs apdexTUs =
