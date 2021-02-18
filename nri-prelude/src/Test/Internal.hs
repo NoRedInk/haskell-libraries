@@ -213,10 +213,17 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
     ]
 
 fuzzBody :: Show a => Fuzzer a -> (a -> Expectation) -> Expectation
-fuzzBody (Fuzzer gen) expectation =
+fuzzBody (Fuzzer gen) expectation = do
   Expectation
     <| Platform.Internal.Task
-      ( \log -> do
+      ( \_log -> do
+          -- For the moment we're not recording traces in fuzz tests. Because
+          -- the test body runs a great many times, we'd record a ton of data
+          -- that's not all that useful.
+          --
+          -- Ideally we'd only keep the recording of the most significant run,
+          -- but we have to figure out how to do that first.
+          silentLog <- Platform.silentHandler
           seed <- Hedgehog.Internal.Seed.random
           failureRef <- IORef.newIORef Nothing
           hedgehogResult <-
@@ -232,7 +239,7 @@ fuzzBody (Fuzzer gen) expectation =
                       |> unExpectation
                       |> Task.map Ok
                       |> Task.onError (Task.succeed << Err)
-                      |> Task.perform log
+                      |> Task.perform silentLog
                       |> Control.Monad.IO.Class.liftIO
                   case result of
                     Ok () -> Prelude.pure ()
