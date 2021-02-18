@@ -57,7 +57,7 @@ renderSkipped test =
 renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> JUnit.TestSuite
 renderFailed test =
   case Internal.body test of
-    (tracingSpan, Internal.FailedAssertion msg) ->
+    (tracingSpan, Internal.FailedAssertion msg _) ->
       JUnit.failed (Internal.name test)
         |> JUnit.stderr msg
         |> ( case stackFrame test of

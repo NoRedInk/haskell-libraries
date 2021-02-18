@@ -11,6 +11,7 @@ where
 
 import qualified Debug
 import qualified Expect
+import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Task
 import qualified Test.Internal as Internal
@@ -55,7 +56,7 @@ succeeds :: Show err => Task err a -> Task Failure a
 succeeds task =
   Task.mapError
     ( \message ->
-        Internal.FailedAssertion (Debug.toString message)
+        Internal.FailedAssertion (Debug.toString message) Internal.getFrame
     )
     task
 
@@ -73,9 +74,7 @@ fails task =
 
 failWith :: Show b => b -> Task Failure a
 failWith msg =
-  msg
-    |> Debug.toString
-    |> Internal.FailedAssertion
+  Internal.FailedAssertion (Debug.toString msg) Internal.getFrame
     |> Task.fail
 
 succeedWith :: a -> Task Failure a

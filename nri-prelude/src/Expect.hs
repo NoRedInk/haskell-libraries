@@ -48,6 +48,7 @@ where
 import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Debug
+import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
 import qualified Platform.Internal
@@ -103,13 +104,14 @@ pass = Internal.Expectation (Task.succeed Internal.Succeeded)
 -- >
 -- >             Err err ->
 -- >                 Expect.fail err
-fail :: Text -> Expectation
+fail :: Stack.HasCallStack => Text -> Expectation
 fail msg =
-  msg
-    |> Internal.FailedAssertion
-    |> Internal.Failed
-    |> Task.succeed
-    |> Internal.Expectation
+  Stack.withFrozenCallStack
+    ( Internal.FailedAssertion msg Internal.getFrame
+        |> Internal.Failed
+        |> Task.succeed
+        |> Internal.Expectation
+    )
 
 -- | If the given expectation fails, replace its failure message with a custom one.
 --
@@ -123,7 +125,7 @@ onFail msg (Internal.Expectation task) =
       ( \res ->
           case res of
             Internal.Succeeded -> Internal.Succeeded
-            Internal.Failed _ -> Internal.Failed (Internal.FailedAssertion msg)
+            Internal.Failed _ -> Internal.Failed (Internal.FailedAssertion msg Internal.getFrame)
       )
     |> Internal.Expectation
 
@@ -148,8 +150,8 @@ onFail msg (Internal.Expectation task) =
 -- > [ "Betty Botter", "bought", "some", "butter" ]
 -- >
 -- > -}
-equal :: (Show a, Eq a) => a -> a -> Expectation
-equal = assert (==) "Expect.equal"
+equal :: (Stack.HasCallStack, Show a, Eq a) => a -> a -> Expectation
+equal = Stack.withFrozenCallStack (assert (==) "Expect.equal")
 
 -- | Passes if the arguments are not equal.
 --
@@ -171,8 +173,8 @@ equal = assert (==) "Expect.equal"
 -- > 100
 -- >
 -- > -}
-notEqual :: (Show a, Eq a) => a -> a -> Expectation
-notEqual = assert (/=) "Expect.notEqual"
+notEqual :: (Stack.HasCallStack, Show a, Eq a) => a -> a -> Expectation
+notEqual = Stack.withFrozenCallStack (assert (/=) "Expect.notEqual")
 
 -- | Passes if the second argument is less than the first.
 --
@@ -196,8 +198,8 @@ notEqual = assert (/=) "Expect.notEqual"
 -- > -1
 -- >
 -- > -}
-lessThan :: (Show a, Ord a) => a -> a -> Expectation
-lessThan = assert (>) "Expect.lessThan"
+lessThan :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+lessThan = Stack.withFrozenCallStack (assert (>) "Expect.lessThan")
 
 -- | Passes if the second argument is less than or equal to the first.
 --
@@ -220,8 +222,8 @@ lessThan = assert (>) "Expect.lessThan"
 -- > -3
 -- >
 -- > -}
-atMost :: (Show a, Ord a) => a -> a -> Expectation
-atMost = assert (>=) "Expect.atMost"
+atMost :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+atMost = Stack.withFrozenCallStack (assert (>=) "Expect.atMost")
 
 -- | Passes if the second argument is greater than the first.
 --
@@ -244,8 +246,8 @@ atMost = assert (>=) "Expect.atMost"
 -- > 1
 -- >
 -- > -}
-greaterThan :: (Show a, Ord a) => a -> a -> Expectation
-greaterThan = assert (<) "Expect.greaterThan"
+greaterThan :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+greaterThan = Stack.withFrozenCallStack (assert (<) "Expect.greaterThan")
 
 -- | Passes if the second argument is greater than or equal to the first.
 --
@@ -268,8 +270,8 @@ greaterThan = assert (<) "Expect.greaterThan"
 -- > 3
 -- >
 -- > -}
-atLeast :: (Show a, Ord a) => a -> a -> Expectation
-atLeast = assert (<=) "Expect.atLeast"
+atLeast :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+atLeast = Stack.withFrozenCallStack (assert (<=) "Expect.atLeast")
 
 -- | Passes if the argument is 'True', and otherwise fails with the given message.
 --
@@ -288,8 +290,8 @@ atLeast = assert (<=) "Expect.atLeast"
 -- > Expected the list to be empty.
 -- >
 -- > -}
-true :: Bool -> Expectation
-true x = assert (&&) "Expect.true" x True
+true :: Stack.HasCallStack => Bool -> Expectation
+true x = Stack.withFrozenCallStack (assert (&&) "Expect.true" x True)
 
 -- | Passes if the argument is 'False', and otherwise fails with the given message.
 --
@@ -308,8 +310,8 @@ true x = assert (&&) "Expect.true" x True
 -- > Expected the list not to be empty.
 -- >
 -- > -}
-false :: Bool -> Expectation
-false x = assert xor "Expect.false" x True
+false :: Stack.HasCallStack => Bool -> Expectation
+false x = Stack.withFrozenCallStack (assert xor "Expect.false" x True)
 
 -- | Passes if each of the given functions passes when applied to the subject.
 --
@@ -338,29 +340,33 @@ false x = assert xor "Expect.false" x True
 -- > ╵
 -- > -10
 -- > -}
-all :: List (subject -> Expectation) -> subject -> Expectation
+all :: Stack.HasCallStack => List (subject -> Expectation) -> subject -> Expectation
 all expectations subject =
-  List.foldl
-    ( \expectation acc ->
-        Internal.append
-          acc
-          (expectation subject)
+  Stack.withFrozenCallStack
+    ( List.foldl
+        ( \expectation acc ->
+            Internal.append
+              acc
+              (expectation subject)
+        )
+        pass
+        expectations
     )
-    pass
-    expectations
 
 -- | Combine multiple expectations into one. The resulting expectation is a
 -- failure if any of the original expectations are a failure.
-concat :: List Expectation -> Expectation
+concat :: Stack.HasCallStack => List Expectation -> Expectation
 concat expectations =
-  List.foldl
-    ( \expectation acc ->
-        Internal.append
-          acc
-          expectation
+  Stack.withFrozenCallStack
+    ( List.foldl
+        ( \expectation acc ->
+            Internal.append
+              acc
+              expectation
+        )
+        pass
+        expectations
     )
-    pass
-    expectations
 
 -- | Passes if the Result is an Ok rather than Err. This is useful for tests where you expect not to see an error, but you don't care what the actual result is.
 --
@@ -385,11 +391,13 @@ concat expectations =
 -- > Err _
 -- >
 -- > -}
-ok :: Show b => Result b a -> Expectation
+ok :: (Stack.HasCallStack, Show b) => Result b a -> Expectation
 ok res =
-  case res of
-    Ok _ -> pass
-    Err message -> fail ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
+  Stack.withFrozenCallStack
+    ( case res of
+        Ok _ -> pass
+        Err message -> fail ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
+    )
 
 -- | Passes if the Result is an Err rather than Ok. This is useful for tests where you expect to get an error but you don't care what the actual error is.
 --
@@ -414,11 +422,13 @@ ok res =
 -- > Err _
 -- >
 -- > -}
-err :: Show a => Result b a -> Expectation
+err :: (Stack.HasCallStack, Show a) => Result b a -> Expectation
 err res =
-  case res of
-    Ok value -> fail ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
-    Err _ -> pass
+  Stack.withFrozenCallStack
+    ( case res of
+        Ok value -> fail ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
+        Err _ -> pass
+    )
 
 -- | Check if a string is equal to the contents of a file.
 --
@@ -432,26 +442,29 @@ err res =
 -- encodings. When a test fails we can throw away the file, rerun the test, and
 -- use @git diff golden-results/complicated-object.txt@ to check whether the
 -- changes are acceptable.
-equalToContentsOf :: Text -> Text -> Expectation
+equalToContentsOf :: Stack.HasCallStack => Text -> Text -> Expectation
 equalToContentsOf filepath' actual =
-  Internal.Expectation <| do
-    let filepath = Data.Text.unpack filepath'
-    exists <-
-      fromIO <| do
-        Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
-        Directory.doesFileExist filepath
-    if exists
-      then do
-        expected <- fromIO (Data.Text.IO.readFile filepath)
-        assert
-          (==)
-          "Expect.equalToContentsOf"
-          (UnescapedShow expected)
-          (UnescapedShow actual)
-          |> Internal.unExpectation
-      else do
-        fromIO (Data.Text.IO.writeFile filepath actual)
-        Internal.unExpectation pass
+  Stack.withFrozenCallStack
+    ( Internal.Expectation
+        <| do
+          let filepath = Data.Text.unpack filepath'
+          exists <-
+            fromIO <| do
+              Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
+              Directory.doesFileExist filepath
+          if exists
+            then do
+              expected <- fromIO (Data.Text.IO.readFile filepath)
+              assert
+                (==)
+                "Expect.equalToContentsOf"
+                (UnescapedShow expected)
+                (UnescapedShow actual)
+                |> Internal.unExpectation
+            else do
+              fromIO (Data.Text.IO.writeFile filepath actual)
+              Internal.unExpectation pass
+    )
 
 -- By default we will compare values with each other after they have been
 -- passed to @show@. Unfortunately @show@ for the @Text@ type escapes special
@@ -473,25 +486,27 @@ newtype UnescapedShow = UnescapedShow Text deriving (Eq)
 instance Show UnescapedShow where
   show (UnescapedShow text) = Data.Text.unpack text
 
-assert :: Show a => (a -> a -> Bool) -> Text -> a -> a -> Expectation
+assert :: (Stack.HasCallStack, Show a) => (a -> a -> Bool) -> Text -> a -> a -> Expectation
 assert pred funcName actual expected =
-  if pred actual expected
-    then pass
-    else
-      Internal.Expectation <| do
-        window <- fromIO Terminal.size
-        let terminalWidth = case window of
-              Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
-              Nothing -> 80
-        Diff.pretty
-          Diff.Config
-            { Diff.separatorText = Just funcName,
-              Diff.wrapping = Diff.Wrap terminalWidth
-            }
-          (PrettyShow expected)
-          (PrettyShow actual)
-          |> fail
-          |> Internal.unExpectation
+  Stack.withFrozenCallStack
+    ( if pred actual expected
+        then pass
+        else
+          Internal.Expectation <| do
+            window <- fromIO Terminal.size
+            let terminalWidth = case window of
+                  Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
+                  Nothing -> 80
+            Diff.pretty
+              Diff.Config
+                { Diff.separatorText = Just funcName,
+                  Diff.wrapping = Diff.Wrap terminalWidth
+                }
+              (PrettyShow expected)
+              (PrettyShow actual)
+              |> fail
+              |> Internal.unExpectation
+    )
 
 fromIO :: Prelude.IO a -> Task e a
 fromIO io = Platform.Internal.Task (\_ -> map Ok io)

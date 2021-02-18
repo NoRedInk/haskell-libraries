@@ -255,7 +255,7 @@ stdoutReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error"),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
@@ -337,7 +337,7 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error"),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
