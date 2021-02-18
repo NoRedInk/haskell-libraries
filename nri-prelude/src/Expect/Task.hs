@@ -6,7 +6,6 @@ module Expect.Task
     succeeds,
     fails,
     fromResult,
-    Failure,
   )
 where
 
@@ -16,9 +15,6 @@ import NriPrelude
 import qualified Task
 import qualified Test.Internal as Internal
 import qualified Prelude
-
--- | Error generated when a test expectation is not met.
-type Failure = Internal.Failure
 
 -- | Check a task returns an expected value, than pass that value on.
 --
@@ -73,7 +69,7 @@ succeedWith payload =
     |> succeeds
 
 -- | Used for making matchers
--- expectOneItem :: Task Expect.Task.Failure [a] -> Task Expect.Task.Failure a
+-- expectOneItem :: Expectation' [a] -> Expectation' a
 -- expectOneItem t = do
 --   xs <- t
 --   case xs of
