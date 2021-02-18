@@ -34,14 +34,11 @@ logTests =
 
 todoTests :: List Test
 todoTests =
-  [ test "that an exception is raised with the given message"
-      <| \() ->
-        Expect.withIO
-          ( \result -> case result of
-              Left (exception :: SomeException) -> Expect.equal (Just "Not yet!") (firstLine exception)
-              Right _home -> Expect.fail "No exception raised"
-          )
-          (Exception.try (Debug.todo ("Not yet!" :: Text)))
+  [ test "that an exception is raised with the given message" <| \() -> do
+      result <- Expect.fromIO (Exception.try (Debug.todo ("Not yet!" :: Text)))
+      case result of
+        Left (exception :: SomeException) -> Expect.equal (Just "Not yet!") (firstLine exception)
+        Right _home -> Expect.fail "No exception raised"
   ]
 
 -- | Extracts the first line of a given text string if it exists. Otherwise returns Nothing.

@@ -22,76 +22,73 @@ tests :: Test
 tests =
   describe
     "Log"
-    [ test "`info` produces expected debugging info" <| \_ ->
-        Expect.withIO identity <| do
-          (recordedTracingSpans, handler) <- newHandler
-          _ <- info "logging a message!" [context "a number" (12 :: Int)] |> Task.attempt handler
-          spans <- recordedTracingSpans
-          spans
-            |> Debug.toString
-            |> Expect.equalToContentsOf "tests/golden-results/log-info"
-            |> Prelude.pure,
-      test "`userIsAnnoyed` produces expected debugging info" <| \_ ->
-        Expect.withIO identity <| do
-          (recordedTracingSpans, handler) <- newHandler
-          _ <-
-            userIsAnnoyed
-              "the button didn't work"
-              "fix the button"
-              [context "button" ("PRESS" :: Text)]
-              |> Task.attempt handler
-          spans <- recordedTracingSpans
-          spans
-            |> Debug.toString
-            |> Expect.equalToContentsOf "tests/golden-results/log-user-is-annoyed"
-            |> Prelude.pure,
-      test "`userIsPained` produces expected debugging info" <| \_ ->
-        Expect.withIO identity <| do
-          (recordedTracingSpans, handler) <- newHandler
-          _ <-
-            userIsPained
-              "user cut themselves on the modal"
-              "file modal's sharp edges"
-              [context "modal" ("SURPRISE!" :: Text)]
-              |> Task.attempt handler
-          spans <- recordedTracingSpans
-          spans
-            |> Debug.toString
-            |> Expect.equalToContentsOf "tests/golden-results/log-user-is-pained"
-            |> Prelude.pure,
-      test "`userIsBlocked` produces expected debugging info" <| \_ ->
-        Expect.withIO identity <| do
-          (recordedTracingSpans, handler) <- newHandler
-          _ <-
-            userIsBlocked
-              "door is blocked"
-              "find key"
-              [context "house number" (5 :: Int)]
-              |> Task.attempt handler
-          spans <- recordedTracingSpans
-          spans
-            |> Debug.toString
-            |> Expect.equalToContentsOf "tests/golden-results/log-user-is-blocked"
-            |> Prelude.pure,
-      test "nested spans pruduce expected debugging info" <| \_ ->
-        Expect.withIO
-          identity
-          <| do
+    [ test "`info` produces expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
+            (recordedTracingSpans, handler) <- newHandler
+            _ <- info "logging a message!" [context "a number" (12 :: Int)] |> Task.attempt handler
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-info",
+      test "`userIsAnnoyed` produces expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
+            (recordedTracingSpans, handler) <- newHandler
+            _ <-
+              userIsAnnoyed
+                "the button didn't work"
+                "fix the button"
+                [context "button" ("PRESS" :: Text)]
+                |> Task.attempt handler
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-user-is-annoyed",
+      test "`userIsPained` produces expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
+            (recordedTracingSpans, handler) <- newHandler
+            _ <-
+              userIsPained
+                "user cut themselves on the modal"
+                "file modal's sharp edges"
+                [context "modal" ("SURPRISE!" :: Text)]
+                |> Task.attempt handler
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-user-is-pained",
+      test "`userIsBlocked` produces expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
+            (recordedTracingSpans, handler) <- newHandler
+            _ <-
+              userIsBlocked
+                "door is blocked"
+                "find key"
+                [context "house number" (5 :: Int)]
+                |> Task.attempt handler
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-user-is-blocked",
+      test "nested spans pruduce expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
             (recordedTracingSpans, handler) <- newHandler
             _ <-
               info "log!" []
                 |> withContext "inner span" [context "word" ("sabbatical" :: Text)]
                 |> withContext "outer span" [context "number" (825 :: Int)]
                 |> Task.attempt handler
-            spans <- recordedTracingSpans
-            spans
-              |> Debug.toString
-              |> Expect.equalToContentsOf "tests/golden-results/log-nested-spans"
-              |> Prelude.pure,
-      test "unexpected exceptions produce expected debugging info" <| \_ ->
-        Expect.withIO
-          identity
-          <| do
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-nested-spans",
+      test "unexpected exceptions produce expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
             (recordedTracingSpans, handler) <- newHandler
             _ <-
               Internal.Task (\_ -> Exception.throwIO TestException)
@@ -99,15 +96,13 @@ tests =
                 |> withContext "outer span" [context "number" (825 :: Int)]
                 |> Task.attempt handler
                 |> Exception.handle (\TestException -> Prelude.pure (Ok ()))
-            spans <- recordedTracingSpans
-            spans
-              |> Debug.toString
-              |> Expect.equalToContentsOf "tests/golden-results/log-unexpected-exceptions"
-              |> Prelude.pure,
-      test "async exceptions produce expected debugging info" <| \_ ->
-        Expect.withIO
-          identity
-          <| do
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-unexpected-exceptions",
+      test "async exceptions produce expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
             (recordedTracingSpans, handler) <- newHandler
             threadId <- Control.Concurrent.myThreadId
             _ <-
@@ -120,25 +115,24 @@ tests =
                 |> withContext "outer span" [context "number" (825 :: Int)]
                 |> Task.attempt handler
                 |> Exception.handleAsync (\(Exception.AsyncExceptionWrapper _) -> Prelude.pure (Ok ()))
-            spans <- recordedTracingSpans
-            spans
-              |> Debug.toString
-              |> Expect.equalToContentsOf "tests/golden-results/log-async-exceptions"
-              |> Prelude.pure,
-      test "secrets do not appear in debugging info" <| \_ ->
-        Expect.withIO identity <| do
-          (recordedTracingSpans, handler) <- newHandler
-          _ <-
-            info
-              "logging a message!"
-              [context "secret" (Log.mkSecret ("Mango's are delicious" :: Text))]
-              |> Task.attempt handler
-          spans <- recordedTracingSpans
-          spans
-            |> Debug.toString
-            |> Text.contains "Mango"
-            |> Expect.equal False
-            |> Prelude.pure,
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-async-exceptions",
+      test "secrets do not appear in debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
+            (recordedTracingSpans, handler) <- newHandler
+            _ <-
+              info
+                "logging a message!"
+                [context "secret" (Log.mkSecret ("Mango's are delicious" :: Text))]
+                |> Task.attempt handler
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Text.contains "Mango"
+          |> Expect.equal False,
       -- Haskell's default @show@ instance prints the shown Haskell value on a
       -- single line. This isn't great when using @show@ to debug larger Haskell
       -- values. That's why our @Debug.toString@ implementation uses the

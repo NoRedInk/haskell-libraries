@@ -17,6 +17,7 @@ module Expect
     notEqual,
     all,
     concat,
+    equalToContentsOf,
 
     -- * Numeric Comparisons
     lessThan,
@@ -44,8 +45,7 @@ module Expect
     andCheck,
 
     -- * Fancy Expectations
-    equalToContentsOf,
-    withIO,
+    fromIO,
     Internal.Expectation',
   )
 where
@@ -66,15 +66,6 @@ import qualified Test.Internal as Internal
 import qualified Text.Show.Pretty
 import Prelude (IO, show)
 import qualified Prelude
-
--- | Run some IO and assert the value it produces.
---
--- If the IO throws an exception the test will fail.
-withIO :: (a -> Expectation) -> IO a -> Expectation
-withIO fn io =
-  fromIO io
-    |> andThen (Internal.unExpectation << fn)
-    |> Internal.Expectation
 
 -- | Always passes.
 --
@@ -436,25 +427,23 @@ err res =
 -- use @git diff golden-results/complicated-object.txt@ to check whether the
 -- changes are acceptable.
 equalToContentsOf :: Text -> Text -> Expectation
-equalToContentsOf filepath' actual =
-  Internal.Expectation <| do
-    let filepath = Data.Text.unpack filepath'
-    exists <-
-      fromIO <| do
-        Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
-        Directory.doesFileExist filepath
-    if exists
-      then do
-        expected <- fromIO (Data.Text.IO.readFile filepath)
-        assert
-          (==)
-          "Expect.equalToContentsOf"
-          (UnescapedShow expected)
-          (UnescapedShow actual)
-          |> Internal.unExpectation
-      else do
-        fromIO (Data.Text.IO.writeFile filepath actual)
-        Internal.unExpectation pass
+equalToContentsOf filepath' actual = do
+  let filepath = Data.Text.unpack filepath'
+  exists <-
+    fromIO <| do
+      Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
+      Directory.doesFileExist filepath
+  if exists
+    then do
+      expected <- fromIO (Data.Text.IO.readFile filepath)
+      assert
+        (==)
+        "Expect.equalToContentsOf"
+        (UnescapedShow expected)
+        (UnescapedShow actual)
+    else do
+      fromIO (Data.Text.IO.writeFile filepath actual)
+      pass
 
 -- By default we will compare values with each other after they have been
 -- passed to @show@. Unfortunately @show@ for the @Text@ type escapes special
@@ -480,31 +469,31 @@ assert :: Show a => (a -> a -> Bool) -> Text -> a -> a -> Expectation
 assert pred funcName actual expected =
   if pred actual expected
     then pass
-    else
-      Internal.Expectation <| do
-        window <- fromIO Terminal.size
-        let terminalWidth = case window of
-              Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
-              Nothing -> 80
-        let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
-        let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
-        let numLines text = List.length (Data.Text.lines text)
-        Diff.pretty
-          Diff.Config
-            { Diff.separatorText = Just funcName,
-              Diff.wrapping = Diff.Wrap terminalWidth,
-              Diff.multilineContext =
-                if numLines expectedText < 6 && numLines actualText < 6
-                  then Diff.FullContext
-                  else Diff.Surrounding 2 "..."
-            }
-          expectedText
-          actualText
-          |> fail
-          |> Internal.unExpectation
+    else do
+      window <- fromIO Terminal.size
+      let terminalWidth = case window of
+            Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
+            Nothing -> 80
+      let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
+      let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
+      let numLines text = List.length (Data.Text.lines text)
+      Diff.pretty
+        Diff.Config
+          { Diff.separatorText = Just funcName,
+            Diff.wrapping = Diff.Wrap terminalWidth,
+            Diff.multilineContext =
+              if numLines expectedText < 6 && numLines actualText < 6
+                then Diff.FullContext
+                else Diff.Surrounding 2 "..."
+          }
+        expectedText
+        actualText
+        |> fail
 
-fromIO :: Prelude.IO a -> Task e a
-fromIO io = Platform.Internal.Task (\_ -> map Ok io)
+fromIO :: Prelude.IO a -> Internal.Expectation' a
+fromIO io =
+  Platform.Internal.Task (\_ -> map Ok io)
+    |> Internal.Expectation
 
 -- | Used for making matchers
 -- expectOneItem :: Expectation' [a] -> Expectation' a
