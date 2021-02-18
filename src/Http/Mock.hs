@@ -12,7 +12,6 @@ import qualified Data.Aeson as Aeson
 import Data.IORef
 import qualified Debug
 import Internal.Http
-import NriPrelude
 import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, pure)

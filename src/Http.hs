@@ -43,7 +43,6 @@ import qualified Network.HTTP.Client.Internal as HTTP.Internal
 import qualified Network.HTTP.Client.TLS as TLS
 import qualified Network.HTTP.Types.Status as Status
 import qualified Network.URI
-import NriPrelude
 import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
