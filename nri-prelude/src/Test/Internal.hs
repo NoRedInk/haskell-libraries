@@ -25,6 +25,7 @@ import qualified List
 import qualified Maybe
 import NriPrelude
 import Platform (TracingSpan)
+import qualified Platform
 import qualified Platform.Internal
 import qualified Task
 import qualified Tuple
@@ -475,11 +476,19 @@ append (Expectation task1) (Expectation task2) =
 -- never each other, to ensure a single unnested 'expectation' entry from
 -- appearing in log-explorer traces.
 
-pass :: Text -> a -> Expectation' a
-pass _name a = Expectation (Task.succeed a)
+pass :: Stack.HasCallStack => Text -> a -> Expectation' a
+pass name a = Stack.withFrozenCallStack traceExpectation name (Task.succeed a)
 
 failAssertion :: Stack.HasCallStack => Text -> Text -> Expectation' a
-failAssertion _name err =
+failAssertion name err =
   FailedAssertion err (Stack.withFrozenCallStack getFrame)
     |> Task.fail
+    |> Stack.withFrozenCallStack traceExpectation name
+
+traceExpectation :: Stack.HasCallStack => Text -> Task Failure a -> Expectation' a
+traceExpectation name task =
+  Stack.withFrozenCallStack
+    Platform.tracingSpan
+    name
+    task
     |> Expectation
