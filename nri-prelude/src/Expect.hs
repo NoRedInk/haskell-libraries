@@ -33,17 +33,20 @@ module Expect
     err,
 
     -- * Customizing
-
-    -- | These functions will let you build your own expectations.
     pass,
     fail,
     onFail,
+    fromResult,
+
+    -- * Testing tasks
+    succeeds,
+    fails,
+    andCheck,
 
     -- * Fancy Expectations
     equalToContentsOf,
     withIO,
     Internal.Expectation',
-    fromResult,
   )
 where
 
@@ -510,7 +513,7 @@ fromIO io = Platform.Internal.Task (\_ -> map Ok io)
 --   case xs of
 --     [x] -> Ok x
 --     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
---   |> Expect.Task.fromResult
+--   |> Expect.fromResult
 fromResult :: Show b => Result b a -> Internal.Expectation' a
 fromResult (Ok a) = Prelude.pure a
 fromResult (Err msg) =
@@ -518,4 +521,42 @@ fromResult (Err msg) =
     |> Debug.toString
     |> Internal.FailedAssertion
     |> Task.fail
+    |> Internal.Expectation
+
+-- | Check a task returns an expected value, than pass that value on.
+--
+-- > test "Greetings are friendly" <| \_ -> do
+-- >     getGreeting
+-- >         |> andCheck (Expect.equal "Hi!")
+andCheck :: Show err => (a -> Expectation) -> Task err a -> Internal.Expectation' a
+andCheck expectation task = do
+  x <- succeeds task
+  expectation x
+  Prelude.pure x
+
+-- | Check a task succeeds.
+--
+-- > test "solve rubicskube" <| \_ -> do
+-- >     solveRubicsKube
+-- >         |> succeeds
+succeeds :: Show err => Task err a -> Internal.Expectation' a
+succeeds task =
+  Task.mapError
+    ( \message ->
+        Internal.FailedAssertion (Debug.toString message)
+    )
+    task
+    |> Internal.Expectation
+
+-- | Check a task fails.
+--
+-- > test "chemistry experiment" <| \_ -> do
+-- >     mixRedAndGreenLiquids
+-- >         |> fails
+fails :: Show a => Task err a -> Internal.Expectation' err
+fails task =
+  task
+    |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
+    |> Task.onError (\err' -> Task.succeed (Ok err'))
+    |> Task.andThen (Internal.unExpectation << fromResult)
     |> Internal.Expectation

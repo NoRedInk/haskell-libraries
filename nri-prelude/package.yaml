@@ -45,7 +45,6 @@ library:
   - Debug
   - Dict
   - Expect
-  - Expect.Task
   - Fuzz
   - List
   - Log

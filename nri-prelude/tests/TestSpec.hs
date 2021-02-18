@@ -6,7 +6,6 @@ import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Expect
-import qualified Expect.Task
 import qualified Fuzz
 import qualified GHC.Exts
 import qualified GHC.Stack as Stack
@@ -39,7 +38,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.Task.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run suite
         result
           |> simplify
           |> Expect.equal (AllPassed ["test 1", "test 2"]),
@@ -50,7 +49,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   only <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.Task.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run suite
         result
           |> simplify
           |> Expect.equal (OnlysPassed ["test 2"] ["test 1"]),
@@ -61,7 +60,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   skip <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.Task.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
@@ -72,13 +71,13 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   todo "test 2"
                 ]
-        result <- Expect.Task.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
       test "suite result is 'NoTestsInSuite' when it contains no tests" <| \_ -> do
         let suite = describe "suite" []
-        result <- Expect.Task.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run suite
         result
           |> simplify
           |> Expect.equal NoTestsInSuite,
@@ -90,7 +89,7 @@ api =
                   skip <| test "test 2" (\_ -> Expect.pass),
                   test "test 3" (\_ -> Expect.fail "oops")
                 ]
-        result <- Expect.Task.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run suite
         result
           |> simplify
           |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"]),
@@ -349,7 +348,7 @@ withTempFile go = do
         Data.Text.IO.readFile path
           |> map Ok
     )
-    |> Expect.Task.succeeds
+    |> Expect.succeeds
 
 mockTest :: Text -> body -> Internal.SingleTest body
 mockTest name body =
