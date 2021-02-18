@@ -1,3 +1,5 @@
+{-# LANGUAGE ExtendedDefaultRules #-}
+
 -- | A library to create @Expecation@s for @Task@s.
 module Expect.Task
   ( andCheck,
@@ -23,7 +25,7 @@ type Failure = Internal.Failure
 -- > task "Greetings are friendly" <| do
 -- >     getGreeting
 -- >         |> andCheck (Expect.equal "Hi!")
-andCheck :: (a -> Expect.Expectation) -> Task err a -> Internal.Expectation' a
+andCheck :: Show err => (a -> Expect.Expectation) -> Task err a -> Internal.Expectation' a
 andCheck expectation task = do
   x <- succeeds task
   expectation x
@@ -34,11 +36,11 @@ andCheck expectation task = do
 -- > task "solve rubicskube" <| do
 -- >     solveRubicsKube
 -- >         |> succeeds
-succeeds :: Task err a -> Internal.Expectation' a
+succeeds :: Show err => Task err a -> Internal.Expectation' a
 succeeds task =
   Task.mapError
-    ( \_message ->
-        Internal.FailedAssertion "Expected task to succeed, but it failed"
+    ( \message ->
+        Internal.FailedAssertion (Debug.toString message)
     )
     task
     |> Internal.Expectation
