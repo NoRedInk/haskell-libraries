@@ -83,8 +83,8 @@ import qualified Prelude
 -- >
 -- >             Err err ->
 -- >                 Expect.fail err
-pass :: Expectation
-pass = Internal.Expectation (Task.succeed ())
+pass :: Stack.HasCallStack => Expectation
+pass = Stack.withFrozenCallStack Internal.pass "Expect.pass" ()
 
 -- | Fails with the given message.
 --
@@ -103,21 +103,20 @@ pass = Internal.Expectation (Task.succeed ())
 -- >                 Expect.fail err
 fail :: Stack.HasCallStack => Text -> Expectation
 fail msg =
-  Internal.FailedAssertion msg (Stack.withFrozenCallStack Internal.getFrame)
-    |> Task.fail
-    |> Internal.Expectation
+  Stack.withFrozenCallStack Internal.failAssertion "Expect.fail" msg
 
 -- | If the given expectation fails, replace its failure message with a custom one.
 --
 -- > "something"
 -- >     |> Expect.equal "something else"
 -- >     |> Expect.onFail "thought those two strings would be the same"
-onFail :: Text -> Expectation -> Expectation
+onFail :: Stack.HasCallStack => Text -> Expectation -> Expectation
 onFail msg (Internal.Expectation task) =
   task
-    |> Task.mapError
+    |> Task.onError
       ( \_ ->
-          Internal.FailedAssertion msg Internal.getFrame
+          Stack.withFrozenCallStack Internal.failAssertion "Expect.onFail" msg
+            |> Internal.unExpectation
       )
     |> Internal.Expectation
 
@@ -382,8 +381,16 @@ concat expectations =
 ok :: (Stack.HasCallStack, Show b) => Result b a -> Expectation
 ok res =
   case res of
-    Ok _ -> pass
-    Err message -> Stack.withFrozenCallStack fail ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
+    Ok _ ->
+      Stack.withFrozenCallStack
+        Internal.pass
+        "Expect.ok"
+        ()
+    Err message ->
+      Stack.withFrozenCallStack
+        Internal.failAssertion
+        "Expect.ok"
+        ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
 
 -- | Passes if the Result is an Err rather than Ok. This is useful for tests where you expect to get an error but you don't care what the actual error is.
 --
@@ -411,8 +418,16 @@ ok res =
 err :: (Stack.HasCallStack, Show a) => Result b a -> Expectation
 err res =
   case res of
-    Ok value -> Stack.withFrozenCallStack fail ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
-    Err _ -> pass
+    Ok value ->
+      Stack.withFrozenCallStack
+        Internal.failAssertion
+        "Expect.err"
+        ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
+    Err _ ->
+      Stack.withFrozenCallStack
+        Internal.pass
+        "Expect.err"
+        ()
 
 -- | Check if a string is equal to the contents of a file.
 --
@@ -444,7 +459,10 @@ equalToContentsOf filepath' actual = do
         (UnescapedShow actual)
     else do
       fromIO (Data.Text.IO.writeFile filepath actual)
-      pass
+      Stack.withFrozenCallStack
+        Internal.pass
+        "Expect.equalToContentsOf"
+        ()
 
 -- By default we will compare values with each other after they have been
 -- passed to @show@. Unfortunately @show@ for the @Text@ type escapes special
@@ -469,7 +487,7 @@ instance Show UnescapedShow where
 assert :: (Stack.HasCallStack, Show a) => (a -> a -> Bool) -> Text -> a -> a -> Expectation
 assert pred funcName actual expected =
   if pred actual expected
-    then pass
+    then Stack.withFrozenCallStack Internal.pass funcName ()
     else do
       window <- fromIO Terminal.size
       let terminalWidth = case window of
@@ -478,7 +496,7 @@ assert pred funcName actual expected =
       let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
       let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
       let numLines text = List.length (Data.Text.lines text)
-      Stack.withFrozenCallStack fail
+      Stack.withFrozenCallStack Internal.failAssertion funcName
         <| Diff.pretty
           Diff.Config
             { Diff.separatorText = Just funcName,
@@ -505,11 +523,16 @@ fromIO io =
 --     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
 --   |> Expect.fromResult
 fromResult :: (Stack.HasCallStack, Show b) => Result b a -> Internal.Expectation' a
-fromResult (Ok a) = Prelude.pure a
+fromResult (Ok a) =
+  Stack.withFrozenCallStack
+    Internal.pass
+    "Expect.fromResult"
+    a
 fromResult (Err msg) =
-  Internal.FailedAssertion (Debug.toString msg) (Stack.withFrozenCallStack Internal.getFrame)
-    |> Task.fail
-    |> Internal.Expectation
+  Stack.withFrozenCallStack
+    Internal.failAssertion
+    "Expect.fromResult"
+    (Debug.toString msg)
 
 -- | Check a task returns an expected value, than pass that value on.
 --
@@ -529,13 +552,23 @@ andCheck expectation task = do
 -- >         |> succeeds
 succeeds :: (Stack.HasCallStack, Show err) => Task err a -> Internal.Expectation' a
 succeeds task =
-  Task.mapError
-    ( \message ->
-        Internal.FailedAssertion
-          (Debug.toString message)
-          (Stack.withFrozenCallStack Internal.getFrame)
-    )
-    task
+  task
+    |> Task.onError
+      ( \message ->
+          Stack.withFrozenCallStack
+            Internal.failAssertion
+            "Expect.succeeds"
+            (Debug.toString message)
+            |> Internal.unExpectation
+      )
+    |> Task.andThen
+      ( \a ->
+          Stack.withFrozenCallStack
+            Internal.pass
+            "Expect.succeeds"
+            a
+            |> Internal.unExpectation
+      )
     |> Internal.Expectation
 
 -- | Check a task fails.
@@ -548,5 +581,19 @@ fails task =
   task
     |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
     |> Task.onError (\err' -> Task.succeed (Ok err'))
-    |> Task.andThen (Internal.unExpectation << Stack.withFrozenCallStack fromResult)
+    |> Task.andThen
+      ( \res ->
+          Internal.unExpectation
+            <| case res of
+              Ok a ->
+                Stack.withFrozenCallStack
+                  Internal.pass
+                  "Expect.fails"
+                  a
+              Err msg ->
+                Stack.withFrozenCallStack
+                  Internal.failAssertion
+                  "Expect.fails"
+                  (Debug.toString msg)
+      )
     |> Internal.Expectation

@@ -469,3 +469,17 @@ append (Expectation task1) (Expectation task2) =
   Expectation <| do
     task1
     task2
+
+-- Assertion constructors
+-- All exposed assertion functions should call these functions internally and
+-- never each other, to ensure a single unnested 'expectation' entry from
+-- appearing in log-explorer traces.
+
+pass :: Text -> a -> Expectation' a
+pass _name a = Expectation (Task.succeed a)
+
+failAssertion :: Stack.HasCallStack => Text -> Text -> Expectation' a
+failAssertion _name err =
+  FailedAssertion err (Stack.withFrozenCallStack getFrame)
+    |> Task.fail
+    |> Expectation
