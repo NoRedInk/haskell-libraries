@@ -37,7 +37,6 @@ import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
 import qualified MySQL.MySQLParameter as MySQLParameter
-import NriPrelude
 import qualified Platform
 import qualified Postgres.Settings
 import qualified Text

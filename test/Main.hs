@@ -7,7 +7,6 @@ import qualified Data.Acquire as Acquire
 import qualified Environment
 import qualified MySQLQuerySpec
 import qualified MySQLSpec
-import NriPrelude
 import qualified ObservabilitySpec
 import qualified Postgres
 import qualified PostgresSettingsSpec

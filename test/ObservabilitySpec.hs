@@ -12,7 +12,6 @@ import qualified Expect.Task
 import qualified Maybe
 import qualified MySQL
 import qualified MySQL.Test
-import NriPrelude
 import qualified Platform
 import qualified Postgres
 import qualified Task

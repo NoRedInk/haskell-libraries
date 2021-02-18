@@ -68,7 +68,6 @@ import qualified Internal.Time as Time
 import qualified List
 import qualified Log
 import Network.Socket (SockAddr (..))
-import NriPrelude
 import qualified Oops
 import qualified Platform
 import qualified Postgres.Query as Query

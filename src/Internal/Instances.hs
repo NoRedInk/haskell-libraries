@@ -4,7 +4,6 @@ module Internal.Instances where
 
 import qualified Data.Int
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
-import NriPrelude
 import Prelude (fromIntegral)
 
 -- |

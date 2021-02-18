@@ -36,7 +36,6 @@ import qualified Log
 import qualified MySQL.FromRow as FromRow
 import qualified MySQL.Query as Query
 import qualified MySQL.Settings as Settings
-import NriPrelude
 import qualified Platform
 import qualified System.IO.Streams as Streams
 import qualified Task

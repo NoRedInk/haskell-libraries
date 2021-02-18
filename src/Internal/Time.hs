@@ -9,8 +9,6 @@ module Internal.Time
   )
 where
 
-import NriPrelude
-
 -- | A type representing a time interval.
 newtype Interval = Interval
   { -- | Get the duration of an interval in microseconds.

@@ -8,7 +8,6 @@ import qualified Expect.Task
 import qualified GHC.Stack as Stack
 import MySQL.Internal
 import qualified MySQL.Settings as Settings
-import NriPrelude
 import qualified Platform
 import qualified System.IO.Unsafe
 import qualified Test

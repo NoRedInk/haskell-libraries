@@ -2,7 +2,6 @@ module QueryParserSpec (tests) where
 
 import qualified Expect
 import qualified Internal.QueryParser as Parser
-import NriPrelude
 import Test (Test, describe, test)
 import qualified Text
 

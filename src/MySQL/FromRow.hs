@@ -11,7 +11,6 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy)
 import qualified Database.MySQL.Base as Base
 import MySQL.MySQLColumn (MySQLColumn (decodeParam))
-import NriPrelude hiding (e)
 
 data UnexpectedAmountOfResultColumns = UnexpectedAmountOfResultColumns
   deriving (Show)
