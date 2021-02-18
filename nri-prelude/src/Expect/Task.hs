@@ -5,7 +5,6 @@ module Expect.Task
   ( andCheck,
     succeeds,
     fails,
-    fromResult,
   )
 where
 
@@ -51,31 +50,5 @@ fails task =
   task
     |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
     |> Task.onError (\err -> Task.succeed (Ok err))
-    |> Task.andThen (Internal.unExpectation << fromResult)
+    |> Task.andThen (Internal.unExpectation << Expect.fromResult)
     |> Internal.Expectation
-
-failWith :: Show b => b -> Internal.Expectation' a
-failWith msg =
-  msg
-    |> Debug.toString
-    |> Internal.FailedAssertion
-    |> Task.fail
-    |> Internal.Expectation
-
-succeedWith :: a -> Internal.Expectation' a
-succeedWith payload =
-  Task.succeed payload
-    |> Task.mapError (\_ -> ())
-    |> succeeds
-
--- | Used for making matchers
--- expectOneItem :: Expectation' [a] -> Expectation' a
--- expectOneItem t = do
---   xs <- t
---   case xs of
---     [x] -> Ok x
---     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
---   |> Expect.Task.fromResult
-fromResult :: Show b => Result b a -> Internal.Expectation' a
-fromResult (Ok a) = succeedWith a
-fromResult (Err msg) = failWith msg

@@ -43,6 +43,7 @@ module Expect
     equalToContentsOf,
     withIO,
     Internal.Expectation',
+    fromResult,
   )
 where
 
@@ -61,6 +62,7 @@ import Test.Internal (Expectation)
 import qualified Test.Internal as Internal
 import qualified Text.Show.Pretty
 import Prelude (IO, show)
+import qualified Prelude
 
 -- | Run some IO and assert the value it produces.
 --
@@ -500,3 +502,20 @@ assert pred funcName actual expected =
 
 fromIO :: Prelude.IO a -> Task e a
 fromIO io = Platform.Internal.Task (\_ -> map Ok io)
+
+-- | Used for making matchers
+-- expectOneItem :: Expectation' [a] -> Expectation' a
+-- expectOneItem t = do
+--   xs <- t
+--   case xs of
+--     [x] -> Ok x
+--     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
+--   |> Expect.Task.fromResult
+fromResult :: Show b => Result b a -> Internal.Expectation' a
+fromResult (Ok a) = Prelude.pure a
+fromResult (Err msg) =
+  msg
+    |> Debug.toString
+    |> Internal.FailedAssertion
+    |> Task.fail
+    |> Internal.Expectation
