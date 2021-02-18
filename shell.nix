@@ -6,8 +6,7 @@ in pkgs.mkShell {
   buildInputs = [
     (pkgs.haskellPackages.ghcWithPackages (haskellPackges:
       with haskellPackges; [
-        (pkgs.haskell.lib.doJailbreak
-          (pkgs.haskell.lib.markUnbroken pretty-diff))
+        (callCabal2nix "pretty-diff" sources.pretty-diff { })
         aeson
         aeson-pretty
         ansi-terminal
