@@ -9,9 +9,9 @@ TracingSpan
             { srcLocPackage = "main"
             , srcLocModule = "Main"
             , srcLocFile = "test/Main.hs"
-            , srcLocStartLine = 125
+            , srcLocStartLine = 124
             , srcLocStartCol = 5
-            , srcLocEndLine = 129
+            , srcLocEndLine = 128
             , srcLocEndCol = 38
             }
         )
@@ -31,9 +31,9 @@ TracingSpan
                     { srcLocPackage = "http-1.0.0.0-inplace"
                     , srcLocModule = "Http"
                     , srcLocFile = "src/Http.hs"
-                    , srcLocStartLine = 310
+                    , srcLocStartLine = 309
                     , srcLocStartCol = 11
-                    , srcLocEndLine = 325
+                    , srcLocEndLine = 324
                     , srcLocEndCol = 14
                     }
                 )

@@ -31,7 +31,6 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
@@ -180,7 +179,7 @@ _request doAnythingHandler manager settings = do
     response <-
       Exception.try <| do
         basicRequest <-
-          HTTP.parseUrlThrow <| Data.Text.unpack (Internal.Http._url settings)
+          HTTP.parseUrlThrow <| Text.toList (Internal.Http._url settings)
         let finalRequest =
               basicRequest
                 { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.Http._method settings),
@@ -210,11 +209,11 @@ _request doAnythingHandler manager settings = do
           HTTP.ConnectionTimeout ->
             Err (Internal.Http.NetworkError "ConnectionTimeout")
           HTTP.ConnectionFailure err ->
-            Err (Internal.Http.NetworkError (Data.Text.pack (Exception.displayException err)))
+            Err (Internal.Http.NetworkError (Text.fromList (Exception.displayException err)))
           err ->
-            Err (Internal.Http.BadResponse (Data.Text.pack (show err)))
+            Err (Internal.Http.BadResponse (Text.fromList (show err)))
       Left (HTTP.InvalidUrlException _ message) ->
-        Err (Internal.Http.BadUrl (Data.Text.pack message))
+        Err (Internal.Http.BadUrl (Text.fromList message))
 
 -- |
 -- Logic for interpreting a response body.
@@ -223,7 +222,7 @@ type Expect a = Internal.Http.Expect a
 decode :: Expect a -> Data.ByteString.Lazy.ByteString -> Result Text a
 decode Internal.Http.ExpectJson bytes =
   case Aeson.eitherDecode bytes of
-    Left err -> Err (Data.Text.pack err)
+    Left err -> Err (Text.fromList err)
     Right x -> Ok x
 decode Internal.Http.ExpectText bytes = (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8) bytes
 decode Internal.Http.ExpectWhatever _ = Ok ()
@@ -302,7 +301,7 @@ prepareManagerForRequest manager = do
               { infoUri =
                   HTTP.getUri req
                     |> Network.URI.uriToString (\_ -> "*****")
-                    |> (\showS -> Data.Text.pack (showS "")),
+                    |> (\showS -> Text.fromList (showS "")),
                 infoRequestMethod =
                   HTTP.method req
                     |> Data.Text.Encoding.decodeUtf8

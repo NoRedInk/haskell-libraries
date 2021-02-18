@@ -5,7 +5,6 @@ import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString.Lazy
 import qualified Data.List
-import qualified Data.Text
 import qualified Debug
 import qualified Expect
 import qualified Http
@@ -111,7 +110,7 @@ expectRequest run =
               case either of
                 Prelude.Left (FirstRequest req) -> Ok req
                 Prelude.Right (Ok _) -> Err "Expected a request, but none was received."
-                Prelude.Right (Err err) -> Err (Data.Text.pack (Prelude.show err))
+                Prelude.Right (Err err) -> Err (Text.fromList (Prelude.show err))
           )
 
 newtype FirstRequest = FirstRequest Wai.Request deriving (Show)
