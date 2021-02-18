@@ -95,18 +95,19 @@ renderReport styled results =
             )
     Internal.TestsFailed passed skipped failed -> do
       let amountPassed = List.length passed
-          amountFailed = List.length failed
-          amountSkipped = List.length skipped
-      failedWithSrc <- Prelude.traverse getSrcOfFailed (List.map (map Tuple.second) failed)
+      let amountFailed = List.length failed
+      let amountSkipped = List.length skipped
+      let failures = List.map (map Tuple.second) failed
+      failuresSrcs <- Prelude.traverse (renderFailureInFile styled) failures
       Prelude.pure
         ( Prelude.foldMap
-            ( \(loc, srcLines, test) ->
+            ( \(srcLines, test) ->
                 prettyPath styled [red] test
-                  ++ prettySrc styled loc srcLines
+                  ++ srcLines
                   ++ testFailure test
                   ++ "\n\n"
             )
-            failedWithSrc
+            (List.map2 (,) failuresSrcs failures)
             ++ styled [red, underlined] "TEST RUN FAILED"
             ++ "\n\n"
             ++ styled [black] ("Passed:    " ++ Builder.int64Dec amountPassed)
@@ -130,10 +131,11 @@ renderReport styled results =
 extraLinesOnFailure :: Int
 extraLinesOnFailure = 2
 
-getSrcOfFailed ::
+renderFailureInFile ::
+  ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
   Internal.SingleTest Internal.Failure ->
-  Prelude.IO (Maybe Stack.SrcLoc, List Builder.Builder, Internal.SingleTest Internal.Failure)
-getSrcOfFailed test =
+  Prelude.IO Builder.Builder
+renderFailureInFile styled test =
   case Internal.body test of
     Internal.FailedAssertion _ (Just loc) -> do
       cwd <- System.Directory.getCurrentDirectory
@@ -143,25 +145,39 @@ getSrcOfFailed test =
         then do
           contents <- BS.readFile path
           let startLine = Prelude.fromIntegral (Stack.srcLocStartLine loc)
-          Prelude.pure
-            ( Just loc,
-              contents
-                |> BS.split 10 -- splitting newlines
-                |> List.drop (startLine - extraLinesOnFailure - 1)
-                |> List.take (extraLinesOnFailure * 2 + 1)
-                |> List.indexedMap
-                  ( \i l ->
-                      Builder.intDec
-                        ( Prelude.fromIntegral
-                            <| startLine + i - extraLinesOnFailure
-                        )
-                        ++ ": "
-                        ++ Builder.byteString l
-                  ),
-              test
-            )
-        else Prelude.pure (Nothing, [], test)
-    _ -> Prelude.pure (Nothing, [], test)
+          let lines =
+                contents
+                  |> BS.split 10 -- splitting newlines
+                  |> List.drop (startLine - extraLinesOnFailure - 1)
+                  |> List.take (extraLinesOnFailure * 2 + 1)
+                  |> List.indexedMap
+                    ( \i l ->
+                        Builder.intDec
+                          ( Prelude.fromIntegral
+                              <| startLine + i - extraLinesOnFailure
+                          )
+                          ++ ": "
+                          ++ Builder.byteString l
+                    )
+          Prelude.pure <| case lines of
+            [] -> ""
+            lines' ->
+              "\n"
+                ++ "Expectation failed at "
+                ++ Builder.stringUtf8 (Stack.srcLocFile loc)
+                ++ ":"
+                ++ Builder.intDec (Stack.srcLocStartLine loc)
+                ++ "\n"
+                ++ Prelude.foldMap
+                  ( \(nr, line) ->
+                      if nr == extraLinesOnFailure
+                        then styled [red] ("✗ " ++ line) ++ "\n"
+                        else "  " ++ styled [dullGrey] line ++ "\n"
+                  )
+                  (List.indexedMap (,) lines')
+                ++ "\n"
+        else Prelude.pure ""
+    _ -> Prelude.pure ""
 
 prettyPath ::
   ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
@@ -186,34 +202,6 @@ prettyPath styled styles test =
       (Internal.describes test)
     ++ styled styles ("✗ " ++ TE.encodeUtf8Builder (Internal.name test))
     ++ "\n"
-
-prettySrc ::
-  ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
-  Maybe Stack.SrcLoc ->
-  List Builder.Builder ->
-  Builder.Builder
-prettySrc styled maybeLoc lines =
-  case lines of
-    [] -> ""
-    lines' ->
-      "\n"
-        ++ ( case maybeLoc of
-               Nothing -> ""
-               Just loc ->
-                 "Expectation failed at "
-                   ++ Builder.stringUtf8 (Stack.srcLocFile loc)
-                   ++ ":"
-                   ++ Builder.intDec (Stack.srcLocStartLine loc)
-                   ++ "\n"
-           )
-        ++ Prelude.foldMap
-          ( \(nr, line) ->
-              if nr == extraLinesOnFailure
-                then styled [red] ("✗ " ++ line) ++ "\n"
-                else "  " ++ styled [dullGrey] line ++ "\n"
-          )
-          (List.indexedMap (,) lines')
-        ++ "\n"
 
 testFailure :: Internal.SingleTest Internal.Failure -> Builder.Builder
 testFailure test =
