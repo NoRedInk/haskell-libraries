@@ -24,16 +24,19 @@ type Failure = Internal.Failure
 -- > task "Greetings are friendly" <| do
 -- >     getGreeting
 -- >         |> andCheck (Expect.equal "Hi!")
-andCheck :: (a -> Expect.Expectation) -> Task Failure a -> Task Failure a
-andCheck expectation task = do
-  x <- task
-  res <-
-    expectation x
-      |> Internal.unExpectation
-      |> Task.mapError never
-  case res of
-    Internal.Succeeded -> Task.succeed x
-    Internal.Failed failure -> Task.fail failure
+andCheck :: Stack.HasCallStack => (a -> Expect.Expectation) -> Task Failure a -> Task Failure a
+andCheck expectation task =
+  Stack.withFrozenCallStack
+    ( do
+        x <- task
+        res <-
+          expectation x
+            |> Internal.unExpectation
+            |> Task.mapError never
+        case res of
+          Internal.Succeeded -> Task.succeed x
+          Internal.Failed failure -> Task.fail failure
+    )
 
 -- | Check an expectation in the middle of a @do@ block.
 --
@@ -52,36 +55,29 @@ check expectation =
 -- > task "solve rubicskube" <| do
 -- >     solveRubicsKube
 -- >         |> succeeds
-succeeds :: Show err => Task err a -> Task Failure a
+succeeds :: (Stack.HasCallStack, Show err) => Task err a -> Task Failure a
 succeeds task =
-  Task.mapError
-    ( \message ->
-        Internal.FailedAssertion (Debug.toString message) Internal.getFrame
+  Stack.withFrozenCallStack
+    ( Task.mapError
+        ( \message ->
+            Internal.FailedAssertion (Debug.toString message) Internal.getFrame
+        )
+        task
     )
-    task
 
 -- | Check a task fails.
 --
 -- > task "chemistry experiment" <| do
 -- >     mixRedAndGreenLiquids
 -- >         |> fails
-fails :: Show a => Task err a -> Task Failure err
+fails :: (Stack.HasCallStack, Show a) => Task err a -> Task Failure err
 fails task =
-  task
-    |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
-    |> Task.onError (\err -> Task.succeed (Ok err))
-    |> Task.andThen fromResult
-
-failWith :: Show b => b -> Task Failure a
-failWith msg =
-  Internal.FailedAssertion (Debug.toString msg) Internal.getFrame
-    |> Task.fail
-
-succeedWith :: a -> Task Failure a
-succeedWith payload =
-  Task.succeed payload
-    |> Task.mapError (\_ -> ())
-    |> succeeds
+  Stack.withFrozenCallStack
+    ( task
+        |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
+        |> Task.onError (\err -> Task.succeed (Ok err))
+        |> Task.andThen fromResult
+    )
 
 -- | Used for making matchers
 -- expectOneItem :: Task Expect.Task.Failure [a] -> Task Expect.Task.Failure a
@@ -91,6 +87,15 @@ succeedWith payload =
 --     [x] -> Ok x
 --     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
 --   |> Expect.Task.fromResult
-fromResult :: Show b => Result b a -> Task Failure a
-fromResult (Ok a) = succeedWith a
-fromResult (Err msg) = failWith msg
+fromResult :: (Stack.HasCallStack, Show b) => Result b a -> Task Failure a
+fromResult (Ok a) =
+  Stack.withFrozenCallStack
+    ( Task.succeed a
+        |> Task.mapError (\_ -> ())
+        |> succeeds
+    )
+fromResult (Err msg) =
+  Stack.withFrozenCallStack
+    ( Internal.FailedAssertion (Debug.toString msg) Internal.getFrame
+        |> Task.fail
+    )
