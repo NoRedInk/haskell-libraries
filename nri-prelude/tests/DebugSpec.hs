@@ -1,6 +1,5 @@
 module DebugSpec (tests) where
 
-import Control.Exception.Safe (SomeException)
 import Control.Exception.Safe as Exception
 import qualified Debug
 import qualified Expect
@@ -8,7 +7,7 @@ import List (head)
 import NriPrelude
 import Test (Test, describe, test)
 import qualified Text
-import Prelude (Either (Left, Right), Show)
+import Prelude (Either (Left, Right))
 
 tests :: Test
 tests =
