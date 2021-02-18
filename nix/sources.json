@@ -22,5 +22,17 @@
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/5c53c720ff690ef82a9fe4849e7b70c104e1c82f.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "pretty-diff": {
+        "branch": "master",
+        "description": "Pretty printing a diff of two values",
+        "homepage": null,
+        "owner": "stoeffel",
+        "repo": "pretty-diff",
+        "rev": "46280511bbdc721147594e636f80ba0ce31a7102",
+        "sha256": "1zjcw6dgw0b8zpxp9pp6m34649dd3xszsl50hg33m7ixyvg46527",
+        "type": "tarball",
+        "url": "https://github.com/stoeffel/pretty-diff/archive/46280511bbdc721147594e636f80ba0ce31a7102.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
