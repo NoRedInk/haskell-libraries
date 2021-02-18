@@ -10,8 +10,10 @@ import qualified Fuzz
 import qualified GHC.Exts
 import qualified GHC.Stack as Stack
 import NriPrelude
+import qualified Platform
 import qualified Platform.Internal
 import qualified System.IO
+import qualified Task
 import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, test, todo)
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.Logfile
@@ -241,7 +243,7 @@ stdoutReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error"),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
@@ -249,7 +251,43 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed"
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed",
+      test "tests failed (actually running)" <| \_ -> do
+        let suite =
+              describe
+                "suite loc"
+                [ test "test 1" (\_ -> Expect.fail "fail"),
+                  test "test 2" (\_ -> Expect.equal True False),
+                  test "test 3" (\_ -> Expect.notEqual True True),
+                  test
+                    "test 4"
+                    ( \_ ->
+                        True
+                          |> Expect.all
+                            [ Expect.equal False
+                            ]
+                    ),
+                  test "test 5" (\_ -> Expect.lessThan 1 (2 :: Int)),
+                  test "test 6" (\_ -> Expect.atMost 1 (2 :: Int)),
+                  test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+                  test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
+                  test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
+                  test "test 10" (\_ -> Expect.true False),
+                  test "test 11" (\_ -> Expect.false True),
+                  test "test 12" (\_ -> Expect.ok (Err ())),
+                  test "test 13" (\_ -> Expect.err (Ok ()))
+                ]
+        contents <-
+          withTempFile
+            ( \_ handle -> do
+                log <- Platform.silentHandler
+                result <-
+                  Internal.run suite
+                    |> Task.perform log
+                Test.Reporter.Stdout.report handle result
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc"
     ]
 
 logfileReporter :: Test
@@ -318,7 +356,7 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error"),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")

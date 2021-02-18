@@ -1,0 +1,239 @@
+↓ tests/TestSpec.hs:259
+↓ suite loc
+✗ test 1
+
+Expectation failed at tests/TestSpec.hs:259
+  257:               describe
+  258:                 "suite loc"
+✗ 259:                 [ test "test 1" (\_ -> Expect.fail "fail"),
+  260:                   test "test 2" (\_ -> Expect.equal True False),
+  261:                   test "test 3" (\_ -> Expect.notEqual True True),
+
+fail
+
+↓ tests/TestSpec.hs:260
+↓ suite loc
+✗ test 2
+
+Expectation failed at tests/TestSpec.hs:260
+  258:                 "suite loc"
+  259:                 [ test "test 1" (\_ -> Expect.fail "fail"),
+✗ 260:                   test "test 2" (\_ -> Expect.equal True False),
+  261:                   test "test 3" (\_ -> Expect.notEqual True True),
+  262:                   test
+
+▼▼▼▼
+False
+╷
+│ Expect.equal
+╵
+True
+▲▲▲
+
+
+↓ tests/TestSpec.hs:261
+↓ suite loc
+✗ test 3
+
+Expectation failed at tests/TestSpec.hs:261
+  259:                 [ test "test 1" (\_ -> Expect.fail "fail"),
+  260:                   test "test 2" (\_ -> Expect.equal True False),
+✗ 261:                   test "test 3" (\_ -> Expect.notEqual True True),
+  262:                   test
+  263:                     "test 4"
+
+True
+╷
+│ Expect.notEqual
+╵
+True
+
+
+↓ tests/TestSpec.hs:262
+↓ suite loc
+✗ test 4
+
+Expectation failed at tests/TestSpec.hs:267
+  265:                         True
+  266:                           |> Expect.all
+✗ 267:                             [ Expect.equal False
+  268:                             ]
+  269:                     ),
+
+▼▼▼
+True
+╷
+│ Expect.equal
+╵
+False
+▲▲▲▲
+
+
+↓ tests/TestSpec.hs:270
+↓ suite loc
+✗ test 5
+
+Expectation failed at tests/TestSpec.hs:270
+  268:                             ]
+  269:                     ),
+✗ 270:                   test "test 5" (\_ -> Expect.lessThan 1 (2 :: Int)),
+  271:                   test "test 6" (\_ -> Expect.atMost 1 (2 :: Int)),
+  272:                   test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+
+▼
+2
+╷
+│ Expect.lessThan
+╵
+1
+▲
+
+
+↓ tests/TestSpec.hs:271
+↓ suite loc
+✗ test 6
+
+Expectation failed at tests/TestSpec.hs:271
+  269:                     ),
+  270:                   test "test 5" (\_ -> Expect.lessThan 1 (2 :: Int)),
+✗ 271:                   test "test 6" (\_ -> Expect.atMost 1 (2 :: Int)),
+  272:                   test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+  273:                   test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
+
+▼
+2
+╷
+│ Expect.atMost
+╵
+1
+▲
+
+
+↓ tests/TestSpec.hs:272
+↓ suite loc
+✗ test 7
+
+Expectation failed at tests/TestSpec.hs:272
+  270:                   test "test 5" (\_ -> Expect.lessThan 1 (2 :: Int)),
+  271:                   test "test 6" (\_ -> Expect.atMost 1 (2 :: Int)),
+✗ 272:                   test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+  273:                   test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  274:                   test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
+
+▼
+1
+╷
+│ Expect.greaterThan
+╵
+2
+▲
+
+
+↓ tests/TestSpec.hs:273
+↓ suite loc
+✗ test 8
+
+Expectation failed at tests/TestSpec.hs:273
+  271:                   test "test 6" (\_ -> Expect.atMost 1 (2 :: Int)),
+  272:                   test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+✗ 273:                   test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  274:                   test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  275:                   test "test 10" (\_ -> Expect.true False),
+
+▼
+1
+╷
+│ Expect.atLeast
+╵
+2
+▲
+
+
+↓ tests/TestSpec.hs:274
+↓ suite loc
+✗ test 9
+
+Expectation failed at tests/TestSpec.hs:274
+  272:                   test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+  273:                   test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
+✗ 274:                   test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  275:                   test "test 10" (\_ -> Expect.true False),
+  276:                   test "test 11" (\_ -> Expect.false True),
+
+▼
+1
+╷
+│ Expect.atLeast
+╵
+2
+▲
+
+
+↓ tests/TestSpec.hs:275
+↓ suite loc
+✗ test 10
+
+Expectation failed at tests/TestSpec.hs:275
+  273:                   test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  274:                   test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
+✗ 275:                   test "test 10" (\_ -> Expect.true False),
+  276:                   test "test 11" (\_ -> Expect.false True),
+  277:                   test "test 12" (\_ -> Expect.ok (Err ())),
+
+▼▼▼
+True
+╷
+│ Expect.true
+╵
+False
+▲▲▲▲
+
+
+↓ tests/TestSpec.hs:276
+↓ suite loc
+✗ test 11
+
+Expectation failed at tests/TestSpec.hs:276
+  274:                   test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  275:                   test "test 10" (\_ -> Expect.true False),
+✗ 276:                   test "test 11" (\_ -> Expect.false True),
+  277:                   test "test 12" (\_ -> Expect.ok (Err ())),
+  278:                   test "test 13" (\_ -> Expect.err (Ok ()))
+
+True
+╷
+│ Expect.false
+╵
+True
+
+
+↓ tests/TestSpec.hs:277
+↓ suite loc
+✗ test 12
+
+Expectation failed at tests/TestSpec.hs:277
+  275:                   test "test 10" (\_ -> Expect.true False),
+  276:                   test "test 11" (\_ -> Expect.false True),
+✗ 277:                   test "test 12" (\_ -> Expect.ok (Err ())),
+  278:                   test "test 13" (\_ -> Expect.err (Ok ()))
+  279:                 ]
+
+I expected a Ok but got Err (())
+
+↓ tests/TestSpec.hs:278
+↓ suite loc
+✗ test 13
+
+Expectation failed at tests/TestSpec.hs:278
+  276:                   test "test 11" (\_ -> Expect.false True),
+  277:                   test "test 12" (\_ -> Expect.ok (Err ())),
+✗ 278:                   test "test 13" (\_ -> Expect.err (Ok ()))
+  279:                 ]
+  280:         contents <-
+
+I expected a Err but got Ok (())
+
+TEST RUN FAILED
+
+Passed:    0
+Failed:    13

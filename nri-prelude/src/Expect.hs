@@ -53,6 +53,7 @@ where
 import qualified Data.Text
 import qualified Data.Text.IO
 import qualified Debug
+import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
 import qualified Platform.Internal
@@ -100,10 +101,9 @@ pass = Internal.Expectation (Task.succeed ())
 -- >
 -- >             Err err ->
 -- >                 Expect.fail err
-fail :: Text -> Expectation
+fail :: Stack.HasCallStack => Text -> Expectation
 fail msg =
-  msg
-    |> Internal.FailedAssertion
+  Internal.FailedAssertion msg (Stack.withFrozenCallStack Internal.getFrame)
     |> Task.fail
     |> Internal.Expectation
 
@@ -115,9 +115,9 @@ fail msg =
 onFail :: Text -> Expectation -> Expectation
 onFail msg (Internal.Expectation task) =
   task
-    |> Task.onError
+    |> Task.mapError
       ( \_ ->
-          Task.fail (Internal.FailedAssertion msg)
+          Internal.FailedAssertion msg Internal.getFrame
       )
     |> Internal.Expectation
 
@@ -142,8 +142,8 @@ onFail msg (Internal.Expectation task) =
 -- > [ "Betty Botter", "bought", "some", "butter" ]
 -- >
 -- > -}
-equal :: (Show a, Eq a) => a -> a -> Expectation
-equal = assert (==) "Expect.equal"
+equal :: (Stack.HasCallStack, Show a, Eq a) => a -> a -> Expectation
+equal = Stack.withFrozenCallStack assert (==) "Expect.equal"
 
 -- | Passes if the arguments are not equal.
 --
@@ -165,8 +165,8 @@ equal = assert (==) "Expect.equal"
 -- > 100
 -- >
 -- > -}
-notEqual :: (Show a, Eq a) => a -> a -> Expectation
-notEqual = assert (/=) "Expect.notEqual"
+notEqual :: (Stack.HasCallStack, Show a, Eq a) => a -> a -> Expectation
+notEqual = Stack.withFrozenCallStack assert (/=) "Expect.notEqual"
 
 -- | Passes if the second argument is less than the first.
 --
@@ -190,8 +190,8 @@ notEqual = assert (/=) "Expect.notEqual"
 -- > -1
 -- >
 -- > -}
-lessThan :: (Show a, Ord a) => a -> a -> Expectation
-lessThan = assert (>) "Expect.lessThan"
+lessThan :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+lessThan = Stack.withFrozenCallStack assert (>) "Expect.lessThan"
 
 -- | Passes if the second argument is less than or equal to the first.
 --
@@ -214,8 +214,8 @@ lessThan = assert (>) "Expect.lessThan"
 -- > -3
 -- >
 -- > -}
-atMost :: (Show a, Ord a) => a -> a -> Expectation
-atMost = assert (>=) "Expect.atMost"
+atMost :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+atMost = Stack.withFrozenCallStack assert (>=) "Expect.atMost"
 
 -- | Passes if the second argument is greater than the first.
 --
@@ -238,8 +238,8 @@ atMost = assert (>=) "Expect.atMost"
 -- > 1
 -- >
 -- > -}
-greaterThan :: (Show a, Ord a) => a -> a -> Expectation
-greaterThan = assert (<) "Expect.greaterThan"
+greaterThan :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+greaterThan = Stack.withFrozenCallStack assert (<) "Expect.greaterThan"
 
 -- | Passes if the second argument is greater than or equal to the first.
 --
@@ -262,8 +262,8 @@ greaterThan = assert (<) "Expect.greaterThan"
 -- > 3
 -- >
 -- > -}
-atLeast :: (Show a, Ord a) => a -> a -> Expectation
-atLeast = assert (<=) "Expect.atLeast"
+atLeast :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
+atLeast = Stack.withFrozenCallStack assert (<=) "Expect.atLeast"
 
 -- | Passes if the argument is 'True', and otherwise fails with the given message.
 --
@@ -282,8 +282,8 @@ atLeast = assert (<=) "Expect.atLeast"
 -- > Expected the list to be empty.
 -- >
 -- > -}
-true :: Bool -> Expectation
-true x = assert (&&) "Expect.true" x True
+true :: Stack.HasCallStack => Bool -> Expectation
+true x = Stack.withFrozenCallStack assert (&&) "Expect.true" x True
 
 -- | Passes if the argument is 'False', and otherwise fails with the given message.
 --
@@ -302,8 +302,8 @@ true x = assert (&&) "Expect.true" x True
 -- > Expected the list not to be empty.
 -- >
 -- > -}
-false :: Bool -> Expectation
-false x = assert xor "Expect.false" x True
+false :: Stack.HasCallStack => Bool -> Expectation
+false x = Stack.withFrozenCallStack assert xor "Expect.false" x True
 
 -- | Passes if each of the given functions passes when applied to the subject.
 --
@@ -332,26 +332,26 @@ false x = assert xor "Expect.false" x True
 -- > ╵
 -- > -10
 -- > -}
-all :: List (subject -> Expectation) -> subject -> Expectation
+all :: Stack.HasCallStack => List (subject -> Expectation) -> subject -> Expectation
 all expectations subject =
   List.foldl
     ( \expectation acc ->
         Internal.append
           acc
-          (expectation subject)
+          (Stack.withFrozenCallStack expectation subject)
     )
     pass
     expectations
 
 -- | Combine multiple expectations into one. The resulting expectation is a
 -- failure if any of the original expectations are a failure.
-concat :: List Expectation -> Expectation
+concat :: Stack.HasCallStack => List Expectation -> Expectation
 concat expectations =
   List.foldl
     ( \expectation acc ->
         Internal.append
           acc
-          expectation
+          (Stack.withFrozenCallStack expectation)
     )
     pass
     expectations
@@ -379,11 +379,11 @@ concat expectations =
 -- > Err _
 -- >
 -- > -}
-ok :: Show b => Result b a -> Expectation
+ok :: (Stack.HasCallStack, Show b) => Result b a -> Expectation
 ok res =
   case res of
     Ok _ -> pass
-    Err message -> fail ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
+    Err message -> Stack.withFrozenCallStack fail ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
 
 -- | Passes if the Result is an Err rather than Ok. This is useful for tests where you expect to get an error but you don't care what the actual error is.
 --
@@ -408,10 +408,10 @@ ok res =
 -- > Err _
 -- >
 -- > -}
-err :: Show a => Result b a -> Expectation
+err :: (Stack.HasCallStack, Show a) => Result b a -> Expectation
 err res =
   case res of
-    Ok value -> fail ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
+    Ok value -> Stack.withFrozenCallStack fail ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
     Err _ -> pass
 
 -- | Check if a string is equal to the contents of a file.
@@ -436,7 +436,8 @@ equalToContentsOf filepath' actual = do
   if exists
     then do
       expected <- fromIO (Data.Text.IO.readFile filepath)
-      assert
+      Stack.withFrozenCallStack
+        assert
         (==)
         "Expect.equalToContentsOf"
         (UnescapedShow expected)
@@ -465,7 +466,7 @@ newtype UnescapedShow = UnescapedShow Text deriving (Eq)
 instance Show UnescapedShow where
   show (UnescapedShow text) = Data.Text.unpack text
 
-assert :: Show a => (a -> a -> Bool) -> Text -> a -> a -> Expectation
+assert :: (Stack.HasCallStack, Show a) => (a -> a -> Bool) -> Text -> a -> a -> Expectation
 assert pred funcName actual expected =
   if pred actual expected
     then pass
@@ -477,18 +478,18 @@ assert pred funcName actual expected =
       let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
       let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
       let numLines text = List.length (Data.Text.lines text)
-      Diff.pretty
-        Diff.Config
-          { Diff.separatorText = Just funcName,
-            Diff.wrapping = Diff.Wrap terminalWidth,
-            Diff.multilineContext =
-              if numLines expectedText < 6 && numLines actualText < 6
-                then Diff.FullContext
-                else Diff.Surrounding 2 "..."
-          }
-        expectedText
-        actualText
-        |> fail
+      Stack.withFrozenCallStack fail
+        <| Diff.pretty
+          Diff.Config
+            { Diff.separatorText = Just funcName,
+              Diff.wrapping = Diff.Wrap terminalWidth,
+              Diff.multilineContext =
+                if numLines expectedText < 6 && numLines actualText < 6
+                  then Diff.FullContext
+                  else Diff.Surrounding 2 "..."
+            }
+          expectedText
+          actualText
 
 fromIO :: Prelude.IO a -> Internal.Expectation' a
 fromIO io =
@@ -503,12 +504,10 @@ fromIO io =
 --     [x] -> Ok x
 --     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
 --   |> Expect.fromResult
-fromResult :: Show b => Result b a -> Internal.Expectation' a
+fromResult :: (Stack.HasCallStack, Show b) => Result b a -> Internal.Expectation' a
 fromResult (Ok a) = Prelude.pure a
 fromResult (Err msg) =
-  msg
-    |> Debug.toString
-    |> Internal.FailedAssertion
+  Internal.FailedAssertion (Debug.toString msg) (Stack.withFrozenCallStack Internal.getFrame)
     |> Task.fail
     |> Internal.Expectation
 
@@ -517,10 +516,10 @@ fromResult (Err msg) =
 -- > test "Greetings are friendly" <| \_ -> do
 -- >     getGreeting
 -- >         |> andCheck (Expect.equal "Hi!")
-andCheck :: Show err => (a -> Expectation) -> Task err a -> Internal.Expectation' a
+andCheck :: (Stack.HasCallStack, Show err) => (a -> Expectation) -> Task err a -> Internal.Expectation' a
 andCheck expectation task = do
   x <- succeeds task
-  expectation x
+  Stack.withFrozenCallStack expectation x
   Prelude.pure x
 
 -- | Check a task succeeds.
@@ -528,11 +527,13 @@ andCheck expectation task = do
 -- > test "solve rubicskube" <| \_ -> do
 -- >     solveRubicsKube
 -- >         |> succeeds
-succeeds :: Show err => Task err a -> Internal.Expectation' a
+succeeds :: (Stack.HasCallStack, Show err) => Task err a -> Internal.Expectation' a
 succeeds task =
   Task.mapError
     ( \message ->
-        Internal.FailedAssertion (Debug.toString message)
+        Internal.FailedAssertion
+          (Debug.toString message)
+          (Stack.withFrozenCallStack Internal.getFrame)
     )
     task
     |> Internal.Expectation
@@ -542,10 +543,10 @@ succeeds task =
 -- > test "chemistry experiment" <| \_ -> do
 -- >     mixRedAndGreenLiquids
 -- >         |> fails
-fails :: Show a => Task err a -> Internal.Expectation' err
+fails :: (Stack.HasCallStack, Show a) => Task err a -> Internal.Expectation' err
 fails task =
   task
     |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
     |> Task.onError (\err' -> Task.succeed (Ok err'))
-    |> Task.andThen (Internal.unExpectation << fromResult)
+    |> Task.andThen (Internal.unExpectation << Stack.withFrozenCallStack fromResult)
     |> Internal.Expectation

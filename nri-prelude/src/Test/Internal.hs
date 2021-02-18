@@ -47,7 +47,7 @@ data TestResult
   | Failed Failure
 
 data Failure
-  = FailedAssertion Text
+  = FailedAssertion Text (Maybe Stack.SrcLoc)
   | ThrewException Exception.SomeException
   | TookTooLong
   | TestRunnerMessedUp Text
