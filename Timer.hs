@@ -12,7 +12,6 @@ module Observability.Timer
   )
 where
 
-import qualified Data.Text
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Clock.POSIX as Clock.POSIX
 import qualified Data.Time.Format as Format
@@ -69,7 +68,7 @@ toISO8601 :: Timer -> Platform.MonotonicTime -> Text
 toISO8601 timer clock =
   toUTC timer clock
     |> Format.formatTime Format.defaultTimeLocale "%FT%T%QZ"
-    |> Data.Text.pack
+    |> Text.fromList
 
 -- | We have to be careful when calculating the difference between two times.
 -- Because they are unsigned (don't allow negative numbers), subtracting times

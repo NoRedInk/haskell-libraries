@@ -20,7 +20,6 @@ import qualified Data.CaseInsensitive as CI
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.IO
 import qualified Data.Typeable as Typeable
@@ -245,7 +244,7 @@ doBreadcrumb timer span =
           Nothing -> Nothing
           Just (_, frame) ->
             Stack.srcLocFile frame ++ ":" ++ Prelude.show (Stack.srcLocStartLine frame)
-              |> Data.Text.pack
+              |> Text.fromList
               |> HashMap.singleton "stack frame"
               |> Just
    in case Platform.details span of
@@ -425,14 +424,14 @@ toException frames span =
           Bugsnag.exception_stacktrace = frames,
           Bugsnag.exception_message =
             Exception.displayException exception
-              |> Data.Text.pack
+              |> Text.fromList
               |> Just
         }
 
 toStackFrame :: Text -> Stack.SrcLoc -> Bugsnag.StackFrame
 toStackFrame functionName frame =
   Bugsnag.defaultStackFrame
-    { Bugsnag.stackFrame_file = Data.Text.pack (Stack.srcLocFile frame),
+    { Bugsnag.stackFrame_file = Text.fromList (Stack.srcLocFile frame),
       Bugsnag.stackFrame_lineNumber = Stack.srcLocStartLine frame,
       Bugsnag.stackFrame_columnNumber = Just (Stack.srcLocStartCol frame),
       Bugsnag.stackFrame_method = functionName,
@@ -443,7 +442,7 @@ typeName :: forall a. Typeable.Typeable a => a -> Text
 typeName _ =
   Typeable.typeRep (Proxy.Proxy :: Proxy.Proxy a)
     |> Prelude.show
-    |> Data.Text.pack
+    |> Text.fromList
 
 data Settings = Settings
   { apiKey :: Log.Secret Bugsnag.ApiKey,
@@ -507,7 +506,7 @@ mkDefaultEvent settings = do
           }
   let device =
         Bugsnag.defaultDevice
-          { Bugsnag.device_hostname = Just (Data.Text.pack hostname)
+          { Bugsnag.device_hostname = Just (Text.fromList hostname)
           }
   Prelude.pure
     Bugsnag.defaultEvent

@@ -22,7 +22,6 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Int
 import qualified Data.Proxy as Proxy
 import qualified Data.Scientific
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Typeable as Typeable
 import qualified Environment
@@ -399,7 +398,7 @@ typeName :: forall a. Typeable.Typeable a => a -> Text
 typeName _ =
   Typeable.typeRep (Proxy.Proxy :: Proxy.Proxy a)
     |> Prelude.show
-    |> Data.Text.pack
+    |> Text.fromList
 
 data Settings = Settings
   { appName :: NewRelic.AppName,

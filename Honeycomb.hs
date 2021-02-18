@@ -35,7 +35,6 @@ import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
-import qualified Data.Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.Lazy as LazyText
 import qualified Data.Text.Lazy.Encoding as Lazy.Encoding
@@ -96,7 +95,7 @@ report handler' _requestId span = do
           -- Else, it will create traces with no parent sharing the same TraceId
           -- Which makes Honeycomb's UI confused
           (Data.UUID.toText uuid)
-          (Data.Text.pack hostname')
+          (Text.fromList hostname')
           (calculateApdex handler' span)
   let (_, events) = toBatchEvents commonFields sampleRate Nothing 0 span
   let enrichedEvents = enrich events
@@ -202,7 +201,7 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
         Platform.frame span
           |> Maybe.map
             ( \(_, frame) ->
-                Data.Text.pack (Stack.srcLocFile frame)
+                Text.fromList (Stack.srcLocFile frame)
                   ++ ":"
                   ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine frame))
             )

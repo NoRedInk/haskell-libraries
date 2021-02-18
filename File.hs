@@ -26,7 +26,6 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Text
 import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified Katip
@@ -170,7 +169,7 @@ mkLogEnv settings = do
         initLogEnv
           { Katip._logEnvHost =
               mockHostname settings
-                |> map Data.Text.unpack
+                |> map Text.toList
                 |> Maybe.withDefault (Katip._logEnvHost initLogEnv),
             Katip._logEnvPid =
               mockPid settings

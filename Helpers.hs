@@ -3,7 +3,6 @@ module Observability.Helpers (toHashMap) where
 import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Text
 import qualified List
 import qualified Text
 import qualified Prelude
@@ -50,6 +49,6 @@ jsonAsText key val =
         |> List.indexedMap (\i elem -> jsonAsText (key ++ "." ++ Text.fromInt i) elem)
         |> HashMap.unions
     Aeson.String str -> HashMap.singleton key str
-    Aeson.Number n -> HashMap.singleton key (Data.Text.pack (Prelude.show n))
-    Aeson.Bool bool -> HashMap.singleton key (Data.Text.pack (Prelude.show bool))
+    Aeson.Number n -> HashMap.singleton key (Text.fromList (Prelude.show n))
+    Aeson.Bool bool -> HashMap.singleton key (Text.fromList (Prelude.show bool))
     Aeson.Null -> HashMap.empty
