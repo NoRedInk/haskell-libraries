@@ -7,10 +7,10 @@ module Test.Reporter.Stdout
 where
 
 import qualified Control.Exception as Exception
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text
 import qualified Data.Text.Encoding as TE
-import qualified Data.Text.IO
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
@@ -141,19 +141,23 @@ getSrcOfFailed test =
       exists <- System.Directory.doesFileExist path
       if exists
         then do
-          contents <- Data.Text.IO.readFile path
+          contents <- BS.readFile path
           let startLine = Prelude.fromIntegral (Stack.srcLocStartLine loc)
           Prelude.pure
             ( Just loc,
               contents
-                |> Data.Text.lines
+                |> BS.split 10 -- splitting newlines
                 |> List.drop (startLine - extraLinesOnFailure - 1)
                 |> List.take (extraLinesOnFailure * 2 + 1)
                 |> List.indexedMap
                   ( \i l ->
-                      Text.fromInt (startLine + i - extraLinesOnFailure) ++ ": " ++ l
-                  )
-                |> List.map TE.encodeUtf8Builder,
+                      Builder.intDec
+                        ( Prelude.fromIntegral
+                            <| startLine + i - extraLinesOnFailure
+                        )
+                        ++ ": "
+                        ++ Builder.byteString l
+                  ),
               test
             )
         else Prelude.pure (Nothing, [], test)
