@@ -31,7 +31,7 @@ andCheck expectation task = do
       |> Internal.unExpectation
       |> Task.mapError never
   case res of
-    Internal.Succeeded -> task
+    Internal.Succeeded -> Task.succeed x
     Internal.Failed failure -> Task.fail failure
 
 -- | Check an expectation in the middle of a @do@ block.
