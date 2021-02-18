@@ -20,6 +20,7 @@ import qualified System.Directory
 import System.FilePath ((</>))
 import qualified System.IO
 import qualified Test.Internal as Internal
+import qualified Text
 import qualified Tuple
 import qualified Prelude
 
@@ -99,9 +100,9 @@ renderReport styled results =
       failedWithSrc <- Prelude.traverse getSrcOfFailed (List.map (map Tuple.second) failed)
       Prelude.pure
         ( Prelude.foldMap
-            ( \(srcLines, test) ->
+            ( \(loc, srcLines, test) ->
                 prettyPath styled [red] test
-                  ++ prettySrc styled srcLines
+                  ++ prettySrc styled loc srcLines
                   ++ testFailure test
                   ++ "\n\n"
             )
@@ -128,7 +129,7 @@ renderReport styled results =
 
 getSrcOfFailed ::
   Internal.SingleTest Internal.Failure ->
-  Prelude.IO (List Builder.Builder, Internal.SingleTest Internal.Failure)
+  Prelude.IO (Maybe Stack.SrcLoc, List Builder.Builder, Internal.SingleTest Internal.Failure)
 getSrcOfFailed test =
   case Internal.body test of
     Internal.FailedAssertion _ (Just loc) -> do
@@ -138,16 +139,22 @@ getSrcOfFailed test =
       if exists
         then do
           contents <- Data.Text.IO.readFile path
+          let startLine = Prelude.fromIntegral (Stack.srcLocStartLine loc)
           Prelude.pure
-            ( contents
+            ( Just loc,
+              contents
                 |> Data.Text.lines
-                |> List.drop (Prelude.fromIntegral (Stack.srcLocStartLine loc) - 2)
+                |> List.drop (startLine - 2)
                 |> List.take 3
+                |> List.indexedMap
+                  ( \i l ->
+                      Text.fromInt (startLine + i - 1) ++ ": " ++ l
+                  )
                 |> List.map TE.encodeUtf8Builder,
               test
             )
-        else Prelude.pure ([], test)
-    _ -> Prelude.pure ([], test)
+        else Prelude.pure (Nothing, [], test)
+    _ -> Prelude.pure (Nothing, [], test)
 
 prettyPath ::
   ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
@@ -175,13 +182,23 @@ prettyPath styled styles test =
 
 prettySrc ::
   ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
+  Maybe Stack.SrcLoc ->
   List Builder.Builder ->
   Builder.Builder
-prettySrc styled lines =
+prettySrc styled maybeLoc lines =
   case lines of
     [] -> ""
     lines' ->
       "\n"
+        ++ ( case maybeLoc of
+               Nothing -> ""
+               Just loc ->
+                 "Expectation failed at "
+                   ++ Builder.stringUtf8 (Stack.srcLocFile loc)
+                   ++ ":"
+                   ++ Builder.intDec (Stack.srcLocStartLine loc)
+                   ++ "\n"
+           )
         ++ Prelude.foldMap
           ( \(nr, line) ->
               if nr == 1
