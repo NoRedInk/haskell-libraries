@@ -6,8 +6,8 @@
     "details": null,
     "finished": 0,
     "frame": {
-        "startLine": 324,
-        "endLine": 324,
+        "startLine": 361,
+        "endLine": 361,
         "name": "report",
         "endCol": 69,
         "module": "TestSpec",

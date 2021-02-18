@@ -9,6 +9,8 @@ import qualified DebugSpec
 import qualified DictSpec
 import qualified GHC.IO.Encoding
 import qualified LogSpec
+import qualified Platform
+import qualified Platform.Internal
 import qualified PlatformSpec
 import qualified SetSpec
 import qualified System.IO
@@ -19,18 +21,19 @@ import qualified Prelude
 
 main :: Prelude.IO ()
 main = do
+  log <- Platform.silentHandler
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
-  run tests
+  run (tests log)
 
-tests :: Test
-tests =
+tests :: Platform.Internal.LogHandler -> Test
+tests log =
   describe
     "NriPrelude"
     [ ArraySpec.tests,
       BitwiseSpec.tests,
       DictSpec.tests,
       SetSpec.tests,
-      TestSpec.tests,
+      TestSpec.tests log,
       TextSpec.tests,
       LogSpec.tests,
       PlatformSpec.tests,
