@@ -11,6 +11,7 @@ import qualified Fuzz
 import qualified GHC.Exts
 import qualified GHC.Stack as Stack
 import NriPrelude
+import qualified Platform
 import qualified Platform.Internal
 import qualified System.IO
 import qualified Task
@@ -20,12 +21,12 @@ import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Prelude
 
-tests :: Platform.Internal.LogHandler -> Test
-tests log =
+tests :: Test
+tests =
   describe
     "Test"
     [ api,
-      stdoutReporter log,
+      stdoutReporter,
       logfileReporter
     ]
 
@@ -186,8 +187,8 @@ simplify suiteResult =
         (map Internal.name failed)
     Internal.NoTestsInSuite -> NoTestsInSuite
 
-stdoutReporter :: Platform.Internal.LogHandler -> Test
-stdoutReporter log =
+stdoutReporter :: Test
+stdoutReporter =
   describe
     "Stdout Reporter"
     [ task "all passed" <| do
@@ -294,6 +295,7 @@ stdoutReporter log =
         contents <-
           withTempFile
             ( \_ handle -> do
+                log <- Platform.silentHandler
                 result <-
                   Internal.run suite
                     |> Task.perform log

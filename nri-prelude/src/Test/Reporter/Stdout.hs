@@ -9,18 +9,15 @@ where
 import qualified Control.Exception as Exception
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
-import qualified Data.Text
 import qualified Data.Text.Encoding as TE
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
-import qualified Platform.Internal
 import qualified System.Console.ANSI as ANSI
 import qualified System.Directory
 import System.FilePath ((</>))
 import qualified System.IO
 import qualified Test.Internal as Internal
-import qualified Text
 import qualified Tuple
 import qualified Prelude
 
