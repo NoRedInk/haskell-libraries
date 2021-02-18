@@ -11,6 +11,7 @@ module Redis
     Internal.Handler,
     Settings.Settings (..),
     Settings.decoder,
+    Settings.decoderWithEnvVarPrefix,
 
     -- * Creating a redis API
     flatApi,
