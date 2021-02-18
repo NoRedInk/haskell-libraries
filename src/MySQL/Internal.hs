@@ -17,7 +17,6 @@ import qualified Data.ByteString.Lazy
 import qualified Data.Int
 import qualified Data.Pool
 import qualified Data.Proxy as Proxy
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.MySQL.Base as Base
 import qualified Database.MySQL.Connection
@@ -136,7 +135,7 @@ toConnectionLogContext settings =
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
           Query.UnixSocket
-            (Data.Text.pack (Settings.unSocket socket))
+            (Text.fromList (Settings.unSocket socket))
             database
         Settings.ConnectTcp host port ->
           Query.TcpSocket
@@ -161,7 +160,7 @@ toConnectInfo settings =
             }
         Settings.ConnectTcp host port ->
           Base.defaultConnectInfoMB4
-            { Base.ciHost = Data.Text.unpack (Settings.unHost host),
+            { Base.ciHost = Text.toList (Settings.unHost host),
               Base.ciUser = user,
               Base.ciPassword = password,
               Base.ciDatabase = database,
@@ -181,7 +180,7 @@ readiness conn =
     log <- Platform.silentHandler
     Stack.withFrozenCallStack executeQuery conn (queryFromText "SELECT 1")
       |> Task.map (\(_ :: [Int]) -> ())
-      |> Task.mapError (Data.Text.pack << Exception.displayException)
+      |> Task.mapError (Text.fromList << Exception.displayException)
       |> Task.attempt log
       |> map Health.fromResult
 
@@ -328,7 +327,7 @@ handleMySqlException io =
       Exception.Handler
         ( \(err :: Exception.SomeException) ->
             Exception.displayException err
-              |> Data.Text.pack
+              |> Text.fromList
               -- We add the full error in the context array rather than the
               -- message string, to help errors being grouped correctly in a
               -- bug tracker. Errors might contain unique bits of data like
@@ -409,7 +408,7 @@ throwRuntimeError task =
   Task.onError
     ( \err ->
         Exception.displayException err
-          |> Data.Text.pack
+          |> Text.fromList
           |> Platform.unsafeThrowException
     )
     task
@@ -480,7 +479,7 @@ unsafeBulkifyInserts ::
 unsafeBulkifyInserts runCombined first rest =
   first
     { Query.preparedStatement =
-        Data.Text.intercalate
+        Text.join
           ","
           ( Query.preparedStatement first :
             map (Text.dropLeft splitAt << Query.preparedStatement) rest
@@ -491,13 +490,18 @@ unsafeBulkifyInserts runCombined first rest =
     }
     |> runCombined
   where
+    -- we always drop the same number of chars -- the length of chars up to the end of values
     splitAt =
       Query.preparedStatement first
-        |> Data.Text.toLower
-        |> Data.Text.breakOn "values"
-        |> Tuple.first
+        |> Text.toLower
+        |> ( \input ->
+               input
+                 |> Text.split "values"
+                 |> List.head
+                 |> Maybe.withDefault input
+           )
         |> Text.length
-        |> (+) 6
+        |> (+) 6 -- length of values
 
 -- | Appends a query with `ON DUPLICATE KEY UPDATE` to allow updating in case
 -- the key isn't unique.
@@ -562,9 +566,9 @@ qqSQLYearly :: Prelude.String -> TH.ExpQ
 qqSQLYearly query =
   let queryFor :: Int -> Prelude.String
       queryFor year =
-        Data.Text.pack query
-          |> Data.Text.replace "[[YEAR]]" (Text.fromInt year)
-          |> Data.Text.unpack
+        Text.fromList query
+          |> Text.replace "[[YEAR]]" (Text.fromInt year)
+          |> Text.toList
    in [e|
         ( \(year :: Int) ->
             case year of
@@ -583,7 +587,7 @@ qqSQLYearly query =
               2027 -> $(QQ.quoteExp sql (queryFor 2027))
               2028 -> $(QQ.quoteExp sql (queryFor 2028))
               2029 -> $(QQ.quoteExp sql (queryFor 2029))
-              _ -> Prelude.error ("Unsupported school year: " ++ Data.Text.unpack (Text.fromInt year))
+              _ -> Prelude.error ("Unsupported school year: " ++ Text.toList (Text.fromInt year))
         )
         |]
 

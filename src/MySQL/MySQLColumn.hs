@@ -4,7 +4,6 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString as BS
 import qualified Data.Int
 import qualified Data.String
-import qualified Data.Text
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Format as Format
 import qualified Data.Time.LocalTime as LocalTime
@@ -63,11 +62,11 @@ instance MySQLColumn Text where
   decodeParam (Base.MySQLDateTime n) =
     LocalTime.localTimeToUTC LocalTime.utc n
       |> Format.formatTime Format.defaultTimeLocale (Format.iso8601DateFormat (Just "%H:%M:%S"))
-      |> Data.Text.pack
+      |> Text.fromList
   decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Text" n)
 
 instance MySQLColumn BS.ByteString where
-  decodeParam (Base.MySQLText n) = Data.String.fromString (Data.Text.unpack n)
+  decodeParam (Base.MySQLText n) = Data.String.fromString (Text.toList n)
   decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "ByteString" n)
 
 instance MySQLColumn a => MySQLColumn (Maybe a) where

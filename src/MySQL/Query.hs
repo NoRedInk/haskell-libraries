@@ -19,7 +19,6 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
 import qualified Data.Aeson as Aeson
 import qualified Data.Proxy as Proxy
-import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder as Builder
 import qualified Database.MySQL.Base as Base
@@ -75,19 +74,19 @@ qqSQL queryWithPgTypedFlags = do
   -- queries straight to MySQL. Consider the line below like a validation
   -- function running against the query string at compile time.
   let forCompilation =
-        Data.Text.pack queryWithPgTypedFlags
+        Text.fromList queryWithPgTypedFlags
           |> inToAny
-          |> Data.Text.unpack
+          |> Text.toList
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
   let query =
         queryWithPgTypedFlags
           |> Prelude.dropWhile (\char -> char == '!' || char == '$' || char == '?')
-          |> Data.Text.pack
+          |> Text.fromList
           |> Text.replace "monolith." ""
-          |> Data.Text.unpack
-  let meta = Parser.parse (Data.Text.pack query)
-  let op = Data.Text.unpack (Parser.sqlOperation meta)
-  let rel = Data.Text.unpack (Parser.queriedRelation meta)
+          |> Text.toList
+  let meta = Parser.parse (Text.fromList query)
+  let op = Text.toList (Parser.sqlOperation meta)
+  let rel = Text.toList (Parser.queriedRelation meta)
   [e|
     let tokens = $(tokenize query)
         q = $(QQ.quoteExp PGTyped.pgSQL forCompilation)
@@ -101,7 +100,7 @@ qqSQL queryWithPgTypedFlags = do
                   params = collectQueryParams tokens,
                   quasiQuotedString = queryWithPgTypedFlags,
                   sqlOperation = op,
-                  queriedRelation = Data.Text.pack rel
+                  queriedRelation = Text.fromList rel
                 }
      in mkQuery q
     |]
@@ -144,9 +143,9 @@ parseToken token =
               |> map (Log.mkSecret << MySQLParameter.mysqlEncode)
               |> SqlParams
             |]
-    SQLToken.SQLToken _ -> tokenE (Prelude.show token)
-    SQLToken.SQLParam _ -> tokenE (Prelude.show token)
-    SQLToken.SQLQMark _ -> tokenE (Prelude.show token)
+    SQLToken.SQLToken _ -> tokenE token
+    SQLToken.SQLParam _ -> tokenE token
+    SQLToken.SQLQMark _ -> tokenE token
 
 -- | Generate a prepared statement. Params in the query will be replaced with
 -- `$1` placeholders. For example, the following quasiquoted query:
@@ -183,8 +182,10 @@ collectQueryParams tokens =
       )
     |> map List.concat
 
-tokenE :: Prelude.String -> TH.ExpQ
-tokenE str = [e|SqlToken str|]
+tokenE :: SQLToken.SQLToken -> TH.ExpQ
+tokenE token =
+  let str = Prelude.show token
+   in [e|SqlToken str|]
 
 newtype HaskellParseError = HaskellParseError Prelude.String
   deriving (Show)

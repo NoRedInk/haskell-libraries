@@ -6,7 +6,6 @@ module MySQLTransactionSpec
 where
 
 import qualified Data.Acquire as Acquire
-import qualified Data.Text
 import qualified Debug
 import qualified Environment
 import qualified Hedgehog
@@ -41,7 +40,7 @@ spec =
       -- the effect of exceptions on transactions. They shouldn't fail
       -- the test.
       Err "oops" -> Prelude.pure ()
-      Err err -> Prelude.fail (Data.Text.unpack err)
+      Err err -> Prelude.fail (Text.toList err)
 
 -- | Representation of a database command. We use this type to fuzz all sorts
 -- of complicated database interacts, to ensure transactions always work.

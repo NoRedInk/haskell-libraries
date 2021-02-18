@@ -68,7 +68,7 @@ spanForTask task = do
       "test-root"
       (\log -> Task.attempt log task)
   case res of
-    Err err -> Prelude.fail (Prelude.show err)
+    Err err -> Prelude.fail <| Text.toList (Debug.toString err)
     Ok _ ->
       MVar.takeMVar spanVar
         |> map constantValuesForVariableFields

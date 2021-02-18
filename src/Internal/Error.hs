@@ -5,7 +5,6 @@ module Internal.Error
 where
 
 import qualified Control.Exception.Safe as Exception
-import qualified Data.Text
 import qualified Internal.Time as Time
 import qualified Log
 import qualified Text
@@ -17,9 +16,9 @@ data Error
   | Other Text [Log.Context]
 
 instance Show Error where
-  show (Timeout _ interval) = "Query timed out after " ++ Data.Text.unpack (Text.fromFloat (Time.seconds interval)) ++ " seconds"
-  show (UniqueViolation err) = "Query violated uniqueness constraint: " ++ Data.Text.unpack err
-  show (Other msg _) = "Query failed with unexpected error: " ++ Data.Text.unpack msg
+  show (Timeout _ interval) = "Query timed out after " ++ Text.toList (Text.fromFloat (Time.seconds interval)) ++ " seconds"
+  show (UniqueViolation err) = "Query violated uniqueness constraint: " ++ Text.toList err
+  show (Other msg _) = "Query failed with unexpected error: " ++ Text.toList msg
 
 instance Exception.Exception Error
 

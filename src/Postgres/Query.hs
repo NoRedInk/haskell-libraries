@@ -22,7 +22,6 @@ where
 import Control.Monad (void)
 import qualified Data.Aeson as Aeson
 import Data.String (String)
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
 import Database.PostgreSQL.Typed.Array ()
@@ -81,17 +80,17 @@ qqSQL query = do
           |> map Postgres.Settings.toPGDatabase
   db' <- runIO db
   void (useTPGDatabase db')
-  let meta = Parser.parse (Data.Text.pack query)
-  let op = Data.Text.unpack (Parser.sqlOperation meta)
-  let rel = Data.Text.unpack (Parser.queriedRelation meta)
+  let meta = Parser.parse (Text.fromList query)
+  let op = Text.toList (Parser.sqlOperation meta)
+  let rel = Text.toList (Parser.queriedRelation meta)
   [e|
-    let q = $(quoteExp pgSQL (Data.Text.unpack (inToAny (Data.Text.pack query))))
+    let q = $(quoteExp pgSQL (Text.toList (inToAny (Text.fromList query))))
      in Query
           { runQuery = \c -> pgQuery c q,
             sqlString = Data.Text.Encoding.decodeUtf8 (getQueryString PGTypes.unknownPGTypeEnv q),
             quasiQuotedString =
               query
-                |> Data.Text.pack
+                |> Text.fromList
                 |> inToAny,
             sqlOperation = op,
             queriedRelation = rel

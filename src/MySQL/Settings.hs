@@ -19,12 +19,11 @@ module MySQL.Settings
   )
 where
 
-import qualified Data.Text
 import qualified Data.Time
 import qualified Environment
 import qualified Internal.Time as Time
 import qualified Log
-import Prelude (FilePath, pure, show)
+import Prelude (FilePath, pure)
 import qualified Prelude
 
 data Settings = Settings
@@ -185,7 +184,7 @@ portDecoder =
     Environment.Variable
       { Environment.name = "MONOLITH_MYSQL_PORT",
         Environment.description = "The monolith port to connect to.",
-        Environment.defaultValue = unPort defaultPort |> show |> Data.Text.pack
+        Environment.defaultValue = unPort defaultPort |> Prelude.show |> Text.fromList
       }
     (map Port Environment.int)
 
@@ -201,7 +200,7 @@ socketDecoder =
         Environment.description = "The monolith socket to connect to.",
         Environment.defaultValue = ""
       }
-    (map (Data.Text.unpack >> Socket) Environment.text)
+    (map (Text.toList >> Socket) Environment.text)
 
 newtype MysqlPoolStripes = MysqlPoolStripes {unMysqlPoolStripes :: Int}
   deriving (Eq, Show, Generic)
@@ -213,7 +212,7 @@ mysqlPoolStripesDecoder =
       { Environment.name = "MYSQL_POOL_STRIPES",
         Environment.description = "The amount of sub-connection pools to create. Best refer to the resource-pool package for more info on this one. 1 is a good value for most applications.",
         Environment.defaultValue =
-          defaultSettings |> mysqlPool |> mysqlPoolStripes |> unMysqlPoolStripes |> show |> Data.Text.pack
+          defaultSettings |> mysqlPool |> mysqlPoolStripes |> unMysqlPoolStripes |> Prelude.show |> Text.fromList
       }
     (Environment.int |> map MysqlPoolStripes)
 
@@ -227,7 +226,7 @@ mysqlPoolMaxIdleTimeDecoder =
       { Environment.name = "MYSQL_POOL_MAX_IDLE_TIME",
         Environment.description = "The maximum time a database connection will be able remain idle until it is closed.",
         Environment.defaultValue =
-          defaultSettings |> mysqlPool |> mysqlPoolMaxIdleTime |> unMysqlPoolMaxIdleTime |> fromNominalDiffTime |> show |> Data.Text.pack
+          defaultSettings |> mysqlPool |> mysqlPoolMaxIdleTime |> unMysqlPoolMaxIdleTime |> fromNominalDiffTime |> Prelude.show |> Text.fromList
       }
     (Environment.int |> map (MysqlPoolMaxIdleTime << toNominalDiffTime))
 
@@ -247,7 +246,7 @@ mysqlPoolSizeDecoder =
       { Environment.name = "MYSQL_POOL_SIZE",
         Environment.description = "The size of the postgres connection pool. This is the maximum amount of parallel database connections the app will be able to use.",
         Environment.defaultValue =
-          defaultSettings |> mysqlPool |> mysqlPoolSize |> unMysqlPoolSize |> show |> Data.Text.pack
+          defaultSettings |> mysqlPool |> mysqlPoolSize |> unMysqlPoolSize |> Prelude.show |> Text.fromList
       }
     (Environment.int |> map MysqlPoolSize)
 
@@ -257,6 +256,6 @@ queryTimeoutSecondsDecoder =
     Environment.Variable
       { Environment.name = "MYSQL_QUERY_TIMEOUT_SECONDS",
         Environment.description = "The maximum time a query can run before it is cancelled.",
-        Environment.defaultValue = defaultSettings |> mysqlQueryTimeoutSeconds |> Time.seconds |> show |> Data.Text.pack
+        Environment.defaultValue = defaultSettings |> mysqlQueryTimeoutSeconds |> Time.seconds |> Prelude.show |> Text.fromList
       }
     (Environment.float |> map Time.fromSeconds)

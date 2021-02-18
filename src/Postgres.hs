@@ -41,7 +41,6 @@ where
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.Pool
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import Database.PostgreSQL.Typed
   ( PGConnection,
@@ -205,7 +204,7 @@ readiness conn =
     log <- Platform.silentHandler
     runQuery conn [Query.sql|!SELECT 1|]
       |> map (\(_ :: [Int]) -> ())
-      |> Task.mapError (Data.Text.pack << Exception.displayException)
+      |> Task.mapError (Exception.displayException >> Text.fromList)
       |> Task.attempt log
       |> map Health.fromResult
 
@@ -255,13 +254,13 @@ fromPGError c pgError =
   case pgErrorCode pgError of
     "23505" ->
       Exception.displayException pgError
-        |> Data.Text.pack
+        |> Text.fromList
         |> Query.UniqueViolation
     "57014" ->
       Query.Timeout Query.ServerTimeout (timeout c)
     _ ->
       Exception.displayException pgError
-        |> Data.Text.pack
+        |> Text.fromList
         -- We add the full error in the context array rather than the
         -- message string, to help errors being grouped correctly in a
         -- bug tracker. Errors might contain unique bits of data like
@@ -277,11 +276,11 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
       ":*****@",
       case pgDBAddr of
         Right sockAddr ->
-          Data.Text.pack (show sockAddr)
+          Text.fromList (show sockAddr)
         Left (hostName, serviceName) ->
-          Data.Text.pack hostName
+          Text.fromList hostName
             <> ":"
-            <> Data.Text.pack serviceName,
+            <> Text.fromList serviceName,
       "/",
       Data.Text.Encoding.decodeUtf8 pgDBName
     ] ::
@@ -291,13 +290,13 @@ toConnectionLogContext :: PGDatabase -> Query.ConnectionInfo
 toConnectionLogContext db =
   case pgDBAddr db of
     Left (hostName, serviceName) ->
-      Query.TcpSocket (Data.Text.pack hostName) (Data.Text.pack serviceName) databaseName
+      Query.TcpSocket (Text.fromList hostName) (Text.fromList serviceName) databaseName
     Right (SockAddrInet portNum hostAddr) ->
-      Query.TcpSocket (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
+      Query.TcpSocket (Text.fromList (show hostAddr)) (Text.fromList (show portNum)) databaseName
     Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-      Query.TcpSocket (Data.Text.pack (show hostAddr)) (Data.Text.pack (show portNum)) databaseName
+      Query.TcpSocket (Text.fromList (show hostAddr)) (Text.fromList (show portNum)) databaseName
     Right (SockAddrUnix sockPath) ->
-      Query.UnixSocket (Data.Text.pack sockPath) databaseName
+      Query.UnixSocket (Text.fromList sockPath) databaseName
   where
     databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8
 
