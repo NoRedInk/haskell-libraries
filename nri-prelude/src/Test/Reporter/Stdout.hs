@@ -205,7 +205,7 @@ prettySrc styled maybeLoc lines =
         ++ Prelude.foldMap
           ( \(nr, line) ->
               if nr == extraLinesOnFailure
-                then "✗ " ++ styled [red] line ++ "\n"
+                then styled [red] ("✗ " ++ line) ++ "\n"
                 else "  " ++ styled [dullGrey] line ++ "\n"
           )
           (List.indexedMap (,) lines')
