@@ -36,7 +36,6 @@ import qualified Network.Bugsnag as Bugsnag
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
-import NriPrelude
 import qualified Observability.Helpers
 import qualified Observability.Timer as Timer
 import qualified Platform

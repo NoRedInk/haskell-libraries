@@ -50,7 +50,6 @@ import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified Network.HostName
-import NriPrelude
 import Observability.Helpers (toHashMap)
 import Observability.Timer (Timer, toISO8601)
 import qualified Platform

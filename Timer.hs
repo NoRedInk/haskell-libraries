@@ -19,7 +19,6 @@ import qualified Data.Time.Format as Format
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Data.Word as Word
 import qualified GHC.Clock
-import NriPrelude
 import qualified Platform
 import qualified Prelude
 

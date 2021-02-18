@@ -5,7 +5,6 @@ import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text
 import qualified List
-import NriPrelude
 import qualified Text
 import qualified Prelude
 

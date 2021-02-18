@@ -30,7 +30,6 @@ import qualified Environment
 import qualified List
 import qualified Maybe
 import qualified Monitoring
-import NriPrelude
 import qualified Observability.Helpers
 import qualified Observability.Timer as Timer
 import qualified Platform

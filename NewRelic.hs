@@ -32,7 +32,6 @@ import qualified Log
 import qualified Maybe
 import qualified Monitoring
 import qualified MySQL
-import NriPrelude
 import qualified Observability.Timer as Timer
 import qualified Platform
 import qualified Postgres
