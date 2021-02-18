@@ -127,6 +127,9 @@ renderReport styled results =
             ++ "\n"
         )
 
+extraLinesOnFailure :: Int
+extraLinesOnFailure = 2
+
 getSrcOfFailed ::
   Internal.SingleTest Internal.Failure ->
   Prelude.IO (Maybe Stack.SrcLoc, List Builder.Builder, Internal.SingleTest Internal.Failure)
@@ -144,11 +147,11 @@ getSrcOfFailed test =
             ( Just loc,
               contents
                 |> Data.Text.lines
-                |> List.drop (startLine - 2)
-                |> List.take 3
+                |> List.drop (startLine - extraLinesOnFailure - 1)
+                |> List.take (extraLinesOnFailure * 2 + 1)
                 |> List.indexedMap
                   ( \i l ->
-                      Text.fromInt (startLine + i - 1) ++ ": " ++ l
+                      Text.fromInt (startLine + i - extraLinesOnFailure) ++ ": " ++ l
                   )
                 |> List.map TE.encodeUtf8Builder,
               test
@@ -201,7 +204,7 @@ prettySrc styled maybeLoc lines =
            )
         ++ Prelude.foldMap
           ( \(nr, line) ->
-              if nr == 1
+              if nr == extraLinesOnFailure
                 then "✗ " ++ styled [red] line ++ "\n"
                 else "  " ++ styled [dullGrey] line ++ "\n"
           )
