@@ -9,7 +9,6 @@ import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Debug
 import qualified Flat
-import NriPrelude
 import qualified Redis.Internal as Internal
 import qualified Prelude
 

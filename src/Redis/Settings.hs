@@ -3,7 +3,6 @@ module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), Quer
 import qualified Data.Text
 import Database.Redis hiding (Ok)
 import qualified Environment
-import NriPrelude
 import qualified Text
 import Prelude (Either (Left, Right))
 

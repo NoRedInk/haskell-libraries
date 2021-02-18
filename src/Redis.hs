@@ -63,7 +63,6 @@ import qualified Dict
 import qualified Flat
 import qualified Health
 import qualified NonEmptyDict
-import NriPrelude
 import qualified Platform
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal

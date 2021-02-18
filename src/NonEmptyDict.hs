@@ -10,7 +10,6 @@ where
 
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Dict
-import NriPrelude
 
 data NonEmptyDict k v
   = NonEmptyDict (k, v) (Dict.Dict k v)

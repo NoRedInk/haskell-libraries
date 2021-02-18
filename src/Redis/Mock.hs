@@ -14,7 +14,6 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding as TE
 import qualified Database.Redis
 import qualified List
-import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified System.IO.Unsafe

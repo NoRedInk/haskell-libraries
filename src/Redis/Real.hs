@@ -19,7 +19,6 @@ import qualified Data.UUID as UUID
 import qualified Data.UUID.V4
 import qualified Database.Redis
 import qualified GHC.Stack as Stack
-import NriPrelude
 import qualified Platform
 import qualified Process
 import qualified Redis.Internal as Internal

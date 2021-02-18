@@ -9,7 +9,6 @@ import qualified Environment
 import qualified Expect
 import qualified Expect.Task
 import qualified NonEmptyDict
-import NriPrelude
 import qualified Platform
 import qualified Redis
 import qualified Redis.Counter
