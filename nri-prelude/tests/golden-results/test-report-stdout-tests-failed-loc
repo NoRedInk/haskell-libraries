@@ -198,7 +198,7 @@ Expectation failed at tests/TestSpec.hs:276
   275:                   test "test 10" (\_ -> Expect.true False),
 ✗ 276:                   test "test 11" (\_ -> Expect.false True),
   277:                   test "test 12" (\_ -> Expect.ok (Err ())),
-  278:                   test "test 13" (\_ -> Expect.err (Ok ()))
+  278:                   test "test 13" (\_ -> Expect.err (Ok ())),
 
 True
 ╷
@@ -215,8 +215,8 @@ Expectation failed at tests/TestSpec.hs:277
   275:                   test "test 10" (\_ -> Expect.true False),
   276:                   test "test 11" (\_ -> Expect.false True),
 ✗ 277:                   test "test 12" (\_ -> Expect.ok (Err ())),
-  278:                   test "test 13" (\_ -> Expect.err (Ok ()))
-  279:                 ]
+  278:                   test "test 13" (\_ -> Expect.err (Ok ())),
+  279:                   test "test 14" (\_ -> Expect.succeeds (Task.fail "oops")),
 
 I expected a Ok but got Err (())
 
@@ -227,13 +227,59 @@ I expected a Ok but got Err (())
 Expectation failed at tests/TestSpec.hs:278
   276:                   test "test 11" (\_ -> Expect.false True),
   277:                   test "test 12" (\_ -> Expect.ok (Err ())),
-✗ 278:                   test "test 13" (\_ -> Expect.err (Ok ()))
-  279:                 ]
-  280:         contents <-
+✗ 278:                   test "test 13" (\_ -> Expect.err (Ok ())),
+  279:                   test "test 14" (\_ -> Expect.succeeds (Task.fail "oops")),
+  280:                   test "test 15" (\_ -> Expect.fails (Task.succeed "oops")),
 
 I expected a Err but got Ok (())
+
+↓ tests/TestSpec.hs:279
+↓ suite loc
+✗ test 14
+
+Expectation failed at tests/TestSpec.hs:279
+  277:                   test "test 12" (\_ -> Expect.ok (Err ())),
+  278:                   test "test 13" (\_ -> Expect.err (Ok ())),
+✗ 279:                   test "test 14" (\_ -> Expect.succeeds (Task.fail "oops")),
+  280:                   test "test 15" (\_ -> Expect.fails (Task.succeed "oops")),
+  281:                   test "test 16" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+
+"oops"
+
+↓ tests/TestSpec.hs:280
+↓ suite loc
+✗ test 15
+
+Expectation failed at tests/TestSpec.hs:280
+  278:                   test "test 13" (\_ -> Expect.err (Ok ())),
+  279:                   test "test 14" (\_ -> Expect.succeeds (Task.fail "oops")),
+✗ 280:                   test "test 15" (\_ -> Expect.fails (Task.succeed "oops")),
+  281:                   test "test 16" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+  282:                 ]
+
+"Expected failure but succeeded with \"oops\""
+
+↓ tests/TestSpec.hs:281
+↓ suite loc
+✗ test 16
+
+Expectation failed at tests/TestSpec.hs:281
+  279:                   test "test 14" (\_ -> Expect.succeeds (Task.fail "oops")),
+  280:                   test "test 15" (\_ -> Expect.fails (Task.succeed "oops")),
+✗ 281:                   test "test 16" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+  282:                 ]
+  283:         contents <-
+
+▼
+1
+╷
+│ Expect.equal
+╵
+2
+▲
+
 
 TEST RUN FAILED
 
 Passed:    0
-Failed:    13
+Failed:    16

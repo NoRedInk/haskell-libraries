@@ -275,7 +275,10 @@ stdoutReporter =
                   test "test 10" (\_ -> Expect.true False),
                   test "test 11" (\_ -> Expect.false True),
                   test "test 12" (\_ -> Expect.ok (Err ())),
-                  test "test 13" (\_ -> Expect.err (Ok ()))
+                  test "test 13" (\_ -> Expect.err (Ok ())),
+                  test "test 14" (\_ -> Expect.succeeds (Task.fail "oops")),
+                  test "test 15" (\_ -> Expect.fails (Task.succeed "oops")),
+                  test "test 16" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
                 ]
         contents <-
           withTempFile
