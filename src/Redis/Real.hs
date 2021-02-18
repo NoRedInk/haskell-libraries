@@ -12,7 +12,6 @@ import qualified Data.ByteString
 import qualified Data.ByteString.Builder
 import qualified Data.ByteString.Lazy
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.UUID as UUID
@@ -25,7 +24,7 @@ import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Task
 import qualified Text
-import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
+import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 import qualified Prelude
 
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
@@ -56,11 +55,11 @@ acquireHandler namespace settings = do
           Database.Redis.connectCluster connectionInfo
         Settings.NotCluster ->
           Database.Redis.checkedConnect connectionInfo
-    let connectionHost = Data.Text.pack (Database.Redis.connectHost connectionInfo)
+    let connectionHost = Text.fromList (Database.Redis.connectHost connectionInfo)
     let connectionPort =
           case Database.Redis.connectPort connectionInfo of
-            Database.Redis.PortNumber port -> Data.Text.pack (show port)
-            Database.Redis.UnixSocket socket -> Data.Text.pack socket
+            Database.Redis.PortNumber port -> Text.fromList (Prelude.show port)
+            Database.Redis.UnixSocket socket -> Text.fromList socket
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
@@ -77,7 +76,7 @@ acquireHandler namespace settings = do
                         case txResult of
                           Database.Redis.TxSuccess y -> Right y
                           Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
-                          Database.Redis.TxError err -> Right (Err (Internal.RedisError (Data.Text.pack err)))
+                          Database.Redis.TxError err -> Right (Err (Internal.RedisError (Text.fromList err)))
                     )
                   |> Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything,
           Internal.doWatch = \keys ->
@@ -263,7 +262,7 @@ platformRedis cmds connection anything action =
     |> Exception.handleAny
       ( \err ->
           Exception.displayException err
-            |> Data.Text.pack
+            |> Text.fromList
             |> Internal.LibraryError
             |> Err
             |> pure
@@ -275,7 +274,7 @@ toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
 toResult reply =
   case reply of
     Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
-    Left err -> Err (Internal.RedisError ("Redis library got back a value with a type it didn't expect: " ++ Data.Text.pack (Prelude.show err)))
+    Left err -> Err (Internal.RedisError ("Redis library got back a value with a type it didn't expect: " ++ Text.fromList (Prelude.show err)))
     Right r -> Ok r
 
 toB :: Text -> Data.ByteString.ByteString

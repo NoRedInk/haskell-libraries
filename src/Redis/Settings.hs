@@ -1,6 +1,5 @@
 module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), QueryTimeout (..), decoder, decoderWithEnvVarPrefix) where
 
-import qualified Data.Text
 import Database.Redis hiding (Ok)
 import qualified Environment
 import qualified Text
@@ -60,9 +59,9 @@ decoderConnectInfo prefix =
     ( Environment.custom
         Environment.text
         ( \str ->
-            case str |> Data.Text.unpack |> parseConnectInfo of
+            case str |> Text.toList |> parseConnectInfo of
               Right info' -> Ok info'
-              Left parseError -> Err ("Invalid Redis connection string: " ++ Data.Text.pack parseError)
+              Left parseError -> Err ("Invalid Redis connection string: " ++ Text.fromList parseError)
         )
     )
 

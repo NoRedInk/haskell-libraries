@@ -7,7 +7,6 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
@@ -35,7 +34,7 @@ instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
 
 instance Show Error where
-  show = errorForHumans >> Data.Text.unpack
+  show = errorForHumans >> Text.toList
 
 errorForHumans :: Error -> Text
 errorForHumans topError =
@@ -66,12 +65,7 @@ cmds query'' =
     Hkeys key -> [unwords ["HKEY", key]]
     Hmget key fields -> [unwords ("HMGET" : key : NonEmpty.toList fields)]
     Hmset key pairs ->
-      [ unwords
-          ( "HMSET" :
-            key :
-            List.concatMap (\(field, _) -> [field, "*****"]) (NonEmpty.toList pairs)
-          )
-      ]
+      [unwords ("HMSET" : key : List.concatMap (\(field, _) -> [field, "*****"]) (NonEmpty.toList pairs))]
     Hset key field _ -> [unwords ["HSET", key, field, "*****"]]
     Hsetnx key field _ -> [unwords ["HSETNX", key, field, "*****"]]
     Incr key -> [unwords ["INCR", key]]

@@ -5,7 +5,6 @@ module Redis.Codec where
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
-import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Debug
 import qualified Flat
@@ -42,7 +41,7 @@ jsonDecoder byteString =
   case Aeson.eitherDecodeStrict' byteString of
     Prelude.Right decoded -> Ok decoded
     Prelude.Left err ->
-      Internal.DecodingError (Data.Text.pack err)
+      Internal.DecodingError (Text.fromList err)
         |> Err
 
 byteStringCodec :: Codec ByteString
