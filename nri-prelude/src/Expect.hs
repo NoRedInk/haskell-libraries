@@ -483,20 +483,22 @@ assert pred funcName actual expected =
         let terminalWidth = case window of
               Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
               Nothing -> 80
+        let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
+        let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
+        let numLines text = List.length (Data.Text.lines text)
         Diff.pretty
           Diff.Config
             { Diff.separatorText = Just funcName,
-              Diff.wrapping = Diff.Wrap terminalWidth
+              Diff.wrapping = Diff.Wrap terminalWidth,
+              Diff.multilineContext =
+                if numLines expectedText < 6 && numLines actualText < 6
+                  then Diff.FullContext
+                  else Diff.Surrounding 2 "..."
             }
-          (PrettyShow expected)
-          (PrettyShow actual)
+          expectedText
+          actualText
           |> fail
           |> Internal.unExpectation
 
 fromIO :: Prelude.IO a -> Task e a
 fromIO io = Platform.Internal.Task (\_ -> map Ok io)
-
-newtype PrettyShow a = PrettyShow a
-
-instance Show a => Show (PrettyShow a) where
-  show (PrettyShow x) = Text.Show.Pretty.ppShow x
