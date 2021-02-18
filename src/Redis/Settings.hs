@@ -1,4 +1,4 @@
-module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), QueryTimeout (..), decoder) where
+module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), QueryTimeout (..), decoder, decoderWithEnvVarPrefix) where
 
 import qualified Data.Text
 import Database.Redis hiding (Ok)
@@ -21,18 +21,22 @@ data QueryTimeout = NoQueryTimeout | TimeoutQueryAfterMilliseconds Int
 
 decoder :: Environment.Decoder Settings
 decoder =
+  decoderWithEnvVarPrefix ""
+
+decoderWithEnvVarPrefix :: Text -> Environment.Decoder Settings
+decoderWithEnvVarPrefix prefix =
   map4
     Settings
-    decoderConnectInfo
-    decoderClusterMode
-    decoderDefaultExpiry
-    decoderQueryTimeout
+    (decoderConnectInfo prefix)
+    (decoderClusterMode prefix)
+    (decoderDefaultExpiry prefix)
+    (decoderQueryTimeout prefix)
 
-decoderClusterMode :: Environment.Decoder ClusterMode
-decoderClusterMode =
+decoderClusterMode :: Text -> Environment.Decoder ClusterMode
+decoderClusterMode prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "REDIS_CLUSTER",
+      { Environment.name = prefix ++ "REDIS CLUSTER",
         Environment.description = "Set to 1 for cluster, everything else is not",
         Environment.defaultValue = "0"
       }
@@ -45,11 +49,11 @@ decoderClusterMode =
         )
     )
 
-decoderConnectInfo :: Environment.Decoder ConnectInfo
-decoderConnectInfo =
+decoderConnectInfo :: Text -> Environment.Decoder ConnectInfo
+decoderConnectInfo prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "REDIS_CONNECTION_STRING",
+      { Environment.name = prefix ++ "REDIS_CONNECTION_STRING",
         Environment.description = "Full redis connection string",
         Environment.defaultValue = "redis://localhost:6379"
       }
@@ -62,11 +66,11 @@ decoderConnectInfo =
         )
     )
 
-decoderDefaultExpiry :: Environment.Decoder DefaultExpiry
-decoderDefaultExpiry =
+decoderDefaultExpiry :: Text -> Environment.Decoder DefaultExpiry
+decoderDefaultExpiry prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "REDIS_DEFAULT_EXPIRY_SECONDS",
+      { Environment.name = prefix ++ "REDIS_DEFAULT_EXPIRY_SECONDS",
         Environment.description = "Set a default amount of seconds after which all keys touched by this handler will expire. The expire time of a key is reset every time it is read or written. A value of 0 means no default expiry.",
         Environment.defaultValue = "0"
       }
@@ -78,11 +82,11 @@ decoderDefaultExpiry =
             else ExpireKeysAfterSeconds secs
       )
 
-decoderQueryTimeout :: Environment.Decoder QueryTimeout
-decoderQueryTimeout =
+decoderQueryTimeout :: Text -> Environment.Decoder QueryTimeout
+decoderQueryTimeout prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "REDIS_QUERY_TIMEOUT_MILLISECONDS",
+      { Environment.name = prefix ++ "REDIS_QUERY_TIMEOUT_MILLISECONDS",
         Environment.description = "0 means no timeout, every other value is a timeout in milliseconds.",
         Environment.defaultValue = "1000"
       }
