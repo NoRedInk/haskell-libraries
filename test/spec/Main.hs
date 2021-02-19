@@ -28,20 +28,21 @@ main = Conduit.withAcquire getHandlers (Test.run << tests)
 -- put this at the top of the file so that adding tests doesn't push
 -- the line number of the source location of this file down, which would
 -- change golden test results
-spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
-spanForTask task = do
-  spanVar <- MVar.newEmptyMVar
-  res <-
-    Platform.rootTracingSpanIO
-      "test-request"
-      (MVar.putMVar spanVar)
-      "test-root"
-      (\log -> Task.attempt log task)
-  case res of
-    Err err -> Prelude.fail (Text.toList (Debug.toString err))
-    Ok _ ->
-      MVar.takeMVar spanVar
-        |> NriPrelude.map constantValuesForVariableFields
+spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForTask task =
+  Expect.fromIO <| do
+    spanVar <- MVar.newEmptyMVar
+    res <-
+      Platform.rootTracingSpanIO
+        "test-request"
+        (MVar.putMVar spanVar)
+        "test-root"
+        (\log -> Task.attempt log task)
+    case res of
+      Err err -> Prelude.fail <| Text.toList (Debug.toString err)
+      Ok _ ->
+        MVar.takeMVar spanVar
+          |> map constantValuesForVariableFields
 
 tests :: TestHandlers -> Test.Test
 tests TestHandlers {realHandler, mockHandler} =
