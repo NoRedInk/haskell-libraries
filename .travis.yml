@@ -1,4 +1,9 @@
 language: nix
 
 script:
+  # Set up cachix
+  - nix-env -iA cachix -f https://cachix.org/api/v1/install
+  - cachix use nri-open-source
+  - cachix push nri --watch-store&
+  # Run tests
   - nix-shell --run "./test.sh"
