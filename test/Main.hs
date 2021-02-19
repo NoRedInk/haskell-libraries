@@ -117,20 +117,21 @@ newtype FirstRequest = FirstRequest Wai.Request deriving (Show)
 
 instance Exception.Exception FirstRequest
 
-spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
-spanForTask task = do
-  spanVar <- MVar.newEmptyMVar
-  res <-
-    Platform.rootTracingSpanIO
-      "test-request"
-      (MVar.putMVar spanVar)
-      "test-root"
-      (\log -> Task.attempt log task)
-  case res of
-    Err err -> Prelude.fail (Prelude.show err)
-    Ok _ ->
-      MVar.takeMVar spanVar
-        |> map constantValuesForVariableFields
+spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForTask task =
+  Expect.fromIO <| do
+    spanVar <- MVar.newEmptyMVar
+    res <-
+      Platform.rootTracingSpanIO
+        "test-request"
+        (MVar.putMVar spanVar)
+        "test-root"
+        (\log -> Task.attempt log task)
+    case res of
+      Err err -> Prelude.fail <| Text.toList (Debug.toString err)
+      Ok _ ->
+        MVar.takeMVar spanVar
+          |> map constantValuesForVariableFields
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.
