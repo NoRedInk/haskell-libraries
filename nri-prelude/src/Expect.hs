@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- |  A library to create @Expectation@s, which describe a claim to be tested.
 --
 -- = Quick Reference
@@ -47,6 +49,7 @@ module Expect
     -- * Fancy Expectations
     fromIO,
     Internal.Expectation',
+    around,
   )
 where
 
@@ -597,3 +600,19 @@ fails task =
                   (Debug.toString msg)
       )
     |> Internal.Expectation
+
+-- | This can be used to create custom test functions that contain some setup
+-- and teardown logic, for example to make tests run in a database transaction
+-- that gets rolled back afterwards.
+around ::
+  (forall e a. (arg -> Task e a) -> Task e a) ->
+  (arg -> Expectation) ->
+  Expectation
+around runTask runExpectation =
+  Internal.Expectation
+    ( runTask
+        ( \arg ->
+            runExpectation arg
+              |> Internal.unExpectation
+        )
+    )
