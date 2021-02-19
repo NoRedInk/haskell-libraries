@@ -8,7 +8,6 @@ where
 import qualified Control.Concurrent.MVar as MVar
 import qualified Debug
 import qualified Expect
-import qualified Expect.Task
 import qualified Maybe
 import qualified MySQL
 import qualified MySQL.Test
@@ -32,46 +31,49 @@ tests :: Postgres.Connection -> Test
 tests postgres =
   describe
     "ObservabilitySpec"
-    [ Test.task "Postgres queries report the span data we expect" <| do
-        Postgres.doQuery
-          postgres
-          [Postgres.sql|!SELECT 1|]
-          ( \res ->
-              case res of
-                Err err -> Task.fail err
-                Ok (_ :: [Int]) -> Task.succeed ()
-          )
-          |> spanForTask
-          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-postgres-reporting")
-          |> Expect.Task.check,
-      MySQL.Test.task "MySQL queries report the span data we expect" <| \mysql ->
-        MySQL.doQuery
-          mysql
-          [MySQL.sql|!SELECT 1|]
-          ( \res ->
-              case res of
-                Err err -> Task.fail err
-                Ok (_ :: [Int]) -> Task.succeed ()
-          )
-          |> spanForTask
-          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-mysql-reporting")
-          |> Expect.Task.check
+    [ Test.test "Postgres queries report the span data we expect" <| \_ -> do
+        span <-
+          Postgres.doQuery
+            postgres
+            [Postgres.sql|!SELECT 1|]
+            ( \res ->
+                case res of
+                  Err err -> Task.fail err
+                  Ok (_ :: [Int]) -> Task.succeed ()
+            )
+            |> spanForTask
+        Debug.toString span
+          |> Expect.equalToContentsOf "test/golden-results/observability-spec-postgres-reporting",
+      MySQL.Test.test "MySQL queries report the span data we expect" <| \mysql -> do
+        span <-
+          MySQL.doQuery
+            mysql
+            [MySQL.sql|!SELECT 1|]
+            ( \res ->
+                case res of
+                  Err err -> Task.fail err
+                  Ok (_ :: [Int]) -> Task.succeed ()
+            )
+            |> spanForTask
+        Debug.toString span
+          |> Expect.equalToContentsOf "test/golden-results/observability-spec-mysql-reporting"
     ]
 
-spanForTask :: Show e => Task e () -> Prelude.IO Platform.TracingSpan
-spanForTask task = do
-  spanVar <- MVar.newEmptyMVar
-  res <-
-    Platform.rootTracingSpanIO
-      "test-request"
-      (MVar.putMVar spanVar)
-      "test-root"
-      (\log -> Task.attempt log task)
-  case res of
-    Err err -> Prelude.fail <| Text.toList (Debug.toString err)
-    Ok _ ->
-      MVar.takeMVar spanVar
-        |> map constantValuesForVariableFields
+spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForTask task =
+  Expect.fromIO <| do
+    spanVar <- MVar.newEmptyMVar
+    res <-
+      Platform.rootTracingSpanIO
+        "test-request"
+        (MVar.putMVar spanVar)
+        "test-root"
+        (\log -> Task.attempt log task)
+    case res of
+      Err err -> Prelude.fail <| Text.toList (Debug.toString err)
+      Ok _ ->
+        MVar.takeMVar spanVar
+          |> map constantValuesForVariableFields
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.

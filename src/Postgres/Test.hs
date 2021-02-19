@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -fno-cse #-}
 
-module Postgres.Test (task) where
+module Postgres.Test (test) where
 
 import qualified Control.Concurrent.MVar as MVar
 import qualified Environment
-import qualified Expect.Task
+import qualified Expect
 import qualified GHC.Stack as Stack
 import qualified Platform
 import qualified Postgres
@@ -13,23 +13,27 @@ import qualified System.IO.Unsafe
 import qualified Test
 import qualified Prelude
 
--- | A variant of `Test.task` that is passed a Postgres connection, for doing tests
+-- | A variant of `Test.test` that is passed a Postgres connection, for doing tests
 -- that require access to Postgres. The test body is run within a transaction that
 -- gets rolled back after the test completes.
 --
 -- Usage:
 --
---     Postgres.Test.task "My Postgres test" <| \Postgres -> do
+--     Postgres.Test.test "My Postgres test" <| \Postgres -> do
 --        -- test stuff!
-task ::
+test ::
   Stack.HasCallStack =>
   Text ->
-  (Postgres.Connection -> Task Expect.Task.Failure a) ->
+  (Postgres.Connection -> Expect.Expectation) ->
   Test.Test
-task description body =
-  Stack.withFrozenCallStack Test.task description <| do
-    conn <- getTestConnection
-    Postgres.inTestTransaction conn body
+test description body =
+  Stack.withFrozenCallStack Test.test description <| \_ ->
+    Expect.around
+      ( \task' -> do
+          conn <- getTestConnection
+          Postgres.inTestTransaction conn task'
+      )
+      body
 
 -- Obtain a Postgres connection for use in tests.
 getTestConnection :: Task e Postgres.Connection

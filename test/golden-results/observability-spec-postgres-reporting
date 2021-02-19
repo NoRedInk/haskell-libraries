@@ -9,10 +9,10 @@ TracingSpan
             { srcLocPackage = "main"
             , srcLocModule = "ObservabilitySpec"
             , srcLocFile = "test/ObservabilitySpec.hs"
-            , srcLocStartLine = 65
-            , srcLocStartCol = 5
-            , srcLocEndLine = 69
-            , srcLocEndCol = 38
+            , srcLocStartLine = 67
+            , srcLocStartCol = 7
+            , srcLocEndLine = 71
+            , srcLocEndCol = 40
             }
         )
   , details = Nothing
@@ -32,9 +32,9 @@ TracingSpan
                     , srcLocModule = "ObservabilitySpec"
                     , srcLocFile = "test/ObservabilitySpec.hs"
                     , srcLocStartLine = 36
-                    , srcLocStartCol = 9
+                    , srcLocStartCol = 11
                     , srcLocEndLine = 43
-                    , srcLocEndCol = 12
+                    , srcLocEndCol = 14
                     }
                 )
           , details =

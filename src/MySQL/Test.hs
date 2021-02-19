@@ -1,10 +1,10 @@
 {-# OPTIONS_GHC -fno-cse #-}
 
-module MySQL.Test (task, inTestTransaction) where
+module MySQL.Test (test, inTestTransaction) where
 
 import qualified Control.Concurrent.MVar as MVar
 import qualified Environment
-import qualified Expect.Task
+import qualified Expect
 import qualified GHC.Stack as Stack
 import MySQL.Internal
 import qualified MySQL.Settings as Settings
@@ -13,23 +13,27 @@ import qualified System.IO.Unsafe
 import qualified Test
 import qualified Prelude
 
--- | A variant of `Test.task` that is passed a MySQL connection, for doing tests
+-- | A variant of `Test.test` that is passed a MySQL connection, for doing tests
 -- that require access to MySQL. The test body is run within a transaction that
 -- gets rolled back after the test completes.
 --
 -- Usage:
 --
---     MySQL.Test.task "My MySQL test" <| \mysql -> do
+--     MySQL.Test.test "My MySQL test" <| \mysql -> do
 --        -- test stuff!
-task ::
+test ::
   Stack.HasCallStack =>
   Text ->
-  (Connection -> Task Expect.Task.Failure a) ->
+  (Connection -> Expect.Expectation) ->
   Test.Test
-task description body =
-  Stack.withFrozenCallStack Test.task description <| do
-    conn <- getTestConnection
-    inTestTransaction conn body
+test description body =
+  Stack.withFrozenCallStack Test.test description <| \_ -> do
+    Expect.around
+      ( \task' -> do
+          conn <- getTestConnection
+          inTestTransaction conn task'
+      )
+      body
 
 -- Obtain a MySQL connection for use in tests.
 getTestConnection :: Task e Connection

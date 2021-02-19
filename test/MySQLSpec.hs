@@ -7,7 +7,6 @@ where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Expect
-import qualified Expect.Task
 import qualified Log
 import qualified MySQL
 import MySQL.Query (Query (..))
@@ -44,25 +43,34 @@ queriesWithQuestionMarks :: Test
 queriesWithQuestionMarks =
   describe
     "queries with question marks don't fail"
-    [ MySQL.Test.task "inserts and selects" <| \conn -> do
+    [ MySQL.Test.test "inserts and selects" <| \conn -> do
         let x = "?" :: Text
         (_ :: Int) <-
           MySQL.doQuery
             conn
             [MySQL.sql|!INSERT INTO monolith.topics (name, percent_correct) VALUES (${x}, 5)|]
-            Expect.Task.fromResult
-        MySQL.doQuery
-          conn
-          [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = ${x}|]
-          Expect.Task.fromResult
-          |> Expect.Task.andCheck (Expect.equal [("?", 5) :: (Text, Int)])
+            fromResult
+            |> Expect.succeeds
+        res <-
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!SELECT name, percent_correct FROM monolith.topics WHERE name = ${x}|]
+            fromResult
+            |> Expect.succeeds
+        Expect.equal [("?", 5) :: (Text, Int)] res
     ]
+
+fromResult :: Result err a -> Task err a
+fromResult res =
+  case res of
+    Err err -> Task.fail err
+    Ok ok -> Task.succeed ok
 
 exceptionTests :: Test
 exceptionTests =
   describe
     "exceptions"
-    [ MySQL.Test.task "dupplicate key errors have groupable error messages" <| \conn -> do
+    [ MySQL.Test.test "dupplicate key errors have groupable error messages" <| \conn -> do
         (_ :: Int) <-
           MySQL.doQuery
             conn
@@ -71,19 +79,17 @@ exceptionTests =
                 -- this test. Don't fail on that.
                 |> MySQL.onDuplicateDoNothing
             )
-            Expect.Task.fromResult
-        MySQL.doQuery
-          conn
-          [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
-          ( \res ->
-              case res of
-                Err err -> Ok err
-                Ok (_ :: Int) -> Err ("Expected an error, but none was returned." :: Text)
-                |> Expect.Task.fromResult
-          )
-          |> Expect.Task.andCheck
-            ( Expect.equal "Query failed with unexpected error: MySQL query failed with error code 1062" << Exception.displayException
-            )
+            fromResult
+            |> Expect.succeeds
+        res <-
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!INSERT INTO monolith.topics (id, name) VALUES (1234, 'hi')|]
+            fromResult
+            |> Expect.fails
+        Expect.equal
+          "Query failed with unexpected error: MySQL query failed with error code 1062"
+          (Exception.displayException res)
     ]
 
 mockQuery :: Text -> Query a
