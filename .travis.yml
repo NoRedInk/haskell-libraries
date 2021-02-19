@@ -12,5 +12,6 @@ install:
 - nix path-info --all > /tmp/store-path-pre-build
 script:
 - nix-shell --run "./test.sh"
+- nix-shell shell-ghc-8-10.nix --run "./test.sh"
 after_success:
 - comm -13 <(sort /tmp/store-path-pre-build | grep -v '\.drv$') <(nix path-info --all | grep -v '\.drv$' | sort) | cachix push $CACHIX_CACHE
