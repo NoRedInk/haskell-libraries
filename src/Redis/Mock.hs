@@ -17,7 +17,6 @@ import qualified Expect
 import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
-import qualified System.IO.Unsafe
 import qualified Text
 import qualified Tuple
 import Prelude (IO, pure)
@@ -28,15 +27,14 @@ import qualified Prelude
 handler :: Expect.Expectation' Internal.Handler
 handler =
   handlerIO
-    |> map Ok
-    |> Platform.doAnything testDoAnything
-    |> Expect.succeeds
+    |> Expect.fromIO
 
 -- | It's better to use handler and create a new mock handler for each test.
 -- Tests run in parallel which means that they all share the same hashmap.
 handlerIO :: IO Internal.Handler
 handlerIO = do
   modelRef <- init
+  doAnything <- Platform.doAnythingHandler
   Internal.Handler
     { Internal.doQuery = \query ->
         atomicModifyIORef'
@@ -47,7 +45,7 @@ handlerIO = do
                     res
                   )
           )
-          |> Platform.doAnything testDoAnything
+          |> Platform.doAnything doAnything
           |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" "",
       Internal.doTransaction = \query ->
         atomicModifyIORef'
@@ -61,7 +59,7 @@ handlerIO = do
                     res
                   )
           )
-          |> Platform.doAnything testDoAnything
+          |> Platform.doAnything doAnything
           |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" "",
       Internal.doWatch = \keys ->
         atomicModifyIORef'
@@ -71,7 +69,7 @@ handlerIO = do
                 Ok ()
               )
           )
-          |> Platform.doAnything testDoAnything,
+          |> Platform.doAnything doAnything,
       -- Not a real locking implementation. Tests that run concurrent threads
       -- might suffer from this. Punting on this until we have such tests.
       Internal.doLock = \_ task -> task,
@@ -392,10 +390,3 @@ doQuery query hm =
 
 wrongTypeErr :: Internal.Error
 wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"
-
--- | Creates a unpacked `DoAnythingHandler`, allowing us to use it without
--- to turn `IO` into `Task` types without needing to pass it in as an argument,
--- in the context of this test helper.
-{-# NOINLINE testDoAnything #-}
-testDoAnything :: Platform.DoAnythingHandler
-testDoAnything = System.IO.Unsafe.unsafePerformIO Platform.doAnythingHandler
