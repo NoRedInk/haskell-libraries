@@ -68,7 +68,6 @@ import qualified Task
 import Test.Internal (Expectation)
 import qualified Test.Internal as Internal
 import qualified Text.Show.Pretty
-import Prelude (IO, show)
 import qualified Prelude
 
 -- | Always passes.
@@ -537,16 +536,15 @@ fromResult (Err msg) =
     "Expect.fromResult"
     (Debug.toString msg)
 
--- | Check a task returns an expected value, than pass that value on.
+-- | Check a task returns an expected value.
 --
 -- > test "Greetings are friendly" <| \_ -> do
 -- >     getGreeting
 -- >         |> andCheck (Expect.equal "Hi!")
-andCheck :: (Stack.HasCallStack, Show err) => (a -> Expectation) -> Task err a -> Internal.Expectation' a
+andCheck :: (Stack.HasCallStack, Show err) => (a -> Expectation) -> Task err a -> Internal.Expectation
 andCheck expectation task = do
   x <- succeeds task
   Stack.withFrozenCallStack expectation x
-  Prelude.pure x
 
 -- | Check a task succeeds.
 --
