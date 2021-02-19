@@ -23,6 +23,18 @@
         "url": "https://github.com/NixOS/nixpkgs/archive/5c53c720ff690ef82a9fe4849e7b70c104e1c82f.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
+    "nixpkgs-unstable": {
+        "branch": "nixpkgs-unstable",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "4ef6da455e926b87d1923c324306e9dc1da8e371",
+        "sha256": "14g4y3wnkfvf1sh7l3c2ifs6m3h4lwr20nd4q5avdvd83plqd5qh",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/4ef6da455e926b87d1923c324306e9dc1da8e371.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "pretty-diff": {
         "branch": "master",
         "description": "Pretty printing a diff of two values",
