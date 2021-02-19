@@ -21,7 +21,16 @@ where
 import Data.Function ((&))
 import qualified Data.List
 import qualified GhcPlugins
-import HsSyn (hsmodImports, hsmodName, ideclImplicit, ideclName, ideclQualified, simpleImportDecl)
+import NriPrelude.Plugin.GhcVersionDependent
+  ( hsmodImports,
+    hsmodName,
+    ideclImplicit,
+    ideclName,
+    ideclQualified,
+    isQualified,
+    mkQualified,
+    simpleImportDecl,
+  )
 import qualified Set
 import Prelude
 
@@ -76,7 +85,7 @@ addImplicitImports _ _ parsed =
       hsmodImports hsModule
         & fmap
           ( \(GhcPlugins.L _ imp) ->
-              case (ideclQualified imp, unLocate (ideclName imp)) of
+              case (isQualified imp, unLocate (ideclName imp)) of
                 (True, name) -> Qualified name
                 (False, name) -> Unqualified name
           )
@@ -88,7 +97,7 @@ addImplicitImports _ _ parsed =
       GhcPlugins.noLoc (simpleImportDecl (GhcPlugins.mkModuleName name))
         & fmap (\qual -> qual {ideclImplicit = True})
     qualified name =
-      fmap (\qual -> qual {ideclQualified = True}) (unqualified name)
+      fmap (\qual -> qual {ideclQualified = mkQualified}) (unqualified name)
 
 data Import
   = Unqualified String
