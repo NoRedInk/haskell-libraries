@@ -62,42 +62,42 @@ tests TestHandlers {realHandler, mockHandler} =
 -- not point to the application code making the query!
 observabilityTests :: Redis.Handler -> List Test.Test
 observabilityTests handler =
-  [ Test.test "Redis.query reports the span data we expect" <| do
+  [ Test.test "Redis.query reports the span data we expect" <| \() -> do
       Redis.query handler (Redis.ping api)
         |> Expect.succeeds
         |> spanForTask
         |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-query"),
-    Test.test "Redis.transaction reports the span data we expect" <| do
+    Test.test "Redis.transaction reports the span data we expect" <| \() -> do
       Redis.transaction handler (Redis.ping api)
         |> Expect.succeeds
         |> spanForTask
         |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-transaction"),
-    Test.test "Redis.Hash.query reports the span data we expect" <| do
+    Test.test "Redis.Hash.query reports the span data we expect" <| \() -> do
       Redis.Hash.query handler (Redis.Hash.ping hashApi)
         |> Expect.succeeds
         |> spanForTask
         |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-query"),
-    Test.test "Redis.Hash.transaction reports the span data we expect" <| do
+    Test.test "Redis.Hash.transaction reports the span data we expect" <| \() -> do
       Redis.Hash.transaction handler (Redis.Hash.ping hashApi)
         |> Expect.succeeds
         |> spanForTask
         |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-transaction"),
-    Test.test "Redis.List.query reports the span data we expect" <| do
+    Test.test "Redis.List.query reports the span data we expect" <| \() -> do
       Redis.List.query handler (Redis.List.ping listApi)
         |> Expect.succeeds
         |> spanForTask
         |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-query"),
-    Test.test "Redis.List.transaction reports the span data we expect" <| do
+    Test.test "Redis.List.transaction reports the span data we expect" <| \() -> do
       Redis.List.transaction handler (Redis.List.ping listApi)
         |> Expect.succeeds
         |> spanForTask
         |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-transaction"),
-    Test.test "Redis.Counter.query reports the span data we expect" <| do
+    Test.test "Redis.Counter.query reports the span data we expect" <| \() -> do
       Redis.Counter.query handler (Redis.Counter.ping counterApi)
         |> Expect.succeeds
         |> spanForTask
         |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-query"),
-    Test.test "Redis.Counter.transaction reports the span data we expect" <| do
+    Test.test "Redis.Counter.transaction reports the span data we expect" <| \() -> do
       Redis.Counter.transaction handler (Redis.Counter.ping counterApi)
         |> Expect.succeeds
         |> spanForTask
@@ -106,11 +106,11 @@ observabilityTests handler =
 
 queryTests :: Redis.Handler -> List Test.Test
 queryTests redisHandler =
-  [ Test.test "get and set" <| do
+  [ Test.test "get and set" <| \() -> do
       Redis.set api "bob" "hello!" |> Redis.query testNS |> Expect.succeeds
       result <- Redis.get api "bob" |> Redis.query testNS |> Expect.succeeds
       Expect.equal result (Just "hello!"),
-    Test.test "namespaces namespace" <| do
+    Test.test "namespaces namespace" <| \() -> do
       let nsHandler1 = addNamespace "NS1" redisHandler
       let nsHandler2 = addNamespace "NS2" redisHandler
       Redis.set api "bob" "hello!" |> Redis.query nsHandler1 |> Expect.succeeds
@@ -123,7 +123,7 @@ queryTests redisHandler =
           \() -> Expect.equal (Just "goodbye") result2
         ]
         (),
-    Test.test "getset" <| do
+    Test.test "getset" <| \() -> do
       Redis.set api "getset" "1" |> Redis.query testNS |> Expect.succeeds
       result1 <- Redis.getset api "getset" "2" |> Redis.query testNS |> Expect.succeeds
       result2 <- Redis.get api "getset" |> Redis.query testNS |> Expect.succeeds
@@ -132,21 +132,21 @@ queryTests redisHandler =
           \() -> Expect.equal (Just "2") result2
         ]
         (),
-    Test.test "del dels" <| do
+    Test.test "del dels" <| \() -> do
       Redis.set api "del" "mistake..." |> Redis.query testNS |> Expect.succeeds
       _ <- Redis.del api ("del" :| []) |> Redis.query testNS |> Expect.succeeds
       result <- Redis.get api "del" |> Redis.query testNS |> Expect.succeeds
       Expect.equal Nothing result,
-    Test.test "del counts" <| do
+    Test.test "del counts" <| \() -> do
       Redis.set api "delCount" "A thing" |> Redis.query testNS |> Expect.succeeds
       result <- Redis.del api ("delCount" :| ["key that doesn't exist"]) |> Redis.query testNS |> Expect.succeeds
       Expect.equal 1 result,
-    Test.test "json roundtrip" <| do
+    Test.test "json roundtrip" <| \() -> do
       let testData :: [Int] = [1, 2, 3]
       Redis.set jsonApi' "JSON list" testData |> Redis.query testNS |> Expect.succeeds
       result <- Redis.get jsonApi' "JSON list" |> Redis.query testNS |> Expect.succeeds
       Expect.equal (Just testData) result,
-    Test.test "atomic modify with no value" <| do
+    Test.test "atomic modify with no value" <| \() -> do
       _ <- Redis.del api ("Empty Atom" :| []) |> Redis.query testNS |> Expect.succeeds
       result <-
         Redis.atomicModify
@@ -159,7 +159,7 @@ queryTests redisHandler =
           )
           |> Expect.succeeds
       Expect.equal "Nothing" result,
-    Test.test "mget retrieves a mapping of the requested keys and their corresponding values" <| do
+    Test.test "mget retrieves a mapping of the requested keys and their corresponding values" <| \() -> do
       Redis.set api "mgetTest::key1" "value 1" |> Redis.query testNS |> Expect.succeeds
       Redis.set api "mgetTest::key3" "value 3" |> Redis.query testNS |> Expect.succeeds
       result <-
@@ -168,7 +168,7 @@ queryTests redisHandler =
       Expect.equal
         (Dict.toList result)
         [("mgetTest::key1", "value 1"), ("mgetTest::key3", "value 3")],
-    Test.test "mget json roundtrip" <| do
+    Test.test "mget json roundtrip" <| \() -> do
       Redis.set jsonApi' "Json.mgetTest::key1" ([1, 2] :: [Int]) |> Redis.query testNS |> Expect.succeeds
       Redis.set jsonApi' "Json.mgetTest::key2" ([3, 4] :: [Int]) |> Redis.query testNS |> Expect.succeeds
       result <-
@@ -180,7 +180,7 @@ queryTests redisHandler =
         [ ("Json.mgetTest::key1", [1, 2]),
           ("Json.mgetTest::key2", [3, 4])
         ],
-    Test.test "mset allows setting multiple values at once" <| do
+    Test.test "mset allows setting multiple values at once" <| \() -> do
       let firstKey = "msetTest::key1"
       let firstValue = "value 1"
       let nonEmptyDict = NonEmptyDict.init firstKey firstValue (Dict.fromList [("msetTest::key2", "value 2")])
@@ -188,7 +188,7 @@ queryTests redisHandler =
       Redis.mset api nonEmptyDict |> Redis.query testNS |> Expect.succeeds
       result <- Redis.mget api (firstKey :| Dict.keys dict) |> Redis.query testNS |> Expect.succeeds
       Expect.equal result dict,
-    Test.test "Json.mset allows setting multiple JSON values at once" <| do
+    Test.test "Json.mset allows setting multiple JSON values at once" <| \() -> do
       let firstKey = "Json.msetTest::key1"
       let firstValue = [1, 2]
       let nonEmptyDict = NonEmptyDict.init firstKey firstValue (Dict.fromList [("Json.msetTest::key2", [3, 4] :: [Int])])
@@ -196,7 +196,7 @@ queryTests redisHandler =
       Redis.mset jsonApi' nonEmptyDict |> Redis.query testNS |> Expect.succeeds
       result <- Redis.mget jsonApi' (firstKey :| Dict.keys dict) |> Redis.query testNS |> Expect.succeeds
       Expect.equal result dict,
-    Test.test "atomic modify with value" <| do
+    Test.test "atomic modify with value" <| \() -> do
       _ <- Redis.del api ("Full Atom" :| []) |> Redis.query testNS |> Expect.succeeds
       Redis.set api "Full Atom" "Something" |> Redis.query testNS |> Expect.succeeds
       result <-
@@ -210,7 +210,7 @@ queryTests redisHandler =
           )
           |> Expect.succeeds
       Expect.equal "Prefix:Something" result,
-    Test.test "atomicModifyWithContext works empty" <| do
+    Test.test "atomicModifyWithContext works empty" <| \() -> do
       _ <- Redis.del api ("Atom With Context" :| []) |> Redis.query testNS |> Expect.succeeds
       result <-
         Redis.atomicModifyWithContext
@@ -223,7 +223,7 @@ queryTests redisHandler =
           )
           |> Expect.succeeds
       Expect.equal ("after", "Nothing") result,
-    Test.test "atomicModifyWithContext works full" <| do
+    Test.test "atomicModifyWithContext works full" <| \() -> do
       Redis.set api "Atom With Context (full)" "A piece of text" |> Redis.query testNS |> Expect.succeeds
       result <-
         Redis.atomicModifyWithContext
@@ -236,7 +236,7 @@ queryTests redisHandler =
           )
           |> Expect.succeeds
       Expect.equal ("after", "Just") result,
-    Test.test "Json.atomicModifyWithContext works" <| do
+    Test.test "Json.atomicModifyWithContext works" <| \() -> do
       _ <- Redis.del api ("JSON Atom With Context" :| []) |> Redis.query testNS |> Expect.succeeds
       result <-
         Redis.atomicModifyWithContext
@@ -249,7 +249,7 @@ queryTests redisHandler =
           )
           |> Expect.succeeds
       Expect.equal ([10], Nothing) result,
-    Test.test "transaction preserves order" <| do
+    Test.test "transaction preserves order" <| \() -> do
       [ Redis.List.del listApi ("order" :| []),
         Redis.List.rpush listApi "order" ("1" :| []),
         Redis.List.rpush listApi "order" ("2" :| []),
@@ -268,7 +268,7 @@ queryTests redisHandler =
              |> Task.sequence
              |> Expect.succeeds
          ),
-    Test.test "hmset inserts at least one field" <| do
+    Test.test "hmset inserts at least one field" <| \() -> do
       Redis.Hash.hmset hashApi "hmset-insert-test" (NonEmptyDict.init "field" "val" Dict.empty)
         |> Redis.query redisHandler
         |> Expect.succeeds
@@ -277,7 +277,7 @@ queryTests redisHandler =
         |> Task.map (Expect.equal (Just "val"))
         |> Expect.succeeds
         |> Task.andThen Expect.check,
-    Test.test "hmset overwrites at least existing field" <| do
+    Test.test "hmset overwrites at least existing field" <| \() -> do
       Redis.Hash.hset hashApi "hmset-overwrite-test" "field" "old-val"
         |> Redis.query redisHandler
         |> Expect.succeeds
@@ -289,7 +289,7 @@ queryTests redisHandler =
         |> Task.map (Expect.equal (Just "val"))
         |> Expect.succeeds
         |> Task.andThen Expect.check,
-    Test.test "hmset inserts multiple fields" <| do
+    Test.test "hmset inserts multiple fields" <| \() -> do
       NonEmptyDict.init
         "field"
         "val"
