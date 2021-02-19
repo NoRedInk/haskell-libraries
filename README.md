@@ -28,6 +28,17 @@ We use [Ormolu][ormolu] for code formatting.
 
 Documentation comments use the [Haddock][haddock] format to ensure they are rendered correctly on package websites.
 
+### Testing compilation against GHC 8.10
+
+Our default `shell.nix` sets up an environment around GHC version 8.8. CI also runs tests against GHC 8.10. To test using this version locally:
+
+```sh
+cachix use nri-open-source       # set up cache so the next step goes faster
+nix-shell shell-ghc-8-10.nix
+```
+
+This starts a special shell in which you can run any of the commands above.
+
 ### Tips for adding dependencies
 
 To allow these libraries to be in [Stackage][stackage] we're limited to dependencies that are themselves in Stackage. Being in stackage indicates a package has an active maintainer, who keeps the package compatible with the latest versions of its dependencies. This means that while using stackage dependencies only limits us it also saves us time.
