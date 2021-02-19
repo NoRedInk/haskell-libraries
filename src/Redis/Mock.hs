@@ -13,6 +13,7 @@ import qualified Data.List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding as TE
 import qualified Database.Redis
+import qualified Expect
 import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
@@ -24,11 +25,12 @@ import qualified Prelude
 
 -- | This functions returns a task that you can run in each test to retrieve a
 -- fresh mock handler
-handler :: Task e Internal.Handler
+handler :: Expect.Expectation' Internal.Handler
 handler =
   handlerIO
     |> map Ok
     |> Platform.doAnything testDoAnything
+    |> Expect.succeeds
 
 -- | It's better to use handler and create a new mock handler for each test.
 -- Tests run in parallel which means that they all share the same hashmap.
