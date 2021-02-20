@@ -2,7 +2,7 @@
 -- type. This includes @Int@, @Float@, @Time@, @Char@, @String@, and tuples or
 -- lists of comparable types.
 --
--- Insert, remove, and query operations all take _O(log n)_ time.
+-- Insert, remove, and query operations all take /O(log n)/ time.
 module Dict
   ( -- * Dictionaries
     Dict,

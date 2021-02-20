@@ -48,16 +48,16 @@ import qualified Prelude
 -- In addition to a log message you can pass additional key-value pairs with
 -- information that might be relevant for debugging.
 --
---     info "I added 1 and 1" [context "answer" 2]
+-- > info "I added 1 and 1" [context "answer" 2]
 info :: Stack.HasCallStack => Text -> [Context] -> Task e ()
 info message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
 
 -- | A log message when the user is annoyed, but not blocked.
 --
---   Log.userIsAnnoyed
---     "We poked the user unnecessarily."
---     "Try to stop poking the user."
---     [ Log.context "The type of poking stick" poker ]
+-- > Log.userIsAnnoyed
+-- >   "We poked the user unnecessarily."
+-- >   "Try to stop poking the user."
+-- >   [ Log.context "The type of poking stick" poker ]
 userIsAnnoyed :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsAnnoyed message advisory contexts =
   let triage = TriageInfo UserAnnoyed advisory
@@ -67,7 +67,7 @@ userIsAnnoyed message advisory contexts =
         ReportAsFailed
         (Context "triage" triage : contexts)
 
--- | Like @userIsAnnoyed@, but when the user is userIsConfused.
+-- | Like 'userIsAnnoyed', but when the user is userIsConfused.
 userIsConfused :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsConfused message advisory contexts =
   let triage = TriageInfo UserConfused advisory
@@ -77,7 +77,7 @@ userIsConfused message advisory contexts =
         ReportAsFailed
         (Context "triage" triage : contexts)
 
--- | Like @userIsAnnoyed@, but when the user is in pain.
+-- | Like 'userIsAnnoyed', but when the user is in pain.
 userIsPained :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsPained message advisory contexts =
   let triage = TriageInfo UserInPain advisory
@@ -87,7 +87,7 @@ userIsPained message advisory contexts =
         ReportAsFailed
         (Context "triage" triage : contexts)
 
--- | Like @userIsAnnoyed@, but when the user is blocked.
+-- | Like 'userIsAnnoyed', but when the user is blocked.
 userIsBlocked :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsBlocked message advisory contexts =
   let triage = TriageInfo UserBlocked advisory
@@ -107,8 +107,8 @@ userIsBlocked message advisory contexts =
 --
 -- Example usage:
 --
---     withContext "play-music" [context "artist" "The Beatles"] <| do
---        -- your code here!
+-- > withContext "play-music" [context "artist" "The Beatles"] <| do
+-- >   -- your code here!
 --
 -- Additionally, this function adds an entry to our homemade stack trace for if something errors.
 -- Why not use the built-in stack trace? Well, the built-in stack trace only records a frame if you
@@ -171,8 +171,8 @@ instance Internal.TracingSpanDetails LogContexts
 
 -- | Wrap a value in a secret to prevent it from being accidentally logged.
 --
---     Debug.log "Logging a secret" (mkSecret "My PIN is 1234")
---     --> Logging a secret: Secret *****
+-- > Debug.log "Logging a secret" (mkSecret "My PIN is 1234")
+-- > --> Logging a secret: Secret *****
 mkSecret :: a -> Secret a
 mkSecret = Secret
 

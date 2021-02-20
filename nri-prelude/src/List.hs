@@ -290,25 +290,25 @@ intersperse =
 -- > -- pairs ["alice","bob","chuck"] [2,5,7,8]
 -- > --   == [("alice",2),("bob",5),("chuck",7)]
 --
--- __NOTE:__ This behaves differently than @NriPrelude.Internal.map2@, which produces
+-- __Note:__ This behaves differently than 'NriPrelude.map2', which produces
 -- all combinations of elements from both lists.
 map2 :: (a -> b -> result) -> List a -> List b -> List result
 map2 =
   Data.List.zipWith
 
--- | __NOTE:__ This behaves differently than @NriPrelude.Internal.map3@, which produces
+-- | __Note:__ This behaves differently than 'NriPrelude.map3', which produces
 -- all combinations of elements from all lists.
 map3 :: (a -> b -> c -> result) -> List a -> List b -> List c -> List result
 map3 =
   Data.List.zipWith3
 
--- | __NOTE:__ This behaves differently than @NriPrelude.Internal.map4@, which produces
+-- | __Note:__ This behaves differently than 'NriPrelude.map4', which produces
 -- all combinations of elements from all lists.
 map4 :: (a -> b -> c -> d -> result) -> List a -> List b -> List c -> List d -> List result
 map4 =
   Data.List.zipWith4
 
--- | __NOTE:__ This behaves differently than @NriPrelude.Internal.map5@, which produces
+-- | __Note:__ This behaves differently than 'NriPrelude.map5', which produces
 -- all combinations of elements from all lists.
 map5 :: (a -> b -> c -> d -> e -> result) -> List a -> List b -> List c -> List d -> List e -> List result
 map5 =
@@ -358,7 +358,7 @@ sortWith =
 --
 -- > isEmpty [] == True
 --
--- **Note:** It is usually preferable to use a @case@ to test this so you do not
+-- __Note:__ It is usually preferable to use a @case@ to test this so you do not
 -- forget to handle the @(x :: xs)@ case as well!
 isEmpty :: List a -> Bool
 isEmpty =
@@ -369,7 +369,7 @@ isEmpty =
 -- > head [1,2,3] == Just 1
 -- > head [] == Nothing
 --
--- **Note:** It is usually preferable to use a @case@ to deconstruct a @List@
+-- __Note:__ It is usually preferable to use a @case@ to deconstruct a @List@
 -- because it gives you @(x :: xs)@ and you can work with both subparts.
 head :: List a -> Maybe a
 head xs =
@@ -384,7 +384,7 @@ head xs =
 -- > tail [1,2,3] == Just [2,3]
 -- > tail [] == Nothing
 --
--- **Note:** It is usually preferable to use a @case@ to deconstruct a @List@
+-- __Note:__ It is usually preferable to use a @case@ to deconstruct a @List@
 -- because it gives you @(x :: xs)@ and you can work with both subparts.
 tail :: List a -> Maybe (List a)
 tail list =

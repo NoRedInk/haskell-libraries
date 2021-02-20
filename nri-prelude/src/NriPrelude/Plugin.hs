@@ -1,22 +1,23 @@
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-record-updates #-}
 
--- | A compiler plugin that imports the equivalents of modules that Elm will
--- also import.
+-- | A GHC plugin for a more Elm-like Haskell experience. It automatically
+-- adds an unqualified import of the NriPrelude module, and qualified imports of
+-- other base modules such as List and Maybe.
 --
+-- To use it make sure your project has @nri-prelude@ listed as a dependency,
+-- then add the follwing ghc option to your cabal or package yaml file:
 --
--- Useful documentation
--- - Elm's default imports: https://package.elm-lang.org/packages/elm/core/latest/
--- - GHC user guide on compiler plugins: https://ghc.gitlab.haskell.org/ghc/doc/users_guide/extending_ghc.html#compiler-plugins
--- - Module providing API for creating plugins: https://www.stackage.org/haddock/lts-17.4/ghc-lib-8.10.4.20210206/GhcPlugins.html
+-- > -fplugin=NriPrelude.Plugin
 module NriPrelude.Plugin
   ( plugin,
   )
 where
 
--- In GHC 8.10 and higher the imports below will come from the GHC.Hs module
--- instead. We'll need to handle this, maybe using some CPP-powered conditional
--- imports.
+-- Useful documentation
+-- - Elm's default imports: https://package.elm-lang.org/packages/elm/core/latest/
+-- - GHC user guide on compiler plugins: https://ghc.gitlab.haskell.org/ghc/doc/users_guide/extending_ghc.html#compiler-plugins
+-- - Module providing API for creating plugins: https://www.stackage.org/haddock/lts-17.4/ghc-lib-8.10.4.20210206/GhcPlugins.html
 
 import Data.Function ((&))
 import qualified Data.List

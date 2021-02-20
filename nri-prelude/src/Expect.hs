@@ -18,7 +18,6 @@ module Expect
     equal,
     notEqual,
     all,
-    concat,
     equalToContentsOf,
 
     -- * Numeric Comparisons
@@ -344,19 +343,6 @@ all expectations subject =
     pass
     expectations
 
--- | Combine multiple expectations into one. The resulting expectation is a
--- failure if any of the original expectations are a failure.
-concat :: Stack.HasCallStack => List Expectation -> Expectation
-concat expectations =
-  List.foldl
-    ( \expectation acc ->
-        Internal.append
-          acc
-          (Stack.withFrozenCallStack expectation)
-    )
-    pass
-    expectations
-
 -- | Passes if the Result is an Ok rather than Err. This is useful for tests where you expect not to see an error, but you don't care what the actual result is.
 --
 -- (Tip: If your function returns a Maybe instead, consider Expect.notEqual Nothing.)
@@ -511,6 +497,8 @@ assert pred funcName actual expected =
           expectedText
           actualText
 
+-- | Convert an IO type to an expectation. Useful if you need to call a function
+-- in Haskell's base library or an external library in a test.
 fromIO :: Prelude.IO a -> Internal.Expectation' a
 fromIO io =
   Platform.Internal.Task (\_ -> map Ok io)
@@ -603,21 +591,21 @@ fails task =
 -- and teardown logic, for example to make tests run in a database transaction
 -- that gets rolled back afterwards.
 --
---     dbTest ::
---       Stack.HasCallStack =>
---       Text ->
---       (Db.Connection -> Expect.Expectation) ->
---       Test.Test
---     dbTest description body =
---       Stack.withFrozenCallStack Test.test description <| \_ -> do
---         Expect.around
---           ( \task' -> do
---               conn <- Db.getConnection
---               Platform.finally
---                 (task' conn)
---                 (Db.rollback conn)
---           )
---           body
+-- > dbTest ::
+-- >   Stack.HasCallStack =>
+-- >   Text ->
+-- >   (Db.Connection -> Expect.Expectation) ->
+-- >   Test.Test
+-- > dbTest description body =
+-- >   Stack.withFrozenCallStack Test.test description <| \_ -> do
+-- >     Expect.around
+-- >       ( \task' -> do
+-- >           conn <- Db.getConnection
+-- >           Platform.finally
+-- >             (task' conn)
+-- >             (Db.rollback conn)
+-- >       )
+-- >       body
 around ::
   (forall e a. (arg -> Task e a) -> Task e a) ->
   (arg -> Expectation) ->
