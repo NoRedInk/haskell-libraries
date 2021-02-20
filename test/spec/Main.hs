@@ -63,45 +63,61 @@ tests TestHandlers {realHandler, mockHandler} =
 observabilityTests :: Redis.Handler -> List Test.Test
 observabilityTests handler =
   [ Test.test "Redis.query reports the span data we expect" <| \() -> do
-      Redis.query handler (Redis.ping api)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-query"),
+      span <-
+        Redis.query handler (Redis.ping api)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-query",
     Test.test "Redis.transaction reports the span data we expect" <| \() -> do
-      Redis.transaction handler (Redis.ping api)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-transaction"),
+      span <-
+        Redis.transaction handler (Redis.ping api)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-transaction",
     Test.test "Redis.Hash.query reports the span data we expect" <| \() -> do
-      Redis.Hash.query handler (Redis.Hash.ping hashApi)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-query"),
+      span <-
+        Redis.Hash.query handler (Redis.Hash.ping hashApi)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-query",
     Test.test "Redis.Hash.transaction reports the span data we expect" <| \() -> do
-      Redis.Hash.transaction handler (Redis.Hash.ping hashApi)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-transaction"),
+      span <-
+        Redis.Hash.transaction handler (Redis.Hash.ping hashApi)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-transaction",
     Test.test "Redis.List.query reports the span data we expect" <| \() -> do
-      Redis.List.query handler (Redis.List.ping listApi)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-query"),
+      span <-
+        Redis.List.query handler (Redis.List.ping listApi)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-query",
     Test.test "Redis.List.transaction reports the span data we expect" <| \() -> do
-      Redis.List.transaction handler (Redis.List.ping listApi)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-transaction"),
+      span <-
+        Redis.List.transaction handler (Redis.List.ping listApi)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-transaction",
     Test.test "Redis.Counter.query reports the span data we expect" <| \() -> do
-      Redis.Counter.query handler (Redis.Counter.ping counterApi)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-query"),
+      span <-
+        Redis.Counter.query handler (Redis.Counter.ping counterApi)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-query",
     Test.test "Redis.Counter.transaction reports the span data we expect" <| \() -> do
-      Redis.Counter.transaction handler (Redis.Counter.ping counterApi)
-        |> Expect.succeeds
-        |> spanForTask
-        |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-transaction")
+      span <-
+        Redis.Counter.transaction handler (Redis.Counter.ping counterApi)
+          |> spanForTask
+      span
+        |> Debug.toString
+        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-transaction"
   ]
 
 queryTests :: Redis.Handler -> List Test.Test
@@ -261,22 +277,25 @@ queryTests redisHandler =
         |> Expect.succeeds
       result <- Redis.List.lrange listApi "order" 0 (-1) |> Redis.query testNS |> Expect.succeeds
       Expect.equal result ["1", "2", "3"],
-    Test.test "sequence is happy doing nothing"
-      <| ( [ Redis.sequence [] |> Redis.transaction testNS,
-             Redis.sequence [] |> Redis.query testNS
-           ]
-             |> Task.sequence
-             |> Expect.succeeds
-         ),
+    Test.test "sequence is happy doing nothing" <| \() -> do
+      _ <-
+        Redis.sequence []
+          |> Redis.transaction testNS
+          |> Expect.succeeds
+      Redis.sequence []
+        |> Redis.query testNS
+        |> Expect.succeeds
+        |> map (\_ -> ()),
     Test.test "hmset inserts at least one field" <| \() -> do
       Redis.Hash.hmset hashApi "hmset-insert-test" (NonEmptyDict.init "field" "val" Dict.empty)
         |> Redis.query redisHandler
         |> Expect.succeeds
-      Redis.Hash.hget hashApi "hmset-insert-test" "field"
-        |> Redis.query redisHandler
-        |> Task.map (Expect.equal (Just "val"))
-        |> Expect.succeeds
-        |> Task.andThen Expect.check,
+      response <-
+        Redis.Hash.hget hashApi "hmset-insert-test" "field"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      response
+        |> Expect.equal (Just "val"),
     Test.test "hmset overwrites at least existing field" <| \() -> do
       Redis.Hash.hset hashApi "hmset-overwrite-test" "field" "old-val"
         |> Redis.query redisHandler
@@ -284,11 +303,12 @@ queryTests redisHandler =
       Redis.Hash.hmset hashApi "hmset-overwrite-test" (NonEmptyDict.init "field" "val" Dict.empty)
         |> Redis.query redisHandler
         |> Expect.succeeds
-      Redis.Hash.hget hashApi "hmset-overwrite-test" "field"
-        |> Redis.query redisHandler
-        |> Task.map (Expect.equal (Just "val"))
-        |> Expect.succeeds
-        |> Task.andThen Expect.check,
+      response <-
+        Redis.Hash.hget hashApi "hmset-overwrite-test" "field"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      response
+        |> Expect.equal (Just "val"),
     Test.test "hmset inserts multiple fields" <| \() -> do
       NonEmptyDict.init
         "field"
@@ -297,26 +317,28 @@ queryTests redisHandler =
         |> Redis.Hash.hmset hashApi "hmset-insert-multiple-test"
         |> Redis.query redisHandler
         |> Expect.succeeds
-      Redis.Hash.hget hashApi "hmset-insert-multiple-test" "field"
-        |> Redis.query redisHandler
-        |> Task.map (Expect.equal (Just "val"))
+      field <-
+        Redis.Hash.hget hashApi "hmset-insert-multiple-test" "field"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      field
+        |> Expect.equal (Just "val")
+      field2 <-
+        Redis.Hash.hget hashApi "hmset-insert-multiple-test" "field2"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      field2
+        |> Expect.equal (Just "val2"),
+    Test.test "lock works without errors" <| \_ -> do
+      let lock =
+            Redis.Lock
+              { Redis.lockKey = "test-lock-key",
+                Redis.lockTimeoutInMs = 100,
+                Redis.lockMaxTries = 1,
+                Redis.lockHandleError = Task.fail
+              }
+      Redis.lock redisHandler lock (Task.succeed ())
         |> Expect.succeeds
-        |> Task.andThen Expect.check
-      Redis.Hash.hget hashApi "hmset-insert-multiple-test" "field2"
-        |> Redis.query redisHandler
-        |> Task.map (Expect.equal (Just "val2"))
-        |> Expect.succeeds
-        |> Task.andThen Expect.check,
-    Test.test "lock works without errors"
-      <| let lock =
-               Redis.Lock
-                 { Redis.lockKey = "test-lock-key",
-                   Redis.lockTimeoutInMs = 100,
-                   Redis.lockMaxTries = 1,
-                   Redis.lockHandleError = Task.fail
-                 }
-          in Redis.lock redisHandler lock (Task.succeed ())
-               |> Expect.succeeds
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
