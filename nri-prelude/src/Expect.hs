@@ -18,7 +18,6 @@ module Expect
     equal,
     notEqual,
     all,
-    concat,
     equalToContentsOf,
 
     -- * Numeric Comparisons
@@ -340,19 +339,6 @@ all expectations subject =
         Internal.append
           acc
           (Stack.withFrozenCallStack expectation subject)
-    )
-    pass
-    expectations
-
--- | Combine multiple expectations into one. The resulting expectation is a
--- failure if any of the original expectations are a failure.
-concat :: Stack.HasCallStack => List Expectation -> Expectation
-concat expectations =
-  List.foldl
-    ( \expectation acc ->
-        Internal.append
-          acc
-          (Stack.withFrozenCallStack expectation)
     )
     pass
     expectations
