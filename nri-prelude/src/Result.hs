@@ -1,5 +1,6 @@
 -- | A @Result@ is the result of a computation that may fail. This is a great
--- way to manage errors in Elm.
+-- way to manage errors in Elm, but we when using this package in Haskell we
+-- tend to rely on 'Task.Task' a lot too for error handling.
 module Result
   ( -- * Type and Constructors
     Result (..),

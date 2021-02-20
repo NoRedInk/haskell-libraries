@@ -70,9 +70,11 @@ data NotRan = NotRan
 -- See 'test' and 'fuzz' for some ways to create a @Test@.
 newtype Test = Test {unTest :: [SingleTest Expectation]}
 
--- |  The result of a single test run: either a 'pass' or a 'fail'.
+-- | The result of a single test run: either a 'pass' or a 'fail'.
 type Expectation = Expectation' ()
 
+-- | The type of a test that runs some script with multiple expectations in
+-- between.
 newtype Expectation' a = Expectation {unExpectation :: Task Failure a}
   deriving (Prelude.Functor, Prelude.Applicative, Prelude.Monad)
 

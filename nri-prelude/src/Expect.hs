@@ -497,6 +497,8 @@ assert pred funcName actual expected =
           expectedText
           actualText
 
+-- | Convert an IO type to an expectation. Useful if you need to call a function
+-- in Haskell's base library or an external library in a test.
 fromIO :: Prelude.IO a -> Internal.Expectation' a
 fromIO io =
   Platform.Internal.Task (\_ -> map Ok io)
@@ -589,21 +591,21 @@ fails task =
 -- and teardown logic, for example to make tests run in a database transaction
 -- that gets rolled back afterwards.
 --
---     dbTest ::
---       Stack.HasCallStack =>
---       Text ->
---       (Db.Connection -> Expect.Expectation) ->
---       Test.Test
---     dbTest description body =
---       Stack.withFrozenCallStack Test.test description <| \_ -> do
---         Expect.around
---           ( \task' -> do
---               conn <- Db.getConnection
---               Platform.finally
---                 (task' conn)
---                 (Db.rollback conn)
---           )
---           body
+-- > dbTest ::
+-- >   Stack.HasCallStack =>
+-- >   Text ->
+-- >   (Db.Connection -> Expect.Expectation) ->
+-- >   Test.Test
+-- > dbTest description body =
+-- >   Stack.withFrozenCallStack Test.test description <| \_ -> do
+-- >     Expect.around
+-- >       ( \task' -> do
+-- >           conn <- Db.getConnection
+-- >           Platform.finally
+-- >             (task' conn)
+-- >             (Db.rollback conn)
+-- >       )
+-- >       body
 around ::
   (forall e a. (arg -> Task e a) -> Task e a) ->
   (arg -> Expectation) ->

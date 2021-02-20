@@ -39,7 +39,7 @@ import qualified Prelude
 --
 
 -- | Here are some common tasks:
-
+--
 -- - @now : Task x Posix@
 -- - @query : String -> Task Error ()@
 -- - @sleep : Float -> Task x ()@
@@ -105,16 +105,16 @@ instance Monad (Task a) where
 -- - Logs are tracingSpans flattened into a series of events ordered by time. For
 --   example, consider the following tracingSpans:
 --
---       do the laundry   11:00-12:15
---           wash clothes   11:00-12:00
---           hang clothes to dry   12:00-12:15
+-- > do the laundry   11:00-12:15
+-- >     wash clothes   11:00-12:00
+-- >     hang clothes to dry   12:00-12:15
 --
 --   we could recover the following logs from this:
 --
---       11:00 starting do the laundry
---       11:00 wash clothes
---       12:00 hang clothes to dry
---       12:15 finishing do the laundry
+-- > 11:00 starting do the laundry
+-- > 11:00 wash clothes
+-- > 12:00 hang clothes to dry
+-- > 12:15 finishing do the laundry
 --
 -- - Metrics are rolling statistics on tracingSpans. For example, we can
 --   increment a counter every time we see a particular tracingSpan pass by.
@@ -374,10 +374,10 @@ instance Prelude.Monoid Succeeded where
 -- We could define a single @SomeTracingSpanDetails@ type that can represent all
 -- of these different types of details. One way would be to write a union:
 --
---     data SomeTracingSpanDetails
---       = Sql SqlDetails
---       | Http HttpDetails
---       | ...
+-- > data SomeTracingSpanDetails
+-- >   = Sql SqlDetails
+-- >   | Http HttpDetails
+-- >   | ...
 --
 -- The disadvantage of this is that nri-prelude will have to know about every
 -- possible type of tracingSpan. If a library wanted to log new information it
@@ -386,7 +386,7 @@ instance Prelude.Monoid Succeeded where
 --
 -- Another approach is to have the details field take arbitrary JSON:
 --
---     type SomeTracingSpanDetails = Data.Aeson.Value
+-- > type SomeTracingSpanDetails = Data.Aeson.Value
 --
 -- This allows any library to log what it wants without requiring any changes in
 -- nri-prelude. However, unless we parse that JSON back into the original types
@@ -599,16 +599,16 @@ mkHandler requestId clock onFinish name' = do
 -- @Platform.bracketWithError@, to ensure we record tracingSpan details even in
 -- the event of an exception cutting the execution of our tracingSpan short.
 --
---     tracingSpan "holiday" do
---       let bookPick = BookPick "The Stone Sky"
---       Platform.finally
---         (readBook bookPick)
---         (setTracingSpanDetails bookPick)
---
---     newtype BookPick = BookPick Text
---       deriving (Aeson.ToJSON)
---
---     instance TracingSpanDetails BookPick
+-- > tracingSpan "holiday" do
+-- >   let bookPick = BookPick "The Stone Sky"
+-- >   Platform.finally
+-- >     (readBook bookPick)
+-- >     (setTracingSpanDetails bookPick)
+-- >
+-- > newtype BookPick = BookPick Text
+-- >   deriving (Aeson.ToJSON)
+-- >
+-- > instance TracingSpanDetails BookPick
 setTracingSpanDetails :: TracingSpanDetails d => d -> Task e ()
 setTracingSpanDetails details =
   Task
@@ -636,10 +636,10 @@ setTracingSpanSummary text =
 -- @tracingSpan@ this is intended for use in writing libraries that define
 -- custom types of effects, such as database queries or http requests.
 --
---     tracingSpan "holiday" do
---       Platform.finally
---         (readBook bookPick)
---         (setTracingSpanSummary "The Stone Sky")
+-- > tracingSpan "holiday" do
+-- >   Platform.finally
+-- >     (readBook bookPick)
+-- >     (setTracingSpanSummary "The Stone Sky")
 markTracingSpanFailed :: Task e ()
 markTracingSpanFailed =
   Task (map Ok << markTracingSpanFailedIO)
@@ -731,9 +731,9 @@ updateIORef ref f = IORef.atomicModifyIORef' ref (\x -> (f x, ()))
 
 -- | Run a task in a tracingSpan.
 --
---     tracingSpan "code dance" <| do
---       waltzPassLeft
---       clockwiseTurn 60
+-- > tracingSpan "code dance" <| do
+-- >   waltzPassLeft
+-- >   clockwiseTurn 60
 --
 -- This will help provide better debugging information if something goes wrong
 -- inside the wrapped task.
@@ -752,9 +752,9 @@ tracingSpan name (Task run) =
 -- sometimes need this in libraries. @Task@ has the concept of a @LogHandler@
 -- built in but @IO@ does not, so we'll have to pass it around ourselves.
 --
---     tracingSpanIO handler "code dance" <| \childHandler -> do
---       waltzPassLeft childHandler
---       clockwiseTurn childHandler 60
+-- > tracingSpanIO handler "code dance" <| \childHandler -> do
+-- >   waltzPassLeft childHandler
+-- >   clockwiseTurn childHandler 60
 tracingSpanIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 tracingSpanIO handler name run =
   Exception.bracketWithError
@@ -766,9 +766,9 @@ tracingSpanIO handler name run =
 -- Instead of taking a parent handler it takes a continuation that will be
 -- called with this root tracingSpan after it has run.
 --
---     rootTracingSpanIO "request-23" Prelude.print "incoming request" <| \handler ->
---       handleRequest
---       |> Task.perform handler
+-- > rootTracingSpanIO "request-23" Prelude.print "incoming request" <| \handler ->
+-- >   handleRequest
+-- >   |> Task.perform handler
 rootTracingSpanIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Text -> (LogHandler -> IO a) -> IO a
 rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock

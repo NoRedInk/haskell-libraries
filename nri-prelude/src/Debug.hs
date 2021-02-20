@@ -1,4 +1,4 @@
--- | This module can be useful while _developing_ an application. It should not
+-- | This module can be useful while /developing/ an application. It should not
 -- be used in production.
 module Debug
   ( -- * Debugging
@@ -24,8 +24,8 @@ import Prelude (Show, error)
 --
 -- Notice that with strings, this is not the @identity@ function. Ultimately it's
 -- down to the value's @Show@ instance, but for strings this typically escapes
--- characters. If you say @toString "he said, \"hi\""@ it will show @"he said,
--- \"hi\""@ rather than @he said, "hi"@.
+-- characters. If you say @toString "he said, \\"hi\\""@ it will show @"he said,
+-- \\"hi\\""@ rather than @he said, "hi"@.
 toString :: Show a => a -> Text
 toString =
   Text.Show.Pretty.ppShow >> pack
