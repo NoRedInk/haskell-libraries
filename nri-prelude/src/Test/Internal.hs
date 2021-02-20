@@ -25,6 +25,7 @@ import qualified List
 import qualified Maybe
 import NriPrelude
 import Platform (TracingSpan)
+import qualified Platform
 import qualified Platform.Internal
 import qualified Task
 import qualified Tuple
@@ -70,7 +71,10 @@ data NotRan = NotRan
 newtype Test = Test {unTest :: [SingleTest Expectation]}
 
 -- |  The result of a single test run: either a 'pass' or a 'fail'.
-newtype Expectation = Expectation {unExpectation :: Task Never TestResult}
+type Expectation = Expectation' ()
+
+newtype Expectation' a = Expectation {unExpectation :: Task Failure a}
+  deriving (Prelude.Functor, Prelude.Applicative, Prelude.Monad)
 
 -- | A @Fuzzer a@ knows how to produce random values of @a@ and how to "shrink"
 -- a value of @a@, that is turn a value into another that is slightly simpler.
@@ -130,7 +134,7 @@ todo name =
           name = name,
           loc = Stack.withFrozenCallStack getFrame,
           label = Todo,
-          body = Expectation (Task.succeed Succeeded)
+          body = Expectation (Task.succeed ())
         }
     ]
 
@@ -209,10 +213,17 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
     ]
 
 fuzzBody :: Show a => Fuzzer a -> (a -> Expectation) -> Expectation
-fuzzBody (Fuzzer gen) expectation =
+fuzzBody (Fuzzer gen) expectation = do
   Expectation
     <| Platform.Internal.Task
-      ( \log -> do
+      ( \_log -> do
+          -- For the moment we're not recording traces in fuzz tests. Because
+          -- the test body runs a great many times, we'd record a ton of data
+          -- that's not all that useful.
+          --
+          -- Ideally we'd only keep the recording of the most significant run,
+          -- but we have to figure out how to do that first.
+          silentLog <- Platform.silentHandler
           seed <- Hedgehog.Internal.Seed.random
           failureRef <- IORef.newIORef Nothing
           hedgehogResult <-
@@ -226,11 +237,13 @@ fuzzBody (Fuzzer gen) expectation =
                     expectation generated
                       |> handleUnexpectedErrors
                       |> unExpectation
-                      |> Task.perform log
+                      |> Task.map Ok
+                      |> Task.onError (Task.succeed << Err)
+                      |> Task.perform silentLog
                       |> Control.Monad.IO.Class.liftIO
                   case result of
-                    Succeeded -> Prelude.pure ()
-                    Failed failure -> do
+                    Ok () -> Prelude.pure ()
+                    Err failure -> do
                       IORef.writeIORef failureRef (Just failure)
                         |> Control.Monad.IO.Class.liftIO
                       Hedgehog.failure
@@ -242,20 +255,17 @@ fuzzBody (Fuzzer gen) expectation =
               case maybeFailure of
                 Nothing ->
                   TestRunnerMessedUp "I lost the error report of a failed fuzz test test."
-                    |> Failed
-                    |> Ok
+                    |> Err
                     |> Prelude.pure
                 Just failure ->
-                  Failed failure
-                    |> Ok
+                  Err failure
                     |> Prelude.pure
             Hedgehog.Internal.Report.GaveUp ->
               TestRunnerMessedUp "I couldn't generate any values for a fuzz test."
-                |> Failed
-                |> Ok
+                |> Err
                 |> Prelude.pure
             Hedgehog.Internal.Report.OK ->
-              Ok Succeeded
+              Ok ()
                 |> Prelude.pure
       )
 
@@ -327,25 +337,6 @@ only :: Test -> Test
 only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
--- | Run a test that executes a task. The test passes if the task returns a
--- success value.
-task :: Stack.HasCallStack => Text -> Task Failure a -> Test
-task name expectation =
-  Test
-    [ SingleTest
-        { describes = [],
-          name = name,
-          loc = Stack.withFrozenCallStack getFrame,
-          label = None,
-          body =
-            expectation
-              |> Task.map (\_ -> Succeeded)
-              |> Task.onError (Task.succeed << Failed)
-              |> Expectation
-              |> handleUnexpectedErrors
-        }
-    ]
-
 run :: Test -> Task e SuiteResult
 run (Test all) = do
   let grouped = groupBy label all
@@ -400,10 +391,9 @@ data Summary = Summary
 handleUnexpectedErrors :: Expectation -> Expectation
 handleUnexpectedErrors (Expectation task') =
   task'
-    |> Task.mapError never
-    |> onException (Task.succeed << Failed << ThrewException)
+    |> onException (Task.fail << ThrewException)
     |> Task.timeout 10_000 TookTooLong
-    |> Task.onError (Task.succeed << Failed)
+    |> Task.onError Task.fail
     |> Expectation
 
 runSingle :: SingleTest Expectation -> Task e (SingleTest (TracingSpan, TestResult))
@@ -419,16 +409,16 @@ runSingle test' =
             ( \log ->
                 body test'
                   |> unExpectation
-                  |> Task.mapError never
-                  |> map Ok
+                  |> Task.map Ok
+                  |> Task.onError (Task.succeed << Err)
                   |> Task.perform log
             )
         let testRest =
               case res of
-                Ok x -> x
+                Ok () -> Succeeded
                 -- If you remove this branch, consider also removing the
                 -- -fno-warn-overlapping-patterns warning above.
-                Err err -> never err
+                Err err -> Failed err
         span' <- MVar.takeMVar spanVar
         let span =
               span'
@@ -484,11 +474,28 @@ groupBy key xs =
 
 append :: Expectation -> Expectation -> Expectation
 append (Expectation task1) (Expectation task2) =
-  task1
-    |> andThen
-      ( \result1 ->
-          case result1 of
-            Succeeded -> task2
-            Failed _ -> task1
-      )
+  Expectation <| do
+    task1
+    task2
+
+-- Assertion constructors
+-- All exposed assertion functions should call these functions internally and
+-- never each other, to ensure a single unnested 'expectation' entry from
+-- appearing in log-explorer traces.
+
+pass :: Stack.HasCallStack => Text -> a -> Expectation' a
+pass name a = Stack.withFrozenCallStack traceExpectation name (Task.succeed a)
+
+failAssertion :: Stack.HasCallStack => Text -> Text -> Expectation' a
+failAssertion name err =
+  FailedAssertion err (Stack.withFrozenCallStack getFrame)
+    |> Task.fail
+    |> Stack.withFrozenCallStack traceExpectation name
+
+traceExpectation :: Stack.HasCallStack => Text -> Task Failure a -> Expectation' a
+traceExpectation name task =
+  Stack.withFrozenCallStack
+    Platform.tracingSpan
+    name
+    task
     |> Expectation

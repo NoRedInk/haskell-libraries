@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- |  A library to create @Expectation@s, which describe a claim to be tested.
 --
 -- = Quick Reference
@@ -17,6 +19,7 @@ module Expect
     notEqual,
     all,
     concat,
+    equalToContentsOf,
 
     -- * Numeric Comparisons
     lessThan,
@@ -33,15 +36,20 @@ module Expect
     err,
 
     -- * Customizing
-
-    -- | These functions will let you build your own expectations.
     pass,
     fail,
     onFail,
+    fromResult,
+
+    -- * Testing tasks
+    succeeds,
+    fails,
+    andCheck,
 
     -- * Fancy Expectations
-    equalToContentsOf,
-    withIO,
+    fromIO,
+    Internal.Expectation',
+    around,
   )
 where
 
@@ -60,16 +68,7 @@ import qualified Task
 import Test.Internal (Expectation)
 import qualified Test.Internal as Internal
 import qualified Text.Show.Pretty
-import Prelude (IO, show)
-
--- | Run some IO and assert the value it produces.
---
--- If the IO throws an exception the test will fail.
-withIO :: (a -> Expectation) -> IO a -> Expectation
-withIO fn io =
-  fromIO io
-    |> andThen (Internal.unExpectation << fn)
-    |> Internal.Expectation
+import qualified Prelude
 
 -- | Always passes.
 --
@@ -86,8 +85,8 @@ withIO fn io =
 -- >
 -- >             Err err ->
 -- >                 Expect.fail err
-pass :: Expectation
-pass = Internal.Expectation (Task.succeed Internal.Succeeded)
+pass :: Stack.HasCallStack => Expectation
+pass = Stack.withFrozenCallStack Internal.pass "Expect.pass" ()
 
 -- | Fails with the given message.
 --
@@ -106,24 +105,20 @@ pass = Internal.Expectation (Task.succeed Internal.Succeeded)
 -- >                 Expect.fail err
 fail :: Stack.HasCallStack => Text -> Expectation
 fail msg =
-  Internal.FailedAssertion msg (Stack.withFrozenCallStack Internal.getFrame)
-    |> Internal.Failed
-    |> Task.succeed
-    |> Internal.Expectation
+  Stack.withFrozenCallStack Internal.failAssertion "Expect.fail" msg
 
 -- | If the given expectation fails, replace its failure message with a custom one.
 --
 -- > "something"
 -- >     |> Expect.equal "something else"
 -- >     |> Expect.onFail "thought those two strings would be the same"
-onFail :: Text -> Expectation -> Expectation
+onFail :: Stack.HasCallStack => Text -> Expectation -> Expectation
 onFail msg (Internal.Expectation task) =
   task
-    |> Task.map
-      ( \res ->
-          case res of
-            Internal.Succeeded -> Internal.Succeeded
-            Internal.Failed _ -> Internal.Failed (Internal.FailedAssertion msg Internal.getFrame)
+    |> Task.onError
+      ( \_ ->
+          Stack.withFrozenCallStack Internal.failAssertion "Expect.onFail" msg
+            |> Internal.unExpectation
       )
     |> Internal.Expectation
 
@@ -388,8 +383,16 @@ concat expectations =
 ok :: (Stack.HasCallStack, Show b) => Result b a -> Expectation
 ok res =
   case res of
-    Ok _ -> pass
-    Err message -> Stack.withFrozenCallStack fail ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
+    Ok _ ->
+      Stack.withFrozenCallStack
+        Internal.pass
+        "Expect.ok"
+        ()
+    Err message ->
+      Stack.withFrozenCallStack
+        Internal.failAssertion
+        "Expect.ok"
+        ("I expected a Ok but got Err (" ++ Debug.toString message ++ ")")
 
 -- | Passes if the Result is an Err rather than Ok. This is useful for tests where you expect to get an error but you don't care what the actual error is.
 --
@@ -417,8 +420,16 @@ ok res =
 err :: (Stack.HasCallStack, Show a) => Result b a -> Expectation
 err res =
   case res of
-    Ok value -> Stack.withFrozenCallStack fail ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
-    Err _ -> pass
+    Ok value ->
+      Stack.withFrozenCallStack
+        Internal.failAssertion
+        "Expect.err"
+        ("I expected a Err but got Ok (" ++ Debug.toString value ++ ")")
+    Err _ ->
+      Stack.withFrozenCallStack
+        Internal.pass
+        "Expect.err"
+        ()
 
 -- | Check if a string is equal to the contents of a file.
 --
@@ -432,28 +443,28 @@ err res =
 -- encodings. When a test fails we can throw away the file, rerun the test, and
 -- use @git diff golden-results/complicated-object.txt@ to check whether the
 -- changes are acceptable.
-equalToContentsOf :: Stack.HasCallStack => Text -> Text -> Expectation
-equalToContentsOf filepath' actual =
-  Internal.Expectation
-    <| do
-      let filepath = Data.Text.unpack filepath'
-      exists <-
-        fromIO <| do
-          Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
-          Directory.doesFileExist filepath
-      if exists
-        then do
-          expected <- fromIO (Data.Text.IO.readFile filepath)
-          Stack.withFrozenCallStack
-            assert
-            (==)
-            "Expect.equalToContentsOf"
-            (UnescapedShow expected)
-            (UnescapedShow actual)
-            |> Internal.unExpectation
-        else do
-          fromIO (Data.Text.IO.writeFile filepath actual)
-          Internal.unExpectation pass
+equalToContentsOf :: Text -> Text -> Expectation
+equalToContentsOf filepath' actual = do
+  let filepath = Data.Text.unpack filepath'
+  exists <-
+    fromIO <| do
+      Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
+      Directory.doesFileExist filepath
+  if exists
+    then do
+      expected <- fromIO (Data.Text.IO.readFile filepath)
+      Stack.withFrozenCallStack
+        assert
+        (==)
+        "Expect.equalToContentsOf"
+        (UnescapedShow expected)
+        (UnescapedShow actual)
+    else do
+      fromIO (Data.Text.IO.writeFile filepath actual)
+      Stack.withFrozenCallStack
+        Internal.pass
+        "Expect.equalToContentsOf"
+        ()
 
 -- By default we will compare values with each other after they have been
 -- passed to @show@. Unfortunately @show@ for the @Text@ type escapes special
@@ -478,17 +489,17 @@ instance Show UnescapedShow where
 assert :: (Stack.HasCallStack, Show a) => (a -> a -> Bool) -> Text -> a -> a -> Expectation
 assert pred funcName actual expected =
   if pred actual expected
-    then pass
-    else
-      Internal.Expectation <| do
-        window <- fromIO Terminal.size
-        let terminalWidth = case window of
-              Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
-              Nothing -> 80
-        let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
-        let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
-        let numLines text = List.length (Data.Text.lines text)
-        Diff.pretty
+    then Stack.withFrozenCallStack Internal.pass funcName ()
+    else do
+      window <- fromIO Terminal.size
+      let terminalWidth = case window of
+            Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
+            Nothing -> 80
+      let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
+      let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
+      let numLines text = List.length (Data.Text.lines text)
+      Stack.withFrozenCallStack Internal.failAssertion funcName
+        <| Diff.pretty
           Diff.Config
             { Diff.separatorText = Just funcName,
               Diff.wrapping = Diff.Wrap terminalWidth,
@@ -499,8 +510,123 @@ assert pred funcName actual expected =
             }
           expectedText
           actualText
-          |> Stack.withFrozenCallStack fail
-          |> Internal.unExpectation
 
-fromIO :: Prelude.IO a -> Task e a
-fromIO io = Platform.Internal.Task (\_ -> map Ok io)
+fromIO :: Prelude.IO a -> Internal.Expectation' a
+fromIO io =
+  Platform.Internal.Task (\_ -> map Ok io)
+    |> Internal.Expectation
+
+-- | Used for making matchers
+-- expectOneItem :: Expectation' [a] -> Expectation' a
+-- expectOneItem t = do
+--   xs <- t
+--   case xs of
+--     [x] -> Ok x
+--     _ -> Err ("Expected one item, but got " ++ Debug.toString (List.length xs) ++ ".")
+--   |> Expect.fromResult
+fromResult :: (Stack.HasCallStack, Show b) => Result b a -> Internal.Expectation' a
+fromResult (Ok a) =
+  Stack.withFrozenCallStack
+    Internal.pass
+    "Expect.fromResult"
+    a
+fromResult (Err msg) =
+  Stack.withFrozenCallStack
+    Internal.failAssertion
+    "Expect.fromResult"
+    (Debug.toString msg)
+
+-- | Check a task returns an expected value.
+--
+-- > test "Greetings are friendly" <| \_ -> do
+-- >     getGreeting
+-- >         |> andCheck (Expect.equal "Hi!")
+andCheck :: (Stack.HasCallStack, Show err) => (a -> Expectation) -> Task err a -> Internal.Expectation
+andCheck expectation task = do
+  x <- succeeds task
+  Stack.withFrozenCallStack expectation x
+
+-- | Check a task succeeds.
+--
+-- > test "solve rubicskube" <| \_ -> do
+-- >     solveRubicsKube
+-- >         |> succeeds
+succeeds :: (Stack.HasCallStack, Show err) => Task err a -> Internal.Expectation' a
+succeeds task =
+  task
+    |> Task.onError
+      ( \message ->
+          Stack.withFrozenCallStack
+            Internal.failAssertion
+            "Expect.succeeds"
+            (Debug.toString message)
+            |> Internal.unExpectation
+      )
+    |> Task.andThen
+      ( \a ->
+          Stack.withFrozenCallStack
+            Internal.pass
+            "Expect.succeeds"
+            a
+            |> Internal.unExpectation
+      )
+    |> Internal.Expectation
+
+-- | Check a task fails.
+--
+-- > test "chemistry experiment" <| \_ -> do
+-- >     mixRedAndGreenLiquids
+-- >         |> fails
+fails :: (Stack.HasCallStack, Show a) => Task err a -> Internal.Expectation' err
+fails task =
+  task
+    |> Task.map (\succ -> Err ("Expected failure but succeeded with " ++ Debug.toString succ))
+    |> Task.onError (\err' -> Task.succeed (Ok err'))
+    |> Task.andThen
+      ( \res ->
+          Internal.unExpectation
+            <| case res of
+              Ok a ->
+                Stack.withFrozenCallStack
+                  Internal.pass
+                  "Expect.fails"
+                  a
+              Err msg ->
+                Stack.withFrozenCallStack
+                  Internal.failAssertion
+                  "Expect.fails"
+                  (Debug.toString msg)
+      )
+    |> Internal.Expectation
+
+-- | This can be used to create custom test functions that contain some setup
+-- and teardown logic, for example to make tests run in a database transaction
+-- that gets rolled back afterwards.
+--
+--     dbTest ::
+--       Stack.HasCallStack =>
+--       Text ->
+--       (Db.Connection -> Expect.Expectation) ->
+--       Test.Test
+--     dbTest description body =
+--       Stack.withFrozenCallStack Test.test description <| \_ -> do
+--         Expect.around
+--           ( \task' -> do
+--               conn <- Db.getConnection
+--               Platform.finally
+--                 (task' conn)
+--                 (Db.rollback conn)
+--           )
+--           body
+around ::
+  (forall e a. (arg -> Task e a) -> Task e a) ->
+  (arg -> Expectation) ->
+  Expectation
+around runTask runExpectation =
+  Internal.Expectation
+    ( runTask
+        ( \arg ->
+            runExpectation arg
+              |> Internal.unExpectation
+        )
+    )

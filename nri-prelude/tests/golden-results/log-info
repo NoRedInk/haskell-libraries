@@ -9,10 +9,10 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 28
-              , srcLocStartCol = 16
-              , srcLocEndLine = 28
-              , srcLocEndCol = 74
+              , srcLocStartLine = 29
+              , srcLocStartCol = 18
+              , srcLocEndLine = 29
+              , srcLocEndCol = 76
               }
           )
     , details = Just "{\"a number\":12}"

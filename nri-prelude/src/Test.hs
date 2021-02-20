@@ -13,9 +13,6 @@ module Test
     Internal.fuzz2,
     Internal.fuzz3,
 
-    -- * Task Testing
-    Internal.task,
-
     -- * Running test
     run,
   )

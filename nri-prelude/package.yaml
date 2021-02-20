@@ -45,7 +45,6 @@ library:
   - Debug
   - Dict
   - Expect
-  - Expect.Task
   - Fuzz
   - List
   - Log
@@ -94,3 +93,6 @@ tests:
     ghc-options:
     - -threaded
     - -rtsopts "-with-rtsopts=-N -T"
+    - -fno-warn-type-defaults
+    default-extensions:
+    - ExtendedDefaultRules
