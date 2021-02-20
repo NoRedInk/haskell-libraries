@@ -27,53 +27,88 @@ tests =
     [ test "Given a request made using `get` when the response has a 200 status code the task return succeeds" <| \() ->
         withServer
           (constant "" Status.ok200)
-          (\http url -> Http.get http url Http.expectWhatever)
-          |> Expect.withIO Expect.ok,
+          ( \http url -> do
+              Http.get http url Http.expectWhatever
+                |> Expect.succeeds
+          ),
       test "Given a request made using `get` when the response has a 400 status code the task fails with a BadStatus error" <| \() ->
         withServer
           (constant "" Status.badRequest400)
-          (\http url -> Http.get http url Http.expectWhatever)
-          |> Expect.withIO (Expect.equal (Err (Http.BadStatus 400))),
+          ( \http url -> do
+              err <-
+                Http.get http url Http.expectWhatever
+                  |> Expect.fails
+              err
+                |> Expect.equal (Http.BadStatus 400)
+          ),
       test "Given a request made using `get` that expects a JSON response when the response includes the right JSON it is returned decoded" <| \() ->
         withServer
           (constant "[1,2,3]" Status.ok200)
-          (\http url -> Http.get http url Http.expectJson)
-          |> Expect.withIO (Expect.equal (Ok [1, 2, 3 :: Int])),
+          ( \http url -> do
+              response <-
+                Http.get http url Http.expectJson
+                  |> Expect.succeeds
+              response
+                |> Expect.equal [1, 2, 3 :: Int]
+          ),
       test "Given a request made using `get` that expects a JSON response when the JSON in the responses can not be decoded we fail with a BadBody error" <| \() ->
         withServer
           (constant "12" Status.ok200)
-          (\http url -> Http.get http url (Http.expectJson :: Http.Expect Text))
-          |> Expect.withIO (Expect.equal (Err (Http.BadBody "Error in $: parsing Text failed, expected String, but encountered Number"))),
+          ( \http url -> do
+              err <-
+                Http.get http url (Http.expectJson :: Http.Expect Text)
+                  |> Expect.fails
+              err
+                |> Expect.equal (Http.BadBody "Error in $: parsing Text failed, expected String, but encountered Number")
+          ),
       test "When a request is made using `get` to an invalid URL we fail with a BadUrl error" <| \() ->
         withServer
           (constant "" Status.ok200)
-          (\http _ -> Http.get http "ceci n'est pas un URL" Http.expectWhatever)
-          |> Expect.withIO (Expect.equal (Err (Http.BadUrl "Invalid URL"))),
-      test "When a request is made using `get` with a json body the `Content-Type` header is set to `application/json`" <| \() ->
-        expectRequest (\http url -> Http.post http url (Http.jsonBody ()) Http.expectWhatever)
-          |> map (map (Data.List.lookup "content-type" << Wai.requestHeaders))
-          |> Expect.withIO (Expect.equal (Ok (Just "application/json"))),
-      test "When a request is made using `get` with a json body the JSON is encoded correctly" <| \() ->
-        expectRequest (\http url -> Http.post http url (Http.jsonBody [1, 2, 3 :: Int]) Http.expectWhatever)
-          |> andThen
-            ( \result ->
-                case result of
-                  Ok req -> map Ok (Wai.strictRequestBody req)
-                  Err err -> Prelude.pure (Err err)
+          ( \http _ -> do
+              err <-
+                Http.get http "ceci n'est pas un URL" Http.expectWhatever
+                  |> Expect.fails
+              err
+                |> Expect.equal (Http.BadUrl "Invalid URL")
+          ),
+      test "When a request is made using `get` with a json body the `Content-Type` header is set to `application/json`" <| \() -> do
+        request <-
+          expectRequest
+            ( \http url ->
+                Http.post http url (Http.jsonBody ()) Http.expectWhatever
             )
-          |> Expect.withIO (Expect.equal (Ok "[1,2,3]")),
-      test "When a request is made using `get` with a string body the `Content-Type` header is set to provided mime type" <| \() ->
-        expectRequest (\http url -> Http.post http url (Http.stringBody "element/fire" "WOOSH") Http.expectWhatever)
-          |> map (map (Data.List.lookup "content-type" << Wai.requestHeaders))
-          |> Expect.withIO (Expect.equal (Ok (Just "element/fire"))),
+        request
+          |> Wai.requestHeaders
+          |> Data.List.lookup "content-type"
+          |> Expect.equal (Just "application/json"),
+      test "When a request is made using `get` with a json body the JSON is encoded correctly" <| \() -> do
+        request <-
+          expectRequest
+            ( \http url ->
+                Http.post http url (Http.jsonBody [1, 2, 3 :: Int]) Http.expectWhatever
+            )
+        body <- Expect.fromIO (Wai.strictRequestBody request)
+        Expect.equal "[1,2,3]" body,
+      test "When a request is made using `get` with a string body the `Content-Type` header is set to provided mime type" <| \() -> do
+        request <-
+          expectRequest
+            ( \http url ->
+                Http.post http url (Http.stringBody "element/fire" "WOOSH") Http.expectWhatever
+            )
+        request
+          |> Wai.requestHeaders
+          |> Data.List.lookup "content-type"
+          |> Expect.equal (Just "element/fire"),
       test "Http requests report the span data we expect" <| \_ ->
-        withServerIO
+        withServer
           (constant "" Status.ok200)
-          ( \http url ->
-              Http.get http url Http.expectWhatever
-                |> spanForTask
+          ( \http url -> do
+              span <-
+                Http.get http url Http.expectWhatever
+                  |> spanForTask
+              Debug.toString span
+                |> Expect.equalToContentsOf "test/golden-results/expected-http-span"
           )
-          |> Expect.withIO (Debug.toString >> Expect.equalToContentsOf "test/golden-results/expected-http-span")
     ]
 
 -- # Wai applications to test against
@@ -86,52 +121,71 @@ constant body status _ respond =
     |> respond
 
 -- | Run a temporary web application to send requests to.
-withServer :: Wai.Application -> (Http.Handler -> Text -> Task e a) -> Prelude.IO (Result e a)
+withServer ::
+  Wai.Application ->
+  (Http.Handler -> Text -> Expect.Expectation) ->
+  Expect.Expectation
 withServer app run = do
-  log <- Platform.silentHandler
-  withServerIO app (\http host -> run http host |> Task.attempt log)
+  log <- Expect.succeeds Platform.logHandler
+  doAnything <- Expect.fromIO Platform.doAnythingHandler
+  Expect.around
+    ( \runTask ->
+        withServerIO log app (\http host -> runTask (http, host))
+          |> Platform.doAnything doAnything
+    )
+    (\(http, host) -> run http host)
 
-withServerIO :: Wai.Application -> (Http.Handler -> Text -> Prelude.IO a) -> Prelude.IO a
-withServerIO app run =
+-- | Run a temporary web application to send requests to.
+withServerIO ::
+  Platform.LogHandler ->
+  Wai.Application ->
+  (Http.Handler -> Text -> Task e a) ->
+  Prelude.IO (Result e a)
+withServerIO log app run = do
   Conduit.withAcquire Http.handler <| \http ->
-    Warp.testWithApplication (Prelude.pure app) <| \port ->
-      run http ("http://localhost:" ++ Debug.toString port)
+    Warp.testWithApplication
+      (Prelude.pure app)
+      ( \port ->
+          run http ("http://localhost:" ++ Text.fromInt (Prelude.fromIntegral port))
+            |> Task.attempt log
+      )
 
 -- | Run a temporary web application that handles a single request, and then
 -- immediately returns that request so you can run expectations against it.
 --
 -- Useful if you want to check properties of requests you send.
-expectRequest :: Show e => (Http.Handler -> Text -> Task e a) -> Prelude.IO (Result Text Wai.Request)
-expectRequest run =
+expectRequest :: Show e => (Http.Handler -> Text -> Task e a) -> Expect.Expectation' Wai.Request
+expectRequest run = do
   let app req _respond = Exception.throwIO (FirstRequest req)
-   in Exception.try (withServer app run)
-        |> map
-          ( \either ->
-              case either of
-                Prelude.Left (FirstRequest req) -> Ok req
-                Prelude.Right (Ok _) -> Err "Expected a request, but none was received."
-                Prelude.Right (Err err) -> Err (Text.fromList (Prelude.show err))
-          )
+  log <- Expect.succeeds Platform.logHandler
+  either <- Expect.fromIO <| Exception.try (withServerIO log app run)
+  Expect.succeeds
+    <| case either of
+      Prelude.Left (FirstRequest req) -> Task.succeed req
+      Prelude.Right (Ok _) -> Task.fail "Expected a request, but none was received."
+      Prelude.Right (Err err) -> Task.fail (Debug.toString err)
 
 newtype FirstRequest = FirstRequest Wai.Request deriving (Show)
 
 instance Exception.Exception FirstRequest
 
 spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
-spanForTask task =
-  Expect.fromIO <| do
-    spanVar <- MVar.newEmptyMVar
-    res <-
+spanForTask task = do
+  spanVar <- Expect.fromIO MVar.newEmptyMVar
+  res <-
+    Expect.fromIO <| do
       Platform.rootTracingSpanIO
         "test-request"
         (MVar.putMVar spanVar)
         "test-root"
         (\log -> Task.attempt log task)
-    case res of
-      Err err -> Prelude.fail <| Text.toList (Debug.toString err)
-      Ok _ ->
-        MVar.takeMVar spanVar
-          |> map constantValuesForVariableFields
+  Expect.ok res
+  maybeSpan <- Expect.fromIO (MVar.tryTakeMVar spanVar)
+  Expect.succeeds
+    ( case maybeSpan of
+        Nothing -> Task.fail "Recording span failed"
+        Just span -> Task.succeed (constantValuesForVariableFields span)
+    )
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.
