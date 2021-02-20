@@ -23,11 +23,11 @@ import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IORef as IORef
 import qualified Data.List
-import qualified Data.Sequence as Seq
 import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
 import qualified Data.Time as Time
+import qualified Data.Vector as Vector
 import qualified Data.Version as Version
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
@@ -62,7 +62,7 @@ data Model = Model
     userDidSomething :: Bool
   }
 
-type List' a = ListWidget.GenericList Name Seq.Seq a
+type List' a = ListWidget.GenericList Name Vector.Vector a
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
@@ -87,17 +87,13 @@ data Msg
   | SetCurrentTime Time.UTCTime
   | CopyDetails
 
-newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
-
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
 -- own state not stored in the main Model type above. Widgets that have state
 -- like that need a unique name which brick uses as a key for storage.
 data Name
-  = RootSpanListViewport
-  | RootSpanLine Id
-  | SpanDetailsListViewport Prelude.Int
-  | SpanLine Id Int
+  = RootSpanList
+  | RootSpanBreakdown Prelude.Int
   deriving (Eq, Ord, Show)
 
 -- An alternative data type containing part of the same data as above, in a
@@ -134,7 +130,7 @@ init clipboardCommand now =
   Model
     { currentTime = now,
       clipboardCommand = clipboardCommand,
-      loglines = ListWidget.list RootSpanListViewport Prelude.mempty 1,
+      loglines = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
       userDidSomething = False
     }
@@ -244,20 +240,20 @@ repeat n f x =
 toFlatList :: Prelude.Int -> Platform.TracingSpan -> List' Span
 toFlatList id span =
   ListWidget.list
-    (SpanDetailsListViewport id)
+    (RootSpanBreakdown id)
     (toFlatListHelper 0 span)
     1
 
-toFlatListHelper :: Int -> Platform.TracingSpan -> Seq.Seq Span
+toFlatListHelper :: Int -> Platform.TracingSpan -> Vector.Vector Span
 toFlatListHelper nesting span =
-  (Seq.<|)
+  Vector.cons
     Span
       { nesting = nesting,
         original = span
       }
     ( Platform.children span
-        |> Seq.fromList
-        |> Seq.reverse
+        |> Vector.fromList
+        |> Vector.reverse
         |> Prelude.foldMap (toFlatListHelper (nesting + 1))
     )
 
