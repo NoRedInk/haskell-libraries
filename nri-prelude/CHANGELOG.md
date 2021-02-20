@@ -1,3 +1,18 @@
+# 0.4.0.0
+
+Breraking changes:
+
+- `Expect.Task` has been removed. Most of it's functionality has been moved into `Expect`.
+- `Test.task` has been removed. Regular `Test.test` now supports monadic-style test writing.
+- `Expect.concat` has been removed. `do`-notation can now be used to run multiple expectations.
+
+Enhancements:
+
+- Test failure diffs now look much nicer if they contain multi-line output.
+- Test failures now show a snippet of the source code around the location of the failure.
+- Tests now write to a log file that can be inspected using a new `log-explorer` tool.
+- Added `Platform.writeSpanToDevLog` to write to `log-explorer` from your own code.
+
 # 0.3.1.0
 
 Enhancements:
