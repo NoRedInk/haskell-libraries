@@ -59,7 +59,7 @@ import qualified Prelude
 -- (@Array Int@) or strings (@Array String@) or any other type of value you can
 -- dream up.
 newtype Array a = Array (Data.Vector.Vector a)
-  deriving (Prelude.Eq, Prelude.Show)
+  deriving (Prelude.Eq, Prelude.Functor, Prelude.Show)
 
 -- | Helper function to unwrap an array
 unwrap :: Array a -> Data.Vector.Vector a

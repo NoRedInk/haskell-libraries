@@ -10,6 +10,7 @@ import qualified Brick
 import qualified Brick.BChan
 import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
+import qualified Brick.Widgets.List as ListWidget
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
@@ -22,6 +23,7 @@ import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IORef as IORef
 import qualified Data.List
+import qualified Data.Sequence as Seq
 import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
@@ -40,7 +42,6 @@ import qualified System.Exit
 import qualified System.IO
 import qualified System.Process
 import qualified Text
-import qualified Zipper
 import qualified Prelude
 
 data Model = Model
@@ -49,25 +50,24 @@ data Model = Model
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
     -- The actual data displayed. In a zipper because one is always selected.
-    loglines :: Maybe (Zipper.Zipper Logline),
+    loglines :: List' Logline,
     -- If we're in the detail view for a root span, this will contain a copy of
     -- the data of that particular span in a format more suitable for this view.
-    selectedRootSpan :: Maybe (Zipper.Zipper Span),
+    selectedRootSpan :: Maybe (List' Span),
     -- Loading in initial data happens piecemeal, starting with the oldest data
     -- first, so visually filling the view from the bottom up. Until the user
     -- interacts we're going to keep the focus on the last-loaded element, but
     -- once the user starts controlling the app themselves we want to keep our
     -- hands off the controls.
-    userDidSomething :: Bool,
-    -- Incrementing number to give all the root spans a unique identifier.
-    lastId :: Id
+    userDidSomething :: Bool
   }
+
+type List' a = ListWidget.GenericList Name Seq.Seq a
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
 data Logline = Logline
-  { logId :: Id,
-    logTime :: Time.UTCTime,
+  { logTime :: Time.UTCTime,
     logSpan :: Platform.TracingSpan
   }
 
@@ -96,7 +96,7 @@ newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
 data Name
   = RootSpanListViewport
   | RootSpanLine Id
-  | SpanDetailsListViewport Id
+  | SpanDetailsListViewport Prelude.Int
   | SpanLine Id Int
   deriving (Eq, Ord, Show)
 
@@ -104,27 +104,27 @@ data Name
 -- format more convenient for some update and view functions.
 data Page
   = NoLogsFound
-  | SpanList Time.UTCTime (Zipper.Zipper Logline)
-  | SpanDetails (Maybe Text) Logline (Zipper.Zipper Span)
+  | SpanList Time.UTCTime (List' Logline)
+  | SpanDetails (Maybe Text) Logline (List' Span)
 
 toPage :: Model -> Page
 toPage model =
-  case (selectedRootSpan model, loglines model) of
-    (Just selected, Just spans) ->
+  case (selectedRootSpan model, ListWidget.listSelectedElement (loglines model)) of
+    (_, Nothing) -> NoLogsFound
+    (Just selected, Just (_, elem)) ->
       SpanDetails
         (clipboardCommand model)
-        (Zipper.current spans)
+        elem
         selected
-    (Nothing, Just spans) -> SpanList (currentTime model) spans
-    (_, Nothing) -> NoLogsFound
+    (Nothing, Just _) -> SpanList (currentTime model) (loglines model)
 
 withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
 withPage model fn =
   map
     ( \newPage ->
         case newPage of
-          NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
-          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
+          NoLogsFound -> model {selectedRootSpan = Nothing}
+          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = zipper}
           SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
     )
     (fn (toPage model))
@@ -134,10 +134,9 @@ init clipboardCommand now =
   Model
     { currentTime = now,
       clipboardCommand = clipboardCommand,
-      loglines = Nothing,
+      loglines = ListWidget.list RootSpanListViewport Prelude.mempty 1,
       selectedRootSpan = Nothing,
-      userDidSomething = False,
-      lastId = 0
+      userDidSomething = False
     }
 
 update :: Model -> Msg -> Brick.EventM Name (Brick.Next Model)
@@ -152,18 +151,14 @@ update model msg =
           -- If a line cannot be parsed we ignore it for now.
           Brick.continue model
         Just (date, span) -> do
-          let newId = lastId model + 1
-              logline = Logline newId date span
+          let logline = Logline date span
               newModel =
                 model
                   { loglines =
-                      case loglines model of
-                        Nothing -> Just (Zipper.singleton logline)
-                        Just zipper ->
-                          -- Each line we read represents a newer log entry then
-                          -- the ones before it, so we insert it at the top.
-                          Just (Zipper.prepend [logline] zipper),
-                    lastId = newId
+                      ListWidget.listInsert
+                        0
+                        logline
+                        (loglines model)
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
@@ -171,13 +166,13 @@ update model msg =
           if userDidSomething model
             then Brick.continue newModel
             else
-              moveZipper Zipper.first newModel
+              moveZipper (ListWidget.listMoveTo 0) newModel
                 |> andThen Brick.continue
     DownBy n ->
-      moveZipper (repeat n Zipper.next) model
+      moveZipper (repeat n ListWidget.listMoveDown) model
         |> andThen continueAfterUserInteraction
     UpBy n ->
-      moveZipper (repeat n Zipper.prev) model
+      moveZipper (repeat n ListWidget.listMoveUp) model
         |> andThen continueAfterUserInteraction
     ShowDetails ->
       withPage
@@ -187,11 +182,14 @@ update model msg =
               NoLogsFound -> Prelude.pure page
               SpanDetails _ _ _ -> Prelude.pure page
               SpanList _ spans ->
-                SpanDetails
-                  (clipboardCommand model)
-                  (Zipper.current spans)
-                  (Zipper.current spans |> logSpan |> toFlatList)
-                  |> Prelude.pure
+                case ListWidget.listSelectedElement spans of
+                  Nothing -> Prelude.pure page
+                  Just (currentIndex, currentSpan) ->
+                    SpanDetails
+                      (clipboardCommand model)
+                      currentSpan
+                      (currentSpan |> logSpan |> toFlatList currentIndex)
+                      |> Prelude.pure
         )
         |> andThen continueAfterUserInteraction
     Exit ->
@@ -205,9 +203,12 @@ update model msg =
         SpanList _ _ -> Prelude.pure ()
         SpanDetails Nothing _ _ -> Prelude.pure ()
         SpanDetails (Just cmd) _ spans ->
-          original (Zipper.current spans)
-            |> spanToClipboard cmd
-            |> liftIO
+          case ListWidget.listSelectedElement spans of
+            Nothing -> Prelude.pure ()
+            Just (_, currentSpan) ->
+              original currentSpan
+                |> spanToClipboard cmd
+                |> liftIO
       continueAfterUserInteraction model
 
 -- The root span and detail span pages can each come to maintain a lot of rows.
@@ -222,23 +223,17 @@ update model msg =
 -- The first argument is supposed to be a focus-changing zipper funtion, such as
 -- `Zipper.next` or `Zipper.first`.
 moveZipper ::
-  (forall a. Zipper.Zipper a -> Zipper.Zipper a) ->
+  (forall a. List' a -> List' a) ->
   Model ->
   Brick.EventM Name Model
-moveZipper move model = do
+moveZipper move model =
   withPage model <| \page ->
     case page of
       NoLogsFound -> Prelude.pure NoLogsFound
-      SpanList time spans -> do
-        let newSpans = move spans
-        Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current spans)))
-        Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current newSpans)))
-        Prelude.pure (SpanList time newSpans)
-      SpanDetails cmd root spans -> do
-        let newSpans = move spans
-        Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex spans))
-        Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex newSpans))
-        Prelude.pure (SpanDetails cmd root newSpans)
+      SpanList time spans ->
+        Prelude.pure (SpanList time (move spans))
+      SpanDetails cmd root spans ->
+        Prelude.pure (SpanDetails cmd root (move spans))
 
 repeat :: Int -> (a -> a) -> a -> a
 repeat n f x =
@@ -246,24 +241,25 @@ repeat n f x =
     then x
     else f x |> repeat (n - 1) f
 
-toFlatList :: Platform.TracingSpan -> Zipper.Zipper Span
-toFlatList span =
-  case Zipper.fromList (toFlatListHelper 0 span) of
-    Just zipper -> zipper
-    Nothing ->
-      Zipper.singleton
-        Span
-          { nesting = 0,
-            original = span
-          }
+toFlatList :: Prelude.Int -> Platform.TracingSpan -> List' Span
+toFlatList id span =
+  ListWidget.list
+    (SpanDetailsListViewport id)
+    (toFlatListHelper 0 span)
+    1
 
-toFlatListHelper :: Int -> Platform.TracingSpan -> [Span]
+toFlatListHelper :: Int -> Platform.TracingSpan -> Seq.Seq Span
 toFlatListHelper nesting span =
-  Span
-    { nesting = nesting,
-      original = span
-    } :
-  List.concatMap (toFlatListHelper (nesting + 1)) (List.reverse (Platform.children span))
+  (Seq.<|)
+    Span
+      { nesting = nesting,
+        original = span
+      }
+    ( Platform.children span
+        |> Seq.fromList
+        |> Seq.reverse
+        |> Prelude.foldMap (toFlatListHelper (nesting + 1))
+    )
 
 continueAfterUserInteraction :: Model -> Brick.EventM Name (Brick.Next Model)
 continueAfterUserInteraction model =
@@ -311,8 +307,8 @@ viewContents page =
         |> Brick.padBottom Brick.Max
     SpanList now logs ->
       logs
-        |> Zipper.indexedMap
-          ( \i Logline {logId, logSpan, logTime} ->
+        |> ListWidget.renderList
+          ( \hasFocus Logline {logSpan, logTime} ->
               Brick.hBox
                 [ Brick.txt (howFarBack logTime now)
                     |> Brick.padRight Brick.Max
@@ -322,14 +318,11 @@ viewContents page =
                     |> Brick.padRight Brick.Max
                 ]
                 |> Center.hCenter
-                |> Brick.cached (RootSpanLine logId)
-                |> if i == 0
-                  then Brick.withAttr "selected" >> Brick.visible
+                |> if hasFocus
+                  then Brick.withAttr "selected"
                   else identity
           )
-        |> Zipper.toList
-        |> Brick.vBox
-        |> Brick.viewport RootSpanListViewport Brick.Vertical
+          True
         |> Brick.padLeftRight 1
     SpanDetails _ logline spans ->
       Brick.vBox
@@ -337,32 +330,33 @@ viewContents page =
             |> Center.hCenter,
           Border.hBorder,
           Brick.hBox
-            [ viewSpanList logline spans
+            [ viewSpanList spans
                 |> Brick.hLimitPercent 50,
-              viewSpanDetails (Zipper.current spans)
+              ( case ListWidget.listSelectedElement spans of
+                  Nothing -> Brick.emptyWidget
+                  Just (_, currentSpan) ->
+                    viewSpanDetails currentSpan
+              )
                 |> Brick.padRight (Brick.Pad 1)
                 |> Brick.padRight Brick.Max
             ]
         ]
 
-viewSpanList :: Logline -> Zipper.Zipper Span -> Brick.Widget Name
-viewSpanList Logline {logId} spans =
+viewSpanList :: List' Span -> Brick.Widget Name
+viewSpanList spans =
   spans
-    |> Zipper.indexedMap
-      ( \i span ->
+    |> ListWidget.renderList
+      ( \hasFocus span ->
           Brick.hBox
             [ Brick.txt (spanSummary (original span))
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
                 |> Brick.padRight Brick.Max
             ]
-            |> Brick.cached (SpanLine logId (i + Zipper.currentIndex spans))
-            |> if i == 0
-              then Brick.withAttr "selected" >> Brick.visible
+            |> if hasFocus
+              then Brick.withAttr "selected"
               else identity
       )
-    |> Zipper.toList
-    |> Brick.vBox
-    |> Brick.viewport (SpanDetailsListViewport logId) Brick.Vertical
+      True
     |> Brick.padLeftRight 1
 
 viewSpanDetails :: Span -> Brick.Widget Name
