@@ -78,8 +78,6 @@ data Span = Span
 
 data Msg
   = AddRootSpan ByteString.ByteString
-  | DownBy Int
-  | UpBy Int
   | ShowDetails
   | Exit
   | SetCurrentTime Time.UTCTime
@@ -162,14 +160,8 @@ update model msg =
           if userDidSomething model
             then Brick.continue newModel
             else
-              moveZipper (ListWidget.listMoveTo 0) newModel
+              scroll (Prelude.pure << ListWidget.listMoveTo 0) newModel
                 |> andThen Brick.continue
-    DownBy n ->
-      moveZipper (repeat n ListWidget.listMoveDown) model
-        |> andThen continueAfterUserInteraction
-    UpBy n ->
-      moveZipper (repeat n ListWidget.listMoveUp) model
-        |> andThen continueAfterUserInteraction
     ShowDetails ->
       withPage
         model
@@ -207,24 +199,20 @@ update model msg =
                 |> liftIO
       continueAfterUserInteraction model
 
-moveZipper ::
-  (forall a. ListWidget.List Name a -> ListWidget.List Name a) ->
+scroll ::
+  (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
   Model ->
   Brick.EventM Name Model
-moveZipper move model =
-  withPage model <| \page ->
+scroll move model =
+  withPage model <| \page -> do
     case page of
       NoDataPage -> Prelude.pure NoDataPage
-      RootSpanPage time spans ->
-        Prelude.pure (RootSpanPage time (move spans))
+      RootSpanPage time rootSpans ->
+        move rootSpans
+          |> map (RootSpanPage time)
       SpanBreakdownPage cmd root spans ->
-        Prelude.pure (SpanBreakdownPage cmd root (move spans))
-
-repeat :: Int -> (a -> a) -> a -> a
-repeat n f x =
-  if n <= 0
-    then x
-    else f x |> repeat (n - 1) f
+        move spans
+          |> map (SpanBreakdownPage cmd root)
 
 toFlatList :: Prelude.Int -> Platform.TracingSpan -> ListWidget.List Name Span
 toFlatList id span =
@@ -547,24 +535,6 @@ handleEvent pushMsg model event =
         Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
         Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
         -- Navigation
-        Vty.EvKey Vty.KDown [] -> do
-          liftIO (pushMsg (DownBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'j') [] -> do
-          liftIO (pushMsg (DownBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'd') [Vty.MCtrl] -> do
-          liftIO (pushMsg (DownBy 10))
-          Brick.continue model
-        Vty.EvKey Vty.KUp [] -> do
-          liftIO (pushMsg (UpBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'k') [] -> do
-          liftIO (pushMsg (UpBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'u') [Vty.MCtrl] -> do
-          liftIO (pushMsg (UpBy 10))
-          Brick.continue model
         Vty.EvKey Vty.KEnter [] -> do
           liftIO (pushMsg ShowDetails)
           Brick.continue model
@@ -582,7 +552,11 @@ handleEvent pushMsg model event =
           liftIO (pushMsg CopyDetails)
           Brick.continue model
         -- Fallback
-        _ -> Brick.continue model
+        _ ->
+          scroll
+            (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
+            model
+            |> andThen Brick.continue
     (Brick.MouseDown _ _ _ _) -> Brick.continue model
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
