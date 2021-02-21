@@ -2,3 +2,4 @@ packages:
   nri-prelude/nri-prelude.cabal
   nri-env-parser/nri-env-parser.cabal
   nri-log-explorer/nri-log-explorer.cabal
+  nri-observability/nri-observability.cabal
