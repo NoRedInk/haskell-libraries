@@ -10,6 +10,7 @@ import qualified Brick
 import qualified Brick.BChan
 import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
+import qualified Brick.Widgets.List as ListWidget
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
@@ -26,6 +27,7 @@ import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
 import qualified Data.Time as Time
+import qualified Data.Vector as Vector
 import qualified Data.Version as Version
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
@@ -40,7 +42,6 @@ import qualified System.Exit
 import qualified System.IO
 import qualified System.Process
 import qualified Text
-import qualified Zipper
 import qualified Prelude
 
 data Model = Model
@@ -48,26 +49,23 @@ data Model = Model
     currentTime :: Time.UTCTime,
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
-    -- The actual data displayed. In a zipper because one is always selected.
-    loglines :: Maybe (Zipper.Zipper Logline),
+    -- The actual data displayed.
+    rootSpans :: ListWidget.List Name RootSpan,
     -- If we're in the detail view for a root span, this will contain a copy of
     -- the data of that particular span in a format more suitable for this view.
-    selectedRootSpan :: Maybe (Zipper.Zipper Span),
+    selectedRootSpan :: Maybe (ListWidget.List Name Span),
     -- Loading in initial data happens piecemeal, starting with the oldest data
     -- first, so visually filling the view from the bottom up. Until the user
     -- interacts we're going to keep the focus on the last-loaded element, but
     -- once the user starts controlling the app themselves we want to keep our
     -- hands off the controls.
-    userDidSomething :: Bool,
-    -- Incrementing number to give all the root spans a unique identifier.
-    lastId :: Id
+    userDidSomething :: Bool
   }
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
-data Logline = Logline
-  { logId :: Id,
-    logTime :: Time.UTCTime,
+data RootSpan = RootSpan
+  { logTime :: Time.UTCTime,
     logSpan :: Platform.TracingSpan
   }
 
@@ -79,53 +77,49 @@ data Span = Span
   }
 
 data Msg
-  = AddLogline ByteString.ByteString
-  | DownBy Int
-  | UpBy Int
+  = AddRootSpan ByteString.ByteString
   | ShowDetails
   | Exit
   | SetCurrentTime Time.UTCTime
   | CopyDetails
-
-newtype Id = Id Int deriving (Prelude.Num, Eq, Ord, Show)
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
 -- own state not stored in the main Model type above. Widgets that have state
 -- like that need a unique name which brick uses as a key for storage.
 data Name
-  = RootSpanListViewport
-  | RootSpanLine Id
-  | SpanDetailsListViewport Id
-  | SpanLine Id Int
+  = RootSpanList
+  | SpanBreakdownList Prelude.Int
   deriving (Eq, Ord, Show)
 
 -- An alternative data type containing part of the same data as above, in a
 -- format more convenient for some update and view functions.
 data Page
-  = NoLogsFound
-  | SpanList Time.UTCTime (Zipper.Zipper Logline)
-  | SpanDetails (Maybe Text) Logline (Zipper.Zipper Span)
+  = NoDataPage
+  | RootSpanPage Time.UTCTime (ListWidget.List Name RootSpan)
+  | SpanBreakdownPage (Maybe Text) RootSpan (ListWidget.List Name Span)
 
 toPage :: Model -> Page
 toPage model =
-  case (selectedRootSpan model, loglines model) of
-    (Just selected, Just spans) ->
-      SpanDetails
+  case (selectedRootSpan model, ListWidget.listSelectedElement (rootSpans model)) of
+    (_, Nothing) -> NoDataPage
+    (Just selected, Just (_, rootSpan)) ->
+      SpanBreakdownPage
         (clipboardCommand model)
-        (Zipper.current spans)
+        rootSpan
         selected
-    (Nothing, Just spans) -> SpanList (currentTime model) spans
-    (_, Nothing) -> NoLogsFound
+    (Nothing, Just _) -> RootSpanPage (currentTime model) (rootSpans model)
 
 withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
 withPage model fn =
   map
     ( \newPage ->
         case newPage of
-          NoLogsFound -> model {selectedRootSpan = Nothing, loglines = Nothing}
-          SpanList _ zipper -> model {selectedRootSpan = Nothing, loglines = Just zipper}
-          SpanDetails _ _ zipper -> model {selectedRootSpan = Just zipper}
+          NoDataPage -> model {selectedRootSpan = Nothing}
+          RootSpanPage _ rootSpans ->
+            model {selectedRootSpan = Nothing, rootSpans = rootSpans}
+          SpanBreakdownPage _ _ spans ->
+            model {selectedRootSpan = Just spans}
     )
     (fn (toPage model))
 
@@ -134,10 +128,9 @@ init clipboardCommand now =
   Model
     { currentTime = now,
       clipboardCommand = clipboardCommand,
-      loglines = Nothing,
+      rootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
-      userDidSomething = False,
-      lastId = 0
+      userDidSomething = False
     }
 
 update :: Model -> Msg -> Brick.EventM Name (Brick.Next Model)
@@ -146,24 +139,20 @@ update model msg =
     SetCurrentTime time ->
       model {currentTime = time}
         |> Brick.continue
-    AddLogline line ->
+    AddRootSpan line ->
       case Aeson.decodeStrict' line of
         Nothing ->
           -- If a line cannot be parsed we ignore it for now.
           Brick.continue model
         Just (date, span) -> do
-          let newId = lastId model + 1
-              logline = Logline newId date span
+          let rootSpan = RootSpan date span
               newModel =
                 model
-                  { loglines =
-                      case loglines model of
-                        Nothing -> Just (Zipper.singleton logline)
-                        Just zipper ->
-                          -- Each line we read represents a newer log entry then
-                          -- the ones before it, so we insert it at the top.
-                          Just (Zipper.prepend [logline] zipper),
-                    lastId = newId
+                  { rootSpans =
+                      ListWidget.listInsert
+                        0
+                        rootSpan
+                        (rootSpans model)
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
@@ -171,27 +160,24 @@ update model msg =
           if userDidSomething model
             then Brick.continue newModel
             else
-              moveZipper Zipper.first newModel
+              scroll (Prelude.pure << ListWidget.listMoveTo 0) newModel
                 |> andThen Brick.continue
-    DownBy n ->
-      moveZipper (repeat n Zipper.next) model
-        |> andThen continueAfterUserInteraction
-    UpBy n ->
-      moveZipper (repeat n Zipper.prev) model
-        |> andThen continueAfterUserInteraction
     ShowDetails ->
       withPage
         model
         ( \page ->
             case page of
-              NoLogsFound -> Prelude.pure page
-              SpanDetails _ _ _ -> Prelude.pure page
-              SpanList _ spans ->
-                SpanDetails
-                  (clipboardCommand model)
-                  (Zipper.current spans)
-                  (Zipper.current spans |> logSpan |> toFlatList)
-                  |> Prelude.pure
+              NoDataPage -> Prelude.pure page
+              SpanBreakdownPage _ _ _ -> Prelude.pure page
+              RootSpanPage _ spans ->
+                case ListWidget.listSelectedElement spans of
+                  Nothing -> Prelude.pure page
+                  Just (currentIndex, currentSpan) ->
+                    SpanBreakdownPage
+                      (clipboardCommand model)
+                      currentSpan
+                      (currentSpan |> logSpan |> toFlatList currentIndex)
+                      |> Prelude.pure
         )
         |> andThen continueAfterUserInteraction
     Exit ->
@@ -201,69 +187,52 @@ update model msg =
         |> continueAfterUserInteraction
     CopyDetails -> do
       case toPage model of
-        NoLogsFound -> Prelude.pure ()
-        SpanList _ _ -> Prelude.pure ()
-        SpanDetails Nothing _ _ -> Prelude.pure ()
-        SpanDetails (Just cmd) _ spans ->
-          original (Zipper.current spans)
-            |> spanToClipboard cmd
-            |> liftIO
+        NoDataPage -> Prelude.pure ()
+        RootSpanPage _ _ -> Prelude.pure ()
+        SpanBreakdownPage Nothing _ _ -> Prelude.pure ()
+        SpanBreakdownPage (Just cmd) _ spans ->
+          case ListWidget.listSelectedElement spans of
+            Nothing -> Prelude.pure ()
+            Just (_, currentSpan) ->
+              original currentSpan
+                |> spanToClipboard cmd
+                |> liftIO
       continueAfterUserInteraction model
 
--- The root span and detail span pages can each come to maintain a lot of rows.
--- To keep performance acceptable we make use of Brick's view caching
--- functionality. That works well because the data we read is immutable.
---
--- The view for a row only changes when we move focus to it or away from it (at
--- this point emphasis-styling gets applied), so whenever we move the focused
--- element of a zipper we need to invalidate the cache for two entries. This
--- function does so correctly.
---
--- The first argument is supposed to be a focus-changing zipper funtion, such as
--- `Zipper.next` or `Zipper.first`.
-moveZipper ::
-  (forall a. Zipper.Zipper a -> Zipper.Zipper a) ->
+scroll ::
+  (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
   Model ->
   Brick.EventM Name Model
-moveZipper move model = do
-  withPage model <| \page ->
+scroll move model =
+  withPage model <| \page -> do
     case page of
-      NoLogsFound -> Prelude.pure NoLogsFound
-      SpanList time spans -> do
-        let newSpans = move spans
-        Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current spans)))
-        Brick.invalidateCacheEntry (RootSpanLine (logId (Zipper.current newSpans)))
-        Prelude.pure (SpanList time newSpans)
-      SpanDetails cmd root spans -> do
-        let newSpans = move spans
-        Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex spans))
-        Brick.invalidateCacheEntry (SpanLine (logId root) (Zipper.currentIndex newSpans))
-        Prelude.pure (SpanDetails cmd root newSpans)
+      NoDataPage -> Prelude.pure NoDataPage
+      RootSpanPage time rootSpans ->
+        move rootSpans
+          |> map (RootSpanPage time)
+      SpanBreakdownPage cmd root spans ->
+        move spans
+          |> map (SpanBreakdownPage cmd root)
 
-repeat :: Int -> (a -> a) -> a -> a
-repeat n f x =
-  if n <= 0
-    then x
-    else f x |> repeat (n - 1) f
+toFlatList :: Prelude.Int -> Platform.TracingSpan -> ListWidget.List Name Span
+toFlatList id span =
+  ListWidget.list
+    (SpanBreakdownList id)
+    (toFlatListHelper 0 span)
+    1
 
-toFlatList :: Platform.TracingSpan -> Zipper.Zipper Span
-toFlatList span =
-  case Zipper.fromList (toFlatListHelper 0 span) of
-    Just zipper -> zipper
-    Nothing ->
-      Zipper.singleton
-        Span
-          { nesting = 0,
-            original = span
-          }
-
-toFlatListHelper :: Int -> Platform.TracingSpan -> [Span]
+toFlatListHelper :: Int -> Platform.TracingSpan -> Vector.Vector Span
 toFlatListHelper nesting span =
-  Span
-    { nesting = nesting,
-      original = span
-    } :
-  List.concatMap (toFlatListHelper (nesting + 1)) (List.reverse (Platform.children span))
+  Vector.cons
+    Span
+      { nesting = nesting,
+        original = span
+      }
+    ( Platform.children span
+        |> Vector.fromList
+        |> Vector.reverse
+        |> Prelude.foldMap (toFlatListHelper (nesting + 1))
+    )
 
 continueAfterUserInteraction :: Model -> Brick.EventM Name (Brick.Next Model)
 continueAfterUserInteraction model =
@@ -289,9 +258,9 @@ viewKey page =
       copy = "y: copy details"
       shortcuts =
         case page of
-          NoLogsFound -> [exit]
-          SpanList _ _ -> [exit, updown, select]
-          SpanDetails clipboardCommand _ _ ->
+          NoDataPage -> [exit]
+          RootSpanPage _ _ -> [exit, updown, select]
+          SpanBreakdownPage clipboardCommand _ _ ->
             [exit, updown, unselect]
               ++ ( case clipboardCommand of
                      Nothing -> []
@@ -305,14 +274,14 @@ viewKey page =
 viewContents :: Page -> Brick.Widget Name
 viewContents page =
   case page of
-    NoLogsFound ->
+    NoDataPage ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
         |> Center.hCenter
         |> Brick.padBottom Brick.Max
-    SpanList now logs ->
+    RootSpanPage now logs ->
       logs
-        |> Zipper.indexedMap
-          ( \i Logline {logId, logSpan, logTime} ->
+        |> ListWidget.renderList
+          ( \hasFocus RootSpan {logSpan, logTime} ->
               Brick.hBox
                 [ Brick.txt (howFarBack logTime now)
                     |> Brick.padRight Brick.Max
@@ -322,57 +291,55 @@ viewContents page =
                     |> Brick.padRight Brick.Max
                 ]
                 |> Center.hCenter
-                |> Brick.cached (RootSpanLine logId)
-                |> if i == 0
-                  then Brick.withAttr "selected" >> Brick.visible
+                |> if hasFocus
+                  then Brick.withAttr "selected"
                   else identity
           )
-        |> Zipper.toList
-        |> Brick.vBox
-        |> Brick.viewport RootSpanListViewport Brick.Vertical
+          True
         |> Brick.padLeftRight 1
-    SpanDetails _ logline spans ->
+    SpanBreakdownPage _ rootSpan spans ->
       Brick.vBox
-        [ Brick.txt (spanSummary (logSpan logline))
+        [ Brick.txt (spanSummary (logSpan rootSpan))
             |> Center.hCenter,
           Border.hBorder,
           Brick.hBox
-            [ viewSpanList logline spans
+            [ viewSpanBreakdown spans
                 |> Brick.hLimitPercent 50,
-              viewSpanDetails (Zipper.current spans)
+              ( case ListWidget.listSelectedElement spans of
+                  Nothing -> Brick.emptyWidget
+                  Just (_, currentSpan) ->
+                    viewSpanDetails currentSpan
+              )
                 |> Brick.padRight (Brick.Pad 1)
                 |> Brick.padRight Brick.Max
             ]
         ]
 
-viewSpanList :: Logline -> Zipper.Zipper Span -> Brick.Widget Name
-viewSpanList Logline {logId} spans =
+viewSpanBreakdown :: ListWidget.List Name Span -> Brick.Widget Name
+viewSpanBreakdown spans =
   spans
-    |> Zipper.indexedMap
-      ( \i span ->
+    |> ListWidget.renderList
+      ( \hasFocus span ->
           Brick.hBox
             [ Brick.txt (spanSummary (original span))
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
                 |> Brick.padRight Brick.Max
             ]
-            |> Brick.cached (SpanLine logId (i + Zipper.currentIndex spans))
-            |> if i == 0
-              then Brick.withAttr "selected" >> Brick.visible
+            |> if hasFocus
+              then Brick.withAttr "selected"
               else identity
       )
-    |> Zipper.toList
-    |> Brick.vBox
-    |> Brick.viewport (SpanDetailsListViewport logId) Brick.Vertical
+      True
     |> Brick.padLeftRight 1
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
   Brick.vBox
-    [ detailEntry "name" (Platform.name original),
+    [ viewDetail "name" (Platform.name original),
       case Platform.summary original of
         Nothing -> Brick.emptyWidget
-        Just summary -> detailEntry "summary" summary,
-      detailEntry
+        Just summary -> viewDetail "summary" summary,
+      viewDetail
         "duration"
         ( ( Platform.finished original - Platform.started original
               |> Platform.inMicroseconds
@@ -385,17 +352,17 @@ viewSpanDetails Span {original} =
       case Platform.frame original of
         Nothing -> Brick.emptyWidget
         Just (_, srcLoc) ->
-          detailEntry
+          viewDetail
             "source"
             ( Data.Text.pack (Stack.srcLocFile srcLoc)
                 ++ ":"
                 ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
             ),
       case Platform.succeeded original of
-        Platform.Succeeded -> detailEntry "result" "succeeded"
-        Platform.Failed -> detailEntry "result" "failed"
+        Platform.Succeeded -> viewDetail "result" "succeeded"
+        Platform.Failed -> viewDetail "result" "failed"
         Platform.FailedWith exception ->
-          detailEntry
+          viewDetail
             "failed with"
             ( Exception.displayException exception
                 |> Data.Text.pack
@@ -403,15 +370,15 @@ viewSpanDetails Span {original} =
       case map Aeson.toJSON (Platform.details original) of
         Nothing -> Brick.emptyWidget
         Just Aeson.Null -> Brick.emptyWidget
-        Just (Aeson.String str) -> detailEntry "details" str
+        Just (Aeson.String str) -> viewDetail "details" str
         Just (Aeson.Number number) ->
           Data.Text.pack (Prelude.show number)
-            |> detailEntry "details"
+            |> viewDetail "details"
         Just (Aeson.Bool bool) ->
           Data.Text.pack (Prelude.show bool)
-            |> detailEntry "details"
+            |> viewDetail "details"
         Just (Aeson.Array array) ->
-          detailEntry
+          viewDetail
             "details"
             ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder array
                 |> Data.Text.Lazy.Builder.toLazyText
@@ -421,7 +388,7 @@ viewSpanDetails Span {original} =
           HashMap.toList object
             |> List.map
               ( \(name, val) ->
-                  detailEntry
+                  viewDetail
                     name
                     ( case Aeson.toJSON val of
                         Aeson.Null -> "Null"
@@ -439,8 +406,8 @@ viewSpanDetails Span {original} =
             |> Brick.vBox
     ]
 
-detailEntry :: Text -> Text -> Brick.Widget Name
-detailEntry label val =
+viewDetail :: Text -> Text -> Brick.Widget Name
+viewDetail label val =
   Brick.hBox
     [ Brick.txt (label ++ ": ")
         |> Brick.padLeft Brick.Max
@@ -524,7 +491,7 @@ run = do
         ( System.IO.withFile
             logFile
             System.IO.ReadMode
-            (tailLines partOfLine (AddLogline >> pushMsg))
+            (tailLines partOfLine (AddRootSpan >> pushMsg))
         )
         (updateTime (SetCurrentTime >> pushMsgNonBlocking))
     )
@@ -568,24 +535,6 @@ handleEvent pushMsg model event =
         Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
         Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
         -- Navigation
-        Vty.EvKey Vty.KDown [] -> do
-          liftIO (pushMsg (DownBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'j') [] -> do
-          liftIO (pushMsg (DownBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'd') [Vty.MCtrl] -> do
-          liftIO (pushMsg (DownBy 10))
-          Brick.continue model
-        Vty.EvKey Vty.KUp [] -> do
-          liftIO (pushMsg (UpBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'k') [] -> do
-          liftIO (pushMsg (UpBy 1))
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'u') [Vty.MCtrl] -> do
-          liftIO (pushMsg (UpBy 10))
-          Brick.continue model
         Vty.EvKey Vty.KEnter [] -> do
           liftIO (pushMsg ShowDetails)
           Brick.continue model
@@ -593,6 +542,9 @@ handleEvent pushMsg model event =
           liftIO (pushMsg ShowDetails)
           Brick.continue model
         Vty.EvKey Vty.KBS [] -> do
+          liftIO (pushMsg Exit)
+          Brick.continue model
+        Vty.EvKey Vty.KEsc [] -> do
           liftIO (pushMsg Exit)
           Brick.continue model
         Vty.EvKey (Vty.KChar 'h') [] -> do
@@ -603,7 +555,11 @@ handleEvent pushMsg model event =
           liftIO (pushMsg CopyDetails)
           Brick.continue model
         -- Fallback
-        _ -> Brick.continue model
+        _ ->
+          scroll
+            (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
+            model
+            |> andThen Brick.continue
     (Brick.MouseDown _ _ _ _) -> Brick.continue model
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg

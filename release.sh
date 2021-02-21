@@ -11,6 +11,10 @@ if [ $# -eq 0 ]; then
   fail "usage: release.sh <project>"
 fi
 
+if [ "$1" = "nri-log-explorer" ]; then
+  fail "no need to publish nri-log-explorer, because it's a tool rather than a library."
+fi
+
 pushd "$1"
 
 name=$(grep name: < package.yaml | awk '{print $2}')
