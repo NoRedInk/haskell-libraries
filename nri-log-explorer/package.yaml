@@ -1,11 +1,11 @@
 name: nri-log-explorer
 synopsis: Explore logs produced by nri-prelude tests.
-description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/log-explorer>.
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explorer>.
 author: NoRedInk
-version: 0.1.0.0
+version: 0.1.1.0
 maintainer: haskell-open-source@noredink.com
-copyright: 2020 NoRedInk Corp.
-github: NoRedInk/haskell-libraries/log-explorer
+copyright: 2021 NoRedInk Corp.
+github: NoRedInk/haskell-libraries
 license-file: LICENSE
 category: Web
 extra-doc-files:
