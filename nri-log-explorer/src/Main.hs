@@ -49,11 +49,11 @@ data Model = Model
     currentTime :: Time.UTCTime,
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
-    -- The actual data displayed. In a zipper because one is always selected.
-    loglines :: List' Logline,
+    -- The actual data displayed.
+    loglines :: ListWidget.List Name Logline,
     -- If we're in the detail view for a root span, this will contain a copy of
     -- the data of that particular span in a format more suitable for this view.
-    selectedRootSpan :: Maybe (List' Span),
+    selectedRootSpan :: Maybe (ListWidget.List Name Span),
     -- Loading in initial data happens piecemeal, starting with the oldest data
     -- first, so visually filling the view from the bottom up. Until the user
     -- interacts we're going to keep the focus on the last-loaded element, but
@@ -61,8 +61,6 @@ data Model = Model
     -- hands off the controls.
     userDidSomething :: Bool
   }
-
-type List' a = ListWidget.GenericList Name Vector.Vector a
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
@@ -100,8 +98,8 @@ data Name
 -- format more convenient for some update and view functions.
 data Page
   = NoLogsFound
-  | SpanList Time.UTCTime (List' Logline)
-  | SpanDetails (Maybe Text) Logline (List' Span)
+  | SpanList Time.UTCTime (ListWidget.List Name Logline)
+  | SpanDetails (Maybe Text) Logline (ListWidget.List Name Span)
 
 toPage :: Model -> Page
 toPage model =
@@ -219,7 +217,7 @@ update model msg =
 -- The first argument is supposed to be a focus-changing zipper funtion, such as
 -- `Zipper.next` or `Zipper.first`.
 moveZipper ::
-  (forall a. List' a -> List' a) ->
+  (forall a. ListWidget.List Name a -> ListWidget.List Name a) ->
   Model ->
   Brick.EventM Name Model
 moveZipper move model =
@@ -237,7 +235,7 @@ repeat n f x =
     then x
     else f x |> repeat (n - 1) f
 
-toFlatList :: Prelude.Int -> Platform.TracingSpan -> List' Span
+toFlatList :: Prelude.Int -> Platform.TracingSpan -> ListWidget.List Name Span
 toFlatList id span =
   ListWidget.list
     (RootSpanBreakdown id)
@@ -338,7 +336,7 @@ viewContents page =
             ]
         ]
 
-viewSpanList :: List' Span -> Brick.Widget Name
+viewSpanList :: ListWidget.List Name Span -> Brick.Widget Name
 viewSpanList spans =
   spans
     |> ListWidget.renderList
