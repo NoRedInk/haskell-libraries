@@ -544,6 +544,9 @@ handleEvent pushMsg model event =
         Vty.EvKey Vty.KBS [] -> do
           liftIO (pushMsg Exit)
           Brick.continue model
+        Vty.EvKey Vty.KEsc [] -> do
+          liftIO (pushMsg Exit)
+          Brick.continue model
         Vty.EvKey (Vty.KChar 'h') [] -> do
           liftIO (pushMsg Exit)
           Brick.continue model
