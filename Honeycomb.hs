@@ -136,11 +136,6 @@ deriveSampleRate rootSpan handler' =
           Nothing -> False
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
       baseRate = handler_fractionOfSuccessRequestsLogged handler'
-      requestDurationUs =
-        Platform.finished rootSpan - Platform.started rootSpan
-          |> Platform.inMicroseconds
-          |> Prelude.fromIntegral
-      apdexTUs = 1000 * Prelude.fromIntegral (handler_apdexTimeMs handler')
    in if isNonAppEndpoint
         then --
         -- We have 2678400 seconds in a month
@@ -157,7 +152,7 @@ deriveSampleRate rootSpan handler' =
         -- High sample rates might make honeycomb make ridiculous assumptions
         -- about the actual request rate tho. Adjust if that's the case.
           baseRate / 500
-        else sampleRateForDuration baseRate requestDurationUs apdexTUs
+        else baseRate
 
 -- For every increase of apdexTU in the request duration we double the chance of
 -- a request getting logged, up to a maximum of 1.
