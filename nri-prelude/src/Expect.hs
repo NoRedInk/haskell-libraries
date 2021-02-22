@@ -429,7 +429,7 @@ err res =
 -- encodings. When a test fails we can throw away the file, rerun the test, and
 -- use @git diff golden-results/complicated-object.txt@ to check whether the
 -- changes are acceptable.
-equalToContentsOf :: Text -> Text -> Expectation
+equalToContentsOf :: Stack.HasCallStack => Text -> Text -> Expectation
 equalToContentsOf filepath' actual = do
   let filepath = Data.Text.unpack filepath'
   exists <-
