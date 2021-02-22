@@ -35,7 +35,7 @@ decoderClusterMode :: Text -> Environment.Decoder ClusterMode
 decoderClusterMode prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = prefix ++ "REDIS CLUSTER",
+      { Environment.name = prefix ++ "REDIS_CLUSTER",
         Environment.description = "Set to 1 for cluster, everything else is not",
         Environment.defaultValue = "0"
       }
