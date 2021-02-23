@@ -20,6 +20,7 @@ module Postgres.Settings
         pgPoolSize
       ),
     decoder,
+    decoderWithPrefix,
     PgDatabase (PgDatabase, unPgDatabase),
     PgUser (PgUser, unPgUser),
     PgHost (PgHost, unPgHost),
@@ -100,20 +101,23 @@ data PoolSettings = PoolSettings
   deriving (Eq, Show)
 
 decoder :: Environment.Decoder Settings
-decoder =
+decoder = decoderWithPrefix ""
+
+decoderWithPrefix :: Text -> Environment.Decoder Settings
+decoderWithPrefix prefix =
   pure Settings
-    |> andMap connectionDecoder
+    |> andMap (connectionDecoder prefix)
     |> andMap poolDecoder
     |> andMap queryTimeoutDecoder
 
-connectionDecoder :: Environment.Decoder ConnectionSettings
-connectionDecoder =
+connectionDecoder :: Text -> Environment.Decoder ConnectionSettings
+connectionDecoder prefix =
   pure ConnectionSettings
-    |> andMap pgDatabaseDecoder
-    |> andMap pgUserDecoder
-    |> andMap pgHostDecoder
-    |> andMap pgPasswordDecoder
-    |> andMap pgPortDecoder
+    |> andMap (pgDatabaseDecoder prefix)
+    |> andMap (pgUserDecoder prefix)
+    |> andMap (pgHostDecoder prefix)
+    |> andMap (pgPasswordDecoder prefix)
+    |> andMap (pgPortDecoder prefix)
 
 poolDecoder :: Environment.Decoder PoolSettings
 poolDecoder =
@@ -125,11 +129,11 @@ poolDecoder =
 newtype PgPort = PgPort {unPgPort :: Int}
   deriving (Eq, Show)
 
-pgPortDecoder :: Environment.Decoder PgPort
-pgPortDecoder =
+pgPortDecoder :: Text -> Environment.Decoder PgPort
+pgPortDecoder prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "PGPORT",
+      { Environment.name = prefix ++ "PGPORT",
         Environment.description = "The port postgres is running on.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgPort |> unPgPort |> show |> Text.fromList
@@ -139,11 +143,11 @@ pgPortDecoder =
 newtype PgPassword = PgPassword {unPgPassword :: Log.Secret Text}
   deriving (Eq, Show)
 
-pgPasswordDecoder :: Environment.Decoder PgPassword
-pgPasswordDecoder =
+pgPasswordDecoder :: Text -> Environment.Decoder PgPassword
+pgPasswordDecoder prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "PGPASSWORD",
+      { Environment.name = prefix ++ "PGPASSWORD",
         Environment.description = "The postgres user password.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgPassword |> unPgPassword |> Log.unSecret
@@ -153,11 +157,11 @@ pgPasswordDecoder =
 newtype PgHost = PgHost {unPgHost :: Text}
   deriving (Eq, Show)
 
-pgHostDecoder :: Environment.Decoder PgHost
-pgHostDecoder =
+pgHostDecoder :: Text -> Environment.Decoder PgHost
+pgHostDecoder prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "PGHOST",
+      { Environment.name = prefix ++ "PGHOST",
         Environment.description = "The hostname of the postgres server to connect to.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgHost |> unPgHost
@@ -167,11 +171,11 @@ pgHostDecoder =
 newtype PgUser = PgUser {unPgUser :: Text}
   deriving (Eq, Show)
 
-pgUserDecoder :: Environment.Decoder PgUser
-pgUserDecoder =
+pgUserDecoder :: Text -> Environment.Decoder PgUser
+pgUserDecoder prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "PGUSER",
+      { Environment.name = prefix ++ "PGUSER",
         Environment.description = "The postgres user to connect with.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgUser |> unPgUser
@@ -181,11 +185,11 @@ pgUserDecoder =
 newtype PgDatabase = PgDatabase {unPgDatabase :: Text}
   deriving (Eq, Show)
 
-pgDatabaseDecoder :: Environment.Decoder PgDatabase
-pgDatabaseDecoder =
+pgDatabaseDecoder :: Text -> Environment.Decoder PgDatabase
+pgDatabaseDecoder prefix =
   Environment.variable
     Environment.Variable
-      { Environment.name = "PGDATABASE",
+      { Environment.name = prefix ++ "PGDATABASE",
         Environment.description = "The postgres database to connect to.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgDatabase |> unPgDatabase
