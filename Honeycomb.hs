@@ -80,7 +80,7 @@ report handler' _requestId span = do
     case Platform.succeeded span of
       Platform.Succeeded -> do
         let probability = deriveSampleRate span handler'
-        roll <- Random.randomRIO (0, 1)
+        roll <- Random.randomRIO (0.0, 1.0)
         Prelude.pure (roll > probability, round (1 / probability))
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)

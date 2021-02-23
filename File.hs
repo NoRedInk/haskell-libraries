@@ -146,7 +146,7 @@ handler timer settings = do
   let skipLogging span =
         case Platform.succeeded span of
           Platform.Succeeded -> do
-            roll <- Random.randomRIO (0, 1)
+            roll <- Random.randomRIO (0.0, 1.0)
             Prelude.pure (roll > fractionOfSuccessRequestsLogged settings)
           Platform.Failed -> Prelude.pure False
           Platform.FailedWith _ -> Prelude.pure False
