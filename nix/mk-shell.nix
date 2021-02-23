@@ -36,6 +36,7 @@ in pkgs.mkShell {
       ]))
     pkgs.cabal-install
     pkgs.haskellPackages.hpack
+    pkgs.niv
     pkgs.zlib
     pkgs.haskellPackages.ghcid
     pkgs.ormolu
