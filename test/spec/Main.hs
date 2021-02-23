@@ -162,19 +162,6 @@ queryTests redisHandler =
       Redis.set jsonApi' "JSON list" testData |> Redis.query testNS |> Expect.succeeds
       result <- Redis.get jsonApi' "JSON list" |> Redis.query testNS |> Expect.succeeds
       Expect.equal (Just testData) result,
-    Test.test "atomic modify with no value" <| \() -> do
-      _ <- Redis.del api ("Empty Atom" :| []) |> Redis.query testNS |> Expect.succeeds
-      result <-
-        Redis.atomicModify
-          (Redis.experimental api)
-          testNS
-          "Empty Atom"
-          ( \v -> case v of
-              Just v' -> "Prefix:" ++ v'
-              Nothing -> "Nothing"
-          )
-          |> Expect.succeeds
-      Expect.equal "Nothing" result,
     Test.test "mget retrieves a mapping of the requested keys and their corresponding values" <| \() -> do
       Redis.set api "mgetTest::key1" "value 1" |> Redis.query testNS |> Expect.succeeds
       Redis.set api "mgetTest::key3" "value 3" |> Redis.query testNS |> Expect.succeeds
@@ -212,59 +199,6 @@ queryTests redisHandler =
       Redis.mset jsonApi' nonEmptyDict |> Redis.query testNS |> Expect.succeeds
       result <- Redis.mget jsonApi' (firstKey :| Dict.keys dict) |> Redis.query testNS |> Expect.succeeds
       Expect.equal result dict,
-    Test.test "atomic modify with value" <| \() -> do
-      _ <- Redis.del api ("Full Atom" :| []) |> Redis.query testNS |> Expect.succeeds
-      Redis.set api "Full Atom" "Something" |> Redis.query testNS |> Expect.succeeds
-      result <-
-        Redis.atomicModify
-          (Redis.experimental api)
-          testNS
-          "Full Atom"
-          ( \v -> case v of
-              Just v' -> "Prefix:" ++ v'
-              Nothing -> "Nothing"
-          )
-          |> Expect.succeeds
-      Expect.equal "Prefix:Something" result,
-    Test.test "atomicModifyWithContext works empty" <| \() -> do
-      _ <- Redis.del api ("Atom With Context" :| []) |> Redis.query testNS |> Expect.succeeds
-      result <-
-        Redis.atomicModifyWithContext
-          (Redis.experimental api)
-          testNS
-          "Atom With Context"
-          ( \v -> case v of
-              Just _ -> ("after", "Just" :: Text)
-              Nothing -> ("after", "Nothing")
-          )
-          |> Expect.succeeds
-      Expect.equal ("after", "Nothing") result,
-    Test.test "atomicModifyWithContext works full" <| \() -> do
-      Redis.set api "Atom With Context (full)" "A piece of text" |> Redis.query testNS |> Expect.succeeds
-      result <-
-        Redis.atomicModifyWithContext
-          (Redis.experimental api)
-          testNS
-          "Atom With Context (full)"
-          ( \v -> case v of
-              Just _ -> ("after", "Just" :: Text)
-              Nothing -> ("after", "Nothing")
-          )
-          |> Expect.succeeds
-      Expect.equal ("after", "Just") result,
-    Test.test "Json.atomicModifyWithContext works" <| \() -> do
-      _ <- Redis.del api ("JSON Atom With Context" :| []) |> Redis.query testNS |> Expect.succeeds
-      result <-
-        Redis.atomicModifyWithContext
-          (Redis.experimental jsonApi')
-          testNS
-          "JSON Atom With Context"
-          ( \v -> case v of
-              Just _ -> ([10], Just ())
-              Nothing -> ([10], Nothing)
-          )
-          |> Expect.succeeds
-      Expect.equal ([10], Nothing) result,
     Test.test "transaction preserves order" <| \() -> do
       [ Redis.List.del listApi ("order" :| []),
         Redis.List.rpush listApi "order" ("1" :| []),
