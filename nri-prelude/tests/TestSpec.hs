@@ -25,6 +25,7 @@ tests =
   describe
     "Test"
     [ api,
+      floatComparison,
       stdoutReporter,
       logfileReporter
     ]
@@ -125,6 +126,21 @@ api =
       test "source location of `fuzz3` are the file in which the test is defined" <| \_ ->
         fuzz3 Fuzz.int Fuzz.int Fuzz.int "test 1" (\_ _ _ -> Expect.pass)
           |> expectSingleTest (expectSrcFile "tests/TestSpec.hs")
+    ]
+
+floatComparison :: Test
+floatComparison =
+  describe
+    "Float comparison expectations"
+    [ test "Expect.within" <| \_ -> do
+        Expect.within (Expect.Absolute 1) 0.1 0.5
+        Expect.within (Expect.Relative 1) 3 5
+        Expect.within (Expect.AbsoluteOrRelative 1 1) 0.1 0.5
+        Expect.within (Expect.AbsoluteOrRelative 1 1) 3 5,
+      test "Expect.notWithin" <| \_ -> do
+        Expect.notWithin (Expect.Absolute 1) 3 5
+        Expect.notWithin (Expect.Relative 1) 0.1 0.5
+        Expect.notWithin (Expect.AbsoluteOrRelative 1 1) 3 10
     ]
 
 expectSingleTest ::
@@ -272,6 +288,8 @@ stdoutReporter =
                   test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
                   test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
                   test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
+                  test "test 9" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
+                  test "test 9" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
                   test "test 10" (\_ -> Expect.true False),
                   test "test 11" (\_ -> Expect.false True),
                   test "test 12" (\_ -> Expect.ok (Err ())),

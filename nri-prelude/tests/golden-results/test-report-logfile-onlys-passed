@@ -53,8 +53,8 @@
     "details": null,
     "finished": 0,
     "frame": {
-        "startLine": 323,
-        "endLine": 323,
+        "startLine": 341,
+        "endLine": 341,
         "name": "report",
         "endCol": 69,
         "module": "TestSpec",
