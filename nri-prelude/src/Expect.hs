@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
--- |  A library to create @Expectation@s, which describe a claim to be tested.
+-- | A library to create @Expectation@s, which describe a claim to be tested.
 --
 -- = Quick Reference
 --
@@ -19,6 +19,11 @@ module Expect
     notEqual,
     all,
     equalToContentsOf,
+
+    -- * Floating Point Comparisons
+    FloatingPointTolerance (..),
+    within,
+    notWithin,
 
     -- * Numeric Comparisons
     lessThan,
@@ -265,6 +270,67 @@ greaterThan = Stack.withFrozenCallStack assert (<) "Expect.greaterThan"
 atLeast :: (Stack.HasCallStack, Show a, Ord a) => a -> a -> Expectation
 atLeast = Stack.withFrozenCallStack assert (<=) "Expect.atLeast"
 
+-- | A type to describe how close a floating point number must be to the
+-- expected value for the test to pass. This may be specified as absolute or
+-- relative.
+--
+-- 'AbsoluteOrRelative' tolerance uses a logical OR between the absolute
+-- (specified first) and relative tolerance. If you want a logical AND, use
+-- 'Expect.all'.
+data FloatingPointTolerance
+  = Absolute Float
+  | Relative Float
+  | AbsoluteOrRelative Float Float
+  deriving (Show)
+
+-- | Passes if the second and third arguments are equal within a tolerance
+-- specified by the first argument. This is intended to avoid failing because
+-- of minor inaccuracies introduced by floating point arithmetic.
+--
+-- > -- Fails because 0.1 + 0.2 == 0.30000000000000004 (0.1 is non-terminating in base 2)
+-- > 0.1 + 0.2 |> Expect.equal 0.3
+-- >
+-- > -- So instead write this test, which passes
+-- > 0.1 + 0.2 |> Expect.within (Absolute 0.000000001) 0.3
+--
+-- Failures resemble code written in pipeline style, so you can tell which argument is which:
+--
+-- > -- Fails because 3.14 is not close enough to pi
+-- > 3.14 |> Expect.within (Absolute 0.0001) pi
+-- >
+-- > {-
+-- >
+-- > 3.14
+-- > ╷
+-- > │ Expect.within Absolute 0.0001
+-- > ╵
+-- > 3.141592653589793
+-- >
+-- > -}
+within :: (Stack.HasCallStack) => FloatingPointTolerance -> Float -> Float -> Expectation
+within tolerance =
+  Stack.withFrozenCallStack
+    assert
+    (withinHelper tolerance)
+    ("Expect.within " ++ Data.Text.pack (Prelude.show tolerance))
+
+-- | Passes if (and only if) a call to within with the same arguments would have failed.
+notWithin :: (Stack.HasCallStack) => FloatingPointTolerance -> Float -> Float -> Expectation
+notWithin tolerance =
+  Stack.withFrozenCallStack
+    assert
+    (\expected actual -> not (withinHelper tolerance expected actual))
+    ("Expect.notWithin " ++ Data.Text.pack (Prelude.show tolerance))
+
+withinHelper :: FloatingPointTolerance -> Float -> Float -> Bool
+withinHelper tolerance expected actual =
+  case tolerance of
+    Absolute absTolerance -> abs (actual - expected) <= absTolerance
+    Relative relTolerance -> abs (actual - expected) / expected <= relTolerance
+    AbsoluteOrRelative absTolerance relTolerance ->
+      withinHelper (Absolute absTolerance) expected actual
+        || withinHelper (Relative relTolerance) expected actual
+
 -- | Passes if the argument is 'True', and otherwise fails with the given message.
 --
 -- > Expect.true "Expected the list to be empty." (List.isEmpty [])
@@ -473,16 +539,16 @@ instance Show UnescapedShow where
   show (UnescapedShow text) = Data.Text.unpack text
 
 assert :: (Stack.HasCallStack, Show a) => (a -> a -> Bool) -> Text -> a -> a -> Expectation
-assert pred funcName actual expected =
-  if pred actual expected
+assert pred funcName expected actual =
+  if pred expected actual
     then Stack.withFrozenCallStack Internal.pass funcName ()
     else do
       window <- fromIO Terminal.size
       let terminalWidth = case window of
             Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
             Nothing -> 80
-      let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
-      let actualText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
+      let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
+      let actualText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
       let numLines text = List.length (Data.Text.lines text)
       Stack.withFrozenCallStack Internal.failAssertion funcName
         <| Diff.pretty

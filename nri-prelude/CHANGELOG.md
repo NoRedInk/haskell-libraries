@@ -1,6 +1,13 @@
+# Unreleased next version
+
+Enhancements:
+
+- Improved diff representation in failing tests.
+- Ported floating point comparison expectations from elm-test.
+
 # 0.4.0.0
 
-Breraking changes:
+Breaking changes:
 
 - `Expect.Task` has been removed. Most of it's functionality has been moved into `Expect`.
 - `Test.task` has been removed. Regular `Test.test` now supports monadic-style test writing.
