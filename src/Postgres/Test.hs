@@ -52,7 +52,11 @@ getTestConnection =
           case maybeConn of
             Just conn -> Prelude.pure conn
             Nothing -> do
-              settings <- Environment.decode Settings.decoder
+              testSettings <- Environment.decode (Settings.decoderWithPrefix "TEST_")
+              settings <-
+                if Settings.pgConnection Settings.defaultSettings == Settings.pgConnection testSettings
+                  then Environment.decode Settings.decoder
+                  else Prelude.pure testSettings
               Postgres.connectionIO settings
         Prelude.pure (Just conn, conn)
     )

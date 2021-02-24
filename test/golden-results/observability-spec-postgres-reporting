@@ -52,7 +52,7 @@ TracingSpan
                       Just
                         ( "withContext"
                         , SrcLoc
-                            { srcLocPackage = "database-1.0.0.0-inplace"
+                            { srcLocPackage = "main"
                             , srcLocModule = "Postgres"
                             , srcLocFile = "src/Postgres.hs"
                             , srcLocStartLine = 358
