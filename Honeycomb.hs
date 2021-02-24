@@ -50,7 +50,7 @@ import qualified Maybe
 import qualified Monitoring
 import qualified Network.HostName
 import Observability.Helpers (toHashMap)
-import Observability.Timer (Timer, toISO8601)
+import qualified Observability.Timer as Timer
 import qualified Platform
 import qualified Redis
 import qualified System.Random as Random
@@ -137,7 +137,7 @@ deriveSampleRate rootSpan handler' =
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
       baseRate = handler_fractionOfSuccessRequestsLogged handler'
       requestDurationUs =
-        Platform.finished rootSpan - Platform.started rootSpan
+        Timer.difference (Platform.finished rootSpan) (Platform.started rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
       apdexTUs = 1000 * Prelude.fromIntegral (handler_apdexTimeMs handler')
@@ -180,7 +180,7 @@ calculateApdex handler' span =
     Platform.FailedWith _ -> 0
     Platform.Succeeded ->
       let duration =
-            Platform.finished span - Platform.started span
+            Timer.difference (Platform.finished span) (Platform.started span)
               |> Platform.inMicroseconds
               |> Prelude.fromIntegral
           apdexTUs = 1000 * handler_apdexTimeMs handler'
@@ -195,8 +195,10 @@ toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingS
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
   let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
-  let duration = Platform.finished span - Platform.started span |> Platform.inMicroseconds
-  let timestamp = toISO8601 (common_timer commonFields) (Platform.started span)
+  let duration =
+        Timer.difference (Platform.finished span) (Platform.started span)
+          |> Platform.inMicroseconds
+  let timestamp = Timer.toISO8601 (common_timer commonFields) (Platform.started span)
   let sourceLocation =
         Platform.frame span
           |> Maybe.map
@@ -390,7 +392,7 @@ instance Aeson.ToJSON BatchEvent where
   toJSON = Aeson.genericToJSON options
 
 data CommonFields = CommonFields
-  { common_timer :: Timer,
+  { common_timer :: Timer.Timer,
     common_serviceName :: Text,
     common_environment :: Text,
     common_requestId :: Text,
@@ -450,7 +452,7 @@ newtype SpanId = SpanId Text
 data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
     -- to spans into real timestamps.
-    handler_timer :: Timer,
+    handler_timer :: Timer.Timer,
     handler_http :: Http.Handler,
     handler_serviceName :: Text,
     handler_environment :: Text,
@@ -459,7 +461,7 @@ data Handler = Handler
     handler_apdexTimeMs :: Int
   }
 
-handler :: Timer -> Settings -> Conduit.Acquire Handler
+handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
   http <- Http.handler
   Prelude.pure
