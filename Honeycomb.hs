@@ -137,7 +137,7 @@ deriveSampleRate rootSpan handler' =
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
       baseRate = handler_fractionOfSuccessRequestsLogged handler'
       requestDurationUs =
-        Timer.difference (Platform.finished rootSpan) (Platform.started rootSpan)
+        Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
       apdexTUs = 1000 * Prelude.fromIntegral (handler_apdexTimeMs handler')
@@ -180,7 +180,7 @@ calculateApdex handler' span =
     Platform.FailedWith _ -> 0
     Platform.Succeeded ->
       let duration =
-            Timer.difference (Platform.finished span) (Platform.started span)
+            Timer.difference (Platform.started span) (Platform.finished span)
               |> Platform.inMicroseconds
               |> Prelude.fromIntegral
           apdexTUs = 1000 * handler_apdexTimeMs handler'
@@ -196,7 +196,7 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
   let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration =
-        Timer.difference (Platform.finished span) (Platform.started span)
+        Timer.difference (Platform.started span) (Platform.finished span)
           |> Platform.inMicroseconds
   let timestamp = Timer.toISO8601 (common_timer commonFields) (Platform.started span)
   let sourceLocation =
