@@ -5,7 +5,7 @@ extra-source-files:
 - README.md
 - "test/golden-results/*.json"
 library:
-  dependencies:
+  dependencies: &dependencies
   - aeson
   - base
   - bytestring
@@ -18,26 +18,19 @@ library:
   - network-uri
   - safe-exceptions
   - text
+  - wai
+  - warp
   exposed-modules:
   - Http
   - Http.Mock
   source-dirs: src
 tests:
   spec:
-    dependencies:
-    - base
-    - bytestring
-    - nri-prelude
-    - conduit
-    - http
-    - http-types
-    - safe-exceptions
-    - text
-    - wai
-    - warp
+    dependencies: *dependencies
     main: Main.hs
     source-dirs:
-    - test/
+    - src
+    - test
     # We intentionally do not add the default ghc-options for tests. These would
     # cause tests to run in parallel, which introduces flakiness in this test
     # suite. The suite creates a number of web servers that are supposed to get

@@ -28,7 +28,7 @@ TracingSpan
               Just
                 ( "tracingSpanIO"
                 , SrcLoc
-                    { srcLocPackage = "http-1.0.0.0-inplace"
+                    { srcLocPackage = "main"
                     , srcLocModule = "Http"
                     , srcLocFile = "src/Http.hs"
                     , srcLocStartLine = 309
