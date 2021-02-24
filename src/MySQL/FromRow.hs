@@ -40,6 +40,7 @@ type family CountColumns (c :: Type) :: ColumnCount where
   CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = 'MultipleColumns
   CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = 'MultipleColumns
   CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) = 'MultipleColumns
   CountColumns x = 'SingleColumn
 
 instance (MySQLColumn a) => FromRow 'SingleColumn a where
@@ -325,4 +326,30 @@ instance
   where
   fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q] =
     (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r)
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
