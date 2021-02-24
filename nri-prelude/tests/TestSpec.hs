@@ -272,31 +272,30 @@ stdoutReporter =
         let suite =
               describe
                 "suite loc"
-                [ test "test 1" (\_ -> Expect.fail "fail"),
-                  test "test 2" (\_ -> Expect.equal True False),
-                  test "test 3" (\_ -> Expect.notEqual True True),
+                [ test "test fail" (\_ -> Expect.fail "fail"),
+                  test "test equal" (\_ -> Expect.equal True False),
+                  test "test notEqual" (\_ -> Expect.notEqual True True),
                   test
-                    "test 4"
+                    "test all"
                     ( \_ ->
                         True
                           |> Expect.all
                             [ Expect.equal False
                             ]
                     ),
-                  test "test 5" (\_ -> Expect.lessThan 1 (2 :: Int)),
-                  test "test 6" (\_ -> Expect.atMost 1 (2 :: Int)),
-                  test "test 7" (\_ -> Expect.greaterThan 2 (1 :: Int)),
-                  test "test 8" (\_ -> Expect.atLeast 2 (1 :: Int)),
-                  test "test 9" (\_ -> Expect.atLeast 2 (1 :: Int)),
-                  test "test 9" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
-                  test "test 9" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
-                  test "test 10" (\_ -> Expect.true False),
-                  test "test 11" (\_ -> Expect.false True),
-                  test "test 12" (\_ -> Expect.ok (Err ())),
-                  test "test 13" (\_ -> Expect.err (Ok ())),
-                  test "test 14" (\_ -> Expect.succeeds (Task.fail "oops")),
-                  test "test 15" (\_ -> Expect.fails (Task.succeed "oops")),
-                  test "test 16" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+                  test "test lessThan" (\_ -> Expect.lessThan 1 (2 :: Int)),
+                  test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
+                  test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+                  test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
+                  test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
+                  test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
+                  test "test true" (\_ -> Expect.true False),
+                  test "test false" (\_ -> Expect.false True),
+                  test "test ok" (\_ -> Expect.ok (Err ())),
+                  test "test err" (\_ -> Expect.err (Ok ())),
+                  test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
+                  test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
+                  test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
                 ]
         contents <-
           withTempFile

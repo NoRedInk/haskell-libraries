@@ -508,14 +508,14 @@ equalToContentsOf filepath' actual = do
       Stack.withFrozenCallStack
         assert
         (==)
-        "Expect.equalToContentsOf"
+        ("Expect.equalToContentsOf " ++ filepath')
         (UnescapedShow expected)
         (UnescapedShow actual)
     else do
       fromIO (Data.Text.IO.writeFile filepath actual)
       Stack.withFrozenCallStack
         Internal.pass
-        "Expect.equalToContentsOf"
+        ("Expect.equalToContentsOf " ++ filepath')
         ()
 
 -- By default we will compare values with each other after they have been
