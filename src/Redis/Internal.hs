@@ -28,7 +28,7 @@ data Error
   | LibraryError Text
   | TransactionAborted
   | TimeoutError
-  | ExhaustedRetriesWhileAcquiringLock
+  | AcquiringLockTookTooLong
 
 instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
@@ -46,7 +46,7 @@ errorForHumans topError =
     DecodingFieldError err -> "Could not decode field of hash: " ++ err
     TransactionAborted -> "Transaction aborted. Watched key has changed."
     TimeoutError -> "Redis query took too long."
-    ExhaustedRetriesWhileAcquiringLock -> "Exhaused retries while attempting to acquire lock."
+    AcquiringLockTookTooLong -> "Had to wait too long to obtain a lock."
 
 -- | Render the commands a query is going to run for monitoring and debugging
 -- purposes. Values we write are replaced with "*****" because they might
@@ -259,9 +259,13 @@ maybesToDict keys values =
     |> Dict.fromList
 
 data Lock e a = Lock
-  { lockKey :: Text,
+  { -- | The redis key to use for the lock.
+    lockKey :: Text,
+    -- | The maximum amount of time the locked operation is allowed to take.
     lockTimeoutInMs :: Float,
-    lockMaxTries :: Int,
+    -- | The maximum amount of time to wait for a lock to become available.
+    lockRetryDurationInMs :: Int,
+    -- | What to do when obtaining a lock fails.
     lockHandleError :: Error -> Task e a
   }
 

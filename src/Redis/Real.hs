@@ -334,8 +334,8 @@ acquireLock ::
   UUID.UUID ->
   Task Internal.Error ()
 acquireLock conn doAnything config uuid =
-  if Internal.lockMaxTries config <= 0
-    then Task.fail Internal.ExhaustedRetriesWhileAcquiringLock
+  if Internal.lockRetryDurationInMs config <= 0
+    then Task.fail Internal.AcquiringLockTookTooLong
     else do
       result <- do
         let cmdChunks =
@@ -361,11 +361,15 @@ acquireLock conn doAnything config uuid =
       case result of
         Database.Redis.Ok -> Task.succeed ()
         _ -> do
-          Process.sleep (Internal.lockTimeoutInMs config)
+          let sleepTime = Internal.lockTimeoutInMs config / 10
+          Process.sleep sleepTime
           acquireLock
             conn
             doAnything
-            config {Internal.lockMaxTries = Internal.lockMaxTries config - 1}
+            config
+              { Internal.lockRetryDurationInMs =
+                  Internal.lockRetryDurationInMs config - round sleepTime
+              }
             uuid
 
 releaseLock ::

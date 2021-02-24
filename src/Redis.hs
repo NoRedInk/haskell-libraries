@@ -243,7 +243,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
             Internal.DecodingFieldError _ -> Task.fail err
             Internal.LibraryError _ -> Task.fail err
             Internal.TimeoutError -> Task.fail err
-            Internal.ExhaustedRetriesWhileAcquiringLock -> Task.fail err
+            Internal.AcquiringLockTookTooLong -> Task.fail err
         action = do
           Internal.watch handler [toKey key]
           oldValue <- Internal.query handler (Internal.Get (toKey key))
