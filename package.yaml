@@ -4,7 +4,7 @@ synopsis: NRI helper for database queries
 extra-source-files:
 - README.md
 - "test/golden-results/*.json"
-dependencies:
+dependencies: &dependencies
 - aeson
 - attoparsec
 - base
@@ -46,15 +46,9 @@ library:
   source-dirs: src
 tests:
   spec:
-    dependencies:
-    - database
-    - hedgehog
-    - nri-prelude
-    - tasty
-    - tasty-ant-xml
-    - tasty-hedgehog
-    - tasty-hunit
+    dependencies: *dependencies
     main: Main.hs
     source-dirs:
+    - src
     - test
     ghc-options: *test-ghc-options
