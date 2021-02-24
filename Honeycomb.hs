@@ -224,7 +224,8 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
             sourceLocation = sourceLocation,
             apdex = common_apdex commonFields,
             enrichedData = [],
-            details = Platform.details span
+            details = Platform.details span,
+            sampleRate
           }
   ( lastSpanIndex,
     BatchEvent
@@ -411,7 +412,8 @@ data Span = Span
     sourceLocation :: Maybe Text,
     apdex :: Float,
     enrichedData :: [(Text, Text)],
-    details :: Maybe Platform.SomeTracingSpanDetails
+    details :: Maybe Platform.SomeTracingSpanDetails,
+    sampleRate :: Int
   }
   deriving (Generic, Show)
 
