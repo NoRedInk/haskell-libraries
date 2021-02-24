@@ -32,5 +32,5 @@ tests:
     dependencies: *dependencies
     main: Main.hs
     source-dirs:
-      - test/spec
+      - test
       - src
