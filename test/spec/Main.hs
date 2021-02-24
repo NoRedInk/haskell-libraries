@@ -268,7 +268,7 @@ queryTests redisHandler =
             Redis.Lock
               { Redis.lockKey = "test-lock-key",
                 Redis.lockTimeoutInMs = 100,
-                Redis.lockMaxTries = 1,
+                Redis.lockRetryDurationInMs = 100,
                 Redis.lockHandleError = Task.fail
               }
       Redis.lock redisHandler lock (Task.succeed ())
