@@ -9,13 +9,9 @@ where
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Acquire
 import qualified Data.ByteString
-import qualified Data.ByteString.Builder
-import qualified Data.ByteString.Lazy
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding
 import qualified Data.Text.Encoding as Encoding
-import qualified Data.UUID as UUID
-import qualified Data.UUID.V4
 import qualified Database.Redis
 import qualified GHC.Stack as Stack
 import qualified Platform
@@ -291,6 +287,12 @@ toB = Data.Text.Encoding.encodeUtf8
 -- For now we are satisfied with the trade-off of this simpler lock. It's the
 -- same algorithm as the one used by the redis-mutex library in the monolith, so
 -- if it's good enough there it's good enough here too.
+--
+-- NOTE: this implementation has been hobbled somewhat from the reference linked
+-- above. We do not write a unique value to the lock, and check that value is
+-- still set before removing the lock key. This is because we had some trouble
+-- with requests timing out on the lock removal step, and so we're experimenting
+-- if a simpler non-eval based mechanism has the same problem.
 lock ::
   Connection ->
   Platform.DoAnythingHandler ->
@@ -298,17 +300,9 @@ lock ::
   Task e a ->
   Task e a
 lock conn doAnything config task = do
-  -- Create a random value to store in the locking key. We use this to ensure
-  -- during cleanup that we only delete the locking key if it was set by us. If
-  -- by some race condition another process wrote to the lock before we get to
-  -- clean it up then we don't touch it.
-  uuid <-
-    Data.UUID.V4.nextRandom
-      |> map Ok
-      |> Platform.doAnything doAnything
   Platform.bracketWithError
-    (acquireLock conn doAnything config uuid |> Task.mapError RedisError)
-    (\_ _ -> releaseLock conn doAnything config uuid |> Task.mapError RedisError)
+    (acquireLock conn doAnything config |> Task.mapError RedisError)
+    (\_ _ -> releaseLock conn doAnything config |> Task.mapError RedisError)
     ( \_ ->
         -- Our code has to finish before the lock expires.
         Task.mapError OtherError task
@@ -331,9 +325,8 @@ acquireLock ::
   Connection ->
   Platform.DoAnythingHandler ->
   Internal.Lock e a ->
-  UUID.UUID ->
   Task Internal.Error ()
-acquireLock conn doAnything config uuid =
+acquireLock conn doAnything config =
   if Internal.lockRetryDurationInMs config <= 0
     then Task.fail Internal.AcquiringLockTookTooLong
     else do
@@ -341,7 +334,7 @@ acquireLock conn doAnything config uuid =
         let cmdChunks =
               [ "SET",
                 Encoding.encodeUtf8 (Internal.lockKey config),
-                UUID.toASCIIBytes uuid,
+                "LOCK TAKEN",
                 "NX",
                 "PX",
                 Text.fromInt (round (Internal.lockTimeoutInMs config))
@@ -370,42 +363,20 @@ acquireLock conn doAnything config uuid =
               { Internal.lockRetryDurationInMs =
                   Internal.lockRetryDurationInMs config - round sleepTime
               }
-            uuid
 
 releaseLock ::
   Connection ->
   Platform.DoAnythingHandler ->
   Internal.Lock e a ->
-  UUID.UUID ->
   Task Internal.Error ()
-releaseLock conn doAnything config uuid = do
+releaseLock conn doAnything config = do
   -- We could use evalsha here, but the script we send is not that much larger
   -- than a sha would be so we save ourselves the trouble. Redis documentation
   -- on the EVALSHA command makes clear that other than bandwidt there's no
   -- performance penalty to using EVAL.
-  let tracingCmd =
-        Text.join
-          " "
-          [ "EVAL <delete key if value matches script> 1",
-            Internal.lockKey config,
-            UUID.toText uuid
-          ]
-  Database.Redis.eval
-    deleteKeyIfValueMatchesScript
+  let tracingCmd = "DEL " ++ Internal.lockKey config
+  Database.Redis.del
     [Encoding.encodeUtf8 (Internal.lockKey config)]
-    [UUID.toASCIIBytes uuid]
     |> map (map Ok)
     |> platformRedis [tracingCmd] conn doAnything
     |> map (\(_ :: Prelude.Integer) -> ())
-
--- This script is copied verbatim from https://redis.io/commands/set.
-deleteKeyIfValueMatchesScript :: Data.ByteString.ByteString
-deleteKeyIfValueMatchesScript =
-  "if redis.call(\"get\",KEYS[1]) == ARGV[1]\n"
-    ++ "then\n"
-    ++ "    return redis.call(\"del\",KEYS[1])\n"
-    ++ "else\n"
-    ++ "    return 0\n"
-    ++ "end"
-    |> Data.ByteString.Builder.toLazyByteString
-    |> Data.ByteString.Lazy.toStrict
