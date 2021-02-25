@@ -237,9 +237,9 @@ doBreadcrumb timer span =
           { Bugsnag.breadcrumb_name = Platform.name span,
             Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
             Bugsnag.breadcrumb_timestamp = Timer.toISO8601 timer (Platform.started span),
-            Bugsnag.breadcrumb_metaData = metadata
+            Bugsnag.breadcrumb_metaData = stackFrameMetaData ++ durationMetaData
           }
-      metadata =
+      stackFrameMetaData =
         case Platform.frame span of
           Nothing -> Nothing
           Just (_, frame) ->
@@ -247,6 +247,19 @@ doBreadcrumb timer span =
               |> Text.fromList
               |> HashMap.singleton "stack frame"
               |> Just
+      durationMetaData =
+        Just
+          ( HashMap.singleton
+              "duration in milliseconds"
+              ( Timer.difference
+                  (Platform.started span)
+                  (Platform.finished span)
+                  |> Platform.inMicroseconds
+                  |> Prelude.fromIntegral
+                  |> (*) 1e-3
+                  |> Text.fromFloat
+              )
+          )
    in case Platform.details span of
         Nothing -> defaultBreadcrumb
         Just details -> customizeBreadcrumb span details defaultBreadcrumb
