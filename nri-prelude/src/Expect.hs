@@ -349,7 +349,10 @@ withinHelper tolerance expected actual =
 -- >
 -- > -}
 true :: Stack.HasCallStack => Bool -> Expectation
-true x = Stack.withFrozenCallStack assert (&&) "Expect.true" x True
+true x =
+  if x
+    then Stack.withFrozenCallStack Internal.pass "Expect.true" ()
+    else Stack.withFrozenCallStack Internal.failAssertion "Expect.true" "I expected a True but got False"
 
 -- | Passes if the argument is 'False', and otherwise fails with the given message.
 --
@@ -369,7 +372,10 @@ true x = Stack.withFrozenCallStack assert (&&) "Expect.true" x True
 -- >
 -- > -}
 false :: Stack.HasCallStack => Bool -> Expectation
-false x = Stack.withFrozenCallStack assert xor "Expect.false" x True
+false x =
+  if x
+    then Stack.withFrozenCallStack Internal.failAssertion "Expect.false" "I expected a False but got True"
+    else Stack.withFrozenCallStack Internal.pass "Expect.false" ()
 
 -- | Passes if each of the given functions passes when applied to the subject.
 --
