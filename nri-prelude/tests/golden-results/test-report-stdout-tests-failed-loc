@@ -198,14 +198,7 @@ Expectation failed at tests/TestSpec.hs:292
   293:                   test "test false" (\_ -> Expect.false True),
   294:                   test "test ok" (\_ -> Expect.ok (Err ())),
 
-▼▼▼
-True
-╷
-│ Expect.true
-╵
-False
-▲▲▲▲
-
+I expected a True but got False
 
 ↓ tests/TestSpec.hs:293
 ↓ suite loc
@@ -218,12 +211,7 @@ Expectation failed at tests/TestSpec.hs:293
   294:                   test "test ok" (\_ -> Expect.ok (Err ())),
   295:                   test "test err" (\_ -> Expect.err (Ok ())),
 
-True
-╷
-│ Expect.false
-╵
-True
-
+I expected a False but got True
 
 ↓ tests/TestSpec.hs:294
 ↓ suite loc
