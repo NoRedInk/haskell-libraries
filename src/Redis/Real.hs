@@ -355,7 +355,10 @@ acquireLock conn doAnything config =
         Database.Redis.Ok -> Task.succeed ()
         _ -> do
           let sleepTime = Internal.lockTimeoutInMs config / 10
-          Process.sleep sleepTime
+          Log.withContext
+            "Sleep for a bit until we try to re-acquire the lock"
+            [Log.context "sleep time in ms" sleepTime]
+            (Process.sleep sleepTime)
           acquireLock
             conn
             doAnything
