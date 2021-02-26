@@ -41,10 +41,10 @@
         "homepage": null,
         "owner": "stoeffel",
         "repo": "pretty-diff",
-        "rev": "4d7ecac49f8d9dde8a006126900843cc1ba63ca6",
-        "sha256": "0d6zc52m6g6651a9pr33vyhhdljwhf83a2z0p0mqwz80gx2w1xnb",
+        "rev": "790c3b2029174a50966e57983e6e12743b2cd818",
+        "sha256": "0m1h3w42a968x2bb2vgd3cxg09l4ql4bhgj19zv68h0i0la288ln",
         "type": "tarball",
-        "url": "https://github.com/stoeffel/pretty-diff/archive/4d7ecac49f8d9dde8a006126900843cc1ba63ca6.tar.gz",
+        "url": "https://github.com/stoeffel/pretty-diff/archive/790c3b2029174a50966e57983e6e12743b2cd818.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
