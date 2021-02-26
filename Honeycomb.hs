@@ -167,10 +167,10 @@ deriveSampleRate rootSpan handler' =
 --  * baseRate 1/1000
 --  * from 1ms to 300ms
 
--- https://www.wolframalpha.com/input/?i=plot+1%2Fmax%281%2F1000%2C+min%281%2C+%281%2F1000%29+*+%281.1+%5E+%28x+%2F+30%29%29%29%29+from+x%3D1+to+x%3D300
+-- https://www.wolframalpha.com/input/?i=plot+1%2Fmax%281%2F1000%2C+min%281%2C+%281%2F1000%29+*+%281.3+%5E+%28x+%2F+30%29%29%29%29+from+x%3D1+to+x%3D300
 sampleRateForDuration :: Float -> Float -> Float -> Float
 sampleRateForDuration baseRate requestDurationUs apdexTUs =
-  baseRate * (1.1 ^ (requestDurationUs / apdexTUs))
+  baseRate * (1.3 ^ (requestDurationUs / apdexTUs))
     |> clamp baseRate 1
 
 calculateApdex :: Handler -> Platform.TracingSpan -> Float
