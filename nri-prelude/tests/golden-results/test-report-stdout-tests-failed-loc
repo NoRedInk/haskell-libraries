@@ -30,7 +30,6 @@ False
 True
 ▲▲▲
 
-
 ↓ tests/TestSpec.hs:277
 ↓ suite loc
 ✗ test notEqual
@@ -47,7 +46,6 @@ True
 │ Expect.notEqual
 ╵
 True
-
 
 ↓ tests/TestSpec.hs:278
 ↓ suite loc
@@ -68,7 +66,6 @@ True
 False
 ▲▲▲▲
 
-
 ↓ tests/TestSpec.hs:286
 ↓ suite loc
 ✗ test lessThan
@@ -87,7 +84,6 @@ Expectation failed at tests/TestSpec.hs:286
 ╵
 1
 ▲
-
 
 ↓ tests/TestSpec.hs:287
 ↓ suite loc
@@ -108,7 +104,6 @@ Expectation failed at tests/TestSpec.hs:287
 1
 ▲
 
-
 ↓ tests/TestSpec.hs:288
 ↓ suite loc
 ✗ test greatherThan
@@ -127,7 +122,6 @@ Expectation failed at tests/TestSpec.hs:288
 ╵
 2
 ▲
-
 
 ↓ tests/TestSpec.hs:289
 ↓ suite loc
@@ -148,7 +142,6 @@ Expectation failed at tests/TestSpec.hs:289
 2
 ▲
 
-
 ↓ tests/TestSpec.hs:290
 ↓ suite loc
 ✗ test within
@@ -168,7 +161,6 @@ Expectation failed at tests/TestSpec.hs:290
 1.0
 ▲
 
-
 ↓ tests/TestSpec.hs:291
 ↓ suite loc
 ✗ test notWithin
@@ -185,7 +177,6 @@ Expectation failed at tests/TestSpec.hs:291
 │ Expect.notWithin Relative 0.1
 ╵
 1.0
-
 
 ↓ tests/TestSpec.hs:292
 ↓ suite loc
@@ -283,7 +274,6 @@ Expectation failed at tests/TestSpec.hs:298
 ╵
 2
 ▲
-
 
 TEST RUN FAILED
 
