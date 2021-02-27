@@ -67,14 +67,13 @@ import qualified Internal.Time as Time
 import qualified List
 import qualified Log
 import Network.Socket (SockAddr (..))
-import qualified Oops
 import qualified Platform
 import qualified Postgres.Query as Query
 import qualified Postgres.Settings as Settings
 import qualified System.Exit
 import qualified Task
 import qualified Tuple
-import Prelude (Either (Left, Right), IO, error, fromIntegral, mconcat, pure, show, (<>))
+import Prelude (Either (Left, Right), IO, error, fromIntegral, mconcat, pure, putStrLn, show, (<>))
 
 data Connection = Connection
   { doAnything :: Platform.DoAnythingHandler,
@@ -302,23 +301,11 @@ toConnectionLogContext db =
 
 handleError :: Text -> Exception.IOException -> IO a
 handleError connectionString err = do
-  _ <-
-    Oops.putNiceError
-      [Oops.help|# Could not connect to Database
-                |
-                |We couldn't connect to the database.
-                |You might see this error when you try to start the content creation app or during compilation.
-                |
-                |Are you sure your database is running?
-                |Bring it up by running `aide setup-postgres`.
-                |We're trying to connect with the credentials stored in `.env`, perhaps you can try to connect manually.
-                |
-                |]
-      [ Oops.extra "Exception" err,
-        Oops.extra "Attempted to connect to" connectionString
-      ]
-  Exception.displayException err
-    |> System.Exit.die
+  putStrLn "I couldn't connect to Postgres"
+  putStrLn ""
+  putStrLn "Is the database running? You can start it by running `aide setup-postgres`."
+  putStrLn ("I tried to connect to: " ++ Text.toList connectionString)
+  System.Exit.die (Exception.displayException err)
 
 --
 -- CONNECTION HELPERS
