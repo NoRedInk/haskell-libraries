@@ -18,7 +18,7 @@ library:
     - base >= 4.12.0.0 && < 4.15
     - nri-prelude >= 0.1.0.0 && < 0.5
   exposed-modules:
-    - Log.MySql
+    - Log.SqlQuery
   source-dirs: src
 default-extensions:
 - DataKinds
