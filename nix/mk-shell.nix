@@ -30,7 +30,9 @@ in pkgs.mkShell {
         network-uri
         pretty-show
         process
+        random
         safe-exceptions
+        stm
         terminal-size
         text
         time

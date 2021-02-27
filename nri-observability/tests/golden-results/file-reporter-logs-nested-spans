@@ -1,0 +1,56 @@
+{
+    "hostname": "some-host",
+    "env": "narnia",
+    "namespace": [
+        "app"
+    ],
+    "allocated_mb": 0.0,
+    "duration_ms": 0.0,
+    "name": "root-span",
+    "details": null,
+    "start_utc": "1970-01-01T00:00:00Z",
+    "request-id": "request-id"
+}
+{
+    "hostname": "some-host",
+    "env": "narnia",
+    "namespace": [
+        "root-span",
+        "app"
+    ],
+    "allocated_mb": 0.0,
+    "duration_ms": 0.0,
+    "name": "child2",
+    "details": null,
+    "start_utc": "1970-01-01T00:00:00Z",
+    "request-id": "request-id"
+}
+{
+    "hostname": "some-host",
+    "env": "narnia",
+    "namespace": [
+        "root-span",
+        "app"
+    ],
+    "allocated_mb": 0.0,
+    "duration_ms": 0.0,
+    "name": "child1",
+    "details": null,
+    "start_utc": "1970-01-01T00:00:00Z",
+    "request-id": "request-id"
+}
+{
+    "hostname": "some-host",
+    "env": "narnia",
+    "namespace": [
+        "child1",
+        "root-span",
+        "app"
+    ],
+    "allocated_mb": 0.0,
+    "duration_ms": 0.0,
+    "name": "grandchild",
+    "details": null,
+    "start_utc": "1970-01-01T00:00:00Z",
+    "request-id": "request-id"
+}

@@ -1,8 +1,9 @@
-module Platform.ReporterHelpers (toHashMap) where
+module Platform.ReporterHelpers (toHashMap, srcString) where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
+import qualified GHC.Stack as Stack
 import qualified List
 import qualified Text
 import qualified Prelude
@@ -52,3 +53,9 @@ jsonAsText key val =
     Aeson.Number n -> HashMap.singleton key (Text.fromList (Prelude.show n))
     Aeson.Bool bool -> HashMap.singleton key (Text.fromList (Prelude.show bool))
     Aeson.Null -> HashMap.empty
+
+srcString :: Stack.SrcLoc -> Text
+srcString frame =
+  Text.fromList (Stack.srcLocFile frame)
+    ++ ":"
+    ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine frame))

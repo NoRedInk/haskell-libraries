@@ -9,6 +9,7 @@ module Platform.Timer
     toPosixMicroseconds,
     toISO8601,
     difference,
+    durationInUs,
   )
 where
 
@@ -91,3 +92,11 @@ difference start end =
   if end > start
     then end - start
     else 0
+
+-- | Get the time covered by a duration in microseconds.
+durationInUs :: Platform.TracingSpan -> Word.Word64
+durationInUs span =
+  difference
+    (Platform.started span)
+    (Platform.finished span)
+    |> Platform.inMicroseconds

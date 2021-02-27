@@ -1,6 +1,8 @@
 module Main (main) where
 
 import qualified Spec.Reporter.Bugsnag
+import qualified Spec.Reporter.Dev
+import qualified Spec.Reporter.File
 import qualified Test
 import qualified Prelude
 
@@ -11,5 +13,7 @@ tests :: Test.Test
 tests =
   Test.describe
     "nri-observability"
-    [ Spec.Reporter.Bugsnag.tests
+    [ Spec.Reporter.Bugsnag.tests,
+      Spec.Reporter.Dev.tests,
+      Spec.Reporter.File.tests
     ]
