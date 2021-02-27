@@ -1,0 +1,29 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "measure humidity"
+        }
+    ],
+    "breadcrumbs": [
+        {
+            "name": "Starting: measure weather",
+            "metaData": {
+                "value": "32 C",
+                "duration in milliseconds": "0.0"
+            },
+            "type": "manual",
+            "timestamp": "1970-01-01T00:00:00Z"
+        }
+    ],
+    "metaData": {
+        "measure weather": "32 C",
+        "measure humidity": "25 %",
+        "request": {
+            "request id": "request-id-1234",
+            "response time in ms": 0,
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false
+}

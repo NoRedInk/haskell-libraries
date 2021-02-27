@@ -14,6 +14,7 @@ in pkgs.mkShell {
         auto-update
         base
         brick
+        bugsnag-hs
         bytestring
         containers
         directory
@@ -21,6 +22,9 @@ in pkgs.mkShell {
         filepath
         ghc
         hedgehog
+        hostname
+        http-client
+        http-client-tls
         junit-xml
         modern-uri
         network-uri

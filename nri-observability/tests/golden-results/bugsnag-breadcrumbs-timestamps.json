@@ -1,0 +1,39 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "some span"
+        }
+    ],
+    "breadcrumbs": [
+        {
+            "name": "Starting: outer",
+            "metaData": {
+                "duration in milliseconds": "3.0"
+            },
+            "type": "manual",
+            "timestamp": "1970-01-01T00:00:00.005Z"
+        },
+        {
+            "name": "inner",
+            "metaData": {
+                "duration in milliseconds": "1.0"
+            },
+            "type": "manual",
+            "timestamp": "1970-01-01T00:00:00.006Z"
+        },
+        {
+            "name": "Finished: outer",
+            "type": "log",
+            "timestamp": "1970-01-01T00:00:00.008Z"
+        }
+    ],
+    "metaData": {
+        "request": {
+            "request id": "request-id-1234",
+            "response time in ms": 5,
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false
+}
