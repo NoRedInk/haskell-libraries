@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-cse #-}
+
 -- | Helper functions for converting the timestamp format used in our `Span`
 -- data to the time formats used by the various platforms we report to.
 module Platform.Timer
@@ -13,6 +15,7 @@ module Platform.Timer
   )
 where
 
+import qualified Control.Concurrent.MVar as MVar
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Clock.POSIX as Clock.POSIX
 import qualified Data.Time.Format as Format
@@ -20,6 +23,7 @@ import qualified Data.Time.LocalTime as LocalTime
 import qualified Data.Word as Word
 import qualified GHC.Clock
 import qualified Platform
+import qualified System.IO.Unsafe
 import qualified Prelude
 
 -- | Our spans' timestamps are produced by the `GHC.Clock` module and consist of
@@ -37,14 +41,32 @@ data Timer = Timer
     timezone :: LocalTime.TimeZone
   }
 
+-- | Create a timer, then cache it. When asked again return the previously
+-- created timer.
+--
+-- Passing separate timers to multiple reporters could result in those reporters
+-- disagreeing very subtly on the exact time when events happen. Having a single
+-- timer prevents this from happening.
 mkTimer :: Prelude.IO Timer
-mkTimer = do
-  -- 'Sync our clocks', to find our how monotonic time and actual time relate.
-  nowTime <- Clock.POSIX.getPOSIXTime
-  nowClock <- GHC.Clock.getMonotonicTimeNSec
-  timezone <- LocalTime.getCurrentTimeZone
-  let tzero = Prelude.floor (1e6 * nowTime) - (nowClock `Prelude.div` 1000)
-  Prelude.pure Timer {tzero, timezone}
+mkTimer =
+  MVar.modifyMVar
+    timerVar
+    ( \maybeTimer ->
+        case maybeTimer of
+          Just timer -> Prelude.pure (Just timer, timer)
+          Nothing -> do
+            -- 'Sync our clocks', to find our how monotonic time and actual time relate.
+            nowTime <- Clock.POSIX.getPOSIXTime
+            nowClock <- GHC.Clock.getMonotonicTimeNSec
+            timezone <- LocalTime.getCurrentTimeZone
+            let tzero = Prelude.floor (1e6 * nowTime) - (nowClock `Prelude.div` 1000)
+            let timer = Timer {tzero, timezone}
+            Prelude.pure (Just timer, timer)
+    )
+
+{-# NOINLINE timerVar #-}
+timerVar :: MVar.MVar (Maybe Timer)
+timerVar = System.IO.Unsafe.unsafePerformIO (MVar.newMVar Nothing)
 
 toUTC :: Timer -> Platform.MonotonicTime -> Clock.UTCTime
 toUTC timer clock =
