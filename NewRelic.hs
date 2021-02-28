@@ -25,7 +25,6 @@ import qualified Data.Scientific
 import qualified Data.Text.Encoding
 import qualified Data.Typeable as Typeable
 import qualified Environment
-import qualified Http
 import qualified List
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
@@ -201,11 +200,13 @@ firstCommand cmds =
     [] -> Nothing
     first : _ -> List.head (Text.split " " first)
 
-httpToExternalSegment :: Http.Info -> NewRelic.ExternalSegment
-httpToExternalSegment info =
+httpToExternalSegment :: HttpRequest.Outgoing -> NewRelic.ExternalSegment
+httpToExternalSegment (HttpRequest.Outgoing details) =
   NewRelic.ExternalSegment
-    { NewRelic.externalSegmentUri = Http.infoUri info,
-      NewRelic.externalSegmentProcedure = nonEmptyText (Http.infoRequestMethod info),
+    { NewRelic.externalSegmentUri =
+        HttpRequest.host details ++ HttpRequest.path details
+          |> Maybe.withDefault "unknown-uri",
+      NewRelic.externalSegmentProcedure = HttpRequest.method details,
       NewRelic.externalSegmentLibrary = Nothing
     }
 
@@ -239,7 +240,7 @@ category span =
       ( Platform.renderTracingSpanDetails
           [ Platform.Renderer (\(_ :: MySQL.Info) -> "mysql"),
             Platform.Renderer (\(_ :: Postgres.Info) -> "postgres"),
-            Platform.Renderer (\(_ :: Http.Info) -> "http"),
+            Platform.Renderer (\(_ :: HttpRequest.Outgoing) -> "http"),
             Platform.Renderer (\(_ :: HttpRequest.Incoming) -> "request"),
             Platform.Renderer (\(_ :: Log.LogContexts) -> "haskell")
           ]
