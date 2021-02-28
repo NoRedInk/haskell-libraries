@@ -8,6 +8,7 @@ import qualified Data.List
 import qualified Debug
 import qualified Expect
 import qualified Http
+import qualified Log.HttpRequest as HttpRequest
 import qualified Network.HTTP.Types.Status as Status
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
@@ -202,10 +203,15 @@ constantValuesForVariableFields span =
         Platform.details span
           |> andThen
             ( \details ->
-                details
-                  |> Platform.renderTracingSpanDetails
-                    [ Platform.Renderer (\info -> Platform.toTracingSpanDetails info {Http.infoUri = "mock-uri"})
-                    ]
+                Platform.renderTracingSpanDetails
+                  [ Platform.Renderer
+                      ( \(HttpRequest.Outgoing httpDetails) ->
+                          httpDetails {HttpRequest.host = Just "mock-uri"}
+                            |> HttpRequest.Outgoing
+                            |> Platform.toTracingSpanDetails
+                      )
+                  ]
+                  details
             ),
       Platform.allocated = 0,
       Platform.summary = Just "mock-uri",

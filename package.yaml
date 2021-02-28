@@ -10,6 +10,7 @@ library:
   - base
   - bytestring
   - nri-prelude
+  - nri-observability
   - conduit
   - http-client
   - http-client-tls

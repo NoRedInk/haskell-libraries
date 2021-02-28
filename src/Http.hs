@@ -21,7 +21,6 @@ module Http
     Internal.Http.Error (..),
     Internal.Http.Settings (..),
     Internal.Http.Body (..),
-    Info (..),
   )
 where
 
@@ -35,7 +34,7 @@ import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import qualified Internal.Http
-import qualified List
+import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.Internal as HTTP.Internal
@@ -296,16 +295,35 @@ prepareManagerForRequest manager = do
               }
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
     wrapException log req io =
-      let spanDetails =
-            Info
-              { infoUri =
-                  HTTP.getUri req
-                    |> Network.URI.uriToString (\_ -> "*****")
-                    |> (\showS -> Text.fromList (showS "")),
-                infoRequestMethod =
-                  HTTP.method req
-                    |> Data.Text.Encoding.decodeUtf8
-              }
+      let uri = HTTP.getUri req
+          host =
+            Network.URI.uriScheme uri
+              ++ ( Network.URI.uriAuthority uri
+                     |> Network.URI.uriAuthToString (\_ -> "*****")
+                     |> (\showS -> showS "")
+                 )
+              |> Text.fromList
+          method =
+            HTTP.method req
+              |> Data.Text.Encoding.decodeUtf8
+          spanDetails =
+            HttpRequest.Outgoing
+              HttpRequest.emptyDetails
+                { HttpRequest.host = Just host,
+                  HttpRequest.path =
+                    Network.URI.uriPath uri
+                      |> Text.fromList
+                      |> Just,
+                  HttpRequest.queryString =
+                    Network.URI.uriQuery uri
+                      |> Text.fromList
+                      |> Just,
+                  HttpRequest.method = Just method
+                }
+          uriStr =
+            HTTP.getUri req
+              |> Network.URI.uriToString (\_ -> "*****")
+              |> (\showS -> Text.fromList (showS ""))
        in Platform.tracingSpanIO
             log
             "Outoing HTTP Request"
@@ -316,28 +334,6 @@ prepareManagerForRequest manager = do
                       Platform.setTracingSpanDetailsIO log' spanDetails
                       Platform.setTracingSpanSummaryIO
                         log'
-                        ( infoRequestMethod spanDetails
-                            ++ " "
-                            ++ infoUri spanDetails
-                        )
+                        (method ++ " " ++ uriStr)
                   )
             )
-
-data Info = Info
-  { infoUri :: Text,
-    infoRequestMethod :: Text
-  }
-  deriving (Generic)
-
-instance Aeson.ToJSON Info where
-  toJSON = Aeson.genericToJSON infoEncodingOptions
-
-  toEncoding = Aeson.genericToEncoding infoEncodingOptions
-
-infoEncodingOptions :: Aeson.Options
-infoEncodingOptions =
-  Aeson.defaultOptions
-    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
-    }
-
-instance Platform.TracingSpanDetails Info

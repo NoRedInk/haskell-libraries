@@ -9,9 +9,9 @@ TracingSpan
             { srcLocPackage = "main"
             , srcLocModule = "Main"
             , srcLocFile = "test/Main.hs"
-            , srcLocStartLine = 177
+            , srcLocStartLine = 178
             , srcLocStartCol = 7
-            , srcLocEndLine = 181
+            , srcLocEndLine = 182
             , srcLocEndCol = 40
             }
         )
@@ -31,14 +31,15 @@ TracingSpan
                     { srcLocPackage = "main"
                     , srcLocModule = "Http"
                     , srcLocFile = "src/Http.hs"
-                    , srcLocStartLine = 309
+                    , srcLocStartLine = 327
                     , srcLocStartCol = 11
-                    , srcLocEndLine = 324
+                    , srcLocEndLine = 339
                     , srcLocEndCol = 14
                     }
                 )
           , details =
-              Just "{\"uri\":\"mock-uri\",\"request method\":\"GET\"}"
+              Just
+                "{\"method\":\"GET\",\"host\":\"mock-uri\",\"path\":\"/\",\"query string\":\"\",\"headers\":{}}"
           , summary = Just "mock-uri"
           , succeeded = Succeeded
           , allocated = 0
