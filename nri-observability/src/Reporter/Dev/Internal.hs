@@ -1,17 +1,6 @@
 {-# LANGUAGE NumericUnderscores #-}
 
-module Reporter.Dev.Internal
-  ( report,
-    Handler,
-    handler,
-    cleanup,
-    Settings,
-    decoder,
-
-    -- * Exported for tests
-    mkLog,
-  )
-where
+module Reporter.Dev.Internal where
 
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
@@ -20,12 +9,17 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.Text.IO
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder as Builder
-import qualified Environment
 import qualified Log.HttpRequest as HttpRequest
 import qualified Platform
 import qualified Platform.Timer as Timer
 import qualified Prelude
 
+-- Print basic information about requests to stdout and make more detailed
+-- information available to the log-explorer tool.
+--
+-- Example usage:
+-- > handler <- Dev.handler
+-- > Dev.report handler "request-id" span
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span = do
   Platform.writeSpanToDevLog span
@@ -84,13 +78,18 @@ data Handler = Handler
     loggingThread :: Async.Async ()
   }
 
-handler :: Timer.Timer -> Settings -> Prelude.IO Handler
-handler timer Settings = do
+-- | Create a 'Handler'. Do this once when your application starts and reuse
+-- the 'Handler' you get.
+handler :: Prelude.IO Handler
+handler = do
   writeLock <- MVar.newEmptyMVar
   counter <- MVar.newMVar 0
   loggingThread <- Async.async (logLoop counter writeLock)
+  timer <- Timer.mkTimer
   Prelude.pure Handler {timer, writeLock, loggingThread}
 
+-- | Clean up your handler after you're done with it. Call this before your
+-- application shuts down.
 cleanup :: Handler -> Prelude.IO ()
 cleanup = Async.cancel << loggingThread
 
@@ -113,8 +112,3 @@ logLoop counter lock = do
           then Prelude.putStrLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
           else Prelude.pure ()
     )
-
-data Settings = Settings
-
-decoder :: Environment.Decoder Settings
-decoder = Prelude.pure Settings

@@ -11,9 +11,9 @@
 -- sending logs to external services.
 module Reporter.File
   ( Internal.report,
+    Internal.Handler,
     Internal.handler,
     Internal.cleanup,
-    Internal.Handler,
     Internal.Settings,
     Internal.decoder,
   )

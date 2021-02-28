@@ -63,6 +63,12 @@ ghc-options:
 - -Wredundant-constraints
 - -Wincomplete-uni-patterns
 - -fplugin=NriPrelude.Plugin
+when:
+- condition: os(linux)
+  ghc-options:
+  # Make it possible for binaries based on this package to only contain the
+  # parts they need. This option isn't available on all platforms.
+  - -split-sections
 tests:
   tests:
     dependencies: *dependencies

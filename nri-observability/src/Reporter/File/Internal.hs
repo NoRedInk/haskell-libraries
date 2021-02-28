@@ -15,6 +15,15 @@ import qualified System.IO
 import qualified System.Random as Random
 import qualified Prelude
 
+-- Log tracing information for a request to a file. Tracing information contains
+-- nested spans but will appear flattend in the log. Each tracing span will
+-- appear on its own line in the log, ordered by its start date.
+--
+-- Example usage:
+--
+-- > settings <- File.decode
+-- > handler <- File.handler settings
+-- > File.report handler "request-id" span
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report Handler {skipLogging, writeQueue, logContext} requestId span = do
   skip <- skipLogging span
@@ -85,8 +94,10 @@ data LogContext = LogContext
     hostname :: Text
   }
 
-handler :: Timer.Timer -> Settings -> Prelude.IO Handler
-handler timer settings = do
+-- | Create a 'Handler' for a specified set of 'Settings'. Do this once when
+-- your application starts and reuse the 'Handler' you get.
+handler :: Settings -> Prelude.IO Handler
+handler settings = do
   let skipLogging span =
         case Platform.succeeded span of
           Platform.Succeeded -> do
@@ -98,6 +109,7 @@ handler timer settings = do
   hostname <- map Text.fromList Network.HostName.getHostName
   writeQueue <- STM.atomically (STM.newTBQueue 100)
   loggingThread <- Async.async (logLoop writeQueue fileHandle)
+  timer <- Timer.mkTimer
   let logContext =
         LogContext
           { timer,
@@ -131,6 +143,8 @@ cleanup Handler {loggingThread, fileHandle} = do
   Async.cancel loggingThread
   System.IO.hClose fileHandle
 
+-- | Configuration settings for this reporter. A value of this type can be read
+-- from the environment using the 'decoder' function.
 data Settings = Settings
   { logFile :: Prelude.FilePath,
     appName :: Text,
@@ -138,6 +152,7 @@ data Settings = Settings
     fractionOfSuccessRequestsLogged :: Float
   }
 
+-- | Read 'Settings' from environment variables.
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings

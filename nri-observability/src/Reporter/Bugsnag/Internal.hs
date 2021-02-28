@@ -68,12 +68,20 @@ import qualified Prelude
 --
 -- A span that happened _after_ the root cause event completed we're not
 -- reporting.
+--
+-- Example usage:
+--
+-- > settings <- Bugsnag.decode
+-- > handler <- Bugsnag.handler settings
+-- > Bugsnag.report handler "request-id" span
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report Handler {http, timer, defaultEvent, apiKey'} requestId span =
   if failed span
     then send http apiKey' (toEvent requestId timer defaultEvent span)
     else Prelude.pure ()
 
+-- | Contextual information this reporter needs to do its work. You can create
+-- one using 'handler'.
 data Handler = Handler
   { http :: HTTP.Manager,
     timer :: Timer.Timer,
@@ -81,11 +89,20 @@ data Handler = Handler
     apiKey' :: Log.Secret Bugsnag.ApiKey
   }
 
-handler :: Timer.Timer -> Settings -> Prelude.IO Handler
-handler timer settings = do
+-- | Create a 'Handler' for a specified set of 'Settings'. Do this once when
+-- your application starts and reuse the 'Handler' you get.
+handler :: Settings -> Prelude.IO Handler
+handler settings = do
   http <- HTTP.TLS.getGlobalManager
   defaultEvent <- mkDefaultEvent settings
-  Prelude.pure (Handler http timer defaultEvent (apiKey settings))
+  timer <- Timer.mkTimer
+  Prelude.pure
+    Handler
+      { http,
+        timer,
+        defaultEvent,
+        apiKey' = apiKey settings
+      }
 
 send :: HTTP.Manager -> Log.Secret Bugsnag.ApiKey -> Bugsnag.Event -> Prelude.IO ()
 send manager key event = do
@@ -461,12 +478,15 @@ typeName _ =
     |> Prelude.show
     |> Text.fromList
 
+-- | Configuration settings for this reporter. A value of this type can be read
+-- from the environment using the 'decoder' function.
 data Settings = Settings
   { apiKey :: Log.Secret Bugsnag.ApiKey,
     appName :: Namespace,
     appEnvironment :: Environment
   }
 
+-- | Read 'Settings' from environment variables.
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
