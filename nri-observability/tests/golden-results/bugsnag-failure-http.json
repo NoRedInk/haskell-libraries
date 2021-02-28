@@ -17,14 +17,10 @@
     ],
     "metaData": {
         "some span": {
-            "status": null,
-            "http version": null,
             "path": "/bulletin",
             "headers": {},
-            "query string": null,
             "method": "GET",
-            "host": "http://antsonline.com",
-            "endpoint": null
+            "host": "http://antsonline.com"
         },
         "request": {
             "request id": "request-id-1234",

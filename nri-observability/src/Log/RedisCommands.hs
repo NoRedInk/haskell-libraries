@@ -43,7 +43,8 @@ instance Aeson.ToJSON Details where
 infoEncodingOptions :: Aeson.Options
 infoEncodingOptions =
   Aeson.defaultOptions
-    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' '
+    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ',
+      Aeson.omitNothingFields = True
     }
 
 instance Platform.TracingSpanDetails Details

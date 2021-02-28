@@ -16,7 +16,6 @@
         },
         "query string": "?top=flat",
         "method": "GET",
-        "host": null,
         "endpoint": "/hats/:hat_id"
     },
     "start_utc": "1970-01-01T00:00:00Z",
