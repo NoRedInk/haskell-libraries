@@ -28,8 +28,8 @@ import qualified Environment
 import qualified Http
 import qualified List
 import qualified Log
+import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe
-import qualified Monitoring
 import qualified MySQL
 import qualified Observability.Timer as Timer
 import qualified Platform
@@ -57,8 +57,8 @@ handler timer settings =
     )
     (\_ -> Prelude.pure ())
 
-reportWebTransaction :: Handler -> Platform.TracingSpan -> Monitoring.RequestDetails -> Prelude.IO ()
-reportWebTransaction (Handler timer app) span details = do
+reportWebTransaction :: Handler -> Platform.TracingSpan -> HttpRequest.Incoming -> Prelude.IO ()
+reportWebTransaction (Handler timer app) span (HttpRequest.Incoming details) = do
   let endpoint =
         -- We're always going to get some requests to routes that don't exist.
         -- Users might mystype a URL, or hackers might try to find admin login
@@ -68,13 +68,21 @@ reportWebTransaction (Handler timer app) span details = do
         -- services. Those quickly add up.
         --
         -- So instead we group all these requests for unknown routes together.
-        case (Monitoring.knownRoute details, Monitoring.responseStatus details) of
+        case (HttpRequest.endpoint details, HttpRequest.status details) of
           -- Some unknown routes are from middlewares. That's why we also check
           -- the response code.
-          (Monitoring.UnknownRoute, 401) -> "401"
-          (Monitoring.UnknownRoute, 403) -> "403"
-          (Monitoring.UnknownRoute, 404) -> "404"
-          _ -> Monitoring.endpoint details
+          (Nothing, Just 401) -> "401"
+          (Nothing, Just 403) -> "403"
+          (Nothing, Just 404) -> "404"
+          _ ->
+            HttpRequest.endpoint details
+              |> Maybe.withDefault
+                ( Maybe.map2
+                    (\method path -> method ++ " " ++ path)
+                    (HttpRequest.method details)
+                    (HttpRequest.path details)
+                    |> Maybe.withDefault "Unknown route"
+                )
   Exception.bracketWithError
     (startWebTransaction app endpoint)
     ( \maybeException tx -> do
@@ -97,9 +105,12 @@ reportWebTransaction (Handler timer app) span details = do
           |> Foldable.traverse_ (reportTracingSpan (Platform.started span) timer tx Nothing)
     )
 
-reportError :: NewRelic.Transaction -> Text -> Monitoring.RequestDetails -> Prelude.IO ()
+reportError :: NewRelic.Transaction -> Text -> HttpRequest.Details -> Prelude.IO ()
 reportError tx msg details =
-  noticeError tx 1 msg (Text.fromInt (Monitoring.responseStatus details))
+  noticeError tx 1 msg
+    <| case HttpRequest.status details of
+      Nothing -> "Unknown"
+      Just status -> Text.fromInt status
 
 reportTracingSpan ::
   Platform.MonotonicTime ->
@@ -229,7 +240,7 @@ category span =
           [ Platform.Renderer (\(_ :: MySQL.Info) -> "mysql"),
             Platform.Renderer (\(_ :: Postgres.Info) -> "postgres"),
             Platform.Renderer (\(_ :: Http.Info) -> "http"),
-            Platform.Renderer (\(_ :: Monitoring.RequestDetails) -> "request"),
+            Platform.Renderer (\(_ :: HttpRequest.Incoming) -> "request"),
             Platform.Renderer (\(_ :: Log.LogContexts) -> "haskell")
           ]
       )

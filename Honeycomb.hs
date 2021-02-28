@@ -46,8 +46,8 @@ import qualified GHC.Stack as Stack
 import qualified Http
 import qualified List
 import qualified Log
+import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe
-import qualified Monitoring
 import qualified Network.HostName
 import Observability.Helpers (toHashMap)
 import qualified Observability.Timer as Timer
@@ -120,14 +120,24 @@ report handler' _requestId span = do
 getRootSpanEndpoint :: Platform.TracingSpan -> Maybe Text
 getRootSpanEndpoint rootSpan =
   Platform.details rootSpan
-    |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
+    |> Maybe.andThen
+      ( Platform.renderTracingSpanDetails
+          [ Platform.Renderer (\(HttpRequest.Incoming details) -> HttpRequest.endpoint details)
+          ]
+      )
+    |> Maybe.andThen identity
 
 getBatchEventEndpoint :: BatchEvent -> Maybe Text
 getBatchEventEndpoint event =
   event
     |> batchevent_data
     |> details
-    |> Maybe.andThen (Platform.renderTracingSpanDetails [Platform.Renderer Monitoring.endpoint])
+    |> Maybe.andThen
+      ( Platform.renderTracingSpanDetails
+          [ Platform.Renderer (\(HttpRequest.Incoming details) -> HttpRequest.endpoint details)
+          ]
+      )
+    |> Maybe.andThen identity
 
 deriveSampleRate :: Platform.TracingSpan -> Handler -> Float
 deriveSampleRate rootSpan handler' =
