@@ -124,8 +124,7 @@ toEvent requestId timer defaultEvent span =
         }
     rootMetaData =
       [ "response time in ms"
-          .= ( Timer.difference (Platform.started span) (Platform.finished span)
-                 |> Platform.inMicroseconds
+          .= ( Timer.durationInUs span
                  |> Prelude.fromIntegral
                  |> (*) 1e-3 ::
                  Float
@@ -288,10 +287,7 @@ doBreadcrumb timer span =
         Just
           ( HashMap.singleton
               "duration in milliseconds"
-              ( Timer.difference
-                  (Platform.started span)
-                  (Platform.finished span)
-                  |> Platform.inMicroseconds
+              ( Timer.durationInUs span
                   |> Prelude.fromIntegral
                   |> (*) 1e-3
                   |> Text.fromFloat
