@@ -16,6 +16,10 @@ module Reporter.File
     Internal.cleanup,
     Internal.Settings,
     Internal.decoder,
+    Internal.logFile,
+    Internal.appName,
+    Internal.appEnvironment,
+    Internal.fractionOfSuccessRequestsLogged,
   )
 where
 

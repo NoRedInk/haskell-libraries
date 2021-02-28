@@ -9,6 +9,9 @@ module Reporter.Bugsnag
     Internal.handler,
     Internal.Settings,
     Internal.decoder,
+    Internal.apiKey,
+    Internal.appName,
+    Internal.appEnvironment,
   )
 where
 

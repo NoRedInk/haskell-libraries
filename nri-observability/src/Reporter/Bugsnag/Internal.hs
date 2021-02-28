@@ -2,15 +2,7 @@
 --
 -- This reporter reports failures to Bugsnag. It does nothing for requests that
 -- completed without error.
-module Reporter.Bugsnag.Internal
-  ( report,
-    Settings,
-    Handler,
-    handler,
-    decoder,
-    toEvent,
-  )
-where
+module Reporter.Bugsnag.Internal where
 
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
@@ -477,12 +469,28 @@ typeName _ =
 -- | Configuration settings for this reporter. A value of this type can be read
 -- from the environment using the 'decoder' function.
 data Settings = Settings
-  { apiKey :: Log.Secret Bugsnag.ApiKey,
+  { -- | The Bugsnag API key to use. This determines which Bugsnag project your
+    -- errors will end up in.
+    --
+    -- [@environment variable@] LOG_FILE
+    -- [@default value@] app.log
+    apiKey :: Log.Secret Bugsnag.ApiKey,
+    -- | The name of this application. This will be attached to all bugsnag
+    -- reports.
+    --
+    -- [@environment variable@] LOG_ROOT_NAMESPACE
+    -- [@default value@] your-application-name-here
     appName :: Namespace,
+    -- | The environment this application is running in. This will be attached
+    -- to all bugsnage reports.
+    --
+    -- [@environment variable@] ENVIRONMENT
+    -- [@default value@] development
     appEnvironment :: Environment
   }
 
--- | Read 'Settings' from environment variables.
+-- | Read 'Settings' from environment variables. Default variables will be used
+-- in case no environment variable is set for an option.
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings

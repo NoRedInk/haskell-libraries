@@ -146,13 +146,33 @@ cleanup Handler {loggingThread, fileHandle} = do
 -- | Configuration settings for this reporter. A value of this type can be read
 -- from the environment using the 'decoder' function.
 data Settings = Settings
-  { logFile :: Prelude.FilePath,
+  { -- | The file to log too. On unix systems you can set this to @/dev/stdout@
+    -- in order to log to stdout.
+    --
+    -- [@environment variable@] LOG_FILE
+    -- [@default value@] app.log
+    logFile :: Prelude.FilePath,
+    -- | The name of this application. This will be attached to all logs.
+    --
+    -- [@environment variable@] LOG_ROOT_NAMESPACE
+    -- [@default value@] your-application-name-here
     appName :: Text,
+    -- | The environment this application is running in. This will be attached
+    -- to all logs.
+    --
+    -- [@environment variable@] ENVIRONMENT
+    -- [@default value@] development
     appEnvironment :: Text,
+    -- | The fraction of requests that should be logged. Set to 1 if you want to
+    -- log everything, and a lower value to save money.
+    --
+    -- [@environment variable@] FRACTION_OF_SUCCESS_REQUESTS_LOGGED
+    -- [@default value@] 1
     fractionOfSuccessRequestsLogged :: Float
   }
 
--- | Read 'Settings' from environment variables.
+-- | Read 'Settings' from environment variables. Default variables will be used
+-- in case no environment variable is set for an option.
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
