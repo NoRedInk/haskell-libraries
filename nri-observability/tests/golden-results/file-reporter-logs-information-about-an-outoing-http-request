@@ -11,12 +11,9 @@
         "status": 500,
         "http version": "1",
         "path": "/hats/5",
-        "headers": [
-            [
-                "Accept",
-                "application/json"
-            ]
-        ],
+        "headers": {
+            "Accept": "application/json"
+        },
         "query string": "?top=flat",
         "method": "GET",
         "host": null,

@@ -7,6 +7,7 @@ import qualified Data.ByteString.Lazy
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import qualified Data.Time.LocalTime as LocalTime
+import qualified Dict
 import qualified Expect
 import qualified Log.HttpRequest as HttpRequest
 import qualified Log.RedisCommands as RedisCommands
@@ -63,7 +64,7 @@ tests =
                   HttpRequest.path = Just "/hats/5",
                   HttpRequest.queryString = Just "?top=flat",
                   HttpRequest.endpoint = Just "/hats/:hat_id",
-                  HttpRequest.headers = [("Accept", "application/json")],
+                  HttpRequest.headers = Dict.fromList [("Accept", "application/json")],
                   HttpRequest.status = Just 500
                 }
                 |> HttpRequest.Incoming
@@ -110,7 +111,7 @@ tests =
                   HttpRequest.path = Just "/hats/5",
                   HttpRequest.queryString = Just "?top=flat",
                   HttpRequest.endpoint = Just "/hats/:hat_id",
-                  HttpRequest.headers = [("Accept", "application/json")],
+                  HttpRequest.headers = Dict.fromList [("Accept", "application/json")],
                   HttpRequest.status = Just 500
                 }
                 |> HttpRequest.Incoming

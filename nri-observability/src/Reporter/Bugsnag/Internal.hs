@@ -12,6 +12,7 @@ import qualified Data.List
 import qualified Data.Proxy as Proxy
 import qualified Data.Text.IO
 import qualified Data.Typeable as Typeable
+import qualified Dict
 import qualified Environment
 import qualified GHC.Stack as Stack
 import qualified List
@@ -403,6 +404,7 @@ renderIncomingHttpRequest event (HttpRequest.Incoming request) =
             { Bugsnag.request_httpMethod = HttpRequest.method request,
               Bugsnag.request_headers =
                 HttpRequest.headers request
+                  |> Dict.toList
                   |> HashMap.fromList
                   |> Just
             },

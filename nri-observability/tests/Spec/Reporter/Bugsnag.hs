@@ -6,6 +6,7 @@ import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy
 import qualified Data.Text.Encoding
 import qualified Data.Time.LocalTime as LocalTime
+import qualified Dict
 import qualified Expect
 import qualified GHC.Stack as Stack
 import qualified Log
@@ -97,7 +98,7 @@ tests =
                   HttpRequest.path = Just "/hats/5",
                   HttpRequest.queryString = Just "?top=flat",
                   HttpRequest.endpoint = Just "GET /hats/:hat_id",
-                  HttpRequest.headers = [("Accept", "application/json")],
+                  HttpRequest.headers = Dict.fromList [("Accept", "application/json")],
                   HttpRequest.status = Just 500
                 }
                 |> HttpRequest.Incoming

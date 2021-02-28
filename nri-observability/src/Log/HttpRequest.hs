@@ -17,6 +17,7 @@ module Log.HttpRequest
 where
 
 import qualified Data.Aeson as Aeson
+import qualified Dict
 
 -- | A type describing an http request.
 --
@@ -35,7 +36,7 @@ data Details = Details
     queryString :: Maybe Text,
     -- | The headers on the request. Do not pass headers with sensitive
     -- information in there, filter them out first!
-    headers :: [(Text, Text)],
+    headers :: Dict.Dict Text Text,
     -- | The version of the http protocol used.
     httpVersion :: Maybe Text,
     -- | The endpoint called. This is like the path, but with the dynamic parts
@@ -52,7 +53,7 @@ data Details = Details
 
 -- | An empty details value to be modified by you.
 emptyDetails :: Details
-emptyDetails = Details Nothing Nothing Nothing Nothing [] Nothing Nothing Nothing
+emptyDetails = Details Nothing Nothing Nothing Nothing Dict.empty Nothing Nothing Nothing
 
 instance Aeson.ToJSON Details where
   toJSON = Aeson.genericToJSON infoEncodingOptions

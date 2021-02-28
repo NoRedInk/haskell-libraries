@@ -20,7 +20,7 @@
             "status": null,
             "http version": null,
             "path": "/bulletin",
-            "headers": [],
+            "headers": {},
             "query string": null,
             "method": "GET",
             "host": "http://antsonline.com",
