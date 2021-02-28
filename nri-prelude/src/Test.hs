@@ -19,6 +19,7 @@ module Test
 where
 
 import qualified Control.Concurrent.Async as Async
+import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
@@ -45,6 +46,9 @@ import qualified Prelude
 -- > main = Test.run (Test.todo "write your tests here!")
 run :: Stack.HasCallStack => Internal.Test -> Prelude.IO ()
 run suite = do
+  -- Work around `hGetContents: invalid argument (invalid byte sequence)` bug on
+  -- Nix: https://github.com/dhall-lang/dhall-haskell/issues/865
+  GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   log <- Platform.silentHandler
   (results, logExplorerAvailable) <-
     Async.concurrently
