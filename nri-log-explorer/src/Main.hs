@@ -1,5 +1,6 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Main
   ( main,
@@ -10,6 +11,7 @@ import qualified Brick
 import qualified Brick.BChan
 import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
+import qualified Brick.Widgets.Edit as Edit
 import qualified Brick.Widgets.List as ListWidget
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
@@ -26,12 +28,14 @@ import qualified Data.List
 import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
+import qualified Data.Text.Zipper as TZ
 import qualified Data.Time as Time
 import qualified Data.Vector as Vector
 import qualified Data.Version as Version
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
+import Lens.Micro ((^.))
 import qualified List
 import NriPrelude
 import qualified Paths_nri_log_explorer as Paths
@@ -59,7 +63,9 @@ data Model = Model
     -- interacts we're going to keep the focus on the last-loaded element, but
     -- once the user starts controlling the app themselves we want to keep our
     -- hands off the controls.
-    userDidSomething :: Bool
+    userDidSomething :: Bool,
+    filter :: Bool,
+    filterEditor :: Edit.Editor Text Name
   }
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
@@ -82,6 +88,7 @@ data Msg
   | Exit
   | SetCurrentTime Time.UTCTime
   | CopyDetails
+  | Filter
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -90,6 +97,7 @@ data Msg
 data Name
   = RootSpanList
   | SpanBreakdownList Prelude.Int
+  | FilterField
   deriving (Eq, Ord, Show)
 
 -- An alternative data type containing part of the same data as above, in a
@@ -130,7 +138,9 @@ init clipboardCommand now =
       clipboardCommand = clipboardCommand,
       rootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
-      userDidSomething = False
+      userDidSomething = False,
+      filter = False,
+      filterEditor = Edit.editorText FilterField (Just 1) ""
     }
 
 update :: Model -> Msg -> Brick.EventM Name (Brick.Next Model)
@@ -198,6 +208,9 @@ update model msg =
                 |> spanToClipboard cmd
                 |> liftIO
       continueAfterUserInteraction model
+    Filter ->
+      model {filter = True}
+        |> continueAfterUserInteraction
 
 scroll ::
   (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
@@ -244,10 +257,29 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ viewContents page,
+          [ if filter model
+              then viewFilter model
+              else Brick.txt "",
+            viewContents page,
             viewKey page
           ]
       ]
+
+viewFilter :: Model -> Brick.Widget Name
+viewFilter model =
+  Edit.renderEditor contentWithCursor (filter model) (filterEditor model)
+  where
+    contentWithCursor t =
+      let (_, cursorPos) = TZ.cursorPosition ((filterEditor model) ^. Edit.editContentsL)
+          (before, after) = Data.Text.splitAt cursorPos (Prelude.mconcat t)
+       in Brick.hBox
+            <| Brick.txt before :
+          case Data.Text.uncons after of
+            Just (x, rest) -> [Brick.modifyDefAttr modReverse <| Brick.txt <| Data.Text.singleton x, Brick.txt rest]
+            Nothing -> [Brick.modifyDefAttr modReverse <| Brick.txt " ", Brick.txt after]
+
+modReverse :: Vty.Attr -> Vty.Attr
+modReverse attr = Vty.withStyle attr Vty.reverseVideo
 
 viewKey :: Page -> Brick.Widget Name
 viewKey page =
@@ -256,10 +288,11 @@ viewKey page =
       select = "enter: details"
       unselect = "backspace: back"
       copy = "y: copy details"
+      filter = "/: filter"
       shortcuts =
         case page of
           NoDataPage -> [exit]
-          RootSpanPage _ _ -> [exit, updown, select]
+          RootSpanPage _ _ -> [exit, updown, select, filter]
           SpanBreakdownPage clipboardCommand _ _ ->
             [exit, updown, unselect]
               ++ ( case clipboardCommand of
@@ -530,36 +563,46 @@ handleEvent ::
 handleEvent pushMsg model event =
   case event of
     (Brick.VtyEvent vtyEvent) ->
-      case vtyEvent of
-        -- Quiting
-        Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
-        Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
-        -- Navigation
-        Vty.EvKey Vty.KEnter [] -> do
-          liftIO (pushMsg ShowDetails)
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'l') [] -> do
-          liftIO (pushMsg ShowDetails)
-          Brick.continue model
-        Vty.EvKey Vty.KBS [] -> do
-          liftIO (pushMsg Exit)
-          Brick.continue model
-        Vty.EvKey Vty.KEsc [] -> do
-          liftIO (pushMsg Exit)
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'h') [] -> do
-          liftIO (pushMsg Exit)
-          Brick.continue model
-        -- Clipboard
-        Vty.EvKey (Vty.KChar 'y') [] -> do
-          liftIO (pushMsg CopyDetails)
-          Brick.continue model
-        -- Fallback
-        _ ->
-          scroll
-            (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
-            model
-            |> andThen Brick.continue
+      if filter model
+        then case vtyEvent of
+          Vty.EvKey Vty.KEsc [] ->
+            Brick.continue model {filter = False}
+          _ -> do
+            filterEditor <- Edit.handleEditorEvent vtyEvent (filterEditor model)
+            Brick.continue model {filterEditor}
+        else case vtyEvent of
+          -- Quiting
+          Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
+          Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
+          -- Navigation
+          Vty.EvKey Vty.KEnter [] -> do
+            liftIO (pushMsg ShowDetails)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar 'l') [] -> do
+            liftIO (pushMsg ShowDetails)
+            Brick.continue model
+          Vty.EvKey Vty.KBS [] -> do
+            liftIO (pushMsg Exit)
+            Brick.continue model
+          Vty.EvKey Vty.KEsc [] -> do
+            liftIO (pushMsg Exit)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar 'h') [] -> do
+            liftIO (pushMsg Exit)
+            Brick.continue model
+          -- Clipboard
+          Vty.EvKey (Vty.KChar 'y') [] -> do
+            liftIO (pushMsg CopyDetails)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar '/') [] -> do
+            liftIO (pushMsg Filter)
+            Brick.continue model
+          -- Fallback
+          _ ->
+            scroll
+              (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
+              model
+              |> andThen Brick.continue
     (Brick.MouseDown _ _ _ _) -> Brick.continue model
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
