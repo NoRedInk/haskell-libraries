@@ -53,6 +53,7 @@ data Model = Model
     currentTime :: Time.UTCTime,
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
+    allRootSpans :: List RootSpan,
     -- The actual data displayed.
     rootSpans :: ListWidget.List Name RootSpan,
     -- If we're in the detail view for a root span, this will contain a copy of
@@ -69,7 +70,7 @@ data Model = Model
 
 data Filter
   = NoFilter
-  | HasFilter Text
+  | HasFilter Text (List Text)
   | Filtering (Edit.Editor Text Name)
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
@@ -143,6 +144,7 @@ init clipboardCommand now =
   Model
     { currentTime = now,
       clipboardCommand = clipboardCommand,
+      allRootSpans = [],
       rootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
       userDidSomething = False,
@@ -164,11 +166,8 @@ update model msg =
           let rootSpan = RootSpan date span
               newModel =
                 model
-                  { rootSpans =
-                      ListWidget.listInsert
-                        0
-                        rootSpan
-                        (rootSpans model)
+                  { allRootSpans = rootSpan : allRootSpans model,
+                    rootSpans = ListWidget.listInsert 0 rootSpan (rootSpans model)
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
@@ -223,23 +222,46 @@ update model msg =
                     ( case filter model of
                         NoFilter -> editor
                         Filtering _ -> editor
-                        HasFilter filterText ->
-                          Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [filterText] (Just 1)) editor
+                        HasFilter first rest ->
+                          Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [Text.join " " (first : rest)] (Just 1)) editor
                     )
               }
     StopFiltering ->
       continueAfterUserInteraction model {filter = NoFilter}
     ApplyFilter filterEditor ->
-      let newFilter = Prelude.mconcat (Edit.getEditContents filterEditor)
-       in continueAfterUserInteraction
+      continueAfterUserInteraction
+        <| case getFiltersFromEditor filterEditor of
+          [] ->
             model
-              { filter =
-                  if Text.isEmpty (Text.trim newFilter)
-                    then NoFilter
-                    else HasFilter newFilter
+              { filter = NoFilter,
+                rootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
               }
+          first : rest -> model {filter = HasFilter first rest}
     HandleFiltering filterEditor ->
-      continueAfterUserInteraction model {filter = Filtering filterEditor}
+      continueAfterUserInteraction
+        model
+          { filter = Filtering filterEditor,
+            rootSpans = case getFiltersFromEditor filterEditor of
+              [] ->
+                ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+              first : rest ->
+                ListWidget.list
+                  RootSpanList
+                  ( List.filter
+                      (\RootSpan {logSpan} -> List.all (\filter -> Text.contains filter (spanSummary logSpan)) (first : rest))
+                      (allRootSpans model)
+                      |> Vector.fromList
+                  )
+                  1
+          }
+
+getFiltersFromEditor :: Edit.Editor Text Name -> List Text
+getFiltersFromEditor editor =
+  Edit.getEditContents editor
+    |> Prelude.mconcat
+    |> Text.trim
+    |> Text.split " "
+    |> List.filter (not << Text.isEmpty)
 
 scroll ::
   (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
@@ -288,9 +310,14 @@ view model =
    in [ Brick.vBox
           [ case filter model of
               NoFilter -> Brick.txt ""
-              HasFilter filterText ->
+              HasFilter first rest ->
                 Brick.vBox
-                  [ Brick.txt ("Filter: " ++ filterText),
+                  [ Brick.hBox
+                      ( Brick.txt "Filter: " :
+                        List.intersperse
+                          (Brick.txt " ")
+                          (List.map (Brick.modifyDefAttr modReverse << Brick.txt) (first : rest))
+                      ),
                     Border.hBorder
                   ]
               Filtering filterEditor ->
@@ -298,7 +325,7 @@ view model =
                   [ viewFilter filterEditor,
                     Border.hBorder
                   ],
-            viewContents (filter model) page,
+            viewContents page,
             viewKey page
           ]
       ]
@@ -345,8 +372,8 @@ viewKey page =
         |> Brick.txt
         |> Center.hCenter
 
-viewContents :: Filter -> Page -> Brick.Widget Name
-viewContents filter page =
+viewContents :: Page -> Brick.Widget Name
+viewContents page =
   case page of
     NoDataPage ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
@@ -356,13 +383,18 @@ viewContents filter page =
       logs
         |> ListWidget.renderList
           ( \hasFocus RootSpan {logSpan, logTime} ->
-              case filter of
-                HasFilter filterText ->
-                  if Text.contains filterText (spanSummary logSpan)
-                    then viewLog hasFocus now logSpan logTime
-                    else Brick.txt ""
-                _ ->
-                  viewLog hasFocus now logSpan logTime
+              Brick.hBox
+                [ Brick.txt (howFarBack logTime now)
+                    |> Brick.padRight Brick.Max
+                    |> Brick.hLimit 15,
+                  Brick.txt "   ",
+                  Brick.txt (spanSummary logSpan)
+                    |> Brick.padRight Brick.Max
+                ]
+                |> Center.hCenter
+                |> if hasFocus
+                  then Brick.withAttr "selected"
+                  else identity
           )
           True
         |> Brick.padLeftRight 1
@@ -383,21 +415,6 @@ viewContents filter page =
                 |> Brick.padRight Brick.Max
             ]
         ]
-
-viewLog :: Bool -> Time.UTCTime -> Platform.TracingSpan -> Time.UTCTime -> Brick.Widget Name
-viewLog hasFocus now logSpan logTime =
-  Brick.hBox
-    [ Brick.txt (howFarBack logTime now)
-        |> Brick.padRight Brick.Max
-        |> Brick.hLimit 15,
-      Brick.txt "   ",
-      Brick.txt (spanSummary logSpan)
-        |> Brick.padRight Brick.Max
-    ]
-    |> Center.hCenter
-    |> if hasFocus
-      then Brick.withAttr "selected"
-      else identity
 
 viewSpanBreakdown :: ListWidget.List Name Span -> Brick.Widget Name
 viewSpanBreakdown spans =
