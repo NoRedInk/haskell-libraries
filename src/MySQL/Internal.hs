@@ -32,6 +32,7 @@ import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
+import qualified Log.SqlQuery as SqlQuery
 import qualified MySQL.FromRow as FromRow
 import qualified MySQL.Query as Query
 import qualified MySQL.Settings as Settings
@@ -64,7 +65,7 @@ data Connection = Connection
     -- every request. That's why we're using a hash of the query as the key
     -- in the dictionary below instead of the query itself.
     singleOrPool :: SingleOrPool Base.MySQLConn,
-    logContext :: Query.ConnectionInfo,
+    connDetails :: SqlQuery.Details,
     timeout :: Time.Interval
   }
 
@@ -104,7 +105,7 @@ acquire settings = do
     ( Connection
         doAnything
         pool
-        (toConnectionLogContext settings)
+        (connectionDetails settings)
         (Settings.mysqlQueryTimeoutSeconds settings)
     )
   where
@@ -128,20 +129,25 @@ acquire settings = do
 -- CONNECTION HELPERS
 --
 
-toConnectionLogContext :: Settings.Settings -> Query.ConnectionInfo
-toConnectionLogContext settings =
+connectionDetails :: Settings.Settings -> SqlQuery.Details
+connectionDetails settings =
   let connectionSettings = Settings.mysqlConnection settings
       database = Settings.unDatabase (Settings.database connectionSettings)
    in case Settings.connection connectionSettings of
         Settings.ConnectSocket socket ->
-          Query.UnixSocket
-            (Text.fromList (Settings.unSocket socket))
-            database
+          SqlQuery.emptyDetails
+            { SqlQuery.databaseType = Just SqlQuery.mysql,
+              SqlQuery.host = Just (Text.fromList (Settings.unSocket socket)),
+              SqlQuery.port = Nothing,
+              SqlQuery.database = Just database
+            }
         Settings.ConnectTcp host port ->
-          Query.TcpSocket
-            (Settings.unHost host)
-            (Text.fromInt (Settings.unPort port))
-            database
+          SqlQuery.emptyDetails
+            { SqlQuery.databaseType = Just SqlQuery.mysql,
+              SqlQuery.host = Just (Settings.unHost host),
+              SqlQuery.port = Just (Settings.unPort port),
+              SqlQuery.database = Just database
+            }
 
 toConnectInfo :: Settings.Settings -> Base.ConnectInfo
 toConnectInfo settings =
@@ -269,7 +275,7 @@ executeCommand conn query =
 
 traceQuery :: Stack.HasCallStack => Connection -> Maybe (a -> Int) -> Query.Query q -> Task e a -> Task e a
 traceQuery conn maybeCountRows query task =
-  let infoForContext = Query.mkInfo query (logContext conn)
+  let infoForContext = Query.details query (connDetails conn)
    in Stack.withFrozenCallStack Platform.tracingSpan "MySQL Query" <| do
         res <-
           Platform.finally
@@ -277,9 +283,9 @@ traceQuery conn maybeCountRows query task =
             ( do
                 Platform.setTracingSpanDetails infoForContext
                 Platform.setTracingSpanSummary
-                  ( Query.infoSqlOperation infoForContext
+                  ( (SqlQuery.sqlOperation infoForContext |> Maybe.withDefault "?")
                       ++ " "
-                      ++ Query.infoQueriedRelation infoForContext
+                      ++ (SqlQuery.queriedRelation infoForContext |> Maybe.withDefault "?")
                   )
             )
         -- If we end up here it means the query succeeded. Overwrite the tracing
@@ -289,7 +295,7 @@ traceQuery conn maybeCountRows query task =
         Platform.setTracingSpanDetails
           <| case maybeCountRows of
             Just countRows ->
-              infoForContext {Query.infoRowsReturned = countRows res}
+              infoForContext {SqlQuery.rowsReturned = Just (countRows res)}
             Nothing ->
               infoForContext
         Prelude.pure res

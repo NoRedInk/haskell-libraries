@@ -22,8 +22,6 @@ module Postgres
     Query.Error (..),
     Query.sql,
     doQuery,
-    Query.Info (..),
-    Query.ConnectionInfo (..),
     -- Handling transactions
     transaction,
     inTestTransaction,
@@ -66,6 +64,7 @@ import qualified Health
 import qualified Internal.Time as Time
 import qualified List
 import qualified Log
+import qualified Log.SqlQuery as SqlQuery
 import Network.Socket (SockAddr (..))
 import qualified Platform
 import qualified Postgres.Query as Query
@@ -78,7 +77,7 @@ import Prelude (Either (Left, Right), IO, error, fromIntegral, mconcat, pure, pu
 data Connection = Connection
   { doAnything :: Platform.DoAnythingHandler,
     singleOrPool :: SingleOrPool PGConnection,
-    logContext :: Query.ConnectionInfo,
+    connDetails :: SqlQuery.Details,
     timeout :: Time.Interval
   }
 
@@ -122,7 +121,7 @@ connectionIO settings = do
     ( Connection
         doAnything
         pool
-        (toConnectionLogContext database)
+        (connectionDetails database)
         (Settings.pgQueryTimeout settings)
     )
 
@@ -226,22 +225,23 @@ doQuery conn query handleResponse =
                  ( do
                      Platform.setTracingSpanDetails queryInfo
                      Platform.setTracingSpanSummary
-                       ( Query.infoSqlOperation queryInfo
+                       ( (SqlQuery.sqlOperation queryInfo |> Maybe.withDefault "?")
                            ++ " "
-                           ++ Query.infoQueriedRelation queryInfo
+                           ++ (SqlQuery.queriedRelation queryInfo |> Maybe.withDefault "?")
                        )
                  )
              -- If we end up here it means the query succeeded. Overwrite the tracing
              -- details to contain the amount of selected rows. This information can be
              -- useful when debugging slow queries.
-             Platform.setTracingSpanDetails queryInfo {Query.infoRowsReturned = List.length res}
+             Platform.setTracingSpanDetails
+               queryInfo {SqlQuery.rowsReturned = Just (List.length res)}
              Prelude.pure res
        )
     |> map Ok
     |> Task.onError (Task.succeed << Err)
     |> andThen handleResponse
   where
-    queryInfo = Query.mkInfo query (logContext conn)
+    queryInfo = Query.details query (connDetails conn)
 
 fromPGError :: Connection -> PGError -> Query.Error
 fromPGError c pgError =
@@ -285,17 +285,37 @@ toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
     ] ::
     Text
 
-toConnectionLogContext :: PGDatabase -> Query.ConnectionInfo
-toConnectionLogContext db =
+connectionDetails :: PGDatabase -> SqlQuery.Details
+connectionDetails db =
   case pgDBAddr db of
     Left (hostName, serviceName) ->
-      Query.TcpSocket (Text.fromList hostName) (Text.fromList serviceName) databaseName
+      SqlQuery.emptyDetails
+        { SqlQuery.databaseType = Just SqlQuery.postgresql,
+          SqlQuery.host = Just (Text.fromList hostName),
+          SqlQuery.port = Text.toInt (Text.fromList serviceName),
+          SqlQuery.database = Just databaseName
+        }
     Right (SockAddrInet portNum hostAddr) ->
-      Query.TcpSocket (Text.fromList (show hostAddr)) (Text.fromList (show portNum)) databaseName
+      SqlQuery.emptyDetails
+        { SqlQuery.databaseType = Just SqlQuery.postgresql,
+          SqlQuery.host = Just (Text.fromList (show hostAddr)),
+          SqlQuery.port = Just (Prelude.fromIntegral portNum),
+          SqlQuery.database = Just databaseName
+        }
     Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-      Query.TcpSocket (Text.fromList (show hostAddr)) (Text.fromList (show portNum)) databaseName
+      SqlQuery.emptyDetails
+        { SqlQuery.databaseType = Just SqlQuery.postgresql,
+          SqlQuery.host = Just (Text.fromList (show hostAddr)),
+          SqlQuery.port = Just (Prelude.fromIntegral portNum),
+          SqlQuery.database = Just databaseName
+        }
     Right (SockAddrUnix sockPath) ->
-      Query.UnixSocket (Text.fromList sockPath) databaseName
+      SqlQuery.emptyDetails
+        { SqlQuery.databaseType = Just SqlQuery.postgresql,
+          SqlQuery.host = Just (Text.fromList sockPath),
+          SqlQuery.port = Nothing,
+          SqlQuery.database = Just databaseName
+        }
   where
     databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8
 

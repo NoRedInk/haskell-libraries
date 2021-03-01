@@ -13,14 +13,11 @@ module Postgres.Query
     Error (..),
     TimeoutOrigin (..),
     format,
-    Info (..),
-    ConnectionInfo (..),
-    mkInfo,
+    details,
   )
 where
 
 import Control.Monad (void)
-import qualified Data.Aeson as Aeson
 import Data.String (String)
 import qualified Data.Text.Encoding
 import Database.PostgreSQL.Typed (PGConnection, pgSQL, useTPGDatabase)
@@ -38,8 +35,8 @@ import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import qualified Log
+import qualified Log.SqlQuery as SqlQuery
 import MySQL.Query (inToAny)
-import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
 import Prelude (IO)
@@ -122,72 +119,11 @@ format query =
         |> fixBang
         |> indent
 
---
--- TracingSpanDetails
---
-
-data Info = Info
-  { -- | The full query we're sending to a database. Wrapped in a Secret
-    -- because some queries might contain sensitive information, and we
-    -- don't know which ones.
-    infoQuery :: Log.Secret Text,
-    -- | The query template (QuasiQuote) that was used to build the template.
-    -- This we don't need to wrap in a `Secret` and can be safely logged.
-    infoQueryTemplate :: Text,
-    -- | Our best guess of the relation we're querying.
-    infoQueriedRelation :: Text,
-    -- | Our best guess of the SQL operation we're performing (SELECT /
-    -- DELETE / ...).
-    infoSqlOperation :: Text,
-    -- | Connection information of the database we're sending the query to.
-    infoConnection :: ConnectionInfo,
-    -- | The amount of rows this query returned.
-    infoRowsReturned :: Int
-  }
-  deriving (Generic)
-
-mkInfo :: Query row -> ConnectionInfo -> Info
-mkInfo query conn =
-  Info
-    { infoQuery = Log.mkSecret (sqlString query),
-      infoQueryTemplate = quasiQuotedString query,
-      infoSqlOperation = sqlOperation query,
-      infoQueriedRelation = queriedRelation query,
-      infoConnection = conn,
-      infoRowsReturned = 0 -- Overwrite this after the query ran.
+details :: Query row -> SqlQuery.Details -> SqlQuery.Details
+details query connectionDetails =
+  connectionDetails
+    { SqlQuery.query = Just (Log.mkSecret (sqlString query)),
+      SqlQuery.queryTemplate = Just (quasiQuotedString query),
+      SqlQuery.sqlOperation = Just (sqlOperation query),
+      SqlQuery.queriedRelation = Just (queriedRelation query)
     }
-
-instance Aeson.ToJSON Info where
-  toJSON = Aeson.genericToJSON infoEncodingOptions
-
-  toEncoding = Aeson.genericToEncoding infoEncodingOptions
-
-infoEncodingOptions :: Aeson.Options
-infoEncodingOptions =
-  Aeson.defaultOptions
-    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
-    }
-
-instance Platform.TracingSpanDetails Info
-
-data ConnectionInfo
-  = TcpSocket Host Port DatabaseName
-  | UnixSocket SocketPath DatabaseName
-  deriving (Generic)
-
-instance Aeson.ToJSON ConnectionInfo where
-  toJSON = Aeson.toJSON << connectionToText
-
-  toEncoding = Aeson.toEncoding << connectionToText
-
-type Host = Text
-
-type Port = Text
-
-type SocketPath = Text
-
-type DatabaseName = Text
-
-connectionToText :: ConnectionInfo -> Text
-connectionToText (TcpSocket host port db) = host ++ ":" ++ port ++ "/" ++ db
-connectionToText (UnixSocket path db) = path ++ ":" ++ db

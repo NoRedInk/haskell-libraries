@@ -7,9 +7,7 @@
 module MySQL.Query
   ( sql,
     Query (..),
-    Info (..),
-    ConnectionInfo (..),
-    mkInfo,
+    details,
     anyToIn,
     inToAny,
   )
@@ -17,7 +15,6 @@ where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Lens as Lens
-import qualified Data.Aeson as Aeson
 import qualified Data.Proxy as Proxy
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder as Builder
@@ -35,8 +32,8 @@ import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as QQ
 import qualified List
 import qualified Log
+import qualified Log.SqlQuery as SqlQuery
 import qualified MySQL.MySQLParameter as MySQLParameter
-import qualified Platform
 import qualified Postgres.Settings
 import qualified Text
 import qualified Prelude
@@ -223,72 +220,14 @@ sql =
       QQ.quoteDec = Prelude.error "sql not supported in declarations"
     }
 
---
--- TracingSpanDetails
---
-
-data Info = Info
-  { -- | The full query we're executing (prepared statement).
-    infoQuery :: Text,
-    -- | The quasi-quoted string of the query we're executing.
-    infoQueryTemplate :: Text,
-    -- | Our best guess of the SQL operation we're performing (SELECT /
-    -- DELETE / ...).
-    infoSqlOperation :: Text,
-    -- | Our best guess of the relation we're querying.
-    infoQueriedRelation :: Text,
-    -- | Connection information of the database we're sending the query to.
-    infoConnection :: ConnectionInfo,
-    -- | The amount of rows this query returned.
-    infoRowsReturned :: Int
-  }
-  deriving (Generic)
-
-instance Aeson.ToJSON Info where
-  toJSON = Aeson.genericToJSON infoEncodingOptions
-
-  toEncoding = Aeson.genericToEncoding infoEncodingOptions
-
-infoEncodingOptions :: Aeson.Options
-infoEncodingOptions =
-  Aeson.defaultOptions
-    { Aeson.fieldLabelModifier = Aeson.camelTo2 ' ' << List.drop 4
+details :: Query row -> SqlQuery.Details -> SqlQuery.Details
+details query connectionDetails =
+  connectionDetails
+    { SqlQuery.query = Just (Log.mkSecret (preparedStatement query)),
+      SqlQuery.queryTemplate = Just (quasiQuotedString query),
+      SqlQuery.sqlOperation = Just (sqlOperation query),
+      SqlQuery.queriedRelation = Just (queriedRelation query)
     }
-
-instance Platform.TracingSpanDetails Info
-
-mkInfo :: Query row -> ConnectionInfo -> Info
-mkInfo query conn =
-  Info
-    { infoQuery = preparedStatement query,
-      infoQueryTemplate = quasiQuotedString query,
-      infoSqlOperation = sqlOperation query,
-      infoQueriedRelation = queriedRelation query,
-      infoConnection = conn,
-      infoRowsReturned = 0 -- Overwrite this after the query ran.
-    }
-
-data ConnectionInfo
-  = TcpSocket Host Port DatabaseName
-  | UnixSocket SocketPath DatabaseName
-  deriving (Generic)
-
-instance Aeson.ToJSON ConnectionInfo where
-  toJSON = Aeson.toJSON << connectionToText
-
-  toEncoding = Aeson.toEncoding << connectionToText
-
-type Host = Text
-
-type Port = Text
-
-type SocketPath = Text
-
-type DatabaseName = Text
-
-connectionToText :: ConnectionInfo -> Text
-connectionToText (TcpSocket host port db) = host ++ ":" ++ port ++ "/" ++ db
-connectionToText (UnixSocket path db) = path ++ ":" ++ db
 
 -- | MySQL doesn't support `= ANY`, we can use `IN` during compilation.
 inToAny :: Text -> Text
