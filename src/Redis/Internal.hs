@@ -12,6 +12,7 @@ import qualified Database.Redis
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified List
+import qualified Log.RedisCommands as RedisCommands
 import NriPrelude hiding (map, map2)
 import qualified Platform
 import qualified Set
@@ -269,13 +270,13 @@ data Lock e a = Lock
     lockHandleError :: Error -> Task e a
   }
 
-traceQuery :: Stack.HasCallStack => [Text] -> Text -> Text -> Task e a -> Task e a
+traceQuery :: Stack.HasCallStack => [Text] -> Text -> Maybe Int -> Task e a -> Task e a
 traceQuery commands host port task =
   let info =
-        Info
-          { infoCommands = commands,
-            infoHost = host,
-            infoPort = port
+        RedisCommands.emptyDetails
+          { RedisCommands.commands = commands,
+            RedisCommands.host = Just host,
+            RedisCommands.port = port
           }
    in Stack.withFrozenCallStack
         Platform.tracingSpan
@@ -292,14 +293,3 @@ traceQuery commands host port task =
                   )
             )
         )
-
-data Info = Info
-  { infoCommands :: List Text,
-    infoHost :: Text,
-    infoPort :: Text
-  }
-  deriving (Generic)
-
-instance Aeson.ToJSON Info
-
-instance Platform.TracingSpanDetails Info

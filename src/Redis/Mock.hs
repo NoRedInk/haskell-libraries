@@ -46,7 +46,7 @@ handlerIO = do
                   )
           )
           |> Platform.doAnything doAnything
-          |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" "",
+          |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" Nothing,
       Internal.doTransaction = \query ->
         atomicModifyIORef'
           modelRef
@@ -60,7 +60,7 @@ handlerIO = do
                   )
           )
           |> Platform.doAnything doAnything
-          |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" "",
+          |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" Nothing,
       Internal.doWatch = \keys ->
         atomicModifyIORef'
           modelRef

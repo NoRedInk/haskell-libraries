@@ -43,7 +43,6 @@ module Redis.Hash
     Internal.sequence,
 
     -- * Observability helpers
-    Internal.Info (..),
     Redis.readiness,
   )
 where

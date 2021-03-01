@@ -54,8 +54,8 @@ acquireHandler namespace settings = do
     let connectionHost = Text.fromList (Database.Redis.connectHost connectionInfo)
     let connectionPort =
           case Database.Redis.connectPort connectionInfo of
-            Database.Redis.PortNumber port -> Text.fromList (Prelude.show port)
-            Database.Redis.UnixSocket socket -> Text.fromList socket
+            Database.Redis.PortNumber port -> Just (Prelude.fromIntegral port)
+            Database.Redis.UnixSocket _ -> Nothing
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
@@ -235,7 +235,7 @@ releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect con
 data Connection = Connection
   { connectionHedis :: Database.Redis.Connection,
     connectionHost :: Text,
-    connectionPort :: Text
+    connectionPort :: Maybe Int
   }
 
 platformRedis ::

@@ -51,7 +51,6 @@ module Redis
     lock,
 
     -- * Observability hepers
-    Internal.Info (..),
     readiness,
   )
 where

@@ -37,7 +37,6 @@ module Redis.List
     Internal.sequence,
 
     -- * Observability hepers
-    Internal.Info (..),
     Redis.readiness,
   )
 where

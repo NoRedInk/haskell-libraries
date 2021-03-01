@@ -12,6 +12,7 @@ library:
   - health
   - hedis
   - nri-env-parser
+  - nri-observability
   - nri-prelude
   - resourcet
   - safe-exceptions

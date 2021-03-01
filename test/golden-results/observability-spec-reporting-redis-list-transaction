@@ -39,7 +39,7 @@ TracingSpan
                 )
           , details =
               Just
-                "{\"infoCommands\":[\"PING\"],\"infoHost\":\"localhost\",\"infoPort\":\"6379\"}"
+                "{\"commands\":[\"PING\"],\"host\":\"localhost\",\"port\":6379}"
           , summary = Just "PING"
           , succeeded = Succeeded
           , allocated = 0
