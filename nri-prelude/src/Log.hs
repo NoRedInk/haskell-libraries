@@ -96,41 +96,25 @@ error message contexts =
 userIsAnnoyed :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsAnnoyed message advisory contexts =
   let triage = TriageInfo UserAnnoyed advisory
-   in Stack.withFrozenCallStack
-        log
-        message
-        ReportAsFailed
-        (Context "triage" triage : contexts)
+   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
 
 -- | Like 'userIsAnnoyed', but when the user is userIsConfused.
 userIsConfused :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsConfused message advisory contexts =
   let triage = TriageInfo UserConfused advisory
-   in Stack.withFrozenCallStack
-        log
-        message
-        ReportAsFailed
-        (Context "triage" triage : contexts)
+   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
 
 -- | Like 'userIsAnnoyed', but when the user is in pain.
 userIsPained :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsPained message advisory contexts =
   let triage = TriageInfo UserInPain advisory
-   in Stack.withFrozenCallStack
-        log
-        message
-        ReportAsFailed
-        (Context "triage" triage : contexts)
+   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
 
 -- | Like 'userIsAnnoyed', but when the user is blocked.
 userIsBlocked :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
 userIsBlocked message advisory contexts =
   let triage = TriageInfo UserBlocked advisory
-   in Stack.withFrozenCallStack
-        log
-        message
-        ReportAsFailed
-        (Context "triage" triage : contexts)
+   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
 
 -- | Mark a block of code as a logical unit by giving it a name. This name will
 -- be used in logs and monitoring dashboards, so use this function to help
