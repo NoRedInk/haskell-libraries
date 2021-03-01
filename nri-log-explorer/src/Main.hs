@@ -264,7 +264,7 @@ filterRootSpans first rest model =
   ListWidget.list
     RootSpanList
     ( List.filter
-        (\RootSpan {logSpan} -> List.all (\filter -> Text.contains filter (spanSummary logSpan)) (first : rest))
+        (\RootSpan {logSpan} -> List.all (\filter -> Text.contains (Text.toLower filter) (Text.toLower (spanSummary logSpan))) (first : rest))
         (allRootSpans model)
         |> Vector.fromList
     )
