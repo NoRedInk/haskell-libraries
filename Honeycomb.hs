@@ -136,11 +136,12 @@ deriveSampleRate rootSpan handler' =
           Nothing -> False
           Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
       baseRate = handler_fractionOfSuccessRequestsLogged handler'
-      requestDurationUs =
+      requestDurationMs =
         Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
-      apdexTUs = 1000 * Prelude.fromIntegral (handler_apdexTimeMs handler')
+          |> (*) 1e-3
+      apdexTMs = Prelude.fromIntegral (handler_apdexTimeMs handler')
    in if isNonAppEndpoint
         then --
         -- We have 2678400 seconds in a month
@@ -157,7 +158,7 @@ deriveSampleRate rootSpan handler' =
         -- High sample rates might make honeycomb make ridiculous assumptions
         -- about the actual request rate tho. Adjust if that's the case.
           baseRate / 500
-        else sampleRateForDuration baseRate requestDurationUs apdexTUs
+        else sampleRateForDuration baseRate requestDurationMs apdexTMs
 
 -- For every increase of apdexTU in the request duration we double the chance of
 -- a request getting logged, up to a maximum of 1.
@@ -169,8 +170,8 @@ deriveSampleRate rootSpan handler' =
 
 -- https://www.wolframalpha.com/input/?i=plot+1%2Fmax%281%2F1000%2C+min%281%2C+%281%2F1000%29+*+%281.5+%5E+%28x+%2F+30%29%29%29%29+from+x%3D1+to+x%3D300
 sampleRateForDuration :: Float -> Float -> Float -> Float
-sampleRateForDuration baseRate requestDurationUs apdexTUs =
-  baseRate * (1.5 ^ (requestDurationUs / apdexTUs))
+sampleRateForDuration baseRate requestDurationMs apdexTMs =
+  baseRate * (1.5 ^ (requestDurationMs / apdexTMs))
     |> clamp baseRate 1
 
 calculateApdex :: Handler -> Platform.TracingSpan -> Float
