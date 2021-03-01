@@ -64,9 +64,13 @@ data Model = Model
     -- once the user starts controlling the app themselves we want to keep our
     -- hands off the controls.
     userDidSomething :: Bool,
-    filter :: Bool,
-    filterEditor :: Edit.Editor Text Name
+    filter :: Filter
   }
+
+data Filter
+  = NoFilter
+  | HasFilter Text
+  | Filtering (Edit.Editor Text Name)
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
@@ -88,7 +92,10 @@ data Msg
   | Exit
   | SetCurrentTime Time.UTCTime
   | CopyDetails
-  | Filter
+  | ShowFilter
+  | StopFiltering
+  | ApplyFilter (Edit.Editor Text Name)
+  | HandleFiltering (Edit.Editor Text Name)
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -139,8 +146,7 @@ init clipboardCommand now =
       rootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
       userDidSomething = False,
-      filter = False,
-      filterEditor = Edit.editorText FilterField (Just 1) ""
+      filter = NoFilter
     }
 
 update :: Model -> Msg -> Brick.EventM Name (Brick.Next Model)
@@ -208,9 +214,32 @@ update model msg =
                 |> spanToClipboard cmd
                 |> liftIO
       continueAfterUserInteraction model
-    Filter ->
-      model {filter = True}
-        |> continueAfterUserInteraction
+    ShowFilter ->
+      let editor = Edit.editorText FilterField (Just 1) ""
+       in continueAfterUserInteraction
+            model
+              { filter =
+                  Filtering
+                    ( case filter model of
+                        NoFilter -> editor
+                        Filtering _ -> editor
+                        HasFilter filterText ->
+                          Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [filterText] (Just 1)) editor
+                    )
+              }
+    StopFiltering ->
+      continueAfterUserInteraction model {filter = NoFilter}
+    ApplyFilter filterEditor ->
+      let newFilter = Prelude.mconcat (Edit.getEditContents filterEditor)
+       in continueAfterUserInteraction
+            model
+              { filter =
+                  if Text.isEmpty (Text.trim newFilter)
+                    then NoFilter
+                    else HasFilter newFilter
+              }
+    HandleFiltering filterEditor ->
+      continueAfterUserInteraction model {filter = Filtering filterEditor}
 
 scroll ::
   (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
@@ -257,20 +286,21 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ if filter model
-              then viewFilter model
-              else Brick.txt "",
+          [ case filter model of
+              NoFilter -> Brick.txt ""
+              HasFilter filterText -> Brick.txt ("Filter: " ++ filterText)
+              Filtering filterEditor -> viewFilter filterEditor,
             viewContents page,
             viewKey page
           ]
       ]
 
-viewFilter :: Model -> Brick.Widget Name
-viewFilter model =
-  Edit.renderEditor contentWithCursor (filter model) (filterEditor model)
+viewFilter :: Edit.Editor Text Name -> Brick.Widget Name
+viewFilter editor =
+  Edit.renderEditor contentWithCursor True editor
   where
     contentWithCursor t =
-      let (_, cursorPos) = TZ.cursorPosition ((filterEditor model) ^. Edit.editContentsL)
+      let (_, cursorPos) = TZ.cursorPosition (editor ^. Edit.editContentsL)
           (before, after) = Data.Text.splitAt cursorPos (Prelude.mconcat t)
        in Brick.hBox
             <| Brick.txt before :
@@ -563,14 +593,20 @@ handleEvent ::
 handleEvent pushMsg model event =
   case event of
     (Brick.VtyEvent vtyEvent) ->
-      if filter model
-        then case vtyEvent of
-          Vty.EvKey Vty.KEsc [] ->
-            Brick.continue model {filter = False}
-          _ -> do
-            filterEditor <- Edit.handleEditorEvent vtyEvent (filterEditor model)
-            Brick.continue model {filterEditor}
-        else case vtyEvent of
+      case filter model of
+        Filtering filterEditor ->
+          case vtyEvent of
+            Vty.EvKey Vty.KEsc [] -> do
+              liftIO (pushMsg StopFiltering)
+              Brick.continue model
+            Vty.EvKey Vty.KEnter [] -> do
+              liftIO (pushMsg (ApplyFilter filterEditor))
+              Brick.continue model
+            _ -> do
+              newEditor <- Edit.handleEditorEvent vtyEvent filterEditor
+              liftIO (pushMsg (HandleFiltering newEditor))
+              Brick.continue model
+        _ -> case vtyEvent of
           -- Quiting
           Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
           Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
@@ -595,7 +631,7 @@ handleEvent pushMsg model event =
             liftIO (pushMsg CopyDetails)
             Brick.continue model
           Vty.EvKey (Vty.KChar '/') [] -> do
-            liftIO (pushMsg Filter)
+            liftIO (pushMsg ShowFilter)
             Brick.continue model
           -- Fallback
           _ ->
