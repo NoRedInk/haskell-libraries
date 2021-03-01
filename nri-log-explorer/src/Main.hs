@@ -1,6 +1,5 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Main
   ( main,
@@ -326,56 +325,60 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ viewFilter page,
+          [ viewMaybeFilter page,
             viewContents page,
             viewKey page
           ]
       ]
 
-viewFilter :: Page -> Brick.Widget Name
-viewFilter page =
+viewMaybeFilter :: Page -> Brick.Widget Name
+viewMaybeFilter page =
   case page of
     SpanBreakdownPage _ _ _ -> Brick.txt ""
-    NoDataPage filter -> viewFilter' filter
-    RootSpanPage _ filter _ -> viewFilter' filter
-  where
-    viewFilter' filter =
-      case filter of
-        NoFilter -> Brick.txt ""
-        HasFilter first rest ->
-          Brick.vBox
-            [ Brick.hBox
-                ( Brick.txt "Filter: " :
-                  List.intersperse
-                    (Brick.txt " ")
-                    (List.map (Brick.modifyDefAttr modReverse << Brick.txt) (first : rest))
-                ),
-              Border.hBorder
-            ]
-        Filtering _ filterEditor ->
-          Brick.vBox
-            [ viewFiltering filterEditor,
-              Border.hBorder
-            ]
+    NoDataPage filter -> viewFilter filter
+    RootSpanPage _ filter _ -> viewFilter filter
 
-viewFiltering :: Edit.Editor Text Name -> Brick.Widget Name
-viewFiltering editor =
-  Brick.hBox
-    [ Brick.txt "Filter: ",
-      Edit.renderEditor contentWithCursor True editor
-    ]
-  where
-    contentWithCursor t =
-      let (_, cursorPos) = TZ.cursorPosition (editor ^. Edit.editContentsL)
-          (before, after) = Data.Text.splitAt cursorPos (Prelude.mconcat t)
-       in Brick.hBox
-            <| Brick.txt before :
-          case Data.Text.uncons after of
-            Just (x, rest) -> [Brick.modifyDefAttr modReverse <| Brick.txt <| Data.Text.singleton x, Brick.txt rest]
-            Nothing -> [Brick.modifyDefAttr modReverse <| Brick.txt " ", Brick.txt after]
+viewFilter :: Filter -> Brick.Widget Name
+viewFilter filter =
+  case filter of
+    NoFilter -> Brick.txt ""
+    HasFilter first rest ->
+      Brick.vBox
+        [ Brick.hBox
+            ( Brick.txt "Filter: " :
+              ( first :
+                rest
+                  |> List.map (Brick.withAttr "selected" << Brick.txt)
+                  |> List.intersperse (Brick.txt " ")
+              )
+            ),
+          Border.hBorder
+        ]
+    Filtering _ filterEditor ->
+      Brick.vBox
+        [ Brick.hBox
+            [ Brick.txt "Filter: ",
+              Edit.renderEditor (editorWithCursor filterEditor) True filterEditor
+            ],
+          Border.hBorder
+        ]
 
-modReverse :: Vty.Attr -> Vty.Attr
-modReverse attr = Vty.withStyle attr Vty.reverseVideo
+editorWithCursor :: Edit.Editor Text Name -> List Text -> Brick.Widget Name
+editorWithCursor editor t =
+  let (_, cursorPos) = TZ.cursorPosition (editor ^. Edit.editContentsL)
+      (before, after) = Data.Text.splitAt cursorPos (Prelude.mconcat t)
+   in Brick.hBox
+        <| case Data.Text.uncons after of
+          Just (x, rest) ->
+            [ Brick.txt before,
+              Brick.withAttr "selected" <| Brick.txt <| Data.Text.singleton x,
+              Brick.txt rest
+            ]
+          Nothing ->
+            [ Brick.txt before,
+              Brick.withAttr "selected" <| Brick.txt " ",
+              Brick.txt after
+            ]
 
 viewKey :: Page -> Brick.Widget Name
 viewKey page =
@@ -387,6 +390,8 @@ viewKey page =
       adjustFilter = "/: adjust filter"
       clearFilter = "x: clear filter"
       stopFiltering = "esc: stop filtering"
+      applyFilter = "enter: apply filter"
+      filter' = "/: filter"
       shortcuts =
         case page of
           NoDataPage filter ->
@@ -396,10 +401,10 @@ viewKey page =
               _ -> [exit, adjustFilter, clearFilter]
           RootSpanPage _ filter _ ->
             case filter of
-              NoFilter -> [exit, updown, select, "/: filter"]
+              NoFilter -> [exit, updown, select, filter']
               HasFilter _ _ -> [exit, updown, select, adjustFilter, clearFilter]
-              Filtering (Just _) _ -> [stopFiltering, "enter: apply filter"]
-              Filtering Nothing _ -> [stopFiltering, "enter: apply filter"]
+              Filtering (Just _) _ -> [stopFiltering, applyFilter]
+              Filtering Nothing _ -> [stopFiltering, applyFilter]
           SpanBreakdownPage clipboardCommand _ _ ->
             [exit, updown, unselect]
               ++ ( case clipboardCommand of
