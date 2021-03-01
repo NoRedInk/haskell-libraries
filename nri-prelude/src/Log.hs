@@ -10,7 +10,10 @@
 -- This module does not have an Elm counterpart.
 module Log
   ( -- * Logging
+    debug,
     info,
+    warn,
+    error,
     userIsAnnoyed,
     userIsConfused,
     userIsPained,
@@ -41,6 +44,10 @@ import qualified Task
 import qualified Text.Show
 import qualified Prelude
 
+-- | DOCS!
+debug :: Stack.HasCallStack => Text -> [Context] -> Task e ()
+debug message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
+
 -- | A log message useful for when things have gone off the rails.
 -- We should have a ton of messages at this level.
 -- It should help us out when we're dealing with something hard.
@@ -51,6 +58,14 @@ import qualified Prelude
 -- > info "I added 1 and 1" [context "answer" 2]
 info :: Stack.HasCallStack => Text -> [Context] -> Task e ()
 info message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
+
+-- | DOCS!
+warn :: Stack.HasCallStack => Text -> [Context] -> Task e ()
+warn message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
+
+-- | DOCS!
+error :: Stack.HasCallStack => Text -> [Context] -> Task e ()
+error message contexts = Stack.withFrozenCallStack log message ReportAsFailed contexts
 
 -- | A log message when the user is annoyed, but not blocked.
 --
