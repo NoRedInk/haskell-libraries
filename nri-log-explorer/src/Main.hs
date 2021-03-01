@@ -264,7 +264,7 @@ filterRootSpans first rest model =
   ListWidget.list
     RootSpanList
     ( List.filter
-        (\RootSpan {logSpan} -> List.all (\filter -> Text.contains (Text.toLower filter) (Text.toLower (spanSummary logSpan))) (first : rest))
+        (\RootSpan {logSpan} -> List.all (\filter -> Text.contains (Text.toLower filter) (Text.toLower (filterSummary logSpan))) (first : rest))
         (allRootSpans model)
         |> Vector.fromList
     )
@@ -576,6 +576,20 @@ spanSummary span =
         Platform.Succeeded -> "  "
         Platform.Failed -> "✖ "
         Platform.FailedWith _ -> "✖ ",
+      Platform.name span,
+      case Platform.summary span of
+        Nothing -> ""
+        Just summary -> ": " ++ summary
+    ]
+
+filterSummary :: Platform.TracingSpan -> Text
+filterSummary span =
+  Text.join
+    ""
+    [ case Platform.succeeded span of
+        Platform.Succeeded -> "succeeded "
+        Platform.Failed -> "failed "
+        Platform.FailedWith _ -> "failed ",
       Platform.name span,
       case Platform.summary span of
         Nothing -> ""
