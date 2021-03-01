@@ -21,7 +21,6 @@ dependencies: &dependencies
 - network
 - nri-env-parser
 - nri-prelude
-- oops
 - pcre-light
 - postgresql-simple
 - postgresql-typed
