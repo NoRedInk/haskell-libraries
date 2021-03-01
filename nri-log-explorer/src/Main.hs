@@ -305,7 +305,10 @@ view model =
 
 viewFilter :: Edit.Editor Text Name -> Brick.Widget Name
 viewFilter editor =
-  Edit.renderEditor contentWithCursor True editor
+  Brick.hBox
+    [ Brick.txt "Filter: ",
+      Edit.renderEditor contentWithCursor True editor
+    ]
   where
     contentWithCursor t =
       let (_, cursorPos) = TZ.cursorPosition (editor ^. Edit.editContentsL)
