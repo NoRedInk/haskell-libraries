@@ -288,8 +288,16 @@ view model =
    in [ Brick.vBox
           [ case filter model of
               NoFilter -> Brick.txt ""
-              HasFilter filterText -> Brick.txt ("Filter: " ++ filterText)
-              Filtering filterEditor -> viewFilter filterEditor,
+              HasFilter filterText ->
+                Brick.vBox
+                  [ Brick.txt ("Filter: " ++ filterText),
+                    Border.hBorder
+                  ]
+              Filtering filterEditor ->
+                Brick.vBox
+                  [ viewFilter filterEditor,
+                    Border.hBorder
+                  ],
             viewContents (filter model) page,
             viewKey page
           ]
