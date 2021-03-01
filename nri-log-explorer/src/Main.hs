@@ -94,6 +94,7 @@ data Msg
   | SetCurrentTime Time.UTCTime
   | CopyDetails
   | ShowFilter
+  | ClearFilter
   | StopFiltering
   | ApplyFilter (Edit.Editor Text Name)
   | HandleFiltering (Edit.Editor Text Name)
@@ -112,7 +113,7 @@ data Name
 -- format more convenient for some update and view functions.
 data Page
   = NoDataPage
-  | RootSpanPage Time.UTCTime (ListWidget.List Name RootSpan)
+  | RootSpanPage Time.UTCTime Filter (ListWidget.List Name RootSpan)
   | SpanBreakdownPage (Maybe Text) RootSpan (ListWidget.List Name Span)
 
 toPage :: Model -> Page
@@ -124,7 +125,7 @@ toPage model =
         (clipboardCommand model)
         rootSpan
         selected
-    (Nothing, Just _) -> RootSpanPage (currentTime model) (rootSpans model)
+    (Nothing, Just _) -> RootSpanPage (currentTime model) (filter model) (rootSpans model)
 
 withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
 withPage model fn =
@@ -132,7 +133,7 @@ withPage model fn =
     ( \newPage ->
         case newPage of
           NoDataPage -> model {selectedRootSpan = Nothing}
-          RootSpanPage _ rootSpans ->
+          RootSpanPage _ _ rootSpans ->
             model {selectedRootSpan = Nothing, rootSpans = rootSpans}
           SpanBreakdownPage _ _ spans ->
             model {selectedRootSpan = Just spans}
@@ -184,7 +185,7 @@ update model msg =
             case page of
               NoDataPage -> Prelude.pure page
               SpanBreakdownPage _ _ _ -> Prelude.pure page
-              RootSpanPage _ spans ->
+              RootSpanPage _ _ spans ->
                 case ListWidget.listSelectedElement spans of
                   Nothing -> Prelude.pure page
                   Just (currentIndex, currentSpan) ->
@@ -203,7 +204,7 @@ update model msg =
     CopyDetails -> do
       case toPage model of
         NoDataPage -> Prelude.pure ()
-        RootSpanPage _ _ -> Prelude.pure ()
+        RootSpanPage _ _ _ -> Prelude.pure ()
         SpanBreakdownPage Nothing _ _ -> Prelude.pure ()
         SpanBreakdownPage (Just cmd) _ spans ->
           case ListWidget.listSelectedElement spans of
@@ -226,6 +227,15 @@ update model msg =
                           Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [Text.join " " (first : rest)] (Just 1)) editor
                     )
               }
+    ClearFilter ->
+      continueAfterUserInteraction
+        <| case filter model of
+          HasFilter _ _ ->
+            model
+              { filter = NoFilter,
+                rootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+              }
+          _ -> model
     StopFiltering ->
       continueAfterUserInteraction model {filter = NoFilter}
     ApplyFilter filterEditor ->
@@ -271,9 +281,9 @@ scroll move model =
   withPage model <| \page -> do
     case page of
       NoDataPage -> Prelude.pure NoDataPage
-      RootSpanPage time rootSpans ->
+      RootSpanPage time filter rootSpans ->
         move rootSpans
-          |> map (RootSpanPage time)
+          |> map (RootSpanPage time filter)
       SpanBreakdownPage cmd root spans ->
         move spans
           |> map (SpanBreakdownPage cmd root)
@@ -356,11 +366,14 @@ viewKey page =
       select = "enter: details"
       unselect = "backspace: back"
       copy = "y: copy details"
-      filter = "/: filter"
       shortcuts =
         case page of
           NoDataPage -> [exit]
-          RootSpanPage _ _ -> [exit, updown, select, filter]
+          RootSpanPage _ filter _ ->
+            case filter of
+              NoFilter -> [exit, updown, select, "/: filter"]
+              HasFilter _ _ -> [exit, updown, select, "/: adjust filter", "x: clear filter"]
+              Filtering _ -> ["esc: stop filtering", "enter: apply filter"]
           SpanBreakdownPage clipboardCommand _ _ ->
             [exit, updown, unselect]
               ++ ( case clipboardCommand of
@@ -379,7 +392,7 @@ viewContents page =
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
         |> Center.hCenter
         |> Brick.padBottom Brick.Max
-    RootSpanPage now logs ->
+    RootSpanPage now _ logs ->
       logs
         |> ListWidget.renderList
           ( \hasFocus RootSpan {logSpan, logTime} ->
@@ -670,6 +683,9 @@ handleEvent pushMsg model event =
             Brick.continue model
           Vty.EvKey (Vty.KChar '/') [] -> do
             liftIO (pushMsg ShowFilter)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar 'x') [] -> do
+            liftIO (pushMsg ClearFilter)
             Brick.continue model
           -- Fallback
           _ ->
