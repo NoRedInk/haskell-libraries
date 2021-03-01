@@ -290,7 +290,7 @@ view model =
               NoFilter -> Brick.txt ""
               HasFilter filterText -> Brick.txt ("Filter: " ++ filterText)
               Filtering filterEditor -> viewFilter filterEditor,
-            viewContents page,
+            viewContents (filter model) page,
             viewKey page
           ]
       ]
@@ -334,8 +334,8 @@ viewKey page =
         |> Brick.txt
         |> Center.hCenter
 
-viewContents :: Page -> Brick.Widget Name
-viewContents page =
+viewContents :: Filter -> Page -> Brick.Widget Name
+viewContents filter page =
   case page of
     NoDataPage ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
@@ -345,18 +345,13 @@ viewContents page =
       logs
         |> ListWidget.renderList
           ( \hasFocus RootSpan {logSpan, logTime} ->
-              Brick.hBox
-                [ Brick.txt (howFarBack logTime now)
-                    |> Brick.padRight Brick.Max
-                    |> Brick.hLimit 15,
-                  Brick.txt "   ",
-                  Brick.txt (spanSummary logSpan)
-                    |> Brick.padRight Brick.Max
-                ]
-                |> Center.hCenter
-                |> if hasFocus
-                  then Brick.withAttr "selected"
-                  else identity
+              case filter of
+                HasFilter filterText ->
+                  if Text.contains filterText (spanSummary logSpan)
+                    then viewLog hasFocus now logSpan logTime
+                    else Brick.txt ""
+                _ ->
+                  viewLog hasFocus now logSpan logTime
           )
           True
         |> Brick.padLeftRight 1
@@ -377,6 +372,21 @@ viewContents page =
                 |> Brick.padRight Brick.Max
             ]
         ]
+
+viewLog :: Bool -> Time.UTCTime -> Platform.TracingSpan -> Time.UTCTime -> Brick.Widget Name
+viewLog hasFocus now logSpan logTime =
+  Brick.hBox
+    [ Brick.txt (howFarBack logTime now)
+        |> Brick.padRight Brick.Max
+        |> Brick.hLimit 15,
+      Brick.txt "   ",
+      Brick.txt (spanSummary logSpan)
+        |> Brick.padRight Brick.Max
+    ]
+    |> Center.hCenter
+    |> if hasFocus
+      then Brick.withAttr "selected"
+      else identity
 
 viewSpanBreakdown :: ListWidget.List Name Span -> Brick.Widget Name
 viewSpanBreakdown spans =
