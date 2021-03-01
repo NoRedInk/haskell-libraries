@@ -47,12 +47,12 @@ import qualified Http
 import qualified List
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
+import qualified Log.RedisCommands as RedisCommands
 import qualified Maybe
 import qualified Network.HostName
 import Observability.Helpers (toHashMap)
 import qualified Observability.Timer as Timer
 import qualified Platform
-import qualified Redis
 import qualified System.Random as Random
 import qualified Task
 import qualified Text
@@ -359,21 +359,22 @@ deNoiseLog context@(Log.LogContexts contexts) =
 -- - How many of each command
 -- - The full blob in a single column
 -- - The rest of our Info record
-deNoiseRedis :: Redis.Info -> Platform.SomeTracingSpanDetails
+deNoiseRedis :: RedisCommands.Details -> Platform.SomeTracingSpanDetails
 deNoiseRedis redisInfo =
   let commandsCount =
         redisInfo
-          |> Redis.infoCommands
+          |> RedisCommands.commands
           |> List.filterMap (NriText.words >> List.head)
           |> (\x -> [(the key ++ ".count", key |> List.length |> NriText.fromInt) | key <- x, then group by key using groupWith])
       fullBlob =
         redisInfo
-          |> Redis.infoCommands
+          |> RedisCommands.commands
           |> NriText.join "\n"
    in HashMap.fromList
         ( ("commands", fullBlob) :
-          ("infoHost", Redis.infoHost redisInfo) :
-          ("infoPort", Redis.infoPort redisInfo) : commandsCount
+          ("host", RedisCommands.host redisInfo |> Maybe.withDefault "unknown") :
+          ("port", RedisCommands.port redisInfo |> Maybe.map Text.fromInt |> Maybe.withDefault "unknown") :
+          commandsCount
         )
         |> GenericTracingSpanDetails
         |> Platform.toTracingSpanDetails

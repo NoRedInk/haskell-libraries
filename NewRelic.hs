@@ -28,11 +28,11 @@ import qualified Environment
 import qualified List
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
+import qualified Log.RedisCommands as RedisCommands
 import qualified Log.SqlQuery as SqlQuery
 import qualified Maybe
 import qualified Observability.Timer as Timer
 import qualified Platform
-import qualified Redis
 import qualified Text
 import qualified Tracing.NewRelic as NewRelic
 import qualified Prelude
@@ -165,16 +165,16 @@ sqlToDatastore details =
       NewRelic.datastoreSegmentQuery = Maybe.map Log.unSecret (SqlQuery.query details)
     }
 
-redisToDatastore :: Redis.Info -> NewRelic.DatastoreSegment
-redisToDatastore info =
+redisToDatastore :: RedisCommands.Details -> NewRelic.DatastoreSegment
+redisToDatastore details =
   NewRelic.DatastoreSegment
     { NewRelic.datastoreSegmentProduct = NewRelic.Redis,
       NewRelic.datastoreSegmentCollection = Nothing,
-      NewRelic.datastoreSegmentOperation = firstCommand (Redis.infoCommands info),
-      NewRelic.datastoreSegmentHost = Just (Redis.infoHost info),
-      NewRelic.datastoreSegmentPortPathOrId = Just (Redis.infoPort info),
+      NewRelic.datastoreSegmentOperation = firstCommand (RedisCommands.commands details),
+      NewRelic.datastoreSegmentHost = RedisCommands.host details,
+      NewRelic.datastoreSegmentPortPathOrId = Maybe.map Text.fromInt (RedisCommands.port details),
       NewRelic.datastoreSegmentDatabaseName = Nothing,
-      NewRelic.datastoreSegmentQuery = Just (Text.join "\n" (Redis.infoCommands info))
+      NewRelic.datastoreSegmentQuery = Just (Text.join "\n" (RedisCommands.commands details))
     }
 
 firstCommand :: [Text] -> Maybe Text
