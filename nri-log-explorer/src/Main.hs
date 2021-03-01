@@ -323,30 +323,40 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ case filter model of
-              NoFilter -> Brick.txt ""
-              HasFilter first rest ->
-                Brick.vBox
-                  [ Brick.hBox
-                      ( Brick.txt "Filter: " :
-                        List.intersperse
-                          (Brick.txt " ")
-                          (List.map (Brick.modifyDefAttr modReverse << Brick.txt) (first : rest))
-                      ),
-                    Border.hBorder
-                  ]
-              Filtering _ filterEditor ->
-                Brick.vBox
-                  [ viewFilter filterEditor,
-                    Border.hBorder
-                  ],
+          [ viewFilter page,
             viewContents page,
             viewKey page
           ]
       ]
 
-viewFilter :: Edit.Editor Text Name -> Brick.Widget Name
-viewFilter editor =
+viewFilter :: Page -> Brick.Widget Name
+viewFilter page =
+  case page of
+    SpanBreakdownPage _ _ _ -> Brick.txt ""
+    NoDataPage filter -> viewFilter' filter
+    RootSpanPage _ filter _ -> viewFilter' filter
+  where
+    viewFilter' filter =
+      case filter of
+        NoFilter -> Brick.txt ""
+        HasFilter first rest ->
+          Brick.vBox
+            [ Brick.hBox
+                ( Brick.txt "Filter: " :
+                  List.intersperse
+                    (Brick.txt " ")
+                    (List.map (Brick.modifyDefAttr modReverse << Brick.txt) (first : rest))
+                ),
+              Border.hBorder
+            ]
+        Filtering _ filterEditor ->
+          Brick.vBox
+            [ viewFiltering filterEditor,
+              Border.hBorder
+            ]
+
+viewFiltering :: Edit.Editor Text Name -> Brick.Widget Name
+viewFiltering editor =
   Brick.hBox
     [ Brick.txt "Filter: ",
       Edit.renderEditor contentWithCursor True editor
