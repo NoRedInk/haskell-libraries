@@ -20,12 +20,14 @@ in pkgs.mkShell {
         directory
         exceptions
         filepath
+        fuzzy
         ghc
         hedgehog
         hostname
         http-client
         http-client-tls
         junit-xml
+        microlens
         modern-uri
         network-uri
         pretty-show
@@ -35,6 +37,7 @@ in pkgs.mkShell {
         stm
         terminal-size
         text
+        text-zipper
         time
         unordered-containers
         vector
