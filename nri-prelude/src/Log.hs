@@ -46,7 +46,12 @@ import qualified Prelude
 
 -- | DOCS!
 debug :: Stack.HasCallStack => Text -> [Context] -> Task e ()
-debug message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
+debug message contexts =
+  Stack.withFrozenCallStack
+    log
+    message
+    ReportAsSucceeded
+    (Context "level" Debug : contexts)
 
 -- | A log message useful for when things have gone off the rails.
 -- We should have a ton of messages at this level.
@@ -57,15 +62,30 @@ debug message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded
 --
 -- > info "I added 1 and 1" [context "answer" 2]
 info :: Stack.HasCallStack => Text -> [Context] -> Task e ()
-info message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
+info message contexts =
+  Stack.withFrozenCallStack
+    log
+    message
+    ReportAsSucceeded
+    (Context "level" Info : contexts)
 
 -- | DOCS!
 warn :: Stack.HasCallStack => Text -> [Context] -> Task e ()
-warn message contexts = Stack.withFrozenCallStack log message ReportAsSucceeded contexts
+warn message contexts =
+  Stack.withFrozenCallStack
+    log
+    message
+    ReportAsSucceeded
+    (Context "level" Warn : contexts)
 
 -- | DOCS!
 error :: Stack.HasCallStack => Text -> [Context] -> Task e ()
-error message contexts = Stack.withFrozenCallStack log message ReportAsFailed contexts
+error message contexts =
+  Stack.withFrozenCallStack
+    log
+    message
+    ReportAsFailed
+    (Context "level" Error : contexts)
 
 -- | A log message when the user is annoyed, but not blocked.
 --
@@ -230,6 +250,15 @@ instance Aeson.ToJSON (Secret a) where
 --
 -- TRIAGE
 --
+
+data LogLevel
+  = Debug
+  | Info
+  | Warn
+  | Error
+  deriving (Generic)
+
+instance Aeson.ToJSON LogLevel
 
 -- | A logged message for log levels warning and above. Because these levels
 -- indicate a (potential) problem we want to provide some additional data that
