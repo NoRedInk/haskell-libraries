@@ -28,11 +28,10 @@ import qualified Environment
 import qualified List
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
+import qualified Log.SqlQuery as SqlQuery
 import qualified Maybe
-import qualified MySQL
 import qualified Observability.Timer as Timer
 import qualified Platform
-import qualified Postgres
 import qualified Redis
 import qualified Text
 import qualified Tracing.NewRelic as NewRelic
@@ -137,8 +136,7 @@ chooseAndStartSegment tx span =
   Platform.details span
     |> andThen
       ( Platform.renderTracingSpanDetails
-          [ Platform.Renderer (startDatastoreSegment tx << mysqlToDatastore),
-            Platform.Renderer (startDatastoreSegment tx << postgresToDatastore),
+          [ Platform.Renderer (startDatastoreSegment tx << sqlToDatastore),
             Platform.Renderer (startDatastoreSegment tx << redisToDatastore),
             Platform.Renderer (startExternalSegment tx << httpToExternalSegment)
           ]
@@ -146,40 +144,25 @@ chooseAndStartSegment tx span =
     |> Maybe.withDefault
       (startSegment tx (Platform.name span) (category span))
 
-mysqlToDatastore :: MySQL.Info -> NewRelic.DatastoreSegment
-mysqlToDatastore info =
+sqlToDatastore :: SqlQuery.Details -> NewRelic.DatastoreSegment
+sqlToDatastore details =
   NewRelic.DatastoreSegment
-    { NewRelic.datastoreSegmentProduct = NewRelic.MySQL,
-      NewRelic.datastoreSegmentCollection = nonEmptyText (MySQL.infoQueriedRelation info),
-      NewRelic.datastoreSegmentOperation = nonEmptyText (MySQL.infoSqlOperation info),
-      NewRelic.datastoreSegmentHost = case MySQL.infoConnection info of
-        MySQL.TcpSocket host _ _ -> nonEmptyText host
-        MySQL.UnixSocket _ _ -> Nothing,
-      NewRelic.datastoreSegmentPortPathOrId = case MySQL.infoConnection info of
-        MySQL.TcpSocket _ port _ -> nonEmptyText port
-        MySQL.UnixSocket path _ -> nonEmptyText path,
-      NewRelic.datastoreSegmentDatabaseName = case MySQL.infoConnection info of
-        MySQL.TcpSocket _ _ dbname -> nonEmptyText dbname
-        MySQL.UnixSocket _ dbname -> nonEmptyText dbname,
-      NewRelic.datastoreSegmentQuery = nonEmptyText (MySQL.infoQueryTemplate info)
-    }
-
-postgresToDatastore :: Postgres.Info -> NewRelic.DatastoreSegment
-postgresToDatastore info =
-  NewRelic.DatastoreSegment
-    { NewRelic.datastoreSegmentProduct = NewRelic.Postgres,
-      NewRelic.datastoreSegmentCollection = nonEmptyText (Postgres.infoQueriedRelation info),
-      NewRelic.datastoreSegmentOperation = nonEmptyText (Postgres.infoSqlOperation info),
-      NewRelic.datastoreSegmentHost = case Postgres.infoConnection info of
-        Postgres.TcpSocket host _ _ -> nonEmptyText host
-        Postgres.UnixSocket _ _ -> Nothing,
-      NewRelic.datastoreSegmentPortPathOrId = case Postgres.infoConnection info of
-        Postgres.TcpSocket _ port _ -> nonEmptyText port
-        Postgres.UnixSocket path _ -> nonEmptyText path,
-      NewRelic.datastoreSegmentDatabaseName = case Postgres.infoConnection info of
-        Postgres.TcpSocket _ _ dbname -> nonEmptyText dbname
-        Postgres.UnixSocket _ dbname -> nonEmptyText dbname,
-      NewRelic.datastoreSegmentQuery = nonEmptyText (Postgres.infoQueryTemplate info)
+    { NewRelic.datastoreSegmentProduct =
+        case SqlQuery.databaseType details of
+          Just product ->
+            if product == SqlQuery.postgresql
+              then NewRelic.Postgres
+              else
+                if product == SqlQuery.mysql
+                  then NewRelic.MySQL
+                  else NewRelic.OtherDatastoreSegmentProduct product
+          Nothing -> NewRelic.OtherDatastoreSegmentProduct "unknown",
+      NewRelic.datastoreSegmentCollection = SqlQuery.queriedRelation details,
+      NewRelic.datastoreSegmentOperation = SqlQuery.sqlOperation details,
+      NewRelic.datastoreSegmentHost = SqlQuery.host details,
+      NewRelic.datastoreSegmentPortPathOrId = Maybe.map Text.fromInt (SqlQuery.port details),
+      NewRelic.datastoreSegmentDatabaseName = SqlQuery.database details,
+      NewRelic.datastoreSegmentQuery = Maybe.map Log.unSecret (SqlQuery.query details)
     }
 
 redisToDatastore :: Redis.Info -> NewRelic.DatastoreSegment
@@ -238,8 +221,12 @@ category span =
   Platform.details span
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
-          [ Platform.Renderer (\(_ :: MySQL.Info) -> "mysql"),
-            Platform.Renderer (\(_ :: Postgres.Info) -> "postgres"),
+          [ Platform.Renderer
+              ( \(details :: SqlQuery.Details) ->
+                  SqlQuery.databaseType details
+                    |> Maybe.withDefault "unknown"
+                    |> Text.toLower
+              ),
             Platform.Renderer (\(_ :: HttpRequest.Outgoing) -> "http"),
             Platform.Renderer (\(_ :: HttpRequest.Incoming) -> "request"),
             Platform.Renderer (\(_ :: Log.LogContexts) -> "haskell")
