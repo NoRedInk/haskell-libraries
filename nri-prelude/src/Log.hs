@@ -44,7 +44,13 @@ import qualified Task
 import qualified Text.Show
 import qualified Prelude
 
--- | DOCS!
+-- | A log message that is probably only useful in development, or when we're
+-- really confused about something and need ALL THE CONTEXT.
+--
+-- In addition to a log message you can pass additional key-value pairs with
+-- information that might be relevant for debugging.
+--
+-- > debug "Computation partially succeeded" [context "answer" 2]
 debug :: Stack.HasCallStack => Text -> [Context] -> Task e ()
 debug message contexts =
   Stack.withFrozenCallStack
@@ -69,7 +75,14 @@ info message contexts =
     ReportAsSucceeded
     (Context "level" Info : contexts)
 
--- | DOCS!
+-- | A log message when something went wrong, but it did not go wrong in a way
+-- to totally break the thing we're doing. These should be triaged and fixed
+-- soon, but aren't show-stoppers.
+--
+-- In addition to a log message you can pass additional key-value pairs with
+-- information that might be relevant for debugging.
+--
+-- > warn "This field was sent, but we're gonna deprecate it!" []
 warn :: Stack.HasCallStack => Text -> [Context] -> Task e ()
 warn message contexts =
   Stack.withFrozenCallStack
@@ -78,7 +91,13 @@ warn message contexts =
     ReportAsSucceeded
     (Context "level" Warn : contexts)
 
--- | DOCS!
+-- | A log message when we can't continue with what we were trying to do
+-- because of a problem.
+--
+-- In addition to a log message you can pass additional key-value pairs with
+-- information that might be relevant for debugging.
+--
+-- > error "The user tried to request this thing, but they aren't allowed!" []
 error :: Stack.HasCallStack => Text -> [Context] -> Task e ()
 error message contexts =
   Stack.withFrozenCallStack
