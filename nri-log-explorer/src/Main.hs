@@ -10,6 +10,7 @@ import qualified Brick
 import qualified Brick.BChan
 import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
+import qualified Brick.Widgets.Edit as Edit
 import qualified Brick.Widgets.List as ListWidget
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
@@ -26,12 +27,15 @@ import qualified Data.List
 import qualified Data.Text
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
+import qualified Data.Text.Zipper as TZ
 import qualified Data.Time as Time
+import qualified Data.Vector
 import qualified Data.Vector as Vector
 import qualified Data.Version as Version
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
+import Lens.Micro ((^.))
 import qualified List
 import NriPrelude
 import qualified Paths_nri_log_explorer as Paths
@@ -42,6 +46,7 @@ import qualified System.Exit
 import qualified System.IO
 import qualified System.Process
 import qualified Text
+import qualified Text.Fuzzy as Fuzzy
 import qualified Prelude
 
 data Model = Model
@@ -49,8 +54,10 @@ data Model = Model
     currentTime :: Time.UTCTime,
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
+    -- All root spans.
+    allRootSpans :: Data.Vector.Vector RootSpan,
     -- The actual data displayed.
-    rootSpans :: ListWidget.List Name RootSpan,
+    filteredRootSpans :: ListWidget.List Name RootSpan,
     -- If we're in the detail view for a root span, this will contain a copy of
     -- the data of that particular span in a format more suitable for this view.
     selectedRootSpan :: Maybe (ListWidget.List Name Span),
@@ -59,8 +66,14 @@ data Model = Model
     -- interacts we're going to keep the focus on the last-loaded element, but
     -- once the user starts controlling the app themselves we want to keep our
     -- hands off the controls.
-    userDidSomething :: Bool
+    userDidSomething :: Bool,
+    filter :: Filter
   }
+
+data Filter
+  = NoFilter
+  | HasFilter Text (List Text)
+  | EditFilter (Maybe (Text, List Text)) (Edit.Editor Text Name)
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
@@ -82,6 +95,11 @@ data Msg
   | Exit
   | SetCurrentTime Time.UTCTime
   | CopyDetails
+  | ShowFilter
+  | ClearFilter
+  | StopEditFilter (Maybe (Text, List Text))
+  | ApplyFilter (Edit.Editor Text Name)
+  | HandleEditFilter (Maybe (Text, List Text)) (Edit.Editor Text Name)
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -90,34 +108,35 @@ data Msg
 data Name
   = RootSpanList
   | SpanBreakdownList Prelude.Int
+  | FilterField
   deriving (Eq, Ord, Show)
 
 -- An alternative data type containing part of the same data as above, in a
 -- format more convenient for some update and view functions.
 data Page
-  = NoDataPage
-  | RootSpanPage Time.UTCTime (ListWidget.List Name RootSpan)
+  = NoDataPage Filter
+  | RootSpanPage Time.UTCTime Filter (ListWidget.List Name RootSpan)
   | SpanBreakdownPage (Maybe Text) RootSpan (ListWidget.List Name Span)
 
 toPage :: Model -> Page
 toPage model =
-  case (selectedRootSpan model, ListWidget.listSelectedElement (rootSpans model)) of
-    (_, Nothing) -> NoDataPage
+  case (selectedRootSpan model, ListWidget.listSelectedElement (filteredRootSpans model)) of
+    (_, Nothing) -> NoDataPage (filter model)
     (Just selected, Just (_, rootSpan)) ->
       SpanBreakdownPage
         (clipboardCommand model)
         rootSpan
         selected
-    (Nothing, Just _) -> RootSpanPage (currentTime model) (rootSpans model)
+    (Nothing, Just _) -> RootSpanPage (currentTime model) (filter model) (filteredRootSpans model)
 
 withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
 withPage model fn =
   map
     ( \newPage ->
         case newPage of
-          NoDataPage -> model {selectedRootSpan = Nothing}
-          RootSpanPage _ rootSpans ->
-            model {selectedRootSpan = Nothing, rootSpans = rootSpans}
+          NoDataPage filter -> model {selectedRootSpan = Nothing, filter}
+          RootSpanPage _ _ filteredRootSpans ->
+            model {selectedRootSpan = Nothing, filteredRootSpans}
           SpanBreakdownPage _ _ spans ->
             model {selectedRootSpan = Just spans}
     )
@@ -128,9 +147,11 @@ init clipboardCommand now =
   Model
     { currentTime = now,
       clipboardCommand = clipboardCommand,
-      rootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
+      allRootSpans = Data.Vector.empty,
+      filteredRootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
-      userDidSomething = False
+      userDidSomething = False,
+      filter = NoFilter
     }
 
 update :: Model -> Msg -> Brick.EventM Name (Brick.Next Model)
@@ -148,11 +169,8 @@ update model msg =
           let rootSpan = RootSpan date span
               newModel =
                 model
-                  { rootSpans =
-                      ListWidget.listInsert
-                        0
-                        rootSpan
-                        (rootSpans model)
+                  { allRootSpans = Data.Vector.cons rootSpan (allRootSpans model),
+                    filteredRootSpans = ListWidget.listInsert 0 rootSpan (filteredRootSpans model)
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
@@ -167,9 +185,9 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage -> Prelude.pure page
+              NoDataPage _ -> Prelude.pure page
               SpanBreakdownPage _ _ _ -> Prelude.pure page
-              RootSpanPage _ spans ->
+              RootSpanPage _ _ spans ->
                 case ListWidget.listSelectedElement spans of
                   Nothing -> Prelude.pure page
                   Just (currentIndex, currentSpan) ->
@@ -187,8 +205,8 @@ update model msg =
         |> continueAfterUserInteraction
     CopyDetails -> do
       case toPage model of
-        NoDataPage -> Prelude.pure ()
-        RootSpanPage _ _ -> Prelude.pure ()
+        NoDataPage _ -> Prelude.pure ()
+        RootSpanPage _ _ _ -> Prelude.pure ()
         SpanBreakdownPage Nothing _ _ -> Prelude.pure ()
         SpanBreakdownPage (Just cmd) _ spans ->
           case ListWidget.listSelectedElement spans of
@@ -198,6 +216,74 @@ update model msg =
                 |> spanToClipboard cmd
                 |> liftIO
       continueAfterUserInteraction model
+    ShowFilter ->
+      let editor = Edit.editorText FilterField (Just 1) ""
+       in continueAfterUserInteraction
+            model
+              { filter =
+                  case filter model of
+                    NoFilter -> EditFilter Nothing editor
+                    EditFilter previous _ -> EditFilter previous editor
+                    HasFilter first rest ->
+                      EditFilter (Just (first, rest))
+                        <| Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [Text.join " " (first : rest)] (Just 1)) editor
+              }
+    ClearFilter ->
+      continueAfterUserInteraction
+        <| case filter model of
+          HasFilter _ _ ->
+            model
+              { filter = NoFilter,
+                filteredRootSpans = unfilterRootSpans model
+              }
+          _ -> model
+    StopEditFilter maybePrevious ->
+      continueAfterUserInteraction
+        <| case maybePrevious of
+          Just (first, rest) -> model {filter = HasFilter first rest, filteredRootSpans = filterRootSpans first rest model}
+          Nothing -> model {filter = NoFilter, filteredRootSpans = unfilterRootSpans model}
+    ApplyFilter filterEditor ->
+      continueAfterUserInteraction
+        <| case getFiltersFromEditor filterEditor of
+          [] ->
+            model
+              { filter = NoFilter,
+                filteredRootSpans = unfilterRootSpans model
+              }
+          first : rest -> model {filter = HasFilter first rest}
+    HandleEditFilter previous filterEditor ->
+      continueAfterUserInteraction
+        model
+          { filter = EditFilter previous filterEditor,
+            filteredRootSpans = case getFiltersFromEditor filterEditor of
+              [] ->
+                unfilterRootSpans model
+              first : rest -> filterRootSpans first rest model
+          }
+
+unfilterRootSpans :: Model -> ListWidget.List Name RootSpan
+unfilterRootSpans model =
+  ListWidget.list RootSpanList (allRootSpans model) 1
+
+filterRootSpans :: Text -> List Text -> Model -> ListWidget.List Name RootSpan
+filterRootSpans first rest model =
+  ListWidget.list
+    RootSpanList
+    ( Data.Vector.filter
+        ( \RootSpan {logSpan} ->
+            List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (first : rest)
+        )
+        (allRootSpans model)
+    )
+    1
+
+getFiltersFromEditor :: Edit.Editor Text Name -> List Text
+getFiltersFromEditor editor =
+  Edit.getEditContents editor
+    |> Prelude.mconcat
+    |> Text.trim
+    |> Text.split " "
+    |> List.filter (not << Text.isEmpty)
 
 scroll ::
   (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
@@ -206,10 +292,10 @@ scroll ::
 scroll move model =
   withPage model <| \page -> do
     case page of
-      NoDataPage -> Prelude.pure NoDataPage
-      RootSpanPage time rootSpans ->
-        move rootSpans
-          |> map (RootSpanPage time)
+      NoDataPage filter -> Prelude.pure (NoDataPage filter)
+      RootSpanPage time filter filteredRootSpans ->
+        move filteredRootSpans
+          |> map (RootSpanPage time filter)
       SpanBreakdownPage cmd root spans ->
         move spans
           |> map (SpanBreakdownPage cmd root)
@@ -244,10 +330,60 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ viewContents page,
+          [ viewMaybeFilter page,
+            viewContents page,
             viewKey page
           ]
       ]
+
+viewMaybeFilter :: Page -> Brick.Widget Name
+viewMaybeFilter page =
+  case page of
+    SpanBreakdownPage _ _ _ -> Brick.txt ""
+    NoDataPage filter -> viewFilter filter
+    RootSpanPage _ filter _ -> viewFilter filter
+
+viewFilter :: Filter -> Brick.Widget Name
+viewFilter filter =
+  case filter of
+    NoFilter -> Brick.txt ""
+    HasFilter first rest ->
+      Brick.vBox
+        [ Brick.hBox
+            ( Brick.txt "Filter: " :
+              ( first :
+                rest
+                  |> List.map (Brick.withAttr "selected" << Brick.txt)
+                  |> List.intersperse (Brick.txt " ")
+              )
+            ),
+          Border.hBorder
+        ]
+    EditFilter _ filterEditor ->
+      Brick.vBox
+        [ Brick.hBox
+            [ Brick.txt "Filter: ",
+              Edit.renderEditor (editorWithCursor filterEditor) True filterEditor
+            ],
+          Border.hBorder
+        ]
+
+editorWithCursor :: Edit.Editor Text Name -> List Text -> Brick.Widget Name
+editorWithCursor editor t =
+  let (_, cursorPos) = TZ.cursorPosition (editor ^. Edit.editContentsL)
+      (before, after) = Data.Text.splitAt cursorPos (Prelude.mconcat t)
+   in Brick.hBox
+        <| case Data.Text.uncons after of
+          Just (x, rest) ->
+            [ Brick.txt before,
+              Brick.withAttr "selected" <| Brick.txt <| Data.Text.singleton x,
+              Brick.txt rest
+            ]
+          Nothing ->
+            [ Brick.txt before,
+              Brick.withAttr "selected" <| Brick.txt " ",
+              Brick.txt after
+            ]
 
 viewKey :: Page -> Brick.Widget Name
 viewKey page =
@@ -256,10 +392,24 @@ viewKey page =
       select = "enter: details"
       unselect = "backspace: back"
       copy = "y: copy details"
+      adjustFilter = "/: adjust filter"
+      clearFilter = "x: clear filter"
+      stopEditFilter = "esc: stop filtering"
+      applyFilter = "enter: apply filter"
+      filter' = "/: filter"
       shortcuts =
         case page of
-          NoDataPage -> [exit]
-          RootSpanPage _ _ -> [exit, updown, select]
+          NoDataPage filter ->
+            case filter of
+              NoFilter -> [exit]
+              EditFilter _ _ -> [exit, stopEditFilter]
+              _ -> [exit, adjustFilter, clearFilter]
+          RootSpanPage _ filter _ ->
+            case filter of
+              NoFilter -> [exit, updown, select, filter']
+              HasFilter _ _ -> [exit, updown, select, adjustFilter, clearFilter]
+              EditFilter (Just _) _ -> [stopEditFilter, applyFilter]
+              EditFilter Nothing _ -> [stopEditFilter, applyFilter]
           SpanBreakdownPage clipboardCommand _ _ ->
             [exit, updown, unselect]
               ++ ( case clipboardCommand of
@@ -274,11 +424,15 @@ viewKey page =
 viewContents :: Page -> Brick.Widget Name
 viewContents page =
   case page of
-    NoDataPage ->
+    NoDataPage NoFilter ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
         |> Center.hCenter
         |> Brick.padBottom Brick.Max
-    RootSpanPage now logs ->
+    NoDataPage _ ->
+      Brick.txt "Waiting for logs or adjust filter...\n\nGo run some tests!"
+        |> Center.hCenter
+        |> Brick.padBottom Brick.Max
+    RootSpanPage now _ logs ->
       logs
         |> ListWidget.renderList
           ( \hasFocus RootSpan {logSpan, logTime} ->
@@ -441,6 +595,20 @@ spanSummary span =
         Just summary -> ": " ++ summary
     ]
 
+filterSummary :: Platform.TracingSpan -> Text
+filterSummary span =
+  Text.join
+    ""
+    [ case Platform.succeeded span of
+        Platform.Succeeded -> "succeeded "
+        Platform.Failed -> "failed "
+        Platform.FailedWith _ -> "failed ",
+      Platform.name span,
+      case Platform.summary span of
+        Nothing -> ""
+        Just summary -> ": " ++ summary
+    ]
+
 -- Brick App boilerplate
 
 main :: Prelude.IO ()
@@ -530,36 +698,55 @@ handleEvent ::
 handleEvent pushMsg model event =
   case event of
     (Brick.VtyEvent vtyEvent) ->
-      case vtyEvent of
-        -- Quiting
-        Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
-        Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
-        -- Navigation
-        Vty.EvKey Vty.KEnter [] -> do
-          liftIO (pushMsg ShowDetails)
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'l') [] -> do
-          liftIO (pushMsg ShowDetails)
-          Brick.continue model
-        Vty.EvKey Vty.KBS [] -> do
-          liftIO (pushMsg Exit)
-          Brick.continue model
-        Vty.EvKey Vty.KEsc [] -> do
-          liftIO (pushMsg Exit)
-          Brick.continue model
-        Vty.EvKey (Vty.KChar 'h') [] -> do
-          liftIO (pushMsg Exit)
-          Brick.continue model
-        -- Clipboard
-        Vty.EvKey (Vty.KChar 'y') [] -> do
-          liftIO (pushMsg CopyDetails)
-          Brick.continue model
-        -- Fallback
-        _ ->
-          scroll
-            (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
-            model
-            |> andThen Brick.continue
+      case filter model of
+        EditFilter previous filterEditor ->
+          case vtyEvent of
+            Vty.EvKey Vty.KEsc [] -> do
+              liftIO (pushMsg (StopEditFilter previous))
+              Brick.continue model
+            Vty.EvKey Vty.KEnter [] -> do
+              liftIO (pushMsg (ApplyFilter filterEditor))
+              Brick.continue model
+            _ -> do
+              newEditor <- Edit.handleEditorEvent vtyEvent filterEditor
+              liftIO (pushMsg (HandleEditFilter previous newEditor))
+              Brick.continue model
+        _ -> case vtyEvent of
+          -- Quiting
+          Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
+          Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
+          -- Navigation
+          Vty.EvKey Vty.KEnter [] -> do
+            liftIO (pushMsg ShowDetails)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar 'l') [] -> do
+            liftIO (pushMsg ShowDetails)
+            Brick.continue model
+          Vty.EvKey Vty.KBS [] -> do
+            liftIO (pushMsg Exit)
+            Brick.continue model
+          Vty.EvKey Vty.KEsc [] -> do
+            liftIO (pushMsg Exit)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar 'h') [] -> do
+            liftIO (pushMsg Exit)
+            Brick.continue model
+          -- Clipboard
+          Vty.EvKey (Vty.KChar 'y') [] -> do
+            liftIO (pushMsg CopyDetails)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar '/') [] -> do
+            liftIO (pushMsg ShowFilter)
+            Brick.continue model
+          Vty.EvKey (Vty.KChar 'x') [] -> do
+            liftIO (pushMsg ClearFilter)
+            Brick.continue model
+          -- Fallback
+          _ ->
+            scroll
+              (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
+              model
+              |> andThen Brick.continue
     (Brick.MouseDown _ _ _ _) -> Brick.continue model
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
