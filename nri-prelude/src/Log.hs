@@ -88,7 +88,7 @@ warn message contexts =
   Stack.withFrozenCallStack
     log
     message
-    ReportAsSucceeded
+    ReportAsFailed
     (Context "level" Warn : contexts)
 
 -- | A log message when we can't continue with what we were trying to do
