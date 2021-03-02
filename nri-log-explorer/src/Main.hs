@@ -72,7 +72,7 @@ data Model = Model
 data Filter
   = NoFilter
   | HasFilter Text (List Text)
-  | Filtering (Maybe (Text, List Text)) (Edit.Editor Text Name)
+  | EditFilter (Maybe (Text, List Text)) (Edit.Editor Text Name)
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
@@ -96,9 +96,9 @@ data Msg
   | CopyDetails
   | ShowFilter
   | ClearFilter
-  | StopFiltering (Maybe (Text, List Text))
+  | StopEditFilter (Maybe (Text, List Text))
   | ApplyFilter (Edit.Editor Text Name)
-  | HandleFiltering (Maybe (Text, List Text)) (Edit.Editor Text Name)
+  | HandleEditFilter (Maybe (Text, List Text)) (Edit.Editor Text Name)
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -221,10 +221,10 @@ update model msg =
             model
               { filter =
                   case filter model of
-                    NoFilter -> Filtering Nothing editor
-                    Filtering previous _ -> Filtering previous editor
+                    NoFilter -> EditFilter Nothing editor
+                    EditFilter previous _ -> EditFilter previous editor
                     HasFilter first rest ->
-                      Filtering (Just (first, rest))
+                      EditFilter (Just (first, rest))
                         <| Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [Text.join " " (first : rest)] (Just 1)) editor
               }
     ClearFilter ->
@@ -236,7 +236,7 @@ update model msg =
                 filteredRootSpans = unfilterRootSpans model
               }
           _ -> model
-    StopFiltering maybePrevious ->
+    StopEditFilter maybePrevious ->
       continueAfterUserInteraction
         <| case maybePrevious of
           Just (first, rest) -> model {filter = HasFilter first rest, filteredRootSpans = filterRootSpans first rest model}
@@ -250,10 +250,10 @@ update model msg =
                 filteredRootSpans = unfilterRootSpans model
               }
           first : rest -> model {filter = HasFilter first rest}
-    HandleFiltering previous filterEditor ->
+    HandleEditFilter previous filterEditor ->
       continueAfterUserInteraction
         model
-          { filter = Filtering previous filterEditor,
+          { filter = EditFilter previous filterEditor,
             filteredRootSpans = case getFiltersFromEditor filterEditor of
               [] ->
                 unfilterRootSpans model
@@ -359,7 +359,7 @@ viewFilter filter =
             ),
           Border.hBorder
         ]
-    Filtering _ filterEditor ->
+    EditFilter _ filterEditor ->
       Brick.vBox
         [ Brick.hBox
             [ Brick.txt "Filter: ",
@@ -394,7 +394,7 @@ viewKey page =
       copy = "y: copy details"
       adjustFilter = "/: adjust filter"
       clearFilter = "x: clear filter"
-      stopFiltering = "esc: stop filtering"
+      stopEditFilter = "esc: stop filtering"
       applyFilter = "enter: apply filter"
       filter' = "/: filter"
       shortcuts =
@@ -402,14 +402,14 @@ viewKey page =
           NoDataPage filter ->
             case filter of
               NoFilter -> [exit]
-              Filtering _ _ -> [exit, stopFiltering]
+              EditFilter _ _ -> [exit, stopEditFilter]
               _ -> [exit, adjustFilter, clearFilter]
           RootSpanPage _ filter _ ->
             case filter of
               NoFilter -> [exit, updown, select, filter']
               HasFilter _ _ -> [exit, updown, select, adjustFilter, clearFilter]
-              Filtering (Just _) _ -> [stopFiltering, applyFilter]
-              Filtering Nothing _ -> [stopFiltering, applyFilter]
+              EditFilter (Just _) _ -> [stopEditFilter, applyFilter]
+              EditFilter Nothing _ -> [stopEditFilter, applyFilter]
           SpanBreakdownPage clipboardCommand _ _ ->
             [exit, updown, unselect]
               ++ ( case clipboardCommand of
@@ -699,17 +699,17 @@ handleEvent pushMsg model event =
   case event of
     (Brick.VtyEvent vtyEvent) ->
       case filter model of
-        Filtering previous filterEditor ->
+        EditFilter previous filterEditor ->
           case vtyEvent of
             Vty.EvKey Vty.KEsc [] -> do
-              liftIO (pushMsg (StopFiltering previous))
+              liftIO (pushMsg (StopEditFilter previous))
               Brick.continue model
             Vty.EvKey Vty.KEnter [] -> do
               liftIO (pushMsg (ApplyFilter filterEditor))
               Brick.continue model
             _ -> do
               newEditor <- Edit.handleEditorEvent vtyEvent filterEditor
-              liftIO (pushMsg (HandleFiltering previous newEditor))
+              liftIO (pushMsg (HandleEditFilter previous newEditor))
               Brick.continue model
         _ -> case vtyEvent of
           -- Quiting
