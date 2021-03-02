@@ -269,13 +269,13 @@ filterRootSpans first rest model =
   ListWidget.list
     RootSpanList
     ( List.filter
-        (\RootSpan {logSpan} -> List.all (\filter -> fuzzyMatch filter (filterSummary logSpan)) (first : rest))
+        ( \RootSpan {logSpan} ->
+            List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (first : rest)
+        )
         (allRootSpans model)
         |> Vector.fromList
     )
     1
-  where
-    fuzzyMatch x y = Fuzzy.match x y "" "" identity False /= Nothing
 
 getFiltersFromEditor :: Edit.Editor Text Name -> List Text
 getFiltersFromEditor editor =
