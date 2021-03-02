@@ -8,6 +8,7 @@ where
 import qualified Control.Concurrent.MVar as MVar
 import qualified Debug
 import qualified Expect
+import qualified Log.SqlQuery as SqlQuery
 import qualified Maybe
 import qualified MySQL
 import qualified MySQL.Test
@@ -92,7 +93,15 @@ constantValuesForVariableFields span =
             ( \details ->
                 details
                   |> Platform.renderTracingSpanDetails
-                    [ Platform.Renderer (\info -> Platform.toTracingSpanDetails info {Postgres.infoConnection = Postgres.UnixSocket "/mock/db/path.sock" "mock-db-name"})
+                    [ Platform.Renderer
+                        ( \info ->
+                            Platform.toTracingSpanDetails
+                              info
+                                { SqlQuery.host = Just "/mock/db/path.sock",
+                                  SqlQuery.port = Nothing,
+                                  SqlQuery.database = Just "mock-db-name"
+                                }
+                        )
                     ]
                   |> Maybe.withDefault details
                   |> Just

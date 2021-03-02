@@ -20,6 +20,7 @@ dependencies: &dependencies
 - mysql-haskell
 - network
 - nri-env-parser
+- nri-observability
 - nri-prelude
 - pcre-light
 - postgresql-simple
