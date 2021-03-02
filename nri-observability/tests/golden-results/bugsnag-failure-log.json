@@ -8,10 +8,6 @@
     "breadcrumbs": [],
     "metaData": {
         "custom": {
-            "triage": {
-                "advisory": "close the windows!",
-                "impact": "User is blocked from performing an action."
-            },
             "text": "Hi!",
             "number": 4
         },
