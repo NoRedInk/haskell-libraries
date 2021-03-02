@@ -353,3 +353,247 @@ instance
   fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r] =
     (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r)
   fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s,
+    MySQLColumn t
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s, decodeParam t)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s,
+    MySQLColumn t,
+    MySQLColumn u
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s, decodeParam t, decodeParam u)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s,
+    MySQLColumn t,
+    MySQLColumn u,
+    MySQLColumn v
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s, decodeParam t, decodeParam u, decodeParam v)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s,
+    MySQLColumn t,
+    MySQLColumn u,
+    MySQLColumn v,
+    MySQLColumn w
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s, decodeParam t, decodeParam u, decodeParam v, decodeParam w)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s,
+    MySQLColumn t,
+    MySQLColumn u,
+    MySQLColumn v,
+    MySQLColumn w,
+    MySQLColumn x
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s, decodeParam t, decodeParam u, decodeParam v, decodeParam w, decodeParam x)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s,
+    MySQLColumn t,
+    MySQLColumn u,
+    MySQLColumn v,
+    MySQLColumn w,
+    MySQLColumn x,
+    MySQLColumn y
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s, decodeParam t, decodeParam u, decodeParam v, decodeParam w, decodeParam x, decodeParam y)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
+
+instance
+  ( MySQLColumn a,
+    MySQLColumn b,
+    MySQLColumn c,
+    MySQLColumn d,
+    MySQLColumn e,
+    MySQLColumn f,
+    MySQLColumn g,
+    MySQLColumn h,
+    MySQLColumn i,
+    MySQLColumn j,
+    MySQLColumn k,
+    MySQLColumn l,
+    MySQLColumn m,
+    MySQLColumn n,
+    MySQLColumn o,
+    MySQLColumn p,
+    MySQLColumn q,
+    MySQLColumn r,
+    MySQLColumn s,
+    MySQLColumn t,
+    MySQLColumn u,
+    MySQLColumn v,
+    MySQLColumn w,
+    MySQLColumn x,
+    MySQLColumn y,
+    MySQLColumn z
+  ) =>
+  FromRow 'MultipleColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z)
+  where
+  fromRow _ [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z] =
+    (decodeParam a, decodeParam b, decodeParam c, decodeParam d, decodeParam e, decodeParam f, decodeParam g, decodeParam h, decodeParam i, decodeParam j, decodeParam k, decodeParam l, decodeParam m, decodeParam n, decodeParam o, decodeParam p, decodeParam q, decodeParam r, decodeParam s, decodeParam t, decodeParam u, decodeParam v, decodeParam w, decodeParam x, decodeParam y, decodeParam z)
+  fromRow _ _ = Exception.impureThrow UnexpectedAmountOfResultColumns
