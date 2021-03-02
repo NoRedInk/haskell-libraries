@@ -1,0 +1,35 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "some span"
+        }
+    ],
+    "breadcrumbs": [
+        {
+            "name": "some span",
+            "metaData": {
+                "query template": "SELECT name FROM ants WHERE id = ${id}",
+                "rows returned": "5.0",
+                "queried relation": "ants",
+                "database": "nri",
+                "database type": "PostgreSQL",
+                "sql operation": "SELECT",
+                "duration in milliseconds": "0.0",
+                "query": "Secret *****",
+                "host": "http://antsonline.com",
+                "port": "5432.0"
+            },
+            "type": "request",
+            "timestamp": "1970-01-01T00:00:00Z"
+        }
+    ],
+    "metaData": {
+        "request": {
+            "request id": "request-id-1234",
+            "response time in ms": 0,
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false
+}

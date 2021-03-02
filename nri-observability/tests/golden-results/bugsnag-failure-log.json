@@ -1,0 +1,25 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "log message"
+        }
+    ],
+    "breadcrumbs": [],
+    "metaData": {
+        "custom": {
+            "triage": {
+                "advisory": "close the windows!",
+                "impact": "User is blocked from performing an action."
+            },
+            "text": "Hi!",
+            "number": 4
+        },
+        "request": {
+            "request id": "request-id-1234",
+            "response time in ms": 0,
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false
+}

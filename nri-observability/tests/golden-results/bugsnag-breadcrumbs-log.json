@@ -1,0 +1,30 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "some span"
+        }
+    ],
+    "breadcrumbs": [
+        {
+            "name": "some span",
+            "metaData": {
+                "text": "Hi!",
+                "triage.impact": "User is blocked from performing an action.",
+                "duration in milliseconds": "0.0",
+                "triage.advisory": "close the windows!",
+                "number": "4.0"
+            },
+            "type": "log",
+            "timestamp": "1970-01-01T00:00:00Z"
+        }
+    ],
+    "metaData": {
+        "request": {
+            "request id": "request-id-1234",
+            "response time in ms": 0,
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false
+}

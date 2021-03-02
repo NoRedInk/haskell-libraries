@@ -1,0 +1,17 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "root span"
+        }
+    ],
+    "breadcrumbs": [],
+    "metaData": {
+        "request": {
+            "request id": "request-id-1234",
+            "response time in ms": 0,
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false
+}

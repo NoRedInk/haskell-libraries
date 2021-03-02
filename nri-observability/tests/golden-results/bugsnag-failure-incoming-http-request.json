@@ -1,0 +1,29 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "some span"
+        }
+    ],
+    "context": "GET /hats/:hat_id",
+    "breadcrumbs": [],
+    "metaData": {
+        "request": {
+            "http version": "1",
+            "path": "/hats/5",
+            "request id": "request-id-1234",
+            "query string": "?top=flat",
+            "response status": 500,
+            "response time in ms": 0,
+            "endpoint": "GET /hats/:hat_id",
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false,
+    "request": {
+        "httpMethod": "GET",
+        "headers": {
+            "Accept": "application/json"
+        }
+    }
+}

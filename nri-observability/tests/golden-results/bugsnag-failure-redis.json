@@ -1,0 +1,24 @@
+{
+    "exceptions": [
+        {
+            "stacktrace": [],
+            "errorClass": "some span"
+        }
+    ],
+    "breadcrumbs": [],
+    "metaData": {
+        "some span": {
+            "commands": [
+                "GET somekey"
+            ],
+            "host": "cache.noredink.com",
+            "port": 6379
+        },
+        "request": {
+            "request id": "request-id-1234",
+            "response time in ms": 0,
+            "megabytes allocated": 0
+        }
+    },
+    "unhandled": false
+}
