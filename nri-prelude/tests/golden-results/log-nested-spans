@@ -9,9 +9,9 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 83
+              , srcLocStartLine = 80
               , srcLocStartCol = 20
-              , srcLocEndLine = 83
+              , srcLocEndLine = 80
               , srcLocEndCol = 76
               }
           )
@@ -31,9 +31,9 @@
                       { srcLocPackage = "main"
                       , srcLocModule = "LogSpec"
                       , srcLocFile = "tests/LogSpec.hs"
-                      , srcLocStartLine = 82
+                      , srcLocStartLine = 79
                       , srcLocStartCol = 20
-                      , srcLocEndLine = 82
+                      , srcLocEndLine = 79
                       , srcLocEndCol = 84
                       }
                   )
@@ -53,13 +53,13 @@
                               { srcLocPackage = "main"
                               , srcLocModule = "LogSpec"
                               , srcLocFile = "tests/LogSpec.hs"
-                              , srcLocStartLine = 81
+                              , srcLocStartLine = 78
                               , srcLocStartCol = 15
-                              , srcLocEndLine = 81
+                              , srcLocEndLine = 78
                               , srcLocEndCol = 29
                               }
                           )
-                    , details = Just "{}"
+                    , details = Just "{\"level\":\"Info\"}"
                     , summary = Nothing
                     , succeeded = Succeeded
                     , allocated = 0

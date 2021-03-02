@@ -31,48 +31,45 @@ tests =
         spans
           |> Debug.toString
           |> Expect.equalToContentsOf "tests/golden-results/log-info",
-      test "`userIsAnnoyed` produces expected debugging info" <| \_ -> do
+      test "`debug` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
             (recordedTracingSpans, handler) <- newHandler
             _ <-
-              userIsAnnoyed
-                "the button didn't work"
-                "fix the button"
+              debug
+                "pressed the button"
                 [context "button" ("PRESS" :: Text)]
                 |> Task.attempt handler
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-user-is-annoyed",
-      test "`userIsPained` produces expected debugging info" <| \_ -> do
+          |> Expect.equalToContentsOf "tests/golden-results/debug",
+      test "`warn` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
             (recordedTracingSpans, handler) <- newHandler
             _ <-
-              userIsPained
+              warn
                 "user cut themselves on the modal"
-                "file modal's sharp edges"
                 [context "modal" ("SURPRISE!" :: Text)]
                 |> Task.attempt handler
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-user-is-pained",
-      test "`userIsBlocked` produces expected debugging info" <| \_ -> do
+          |> Expect.equalToContentsOf "tests/golden-results/warn",
+      test "`error` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
             (recordedTracingSpans, handler) <- newHandler
             _ <-
-              userIsBlocked
+              error
                 "door is blocked"
-                "find key"
                 [context "house number" (5 :: Int)]
                 |> Task.attempt handler
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-user-is-blocked",
+          |> Expect.equalToContentsOf "tests/golden-results/error",
       test "nested spans pruduce expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do

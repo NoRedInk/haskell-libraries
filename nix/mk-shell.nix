@@ -49,5 +49,6 @@ in pkgs.mkShell {
     pkgs.zlib
     pkgs.haskellPackages.ghcid
     pkgs.ormolu
+    pkgs.gnumake
   ];
 }

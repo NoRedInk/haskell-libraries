@@ -10,9 +10,7 @@
             "name": "some span",
             "metaData": {
                 "text": "Hi!",
-                "triage.impact": "User is blocked from performing an action.",
                 "duration in milliseconds": "0.0",
-                "triage.advisory": "close the windows!",
                 "number": "4.0"
             },
             "type": "log",

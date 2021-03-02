@@ -124,11 +124,7 @@ tests =
           { Platform.details =
               Log.LogContexts
                 [ Log.context "number" (4 :: Int),
-                  Log.context "text" ("Hi!" :: Text),
-                  Log.context
-                    "triage"
-                    ( Log.TriageInfo Log.UserBlocked "close the windows!"
-                    )
+                  Log.context "text" ("Hi!" :: Text)
                 ]
                 |> Platform.toTracingSpanDetails
                 |> Just

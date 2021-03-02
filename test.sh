@@ -13,9 +13,6 @@ if git status --porcelain | grep . ; then
 fi
 
 # Run Haskell tests
-hpack nri-prelude
-hpack nri-env-parser
-hpack nri-log-explorer
-hpack nri-observability
+make cabal
 cabal build all
 cabal test all
