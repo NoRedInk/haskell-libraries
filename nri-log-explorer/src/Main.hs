@@ -53,9 +53,10 @@ data Model = Model
     currentTime :: Time.UTCTime,
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
+    -- All root spans.
     allRootSpans :: List RootSpan,
     -- The actual data displayed.
-    rootSpans :: ListWidget.List Name RootSpan,
+    filteredRootSpans :: ListWidget.List Name RootSpan,
     -- If we're in the detail view for a root span, this will contain a copy of
     -- the data of that particular span in a format more suitable for this view.
     selectedRootSpan :: Maybe (ListWidget.List Name Span),
@@ -118,14 +119,14 @@ data Page
 
 toPage :: Model -> Page
 toPage model =
-  case (selectedRootSpan model, ListWidget.listSelectedElement (rootSpans model)) of
+  case (selectedRootSpan model, ListWidget.listSelectedElement (filteredRootSpans model)) of
     (_, Nothing) -> NoDataPage (filter model)
     (Just selected, Just (_, rootSpan)) ->
       SpanBreakdownPage
         (clipboardCommand model)
         rootSpan
         selected
-    (Nothing, Just _) -> RootSpanPage (currentTime model) (filter model) (rootSpans model)
+    (Nothing, Just _) -> RootSpanPage (currentTime model) (filter model) (filteredRootSpans model)
 
 withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
 withPage model fn =
@@ -133,8 +134,8 @@ withPage model fn =
     ( \newPage ->
         case newPage of
           NoDataPage filter -> model {selectedRootSpan = Nothing, filter}
-          RootSpanPage _ _ rootSpans ->
-            model {selectedRootSpan = Nothing, rootSpans = rootSpans}
+          RootSpanPage _ _ filteredRootSpans ->
+            model {selectedRootSpan = Nothing, filteredRootSpans}
           SpanBreakdownPage _ _ spans ->
             model {selectedRootSpan = Just spans}
     )
@@ -146,7 +147,7 @@ init clipboardCommand now =
     { currentTime = now,
       clipboardCommand = clipboardCommand,
       allRootSpans = [],
-      rootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
+      filteredRootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
       userDidSomething = False,
       filter = NoFilter
@@ -168,7 +169,7 @@ update model msg =
               newModel =
                 model
                   { allRootSpans = rootSpan : allRootSpans model,
-                    rootSpans = ListWidget.listInsert 0 rootSpan (rootSpans model)
+                    filteredRootSpans = ListWidget.listInsert 0 rootSpan (filteredRootSpans model)
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
@@ -232,28 +233,28 @@ update model msg =
           HasFilter _ _ ->
             model
               { filter = NoFilter,
-                rootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+                filteredRootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
               }
           _ -> model
     StopFiltering maybePrevious ->
       continueAfterUserInteraction
         <| case maybePrevious of
-          Just (first, rest) -> model {filter = HasFilter first rest, rootSpans = filterRootSpans first rest model}
-          Nothing -> model {filter = NoFilter, rootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1}
+          Just (first, rest) -> model {filter = HasFilter first rest, filteredRootSpans = filterRootSpans first rest model}
+          Nothing -> model {filter = NoFilter, filteredRootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1}
     ApplyFilter filterEditor ->
       continueAfterUserInteraction
         <| case getFiltersFromEditor filterEditor of
           [] ->
             model
               { filter = NoFilter,
-                rootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+                filteredRootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
               }
           first : rest -> model {filter = HasFilter first rest}
     HandleFiltering previous filterEditor ->
       continueAfterUserInteraction
         model
           { filter = Filtering previous filterEditor,
-            rootSpans = case getFiltersFromEditor filterEditor of
+            filteredRootSpans = case getFiltersFromEditor filterEditor of
               [] ->
                 ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
               first : rest -> filterRootSpans first rest model
@@ -288,8 +289,8 @@ scroll move model =
   withPage model <| \page -> do
     case page of
       NoDataPage filter -> Prelude.pure (NoDataPage filter)
-      RootSpanPage time filter rootSpans ->
-        move rootSpans
+      RootSpanPage time filter filteredRootSpans ->
+        move filteredRootSpans
           |> map (RootSpanPage time filter)
       SpanBreakdownPage cmd root spans ->
         move spans
