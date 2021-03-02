@@ -70,9 +70,6 @@ handlerIO = do
               )
           )
           |> Platform.doAnything doAnything,
-      -- Not a real locking implementation. Tests that run concurrent threads
-      -- might suffer from this. Punting on this until we have such tests.
-      Internal.doLock = \_ task -> task,
       Internal.namespace = "tests"
     }
     |> Prelude.pure

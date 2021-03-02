@@ -29,7 +29,6 @@ data Error
   | LibraryError Text
   | TransactionAborted
   | TimeoutError
-  | AcquiringLockTookTooLong
 
 instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
@@ -47,7 +46,6 @@ errorForHumans topError =
     DecodingFieldError err -> "Could not decode field of hash: " ++ err
     TransactionAborted -> "Transaction aborted. Watched key has changed."
     TimeoutError -> "Redis query took too long."
-    AcquiringLockTookTooLong -> "Had to wait too long to obtain a lock."
 
 -- | Render the commands a query is going to run for monitoring and debugging
 -- purposes. Values we write are replaced with "*****" because they might
@@ -138,7 +136,6 @@ data Handler = Handler
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doWatch :: [Text] -> Task Error (),
-    doLock :: forall e a. Lock e a -> Task e a -> Task e a,
     namespace :: Text
   }
 
@@ -258,17 +255,6 @@ maybesToDict keys values =
             Just v -> Just (key, v)
       )
     |> Dict.fromList
-
-data Lock e a = Lock
-  { -- | The redis key to use for the lock.
-    lockKey :: Text,
-    -- | The maximum amount of time the locked operation is allowed to take.
-    lockTimeoutInMs :: Float,
-    -- | The maximum amount of time to wait for a lock to become available.
-    lockRetryDurationInMs :: Int,
-    -- | What to do when obtaining a lock fails.
-    lockHandleError :: Error -> Task e a
-  }
 
 traceQuery :: Stack.HasCallStack => [Text] -> Text -> Maybe Int -> Task e a -> Task e a
 traceQuery commands host port task =
