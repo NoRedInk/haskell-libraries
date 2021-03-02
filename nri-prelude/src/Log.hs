@@ -14,10 +14,6 @@ module Log
     info,
     warn,
     error,
-    userIsAnnoyed,
-    userIsConfused,
-    userIsPained,
-    userIsBlocked,
     withContext,
     context,
 
@@ -29,8 +25,6 @@ module Log
     -- * For use in observability modules
     Context (..),
     LogContexts (..),
-    TriageInfo (..),
-    Impact (..),
   )
 where
 
@@ -105,35 +99,6 @@ error message contexts =
     message
     ReportAsFailed
     (Context "level" Error : contexts)
-
--- | A log message when the user is annoyed, but not blocked.
---
--- > Log.userIsAnnoyed
--- >   "We poked the user unnecessarily."
--- >   "Try to stop poking the user."
--- >   [ Log.context "The type of poking stick" poker ]
-userIsAnnoyed :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
-userIsAnnoyed message advisory contexts =
-  let triage = TriageInfo UserAnnoyed advisory
-   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
-
--- | Like 'userIsAnnoyed', but when the user is userIsConfused.
-userIsConfused :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
-userIsConfused message advisory contexts =
-  let triage = TriageInfo UserConfused advisory
-   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
-
--- | Like 'userIsAnnoyed', but when the user is in pain.
-userIsPained :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
-userIsPained message advisory contexts =
-  let triage = TriageInfo UserInPain advisory
-   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
-
--- | Like 'userIsAnnoyed', but when the user is blocked.
-userIsBlocked :: Stack.HasCallStack => Text -> Text -> [Context] -> Task e ()
-userIsBlocked message advisory contexts =
-  let triage = TriageInfo UserBlocked advisory
-   in Stack.withFrozenCallStack error message (Context "triage" triage : contexts)
 
 -- | Mark a block of code as a logical unit by giving it a name. This name will
 -- be used in logs and monitoring dashboards, so use this function to help
@@ -262,38 +227,6 @@ data LogLevel
   deriving (Generic)
 
 instance Aeson.ToJSON LogLevel
-
--- | A logged message for log levels warning and above. Because these levels
--- indicate a (potential) problem we want to provide some additional data that
--- would help a triager figure out what next steps to take.
-data TriageInfo = TriageInfo
-  { impact :: Impact,
-    advisory :: Text
-  }
-  deriving (Generic)
-
-instance Aeson.ToJSON TriageInfo
-
--- | Classification of the levels of impact an issue might have on end-users.
-data Impact
-  = UserAnnoyed
-  | UserConfused
-  | UserInPain
-  | UserBlocked
-  deriving (Show)
-
-instance Aeson.ToJSON Impact where
-  toJSON = Aeson.toJSON << impactToText
-
-  toEncoding = Aeson.toEncoding << impactToText
-
-impactToText :: Impact -> Text
-impactToText kind =
-  case kind of
-    UserAnnoyed -> "This is causing inconveniences to users but they will be able to achieve want they want."
-    UserBlocked -> "User is blocked from performing an action."
-    UserConfused -> "The UI did something unexpected and it's unclear why."
-    UserInPain -> "This is causing pain to users and workaround is not obvious."
 
 -- ReportAsFailed marks the request as a failure in logging, but has no impact on the resulting Task. E.g. will not trigger a 500 error but will report an error to, e.g. BugSnag.
 data ReportStatus = ReportAsFailed | ReportAsSucceeded
