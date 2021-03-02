@@ -233,21 +233,21 @@ update model msg =
           HasFilter _ _ ->
             model
               { filter = NoFilter,
-                filteredRootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+                filteredRootSpans = unfilterRootSpans model
               }
           _ -> model
     StopFiltering maybePrevious ->
       continueAfterUserInteraction
         <| case maybePrevious of
           Just (first, rest) -> model {filter = HasFilter first rest, filteredRootSpans = filterRootSpans first rest model}
-          Nothing -> model {filter = NoFilter, filteredRootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1}
+          Nothing -> model {filter = NoFilter, filteredRootSpans = unfilterRootSpans model}
     ApplyFilter filterEditor ->
       continueAfterUserInteraction
         <| case getFiltersFromEditor filterEditor of
           [] ->
             model
               { filter = NoFilter,
-                filteredRootSpans = ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+                filteredRootSpans = unfilterRootSpans model
               }
           first : rest -> model {filter = HasFilter first rest}
     HandleFiltering previous filterEditor ->
@@ -256,9 +256,13 @@ update model msg =
           { filter = Filtering previous filterEditor,
             filteredRootSpans = case getFiltersFromEditor filterEditor of
               [] ->
-                ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+                unfilterRootSpans model
               first : rest -> filterRootSpans first rest model
           }
+
+unfilterRootSpans :: Model -> ListWidget.List Name RootSpan
+unfilterRootSpans model =
+  ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
 
 filterRootSpans :: Text -> List Text -> Model -> ListWidget.List Name RootSpan
 filterRootSpans first rest model =
