@@ -1,0 +1,173 @@
+cabal-version: 1.18
+
+-- This file has been generated from package.yaml by hpack version 0.34.2.
+--
+-- see: https://github.com/sol/hpack
+
+name:           nri-prelude
+version:        0.4.0.0
+synopsis:       A Prelude inspired by the Elm programming language
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
+category:       Web
+homepage:       https://github.com/NoRedInk/haskell-libraries#readme
+bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
+author:         NoRedInk
+maintainer:     haskell-open-source@noredink.com
+copyright:      2021 NoRedInk Corp.
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-doc-files:
+    README.md
+    LICENSE
+    CHANGELOG.md
+    licenses/ELM_CORE_LICENSE
+    licenses/ELM_TEST_LICENSE
+
+source-repository head
+  type: git
+  location: https://github.com/NoRedInk/haskell-libraries
+  subdir: nri-prelude
+
+library
+  exposed-modules:
+      Array
+      Basics
+      Bitwise
+      Char
+      Debug
+      Dict
+      Expect
+      Fuzz
+      List
+      Log
+      Maybe
+      NriPrelude
+      NriPrelude.Plugin
+      Platform
+      Process
+      Result
+      Set
+      Task
+      Test
+      Text
+      Tuple
+  other-modules:
+      Internal.Shortcut
+      Internal.Terminal
+      NriPrelude.Plugin.GhcVersionDependent
+      Platform.DevLog
+      Platform.DoAnything
+      Platform.Internal
+      Test.Internal
+      Test.Reporter.ExitCode
+      Test.Reporter.Junit
+      Test.Reporter.Logfile
+      Test.Reporter.Stdout
+      Paths_nri_prelude
+  hs-source-dirs:
+      src
+  default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
+  build-depends:
+      aeson >=1.4.6.0 && <1.6
+    , aeson-pretty >=0.8.0 && <0.9
+    , ansi-terminal >=0.9.1 && <0.12
+    , async >=2.2.2 && <2.3
+    , auto-update >=0.1.6 && <0.2
+    , base >=4.12.0.0 && <4.15
+    , bytestring >=0.10.8.2 && <0.12
+    , containers >=0.6.0.1 && <0.7
+    , directory >=1.3.3.0 && <1.4
+    , exceptions >=0.10.4 && <0.11
+    , filepath >=1.4.2.1 && <1.5
+    , ghc >=8.6.1 && <8.11
+    , hedgehog >=1.0.2 && <1.1
+    , junit-xml >=0.1.0.0 && <0.2.0.0
+    , pretty-diff >=0.4.0.2 && <0.5
+    , pretty-show >=1.9.5 && <1.11
+    , safe-exceptions >=0.1.7.0 && <1.3
+    , terminal-size >=0.3.2.1 && <0.4
+    , text >=1.2.3.1 && <1.3
+    , time >=1.8.0.2 && <1.12
+    , vector >=0.12.1.2 && <0.13
+  if os(linux)
+    ghc-options: -split-sections
+  default-language: Haskell2010
+
+test-suite tests
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      ArraySpec
+      BitwiseSpec
+      DebugSpec
+      DictSpec
+      LogSpec
+      PlatformSpec
+      SetSpec
+      TestSpec
+      TextSpec
+      Array
+      Basics
+      Bitwise
+      Char
+      Debug
+      Dict
+      Expect
+      Fuzz
+      Internal.Shortcut
+      Internal.Terminal
+      List
+      Log
+      Maybe
+      NriPrelude
+      NriPrelude.Plugin
+      NriPrelude.Plugin.GhcVersionDependent
+      Platform
+      Platform.DevLog
+      Platform.DoAnything
+      Platform.Internal
+      Process
+      Result
+      Set
+      Task
+      Test
+      Test.Internal
+      Test.Reporter.ExitCode
+      Test.Reporter.Junit
+      Test.Reporter.Logfile
+      Test.Reporter.Stdout
+      Text
+      Tuple
+      Paths_nri_prelude
+  hs-source-dirs:
+      tests
+      src
+  default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators ExtendedDefaultRules
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
+  build-depends:
+      aeson >=1.4.6.0 && <1.6
+    , aeson-pretty >=0.8.0 && <0.9
+    , ansi-terminal >=0.9.1 && <0.12
+    , async >=2.2.2 && <2.3
+    , auto-update >=0.1.6 && <0.2
+    , base >=4.12.0.0 && <4.15
+    , bytestring >=0.10.8.2 && <0.12
+    , containers >=0.6.0.1 && <0.7
+    , directory >=1.3.3.0 && <1.4
+    , exceptions >=0.10.4 && <0.11
+    , filepath >=1.4.2.1 && <1.5
+    , ghc >=8.6.1 && <8.11
+    , hedgehog >=1.0.2 && <1.1
+    , junit-xml >=0.1.0.0 && <0.2.0.0
+    , pretty-diff >=0.4.0.2 && <0.5
+    , pretty-show >=1.9.5 && <1.11
+    , safe-exceptions >=0.1.7.0 && <1.3
+    , terminal-size >=0.3.2.1 && <0.4
+    , text >=1.2.3.1 && <1.3
+    , time >=1.8.0.2 && <1.12
+    , vector >=0.12.1.2 && <0.13
+  if os(linux)
+    ghc-options: -split-sections
+  default-language: Haskell2010

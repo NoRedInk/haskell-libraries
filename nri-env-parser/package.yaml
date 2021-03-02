@@ -23,25 +23,25 @@ library:
     - Environment
   source-dirs: src
 default-extensions:
-- DataKinds
-- DeriveGeneric
-- FlexibleContexts
-- FlexibleInstances
-- GeneralizedNewtypeDeriving
-- MultiParamTypeClasses
-- NamedFieldPuns
-- NoImplicitPrelude
-- OverloadedStrings
-- PartialTypeSignatures
-- ScopedTypeVariables
-- Strict
-- TypeOperators
+  - DataKinds
+  - DeriveGeneric
+  - FlexibleContexts
+  - FlexibleInstances
+  - GeneralizedNewtypeDeriving
+  - MultiParamTypeClasses
+  - NamedFieldPuns
+  - NoImplicitPrelude
+  - OverloadedStrings
+  - PartialTypeSignatures
+  - ScopedTypeVariables
+  - Strict
+  - TypeOperators
 ghc-options:
-- -Wall
-- -Wcompat
-- -Widentities
-- -Wincomplete-record-updates
-- -Wpartial-fields
-- -Wredundant-constraints
-- -Wincomplete-uni-patterns
-- -fplugin=NriPrelude.Plugin
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wpartial-fields
+  - -Wredundant-constraints
+  - -Wincomplete-uni-patterns
+  - -fplugin=NriPrelude.Plugin
