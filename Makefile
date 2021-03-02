@@ -1,4 +1,9 @@
-all: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal
+all: cabal
+
+cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal
+
+nri-observability/nri-observability.cabal: nri-observability/package.yaml
+	hpack nri-observability
 
 nri-prelude/nri-prelude.cabal: nri-prelude/package.yaml
 	hpack nri-prelude
