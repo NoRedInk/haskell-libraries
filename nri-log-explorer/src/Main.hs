@@ -29,6 +29,7 @@ import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
 import qualified Data.Text.Zipper as TZ
 import qualified Data.Time as Time
+import qualified Data.Vector
 import qualified Data.Vector as Vector
 import qualified Data.Version as Version
 import qualified GHC.IO.Encoding
@@ -54,7 +55,7 @@ data Model = Model
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
     -- All root spans.
-    allRootSpans :: List RootSpan,
+    allRootSpans :: Data.Vector.Vector RootSpan,
     -- The actual data displayed.
     filteredRootSpans :: ListWidget.List Name RootSpan,
     -- If we're in the detail view for a root span, this will contain a copy of
@@ -146,7 +147,7 @@ init clipboardCommand now =
   Model
     { currentTime = now,
       clipboardCommand = clipboardCommand,
-      allRootSpans = [],
+      allRootSpans = Data.Vector.empty,
       filteredRootSpans = ListWidget.list RootSpanList Prelude.mempty 1,
       selectedRootSpan = Nothing,
       userDidSomething = False,
@@ -168,7 +169,7 @@ update model msg =
           let rootSpan = RootSpan date span
               newModel =
                 model
-                  { allRootSpans = rootSpan : allRootSpans model,
+                  { allRootSpans = Data.Vector.cons rootSpan (allRootSpans model),
                     filteredRootSpans = ListWidget.listInsert 0 rootSpan (filteredRootSpans model)
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
@@ -262,18 +263,17 @@ update model msg =
 
 unfilterRootSpans :: Model -> ListWidget.List Name RootSpan
 unfilterRootSpans model =
-  ListWidget.list RootSpanList (Vector.fromList (allRootSpans model)) 1
+  ListWidget.list RootSpanList (allRootSpans model) 1
 
 filterRootSpans :: Text -> List Text -> Model -> ListWidget.List Name RootSpan
 filterRootSpans first rest model =
   ListWidget.list
     RootSpanList
-    ( List.filter
+    ( Data.Vector.filter
         ( \RootSpan {logSpan} ->
             List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (first : rest)
         )
         (allRootSpans model)
-        |> Vector.fromList
     )
     1
 
