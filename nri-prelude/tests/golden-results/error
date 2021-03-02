@@ -1,23 +1,21 @@
 [ TracingSpan
-    { name = "the button didn't work"
+    { name = "door is blocked"
     , started = MonotonicTime { inMicroseconds = 0 }
     , finished = MonotonicTime { inMicroseconds = 0 }
     , frame =
         Just
-          ( "userIsAnnoyed"
+          ( "error"
           , SrcLoc
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 39
+              , srcLocStartLine = 65
               , srcLocStartCol = 15
-              , srcLocEndLine = 42
-              , srcLocEndCol = 53
+              , srcLocEndLine = 67
+              , srcLocEndCol = 52
               }
           )
-    , details =
-        Just
-          "{\"triage\":{\"advisory\":\"fix the button\",\"impact\":\"This is causing inconveniences to users but they will be able to achieve want they want.\"},\"button\":\"PRESS\"}"
+    , details = Just "{\"level\":\"Error\",\"house number\":5}"
     , summary = Nothing
     , succeeded = Failed
     , allocated = 0
