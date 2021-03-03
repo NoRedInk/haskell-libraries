@@ -98,7 +98,6 @@ data Msg
   | CopyDetails
   | ShowFilter
   | ClearFilter
-  | HandleEditFilter (Maybe (Text, List Text)) (Edit.Editor Text Name)
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -223,13 +222,13 @@ update model msg =
         )
         |> andThen continueAfterUserInteraction
     Cancel ->
-      case filter model of
-        EditFilter previous _ ->
+      case toMode model of
+        EditMode previous _ ->
           continueAfterUserInteraction
             <| case previous of
               Just (first, rest) -> model {filter = HasFilter first rest, filteredRootSpans = filterRootSpans first rest model}
               Nothing -> model {filter = NoFilter, filteredRootSpans = unfilterRootSpans model}
-        _ ->
+        NormalMode ->
           model
             { selectedRootSpan = Nothing
             }
@@ -276,15 +275,6 @@ update model msg =
                 filteredRootSpans = unfilterRootSpans model
               }
           _ -> model
-    HandleEditFilter previous filterEditor ->
-      continueAfterUserInteraction
-        model
-          { filter = EditFilter previous filterEditor,
-            filteredRootSpans = case getFiltersFromEditor filterEditor of
-              [] ->
-                unfilterRootSpans model
-              first : rest -> filterRootSpans first rest model
-          }
 
 unfilterRootSpans :: Model -> ListWidget.List Name RootSpan
 unfilterRootSpans model =
@@ -723,52 +713,64 @@ handleEvent ::
   Brick.EventM Name (Brick.Next Model)
 handleEvent pushMsg model event =
   case event of
-    (Brick.VtyEvent vtyEvent) ->
-      case vtyEvent of
+    (Brick.VtyEvent vtyEvent) -> do
+      case (toMode model, vtyEvent) of
         -- Quitting
-        Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
-        Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
+        (NormalMode, Vty.EvKey (Vty.KChar 'q') []) -> do Brick.halt model
+        (_, Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl]) -> Brick.halt model
         -- Navigation
-        Vty.EvKey Vty.KEnter [] -> do
+        (_, Vty.EvKey Vty.KEnter []) -> do
           liftIO (pushMsg Confirm)
           Brick.continue model
-        Vty.EvKey (Vty.KChar 'l') [] -> do
+        (NormalMode, Vty.EvKey (Vty.KChar 'l') []) -> do
           liftIO (pushMsg ShowDetails)
           Brick.continue model
-        -- Vty.EvKey Vty.KBS [] -> do
-        --   liftIO (pushMsg Cancel)
-        --   Brick.continue model
-        Vty.EvKey Vty.KEsc [] -> do
+        (NormalMode, Vty.EvKey Vty.KBS []) -> do
           liftIO (pushMsg Cancel)
           Brick.continue model
-        Vty.EvKey (Vty.KChar 'h') [] -> do
+        (_, Vty.EvKey Vty.KEsc []) -> do
+          liftIO (pushMsg Cancel)
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar 'h') []) -> do
           liftIO (pushMsg Cancel)
           Brick.continue model
         -- Clipboard
-        Vty.EvKey (Vty.KChar 'y') [] -> do
+        (NormalMode, Vty.EvKey (Vty.KChar 'y') []) -> do
           liftIO (pushMsg CopyDetails)
           Brick.continue model
-        Vty.EvKey (Vty.KChar '/') [] -> do
+        (NormalMode, Vty.EvKey (Vty.KChar '/') []) -> do
           liftIO (pushMsg ShowFilter)
           Brick.continue model
-        Vty.EvKey (Vty.KChar 'x') [] -> do
+        (NormalMode, Vty.EvKey (Vty.KChar 'x') []) -> do
           liftIO (pushMsg ClearFilter)
           Brick.continue model
         -- Fallback
+        (EditMode previous editor, _) -> do
+          newEditor <- Edit.handleEditorEvent vtyEvent editor
+          Brick.continue
+            model
+              { filter = EditFilter previous newEditor,
+                filteredRootSpans =
+                  case getFiltersFromEditor newEditor of
+                    [] -> unfilterRootSpans model
+                    first : rest -> filterRootSpans first rest model
+              }
         _ ->
-          case filter model of
-            EditFilter previous filterEditor -> do
-              newEditor <- Edit.handleEditorEvent vtyEvent filterEditor
-              liftIO (pushMsg (HandleEditFilter previous newEditor))
-              Brick.continue model
-            _ ->
-              scroll
-                (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
-                model
-                |> andThen Brick.continue
+          scroll
+            (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
+            model
+            |> andThen Brick.continue
     (Brick.MouseDown _ _ _ _) -> Brick.continue model
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
+
+data Mode = NormalMode | EditMode (Maybe (Text, List Text)) (Edit.Editor Text Name)
+
+toMode :: Model -> Mode
+toMode model =
+  case filter model of
+    EditFilter previous editor -> EditMode previous editor
+    _ -> NormalMode
 
 updateTime :: (Time.UTCTime -> Prelude.IO ()) -> Prelude.IO ()
 updateTime withTime = do
