@@ -394,7 +394,7 @@ viewFilter filter =
             ( Brick.txt "Filter: " :
               ( first :
                 rest
-                  |> List.map (Brick.withAttr "selected" << Brick.txt)
+                  |> List.map (Brick.withAttr "underlined" << Brick.txt)
                   |> List.intersperse (Brick.txt " ")
               )
             ),
@@ -728,7 +728,8 @@ attrMap :: Brick.AttrMap
 attrMap =
   Brick.attrMap
     Vty.defAttr
-    [ ("selected", Vty.withStyle Vty.defAttr Vty.reverseVideo)
+    [ ("selected", Vty.withStyle Vty.defAttr Vty.reverseVideo),
+      ("underlined", Vty.withStyle Vty.defAttr Vty.underline)
     ]
 
 handleEvent ::
