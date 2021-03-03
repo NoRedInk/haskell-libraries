@@ -92,7 +92,8 @@ data Span = Span
 data Msg
   = AddRootSpan ByteString.ByteString
   | ShowDetails
-  | Exit
+  | Confirm
+  | Cancel
   | SetCurrentTime Time.UTCTime
   | CopyDetails
   | ShowFilter
@@ -198,11 +199,43 @@ update model msg =
                       |> Prelude.pure
         )
         |> andThen continueAfterUserInteraction
-    Exit ->
-      model
-        { selectedRootSpan = Nothing
-        }
-        |> continueAfterUserInteraction
+    Confirm ->
+      withPage
+        model
+        ( \page ->
+            case page of
+              NoDataPage _ -> Prelude.pure page
+              SpanBreakdownPage _ _ _ -> Prelude.pure page
+              RootSpanPage time (EditFilter _ filterEditor) spans ->
+                Prelude.pure
+                  <| case getFiltersFromEditor filterEditor of
+                    [] ->
+                      RootSpanPage time NoFilter (unfilterRootSpans model)
+                    first : rest ->
+                      RootSpanPage time (HasFilter first rest) spans
+              RootSpanPage _ _ spans ->
+                case ListWidget.listSelectedElement spans of
+                  Nothing -> Prelude.pure page
+                  Just (currentIndex, currentSpan) ->
+                    SpanBreakdownPage
+                      (clipboardCommand model)
+                      currentSpan
+                      (currentSpan |> logSpan |> toFlatList currentIndex)
+                      |> Prelude.pure
+        )
+        |> andThen continueAfterUserInteraction
+    Cancel ->
+      case filter model of
+        EditFilter previous _ ->
+          continueAfterUserInteraction
+            <| case previous of
+              Just (first, rest) -> model {filter = HasFilter first rest, filteredRootSpans = filterRootSpans first rest model}
+              Nothing -> model {filter = NoFilter, filteredRootSpans = unfilterRootSpans model}
+        _ ->
+          model
+            { selectedRootSpan = Nothing
+            }
+            |> continueAfterUserInteraction
     CopyDetails -> do
       case toPage model of
         NoDataPage _ -> Prelude.pure ()
@@ -706,55 +739,48 @@ handleEvent ::
 handleEvent pushMsg model event =
   case event of
     (Brick.VtyEvent vtyEvent) ->
-      case filter model of
-        EditFilter previous filterEditor ->
-          case vtyEvent of
-            Vty.EvKey Vty.KEsc [] -> do
-              liftIO (pushMsg (StopEditFilter previous))
-              Brick.continue model
-            Vty.EvKey Vty.KEnter [] -> do
-              liftIO (pushMsg (ApplyFilter filterEditor))
-              Brick.continue model
-            _ -> do
+      case vtyEvent of
+        -- Quitting
+        Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
+        Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
+        -- Navigation
+        Vty.EvKey Vty.KEnter [] -> do
+          liftIO (pushMsg Confirm)
+          Brick.continue model
+        Vty.EvKey (Vty.KChar 'l') [] -> do
+          liftIO (pushMsg ShowDetails)
+          Brick.continue model
+        -- Vty.EvKey Vty.KBS [] -> do
+        --   liftIO (pushMsg Cancel)
+        --   Brick.continue model
+        Vty.EvKey Vty.KEsc [] -> do
+          liftIO (pushMsg Cancel)
+          Brick.continue model
+        Vty.EvKey (Vty.KChar 'h') [] -> do
+          liftIO (pushMsg Cancel)
+          Brick.continue model
+        -- Clipboard
+        Vty.EvKey (Vty.KChar 'y') [] -> do
+          liftIO (pushMsg CopyDetails)
+          Brick.continue model
+        Vty.EvKey (Vty.KChar '/') [] -> do
+          liftIO (pushMsg ShowFilter)
+          Brick.continue model
+        Vty.EvKey (Vty.KChar 'x') [] -> do
+          liftIO (pushMsg ClearFilter)
+          Brick.continue model
+        -- Fallback
+        _ ->
+          case filter model of
+            EditFilter previous filterEditor -> do
               newEditor <- Edit.handleEditorEvent vtyEvent filterEditor
               liftIO (pushMsg (HandleEditFilter previous newEditor))
               Brick.continue model
-        _ -> case vtyEvent of
-          -- Quiting
-          Vty.EvKey (Vty.KChar 'q') [] -> do Brick.halt model
-          Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> Brick.halt model
-          -- Navigation
-          Vty.EvKey Vty.KEnter [] -> do
-            liftIO (pushMsg ShowDetails)
-            Brick.continue model
-          Vty.EvKey (Vty.KChar 'l') [] -> do
-            liftIO (pushMsg ShowDetails)
-            Brick.continue model
-          Vty.EvKey Vty.KBS [] -> do
-            liftIO (pushMsg Exit)
-            Brick.continue model
-          Vty.EvKey Vty.KEsc [] -> do
-            liftIO (pushMsg Exit)
-            Brick.continue model
-          Vty.EvKey (Vty.KChar 'h') [] -> do
-            liftIO (pushMsg Exit)
-            Brick.continue model
-          -- Clipboard
-          Vty.EvKey (Vty.KChar 'y') [] -> do
-            liftIO (pushMsg CopyDetails)
-            Brick.continue model
-          Vty.EvKey (Vty.KChar '/') [] -> do
-            liftIO (pushMsg ShowFilter)
-            Brick.continue model
-          Vty.EvKey (Vty.KChar 'x') [] -> do
-            liftIO (pushMsg ClearFilter)
-            Brick.continue model
-          -- Fallback
-          _ ->
-            scroll
-              (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
-              model
-              |> andThen Brick.continue
+            _ ->
+              scroll
+                (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
+                model
+                |> andThen Brick.continue
     (Brick.MouseDown _ _ _ _) -> Brick.continue model
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
