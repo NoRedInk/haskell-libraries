@@ -98,8 +98,6 @@ data Msg
   | CopyDetails
   | ShowFilter
   | ClearFilter
-  | StopEditFilter (Maybe (Text, List Text))
-  | ApplyFilter (Edit.Editor Text Name)
   | HandleEditFilter (Maybe (Text, List Text)) (Edit.Editor Text Name)
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
@@ -278,20 +276,6 @@ update model msg =
                 filteredRootSpans = unfilterRootSpans model
               }
           _ -> model
-    StopEditFilter maybePrevious ->
-      continueAfterUserInteraction
-        <| case maybePrevious of
-          Just (first, rest) -> model {filter = HasFilter first rest, filteredRootSpans = filterRootSpans first rest model}
-          Nothing -> model {filter = NoFilter, filteredRootSpans = unfilterRootSpans model}
-    ApplyFilter filterEditor ->
-      continueAfterUserInteraction
-        <| case getFiltersFromEditor filterEditor of
-          [] ->
-            model
-              { filter = NoFilter,
-                filteredRootSpans = unfilterRootSpans model
-              }
-          first : rest -> model {filter = HasFilter first rest}
     HandleEditFilter previous filterEditor ->
       continueAfterUserInteraction
         model
