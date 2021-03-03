@@ -1,19 +1,27 @@
 # Unreleased next version
 
-Enhancements:
+# 0.5.0.0
 
-- Improved diff representation in failing tests.
-- Ported floating point comparison expectations from elm-test.
+### Breaking changes:
+
+- replace Log.userIs\* functions with more standard debug, info, warn, error (#48)
+
+### Enhancements:
+
+- Improved diff representation in failing tests. (#40, #41, #43, #44)
+- Ported floating point comparison expectations from elm-test. (#41, #42)
+  - FloatingPointTolerance (..), within, notWithin
+- Expect.equalToContentsOf now includes proper stack traces (is this a bugfix? Let's call it an enhancement.) (#40)
 
 # 0.4.0.0
 
-Breaking changes:
+### Breaking changes:
 
 - `Expect.Task` has been removed. Most of it's functionality has been moved into `Expect`.
 - `Test.task` has been removed. Regular `Test.test` now supports monadic-style test writing.
 - `Expect.concat` has been removed. `do`-notation can now be used to run multiple expectations.
 
-Enhancements:
+### Enhancements:
 
 - Test failure diffs now look much nicer if they contain multi-line output.
 - Test failures now show a snippet of the source code around the location of the failure.
@@ -22,21 +30,21 @@ Enhancements:
 
 # 0.3.1.0
 
-Enhancements:
+### Enhancements:
 
 - `Platform.summary` can be used to decorate tracing spans with a text summary for use in dev tooling.
 - `Platform.writeSpanToDevLog` can be used to write a span for consumption by the new `log-explorer` tool.
 
 # 0.3.0.0
 
-Breaking changs:
+### Breaking changes:
 
 - `Test.fromTestTree` has been removed.
 - `Fuzz.Fuzzer` is now an opague type and no a synonomy for `Hedgehog.Gen`.
 - `Expect.Task.TestFailure` renamed to `Expect.Task.failure`.
 - `Test.Runner.Tasy.main` renamed to `Test.run`.
 
-Enhancements:
+### Enhancements:
 
 - Test reports now show source locations of failing tests.
 - `Fuzz` module has been extended and now covers almost the entire API of its Elm counterpart.

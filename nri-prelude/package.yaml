@@ -2,7 +2,7 @@ name: nri-prelude
 synopsis: A Prelude inspired by the Elm programming language
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
 author: NoRedInk
-version: 0.4.0.0
+version: 0.5.0.0
 maintainer: haskell-open-source@noredink.com
 copyright: 2021 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-prelude
@@ -83,12 +83,6 @@ ghc-options:
   - -Wpartial-fields
   - -Wredundant-constraints
   - -Wincomplete-uni-patterns
-when:
-  - condition: os(linux)
-    ghc-options:
-      # Make it possible for binaries based on this package to only contain the
-      # parts they need. This option isn't available on all platforms.
-      - -split-sections
 tests:
   tests:
     dependencies: *dependencies

@@ -15,6 +15,10 @@ if [ "$1" = "nri-log-explorer" ]; then
   fail "no need to publish nri-log-explorer, because it's a tool rather than a library."
 fi
 
+if git status --porcelain | grep . ; then
+  fail "Stash any changes before starting the release script."
+fi
+
 pushd "$1"
 
 name=$(grep name: < package.yaml | awk '{print $2}')
@@ -36,6 +40,9 @@ git tag -l --points-at HEAD | grep "^$name-$version$" > /dev/null \
   || fail "No git tag for current version exists. Please create tag with name: $name-$version"
 
 hpack
+if git status --porcelain | grep . ; then
+  fail "Cabal file changed after running hpack. Check in latest cabal file before releasing."
+fi
 cabal sdist -o - > "$bundle"
 cabal upload --publish "$bundle"
 # Documentation upload doesn't seem to work, not sure why. If you find a fix
