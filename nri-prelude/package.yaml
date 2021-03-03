@@ -83,12 +83,6 @@ ghc-options:
   - -Wpartial-fields
   - -Wredundant-constraints
   - -Wincomplete-uni-patterns
-when:
-  - condition: os(linux)
-    ghc-options:
-      # Make it possible for binaries based on this package to only contain the
-      # parts they need. This option isn't available on all platforms.
-      - -split-sections
 tests:
   tests:
     dependencies: *dependencies
