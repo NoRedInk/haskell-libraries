@@ -135,8 +135,8 @@ withPage model fn =
     ( \newPage ->
         case newPage of
           NoDataPage filter -> model {selectedRootSpan = Nothing, filter}
-          RootSpanPage _ _ filteredRootSpans ->
-            model {selectedRootSpan = Nothing, filteredRootSpans}
+          RootSpanPage _ filter filteredRootSpans ->
+            model {selectedRootSpan = Nothing, filter, filteredRootSpans}
           SpanBreakdownPage _ _ spans ->
             model {selectedRootSpan = Just spans}
     )
@@ -218,16 +218,24 @@ update model msg =
       continueAfterUserInteraction model
     ShowFilter ->
       let editor = Edit.editorText FilterField (Just 1) ""
-       in continueAfterUserInteraction
+       in withPage
             model
-              { filter =
-                  case filter model of
-                    NoFilter -> EditFilter Nothing editor
-                    EditFilter previous _ -> EditFilter previous editor
-                    HasFilter first rest ->
-                      EditFilter (Just (first, rest))
-                        <| Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [Text.join " " (first : rest)] (Just 1)) editor
-              }
+            ( \page ->
+                case page of
+                  NoDataPage _ -> Prelude.pure page
+                  SpanBreakdownPage _ _ _ -> Prelude.pure page
+                  RootSpanPage time filter spans ->
+                    let newFilter =
+                          case filter of
+                            NoFilter -> EditFilter Nothing editor
+                            EditFilter previous _ -> EditFilter previous editor
+                            HasFilter first rest ->
+                              EditFilter (Just (first, rest))
+                                <| Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [Text.join " " (first : rest)] (Just 1)) editor
+                     in RootSpanPage time newFilter spans
+                          |> Prelude.pure
+            )
+            |> andThen continueAfterUserInteraction
     ClearFilter ->
       continueAfterUserInteraction
         <| case filter model of
