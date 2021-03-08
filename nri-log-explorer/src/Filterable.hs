@@ -1,4 +1,4 @@
-module Modifiable
+module Filterable
   ( ListWidget,
     init,
     cons,

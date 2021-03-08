@@ -31,12 +31,12 @@ import qualified Data.Text.Zipper as TZ
 import qualified Data.Time as Time
 import qualified Data.Vector as Vector
 import qualified Data.Version as Version
+import qualified Filterable
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
 import Lens.Micro ((^.))
 import qualified List
-import qualified Modifiable
 import NriPrelude
 import qualified Paths_nri_log_explorer as Paths
 import qualified Platform
@@ -55,7 +55,7 @@ data Model = Model
     -- A tool like pbcopy or xclip for copying to clipboard.
     clipboardCommand :: Maybe Text,
     -- The actual data displayed.
-    rootSpans :: Modifiable.ListWidget Name RootSpan,
+    rootSpans :: Filterable.ListWidget Name RootSpan,
     -- If we're in the detail view for a root span, this will contain a copy of
     -- the data of that particular span in a format more suitable for this view.
     selectedRootSpan :: Maybe (ListWidget.List Name Span),
@@ -119,12 +119,12 @@ data Name
 -- format more convenient for some update and view functions.
 data Page
   = NoDataPage Filter
-  | RootSpanPage Time.UTCTime Filter (Modifiable.ListWidget Name RootSpan)
+  | RootSpanPage Time.UTCTime Filter (Filterable.ListWidget Name RootSpan)
   | SpanBreakdownPage (Maybe Text) RootSpan (ListWidget.List Name Span)
 
 toPage :: Model -> Page
 toPage model =
-  case (selectedRootSpan model, ListWidget.listSelectedElement (Modifiable.toListWidget (rootSpans model))) of
+  case (selectedRootSpan model, ListWidget.listSelectedElement (Filterable.toListWidget (rootSpans model))) of
     (_, Nothing) -> NoDataPage (filter model)
     (Just selected, Just (_, rootSpan)) ->
       SpanBreakdownPage
@@ -151,7 +151,7 @@ init clipboardCommand now =
   Model
     { currentTime = now,
       clipboardCommand = clipboardCommand,
-      rootSpans = Modifiable.init RootSpanList,
+      rootSpans = Filterable.init RootSpanList,
       selectedRootSpan = Nothing,
       userDidSomething = False,
       filter = NoFilter
@@ -172,7 +172,7 @@ update model msg =
           let rootSpan = RootSpan date span
               newModel =
                 model
-                  { rootSpans = Modifiable.cons rootSpan (rootSpans model)
+                  { rootSpans = Filterable.cons rootSpan (rootSpans model)
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
@@ -190,7 +190,7 @@ update model msg =
               NoDataPage _ -> Prelude.pure page
               SpanBreakdownPage _ _ _ -> Prelude.pure page
               RootSpanPage _ _ spans ->
-                case ListWidget.listSelectedElement (Modifiable.toListWidget spans) of
+                case ListWidget.listSelectedElement (Filterable.toListWidget spans) of
                   Nothing -> Prelude.pure page
                   Just (currentIndex, currentSpan) ->
                     SpanBreakdownPage
@@ -210,10 +210,10 @@ update model msg =
               RootSpanPage time (EditFilter filterEditor) spans ->
                 Prelude.pure
                   <| if hasNoFilters (currentValue filterEditor)
-                    then RootSpanPage time NoFilter (Modifiable.reset (rootSpans model))
+                    then RootSpanPage time NoFilter (Filterable.reset (rootSpans model))
                     else RootSpanPage time (HasFilter (currentValue filterEditor)) spans
               RootSpanPage _ _ spans ->
-                case ListWidget.listSelectedElement (Modifiable.toListWidget spans) of
+                case ListWidget.listSelectedElement (Filterable.toListWidget spans) of
                   Nothing -> Prelude.pure page
                   Just (currentIndex, currentSpan) ->
                     SpanBreakdownPage
@@ -228,7 +228,7 @@ update model msg =
         EditMode editor' ->
           continueAfterUserInteraction
             <| if hasNoFilters (originalValue editor')
-              then model {filter = NoFilter, rootSpans = Modifiable.reset (rootSpans model)}
+              then model {filter = NoFilter, rootSpans = Filterable.reset (rootSpans model)}
               else model {filter = HasFilter (originalValue editor'), rootSpans = filterRootSpans (originalValue editor') (rootSpans model)}
         NormalMode ->
           model
@@ -272,13 +272,13 @@ update model msg =
           HasFilter _ ->
             model
               { filter = NoFilter,
-                rootSpans = Modifiable.reset (rootSpans model)
+                rootSpans = Filterable.reset (rootSpans model)
               }
           _ -> model
 
-filterRootSpans :: Edit.Editor Text Name -> Modifiable.ListWidget Name RootSpan -> Modifiable.ListWidget Name RootSpan
+filterRootSpans :: Edit.Editor Text Name -> Filterable.ListWidget Name RootSpan -> Filterable.ListWidget Name RootSpan
 filterRootSpans editor =
-  Modifiable.filter
+  Filterable.filter
     ( \RootSpan {logSpan} ->
         List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (getFiltersFromEditor editor)
     )
@@ -303,8 +303,8 @@ scroll move model =
     case page of
       NoDataPage filter -> Prelude.pure (NoDataPage filter)
       RootSpanPage time filter rootSpans ->
-        move (Modifiable.toListWidget rootSpans)
-          |> map (Modifiable.setListWidget rootSpans)
+        move (Filterable.toListWidget rootSpans)
+          |> map (Filterable.setListWidget rootSpans)
           |> map (RootSpanPage time filter)
       SpanBreakdownPage cmd root spans ->
         move spans
@@ -442,7 +442,7 @@ viewContents page =
         |> Brick.padBottom Brick.Max
     RootSpanPage now _ logs ->
       logs
-        |> Modifiable.toListWidget
+        |> Filterable.toListWidget
         |> ListWidget.renderList
           ( \hasFocus RootSpan {logSpan, logTime} ->
               Brick.hBox
@@ -746,7 +746,7 @@ handleEvent pushMsg model event =
               { filter = EditFilter (setCurrent newEditor editor),
                 rootSpans =
                   if hasNoFilters newEditor
-                    then Modifiable.reset (rootSpans model)
+                    then Filterable.reset (rootSpans model)
                     else filterRootSpans newEditor (rootSpans model)
               }
         _ ->

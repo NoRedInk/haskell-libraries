@@ -29,7 +29,7 @@ source-repository head
 executable log-explorer
   main-is: Main.hs
   other-modules:
-      Modifiable
+      Filterable
       Paths_nri_log_explorer
   hs-source-dirs:
       src
