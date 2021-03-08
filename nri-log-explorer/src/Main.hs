@@ -71,7 +71,15 @@ data Model = Model
 data Filter
   = NoFilter
   | HasFilter (Edit.Editor Text Name)
-  | EditFilter (Maybe (Edit.Editor Text Name)) (Edit.Editor Text Name)
+  | EditFilter (Undo (Edit.Editor Text Name))
+
+data Undo a = Undo {originalValue :: a, currentValue :: a}
+
+initUndo :: a -> Undo a
+initUndo x = Undo x x
+
+setCurrent :: a -> Undo a -> Undo a
+setCurrent currentValue undo = undo {currentValue}
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
@@ -199,13 +207,13 @@ update model msg =
             case page of
               NoDataPage _ -> Prelude.pure page
               SpanBreakdownPage _ _ _ -> Prelude.pure page
-              RootSpanPage time (EditFilter _ filterEditor) spans ->
+              RootSpanPage time (EditFilter filterEditor) spans ->
                 Prelude.pure
-                  <| case getFiltersFromEditor filterEditor of
+                  <| case getFiltersFromEditor (currentValue filterEditor) of
                     [] ->
                       RootSpanPage time NoFilter (Modifiable.reset (rootSpans model))
                     _ ->
-                      RootSpanPage time (HasFilter filterEditor) spans
+                      RootSpanPage time (HasFilter (currentValue filterEditor)) spans
               RootSpanPage _ _ spans ->
                 case ListWidget.listSelectedElement (Modifiable.toListWidget spans) of
                   Nothing -> Prelude.pure page
@@ -219,11 +227,11 @@ update model msg =
         |> andThen continueAfterUserInteraction
     Cancel ->
       case toMode model of
-        EditMode maybePrevious _ ->
+        EditMode editor' ->
           continueAfterUserInteraction
-            <| case maybePrevious of
-              Just previous -> model {filter = HasFilter previous, rootSpans = filterRootSpans previous (rootSpans model)}
-              Nothing -> model {filter = NoFilter, rootSpans = Modifiable.reset (rootSpans model)}
+            <| case getFiltersFromEditor (originalValue editor') of
+              [] -> model {filter = NoFilter, rootSpans = Modifiable.reset (rootSpans model)}
+              _ -> model {filter = HasFilter (originalValue editor'), rootSpans = filterRootSpans (originalValue editor') (rootSpans model)}
         NormalMode ->
           model
             { selectedRootSpan = Nothing
@@ -253,9 +261,9 @@ update model msg =
                   RootSpanPage time filter spans ->
                     let newFilter =
                           case filter of
-                            NoFilter -> EditFilter Nothing editor
-                            EditFilter previous _ -> EditFilter previous editor
-                            HasFilter editor' -> EditFilter (Just editor') editor'
+                            NoFilter -> EditFilter (initUndo editor)
+                            EditFilter editor' -> EditFilter editor'
+                            HasFilter editor' -> EditFilter (initUndo editor')
                      in RootSpanPage time newFilter spans
                           |> Prelude.pure
             )
@@ -359,11 +367,11 @@ viewFilter filter =
             ),
           Border.hBorder
         ]
-    EditFilter _ filterEditor ->
+    EditFilter filterEditor ->
       Brick.vBox
         [ Brick.hBox
             [ Brick.txt "Filter: ",
-              Edit.renderEditor (editorWithCursor filterEditor) True filterEditor
+              Edit.renderEditor (editorWithCursor (currentValue filterEditor)) True (currentValue filterEditor)
             ],
           Border.hBorder
         ]
@@ -402,14 +410,13 @@ viewKey page =
           NoDataPage filter ->
             case filter of
               NoFilter -> [exit]
-              EditFilter _ _ -> [exit, stopEditFilter]
+              EditFilter _ -> [exit, stopEditFilter]
               _ -> [exit, adjustFilter, clearFilter]
           RootSpanPage _ filter _ ->
             case filter of
               NoFilter -> [exit, updown, select, filter']
               HasFilter _ -> [exit, updown, select, adjustFilter, clearFilter]
-              EditFilter (Just _) _ -> [stopEditFilter, applyFilter]
-              EditFilter Nothing _ -> [stopEditFilter, applyFilter]
+              EditFilter _ -> [stopEditFilter, applyFilter]
           SpanBreakdownPage clipboardCommand _ _ ->
             [exit, updown, unselect]
               ++ ( case clipboardCommand of
@@ -731,11 +738,11 @@ handleEvent pushMsg model event =
           liftIO (pushMsg ClearFilter)
           Brick.continue model
         -- Fallback
-        (EditMode previous editor, _) -> do
-          newEditor <- Edit.handleEditorEvent vtyEvent editor
+        (EditMode editor, _) -> do
+          newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
           Brick.continue
             model
-              { filter = EditFilter previous newEditor,
+              { filter = EditFilter (setCurrent newEditor editor),
                 rootSpans =
                   case getFiltersFromEditor newEditor of
                     [] -> Modifiable.reset (rootSpans model)
@@ -750,12 +757,12 @@ handleEvent pushMsg model event =
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
 
-data Mode = NormalMode | EditMode (Maybe (Edit.Editor Text Name)) (Edit.Editor Text Name)
+data Mode = NormalMode | EditMode (Undo (Edit.Editor Text Name))
 
 toMode :: Model -> Mode
 toMode model =
   case filter model of
-    EditFilter previous editor -> EditMode previous editor
+    EditFilter editor -> EditMode editor
     _ -> NormalMode
 
 updateTime :: (Time.UTCTime -> Prelude.IO ()) -> Prelude.IO ()
