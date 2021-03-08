@@ -70,8 +70,8 @@ data Model = Model
 
 data Filter
   = NoFilter
-  | HasFilter Text (List Text)
-  | EditFilter (Maybe (Text, List Text)) (Edit.Editor Text Name)
+  | HasFilter (Edit.Editor Text Name)
+  | EditFilter (Maybe (Edit.Editor Text Name)) (Edit.Editor Text Name)
 
 -- One log entry on the main page. The Platform.TracingSpan contains the data we
 -- parsed (it in turn contains nested child spans, and so on).
@@ -204,8 +204,8 @@ update model msg =
                   <| case getFiltersFromEditor filterEditor of
                     [] ->
                       RootSpanPage time NoFilter (Modifiable.reset (rootSpans model))
-                    first : rest ->
-                      RootSpanPage time (HasFilter first rest) spans
+                    _ ->
+                      RootSpanPage time (HasFilter filterEditor) spans
               RootSpanPage _ _ spans ->
                 case ListWidget.listSelectedElement (Modifiable.toListWidget spans) of
                   Nothing -> Prelude.pure page
@@ -219,10 +219,10 @@ update model msg =
         |> andThen continueAfterUserInteraction
     Cancel ->
       case toMode model of
-        EditMode previous _ ->
+        EditMode maybePrevious _ ->
           continueAfterUserInteraction
-            <| case previous of
-              Just (first, rest) -> model {filter = HasFilter first rest, rootSpans = filterRootSpans first rest (rootSpans model)}
+            <| case maybePrevious of
+              Just previous -> model {filter = HasFilter previous, rootSpans = filterRootSpans previous (rootSpans model)}
               Nothing -> model {filter = NoFilter, rootSpans = Modifiable.reset (rootSpans model)}
         NormalMode ->
           model
@@ -255,9 +255,7 @@ update model msg =
                           case filter of
                             NoFilter -> EditFilter Nothing editor
                             EditFilter previous _ -> EditFilter previous editor
-                            HasFilter first rest ->
-                              EditFilter (Just (first, rest))
-                                <| Edit.applyEdit (\_ -> TZ.gotoEOL <| TZ.textZipper [Text.join " " (first : rest)] (Just 1)) editor
+                            HasFilter editor' -> EditFilter (Just editor') editor'
                      in RootSpanPage time newFilter spans
                           |> Prelude.pure
             )
@@ -265,18 +263,18 @@ update model msg =
     ClearFilter ->
       continueAfterUserInteraction
         <| case filter model of
-          HasFilter _ _ ->
+          HasFilter _ ->
             model
               { filter = NoFilter,
                 rootSpans = Modifiable.reset (rootSpans model)
               }
           _ -> model
 
-filterRootSpans :: Text -> List Text -> Modifiable.ListWidget Name RootSpan -> Modifiable.ListWidget Name RootSpan
-filterRootSpans first rest =
+filterRootSpans :: Edit.Editor Text Name -> Modifiable.ListWidget Name RootSpan -> Modifiable.ListWidget Name RootSpan
+filterRootSpans editor =
   Modifiable.filter
     ( \RootSpan {logSpan} ->
-        List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (first : rest)
+        List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (getFiltersFromEditor editor)
     )
 
 getFiltersFromEditor :: Edit.Editor Text Name -> List Text
@@ -350,12 +348,11 @@ viewFilter :: Filter -> Brick.Widget Name
 viewFilter filter =
   case filter of
     NoFilter -> Brick.txt ""
-    HasFilter first rest ->
+    HasFilter editor ->
       Brick.vBox
         [ Brick.hBox
             ( Brick.txt "Filter: " :
-              ( first :
-                rest
+              ( getFiltersFromEditor editor
                   |> List.map (Brick.withAttr "underlined" << Brick.txt)
                   |> List.intersperse (Brick.txt " ")
               )
@@ -410,7 +407,7 @@ viewKey page =
           RootSpanPage _ filter _ ->
             case filter of
               NoFilter -> [exit, updown, select, filter']
-              HasFilter _ _ -> [exit, updown, select, adjustFilter, clearFilter]
+              HasFilter _ -> [exit, updown, select, adjustFilter, clearFilter]
               EditFilter (Just _) _ -> [stopEditFilter, applyFilter]
               EditFilter Nothing _ -> [stopEditFilter, applyFilter]
           SpanBreakdownPage clipboardCommand _ _ ->
@@ -742,7 +739,7 @@ handleEvent pushMsg model event =
                 rootSpans =
                   case getFiltersFromEditor newEditor of
                     [] -> Modifiable.reset (rootSpans model)
-                    first : rest -> filterRootSpans first rest (rootSpans model)
+                    _ -> filterRootSpans newEditor (rootSpans model)
               }
         _ ->
           scroll
@@ -753,7 +750,7 @@ handleEvent pushMsg model event =
     (Brick.MouseUp _ _ _) -> Brick.continue model
     (Brick.AppEvent msg) -> update model msg
 
-data Mode = NormalMode | EditMode (Maybe (Text, List Text)) (Edit.Editor Text Name)
+data Mode = NormalMode | EditMode (Maybe (Edit.Editor Text Name)) (Edit.Editor Text Name)
 
 toMode :: Model -> Mode
 toMode model =
