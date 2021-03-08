@@ -209,11 +209,9 @@ update model msg =
               SpanBreakdownPage _ _ _ -> Prelude.pure page
               RootSpanPage time (EditFilter filterEditor) spans ->
                 Prelude.pure
-                  <| case getFiltersFromEditor (currentValue filterEditor) of
-                    [] ->
-                      RootSpanPage time NoFilter (Modifiable.reset (rootSpans model))
-                    _ ->
-                      RootSpanPage time (HasFilter (currentValue filterEditor)) spans
+                  <| if hasNoFilters (currentValue filterEditor)
+                    then RootSpanPage time NoFilter (Modifiable.reset (rootSpans model))
+                    else RootSpanPage time (HasFilter (currentValue filterEditor)) spans
               RootSpanPage _ _ spans ->
                 case ListWidget.listSelectedElement (Modifiable.toListWidget spans) of
                   Nothing -> Prelude.pure page
@@ -229,9 +227,9 @@ update model msg =
       case toMode model of
         EditMode editor' ->
           continueAfterUserInteraction
-            <| case getFiltersFromEditor (originalValue editor') of
-              [] -> model {filter = NoFilter, rootSpans = Modifiable.reset (rootSpans model)}
-              _ -> model {filter = HasFilter (originalValue editor'), rootSpans = filterRootSpans (originalValue editor') (rootSpans model)}
+            <| if hasNoFilters (originalValue editor')
+              then model {filter = NoFilter, rootSpans = Modifiable.reset (rootSpans model)}
+              else model {filter = HasFilter (originalValue editor'), rootSpans = filterRootSpans (originalValue editor') (rootSpans model)}
         NormalMode ->
           model
             { selectedRootSpan = Nothing
@@ -284,6 +282,9 @@ filterRootSpans editor =
     ( \RootSpan {logSpan} ->
         List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (getFiltersFromEditor editor)
     )
+
+hasNoFilters :: Edit.Editor Text Name -> Bool
+hasNoFilters editor = getFiltersFromEditor editor == []
 
 getFiltersFromEditor :: Edit.Editor Text Name -> List Text
 getFiltersFromEditor editor =
@@ -744,9 +745,9 @@ handleEvent pushMsg model event =
             model
               { filter = EditFilter (setCurrent newEditor editor),
                 rootSpans =
-                  case getFiltersFromEditor newEditor of
-                    [] -> Modifiable.reset (rootSpans model)
-                    _ -> filterRootSpans newEditor (rootSpans model)
+                  if hasNoFilters newEditor
+                    then Modifiable.reset (rootSpans model)
+                    else filterRootSpans newEditor (rootSpans model)
               }
         _ ->
           scroll
