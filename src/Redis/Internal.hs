@@ -200,15 +200,21 @@ namespaceQuery prefix query' =
 
 defaultExpiryKeysAfterSeconds :: Int -> Handler -> Handler
 defaultExpiryKeysAfterSeconds secs handler =
-  let doQuery :: Stack.HasCallStack => Query a -> Task Error a
-      doQuery query' =
+  let wrapWithExpire :: Query a -> Query a
+      wrapWithExpire query' =
         keysTouchedByQuery query'
           |> Set.toList
           |> List.map (\key -> Expire key secs)
           |> sequence
           |> map2 (\res _ -> res) query'
-          |> Stack.withFrozenCallStack doTransaction handler
-   in handler {doQuery = Stack.withFrozenCallStack doQuery, doTransaction = Stack.withFrozenCallStack doQuery}
+   in handler
+        { doQuery = \query' ->
+            wrapWithExpire query'
+              |> Stack.withFrozenCallStack doQuery handler,
+          doTransaction = \query' ->
+            wrapWithExpire query'
+              |> Stack.withFrozenCallStack doTransaction handler
+        }
 
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
