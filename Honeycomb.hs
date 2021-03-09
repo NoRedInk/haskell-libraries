@@ -117,8 +117,8 @@ report handler' _requestId span = do
     |> map (\_ -> ())
     |> unless skipLogging
 
-getRootSpanEndpoint :: Platform.TracingSpan -> Maybe Text
-getRootSpanEndpoint rootSpan =
+getRootSpanRequestPath :: Platform.TracingSpan -> Maybe Text
+getRootSpanRequestPath rootSpan =
   Platform.details rootSpan
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
@@ -141,10 +141,13 @@ getBatchEventEndpoint event =
 
 deriveSampleRate :: Platform.TracingSpan -> Handler -> Float
 deriveSampleRate rootSpan handler' =
-  let isNonAppEndpoint =
-        case getRootSpanEndpoint rootSpan of
+  let isNonAppRequestPath =
+        case getRootSpanRequestPath rootSpan of
           Nothing -> False
-          Just endpoint -> List.any (endpoint ==) ["GET /health/readiness", "GET /metrics", "GET /health/liveness"]
+          -- You might be tempted to use `endpoint` instead of `path`, but
+          -- healthcheck endpoints don't populate `HttpRequest.endpoint`.
+          -- Fix that first before trying this.
+          Just requestPath -> List.any (requestPath ==) ["/health/readiness", "/metrics", "/health/liveness"]
       baseRate = handler_fractionOfSuccessRequestsLogged handler'
       requestDurationMs =
         Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
@@ -152,7 +155,7 @@ deriveSampleRate rootSpan handler' =
           |> Prelude.fromIntegral
           |> (*) 1e-3
       apdexTMs = Prelude.fromIntegral (handler_apdexTimeMs handler')
-   in if isNonAppEndpoint
+   in if isNonAppRequestPath
         then --
         -- We have 2678400 seconds in a month
         -- We health-check once per second per Pod in Haskell
