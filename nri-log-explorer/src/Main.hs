@@ -219,10 +219,7 @@ update model msg =
                 RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
                   case filter of
                     EditFilter filterEditor ->
-                      RootSpanPage
-                        <| if hasNoFilters (currentValue filterEditor)
-                          then rootSpanPageData {filter = NoFilter, rootSpans = Filterable.reset rootSpans}
-                          else rootSpanPageData {filter = HasFilter (currentValue filterEditor)}
+                      RootSpanPage (updateRootSpanFilter (currentValue filterEditor) rootSpanPageData)
                     _ ->
                       case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
                         Nothing -> page
@@ -238,12 +235,7 @@ update model msg =
       case toMode model of
         EditMode editor' ->
           continueAfterUserInteraction
-            model
-              { rootSpanPage =
-                  if hasNoFilters (originalValue editor')
-                    then (rootSpanPage model) {filter = NoFilter, rootSpans = Filterable.reset (rootSpans (rootSpanPage model))}
-                    else (rootSpanPage model) {filter = HasFilter (originalValue editor'), rootSpans = filterRootSpans (originalValue editor') (rootSpans (rootSpanPage model))}
-              }
+            model {rootSpanPage = updateRootSpanFilter (originalValue editor') (rootSpanPage model)}
         NormalMode ->
           continueAfterUserInteraction model {spanBreakdownPage = Nothing}
     CopyDetails -> do
@@ -268,7 +260,12 @@ update model msg =
             ( \page ->
                 Prelude.pure
                   <| case page of
-                    NoDataPage _ -> page
+                    NoDataPage filter' ->
+                      NoDataPage
+                        <| case filter' of
+                          NoFilter -> EditFilter (initUndo editor)
+                          EditFilter editor' -> EditFilter editor'
+                          HasFilter editor' -> EditFilter (initUndo editor')
                     SpanBreakdownPage _ -> page
                     RootSpanPage rootSpanPageData ->
                       RootSpanPage
@@ -285,14 +282,32 @@ update model msg =
       continueAfterUserInteraction
         <| case filter (rootSpanPage model) of
           HasFilter _ ->
-            model
-              { rootSpanPage =
-                  (rootSpanPage model)
-                    { filter = NoFilter,
-                      rootSpans = Filterable.reset (rootSpans (rootSpanPage model))
-                    }
-              }
+            model {rootSpanPage = resetRootSpanFilter (rootSpanPage model)}
           _ -> model
+
+updateRootSpanFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
+updateRootSpanFilter editor rootSpanPageData =
+  if hasNoFilters editor
+    then resetRootSpanFilter rootSpanPageData
+    else
+      rootSpanPageData
+        { filter = HasFilter editor,
+          rootSpans = filterRootSpans editor (rootSpans rootSpanPageData)
+        }
+
+resetRootSpanFilter :: RootSpanPageData -> RootSpanPageData
+resetRootSpanFilter rootSpanPageData =
+  rootSpanPageData {filter = NoFilter, rootSpans = Filterable.reset (rootSpans rootSpanPageData)}
+
+editRootSpanFilter :: Undo (Edit.Editor Text Name) -> RootSpanPageData -> RootSpanPageData
+editRootSpanFilter editor rootSpanPageData =
+  rootSpanPageData
+    { filter = EditFilter editor,
+      rootSpans =
+        if hasNoFilters (currentValue editor)
+          then Filterable.reset (rootSpans rootSpanPageData)
+          else filterRootSpans (currentValue editor) (rootSpans rootSpanPageData)
+    }
 
 filterRootSpans :: Edit.Editor Text Name -> Filterable.ListWidget Name RootSpan -> Filterable.ListWidget Name RootSpan
 filterRootSpans editor =
@@ -760,16 +775,7 @@ handleEvent pushMsg model event =
         (EditMode editor, _) -> do
           newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
           Brick.continue
-            model
-              { rootSpanPage =
-                  (rootSpanPage model)
-                    { filter = EditFilter (setCurrent newEditor editor),
-                      rootSpans =
-                        if hasNoFilters newEditor
-                          then Filterable.reset (rootSpans (rootSpanPage model))
-                          else filterRootSpans newEditor (rootSpans (rootSpanPage model))
-                    }
-              }
+            model {rootSpanPage = editRootSpanFilter (setCurrent newEditor editor) (rootSpanPage model)}
         _ ->
           scroll
             (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
