@@ -110,7 +110,7 @@ data Msg
   | Cancel
   | SetCurrentTime Time.UTCTime
   | CopyDetails
-  | ShowFilter
+  | EnterEditFilter
   | ClearFilter
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
@@ -253,37 +253,32 @@ update model msg =
                     |> spanToClipboard cmd
                     |> liftIO
       continueAfterUserInteraction model
-    ShowFilter ->
-      let editor = Edit.editorText FilterField (Just 1) ""
-       in withPage
-            model
-            ( \page ->
-                Prelude.pure
-                  <| case page of
-                    NoDataPage filter' ->
-                      NoDataPage
-                        <| case filter' of
-                          NoFilter -> EditFilter (initUndo editor)
-                          EditFilter editor' -> EditFilter editor'
-                          HasFilter editor' -> EditFilter (initUndo editor')
-                    SpanBreakdownPage _ -> page
-                    RootSpanPage rootSpanPageData ->
-                      RootSpanPage
-                        rootSpanPageData
-                          { filter =
-                              case filter rootSpanPageData of
-                                NoFilter -> EditFilter (initUndo editor)
-                                EditFilter editor' -> EditFilter editor'
-                                HasFilter editor' -> EditFilter (initUndo editor')
-                          }
-            )
-            |> andThen continueAfterUserInteraction
+    EnterEditFilter ->
+      withPage
+        model
+        ( \page -> do
+            let editor = Edit.editorText FilterField (Just 1) ""
+            Prelude.pure
+              <| case page of
+                SpanBreakdownPage _ -> page
+                NoDataPage filter' -> NoDataPage (enterEditFilter filter' editor)
+                RootSpanPage rootSpanPageData ->
+                  RootSpanPage rootSpanPageData {filter = enterEditFilter (filter rootSpanPageData) editor}
+        )
+        |> andThen continueAfterUserInteraction
     ClearFilter ->
       continueAfterUserInteraction
         <| case filter (rootSpanPage model) of
           HasFilter _ ->
             model {rootSpanPage = resetRootSpanFilter (rootSpanPage model)}
           _ -> model
+
+enterEditFilter :: Filter -> Edit.Editor Text Name -> Filter
+enterEditFilter filter' editor =
+  case filter' of
+    NoFilter -> EditFilter (initUndo editor)
+    EditFilter editor' -> EditFilter editor'
+    HasFilter editor' -> EditFilter (initUndo editor')
 
 updateRootSpanFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
 updateRootSpanFilter editor rootSpanPageData =
@@ -766,7 +761,7 @@ handleEvent pushMsg model event =
           liftIO (pushMsg CopyDetails)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar '/') []) -> do
-          liftIO (pushMsg ShowFilter)
+          liftIO (pushMsg EnterEditFilter)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'x') []) -> do
           liftIO (pushMsg ClearFilter)
