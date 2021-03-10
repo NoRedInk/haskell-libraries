@@ -143,10 +143,10 @@ withPage model fn =
     ( \newPage ->
         case newPage of
           NoDataPage filter -> model {rootSpanPage = (rootSpanPage model) {filter}}
-          RootSpanPage RootSpanPageData {filter, rootSpans} ->
-            model {rootSpanPage = (rootSpanPage model) {filter, rootSpans}}
-          SpanBreakdownPage SpanBreakdownPageData {currentSpan, spans} ->
-            model {spanBreakdownPage = Just SpanBreakdownPageData {currentSpan, spans}}
+          RootSpanPage rootSpanPageData ->
+            model {rootSpanPage = rootSpanPageData}
+          SpanBreakdownPage spanBreakdownPageData ->
+            model {spanBreakdownPage = Just spanBreakdownPageData}
     )
     (fn (toPage model))
 
