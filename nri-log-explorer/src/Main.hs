@@ -618,6 +618,7 @@ viewKey page clipboardCommand =
       applyFilter = "enter: apply filter"
       filter' = "/: filter"
       adjustSearch = "/: adjust search"
+      nextMatch = "n: next match"
       clearSearch = "x: clear search"
       stopEditSearch = "esc: stop searching"
       applySearch = "enter: apply search"
@@ -637,7 +638,7 @@ viewKey page clipboardCommand =
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
                 NoSearch -> [exit, updown, unselect, search']
-                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch]
+                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch, nextMatch]
                 EditSearch _ -> [stopEditSearch, applySearch]
             )
               ++ ( case clipboardCommand of
