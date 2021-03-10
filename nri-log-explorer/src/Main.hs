@@ -71,10 +71,13 @@ data RootSpanPageData = RootSpanPageData
     rootSpans :: Filterable.ListWidget Name RootSpan
   }
 
+data SearchMatch = NoMatch | Matches
+  deriving (Eq)
+
 data SpanBreakdownPageData = SpanBreakdownPageData
   { currentSpan :: RootSpan,
     search :: Search,
-    spans :: ListWidget.List Name Span
+    spans :: ListWidget.List Name (SearchMatch, Span)
   }
 
 data Filter
@@ -118,6 +121,7 @@ data Msg
   | CopyDetails
   | EnterEdit
   | ClearFilter
+  | Next
   | EditorEvent Vty.Event
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
@@ -281,7 +285,7 @@ update model msg =
             Just cmd ->
               case ListWidget.listSelectedElement spans of
                 Nothing -> Prelude.pure ()
-                Just (_, currentSpan) ->
+                Just (_, (_, currentSpan)) ->
                   original currentSpan
                     |> spanToClipboard cmd
                     |> liftIO
@@ -335,6 +339,29 @@ update model msg =
                     |> SpanBreakdownPage
                     |> Prelude.pure
                 _ -> Prelude.pure page
+    Next ->
+      withPage
+        model
+        ( \page ->
+            case page of
+              NoDataPage _ -> Prelude.pure page
+              RootSpanPage _ -> Prelude.pure page
+              SpanBreakdownPage spanBreakdownPageData ->
+                case search spanBreakdownPageData of
+                  HasSearch _ -> do
+                    let newData =
+                          spanBreakdownPageData
+                            { spans =
+                                ListWidget.listFindBy (Tuple.first >> (==) Matches) (spans spanBreakdownPageData)
+                            }
+                    case ListWidget.listSelectedElement (spans newData) of
+                      Nothing -> Prelude.pure page
+                      Just (index, _) ->
+                        scrollSpanBreakdownPage (Prelude.pure << ListWidget.listMoveTo index) newData
+                          |> map SpanBreakdownPage
+                  _ -> Prelude.pure page
+        )
+        |> andThen continueAfterUserInteraction
 
 enterEditFilter :: Filter -> Edit.Editor Text Name -> Filter
 enterEditFilter filter' editor =
@@ -362,12 +389,26 @@ updateRootSpanFilter editor rootSpanPageData =
 
 updateSpanBreakdownSearch :: Edit.Editor Text Name -> SpanBreakdownPageData -> SpanBreakdownPageData
 updateSpanBreakdownSearch editor spanBreakdownPageData =
-  spanBreakdownPageData
-    { search =
+  let search =
         if getEditContents editor == []
           then NoSearch
           else HasSearch editor
-    }
+   in spanBreakdownPageData
+        { search,
+          spans =
+            spans spanBreakdownPageData
+              |> Prelude.fmap (Tuple.second >> annotateSearch search)
+        }
+
+annotateSearch :: Search -> Span -> (SearchMatch, Span)
+annotateSearch search span =
+  case search of
+    NoSearch -> (NoMatch, span)
+    EditSearch _ -> (NoMatch, span) -- TODO live update
+    HasSearch editor ->
+      if List.all (\searching -> Text.contains searching (rawSummary (original span))) (getEditContents editor)
+        then (Matches, span)
+        else (NoMatch, span)
 
 resetRootSpanFilter :: RootSpanPageData -> RootSpanPageData
 resetRootSpanFilter rootSpanPageData =
@@ -413,16 +454,25 @@ scroll move model =
         move (Filterable.toListWidget rootSpans)
           |> map (Filterable.setListWidget rootSpans)
           |> map (\rootSpans' -> RootSpanPage rootSpanPageData {rootSpans = rootSpans'})
-      SpanBreakdownPage spanBreakdownPageData@SpanBreakdownPageData {spans} ->
-        move spans
-          |> map (\spans' -> SpanBreakdownPage spanBreakdownPageData {spans = spans'})
+      SpanBreakdownPage spanBreakdownPageData ->
+        scrollSpanBreakdownPage move spanBreakdownPageData
+          |> map SpanBreakdownPage
 
-toFlatList :: Prelude.Int -> Platform.TracingSpan -> ListWidget.List Name Span
+scrollSpanBreakdownPage ::
+  (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
+  SpanBreakdownPageData ->
+  Brick.EventM Name SpanBreakdownPageData
+scrollSpanBreakdownPage move spanBreakdownPageData =
+  move (spans spanBreakdownPageData)
+    |> map (\spans' -> spanBreakdownPageData {spans = spans'})
+
+toFlatList :: Prelude.Int -> Platform.TracingSpan -> ListWidget.List Name (SearchMatch, Span)
 toFlatList id span =
   ListWidget.list
     (SpanBreakdownList id)
     (toFlatListHelper 0 span)
     1
+    |> Prelude.fmap (\s -> (NoMatch, s))
 
 toFlatListHelper :: Int -> Platform.TracingSpan -> Vector.Vector Span
 toFlatListHelper nesting span =
@@ -591,17 +641,17 @@ viewContents page =
           )
           True
         |> Brick.padLeftRight 1
-    SpanBreakdownPage SpanBreakdownPageData {currentSpan, spans, search} ->
+    SpanBreakdownPage SpanBreakdownPageData {currentSpan, spans} ->
       Brick.vBox
         [ Brick.txt (spanSummary (logSpan currentSpan))
             |> Center.hCenter,
           Border.hBorder,
           Brick.hBox
-            [ viewSpanBreakdown spans search
+            [ viewSpanBreakdown spans
                 |> Brick.hLimitPercent 50,
               ( case ListWidget.listSelectedElement spans of
                   Nothing -> Brick.emptyWidget
-                  Just (_, currentSpan') ->
+                  Just (_, (_, currentSpan')) ->
                     viewSpanDetails currentSpan'
               )
                 |> Brick.padRight (Brick.Pad 1)
@@ -609,10 +659,9 @@ viewContents page =
             ]
         ]
 
-viewSpanBreakdown :: ListWidget.List Name Span -> Search -> Brick.Widget Name
-viewSpanBreakdown spans search =
+viewSpanBreakdown :: ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
+viewSpanBreakdown spans =
   spans
-    |> Prelude.fmap (annotateSearch search)
     |> ListWidget.renderList
       ( \hasFocus (matches, span) ->
           Brick.hBox
@@ -631,18 +680,6 @@ viewSpanBreakdown spans search =
       )
       True
     |> Brick.padLeftRight 1
-
-data SearchMatch = NoMatch | Matches
-
-annotateSearch :: Search -> Span -> (SearchMatch, Span)
-annotateSearch search span =
-  case search of
-    NoSearch -> (NoMatch, span)
-    EditSearch _ -> (NoMatch, span) -- TODO live update
-    HasSearch editor ->
-      if List.all (\searching -> Text.contains searching (rawSummary (original span))) (getEditContents editor)
-        then (Matches, span)
-        else (NoMatch, span)
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
@@ -873,6 +910,9 @@ handleEvent pushMsg model event =
           Brick.continue model
         (_, Vty.EvKey Vty.KEsc []) -> do
           liftIO (pushMsg Cancel)
+          Brick.continue model
+        (_, Vty.EvKey (Vty.KChar 'n') []) -> do
+          liftIO (pushMsg Next)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'h') []) -> do
           liftIO (pushMsg Cancel)
