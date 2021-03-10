@@ -349,19 +349,36 @@ update model msg =
               SpanBreakdownPage spanBreakdownPageData ->
                 case search spanBreakdownPageData of
                   HasSearch _ -> do
-                    let newData =
-                          spanBreakdownPageData
-                            { spans =
-                                ListWidget.listFindBy (Tuple.first >> (==) Matches) (spans spanBreakdownPageData)
-                            }
-                    case ListWidget.listSelectedElement (spans newData) of
+                    case selectNextMatch spanBreakdownPageData of
                       Nothing -> Prelude.pure page
-                      Just (index, _) ->
-                        scrollSpanBreakdownPage (Prelude.pure << ListWidget.listMoveTo index) newData
+                      Just (index, spanBreakdownPageData') ->
+                        spanBreakdownPageData'
+                          |> scrollSpanBreakdownPage (Prelude.pure << ListWidget.listMoveTo index)
                           |> map SpanBreakdownPage
                   _ -> Prelude.pure page
         )
         |> andThen continueAfterUserInteraction
+
+selectNextMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
+selectNextMatch spanBreakdownPageData = do
+  let currentSelectedIndex =
+        spans spanBreakdownPageData
+          |> ListWidget.listSelectedElement
+          |> Maybe.map Tuple.first
+  let nextSpans = ListWidget.listFindBy (Tuple.first >> (==) Matches) (spans spanBreakdownPageData)
+  case ListWidget.listSelectedElement nextSpans of
+    Just (index, _) ->
+      if Just index == currentSelectedIndex
+        then do
+          let nextSpans' =
+                nextSpans
+                  |> ListWidget.listMoveTo 0
+                  |> ListWidget.listFindBy (Tuple.first >> (==) Matches)
+          case ListWidget.listSelectedElement nextSpans' of
+            Just (index', _) -> Just (index', spanBreakdownPageData {spans = nextSpans'})
+            Nothing -> Nothing
+        else Just (index, spanBreakdownPageData {spans = nextSpans})
+    Nothing -> Nothing
 
 enterEditFilter :: Filter -> Edit.Editor Text Name -> Filter
 enterEditFilter filter' editor =
