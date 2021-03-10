@@ -120,7 +120,7 @@ data Msg
   | SetCurrentTime Time.UTCTime
   | CopyDetails
   | EnterEdit
-  | ClearFilter
+  | ClearEdit
   | Next
   | EditorEvent Vty.Event
 
@@ -305,12 +305,17 @@ update model msg =
                   RootSpanPage rootSpanPageData {filter = enterEditFilter (filter rootSpanPageData) editor}
         )
         |> andThen continueAfterUserInteraction
-    ClearFilter ->
+    ClearEdit ->
       continueAfterUserInteraction
-        <| case filter (rootSpanPage model) of
-          HasFilter _ ->
-            model {rootSpanPage = resetRootSpanFilter (rootSpanPage model)}
-          _ -> model
+        ( case toPage model of
+            SpanBreakdownPage spanBreakdownPageData ->
+              model {spanBreakdownPage = Just <| resetSpanBreakdownSearch spanBreakdownPageData}
+            NoDataPage (HasFilter _) ->
+              model {rootSpanPage = resetRootSpanFilter (rootSpanPage model)}
+            RootSpanPage rootSpanPageData ->
+              model {rootSpanPage = resetRootSpanFilter rootSpanPageData}
+            _ -> model
+        )
     EditorEvent vtyEvent ->
       andThen continueAfterUserInteraction
         <| withPage model
@@ -406,16 +411,24 @@ updateRootSpanFilter editor rootSpanPageData =
 
 updateSpanBreakdownSearch :: Edit.Editor Text Name -> SpanBreakdownPageData -> SpanBreakdownPageData
 updateSpanBreakdownSearch editor spanBreakdownPageData =
-  let search =
-        if getEditContents editor == []
-          then NoSearch
-          else HasSearch editor
-   in spanBreakdownPageData
-        { search,
+  if getEditContents editor == []
+    then resetSpanBreakdownSearch spanBreakdownPageData
+    else
+      spanBreakdownPageData
+        { search = HasSearch editor,
           spans =
             spans spanBreakdownPageData
-              |> Prelude.fmap (Tuple.second >> annotateSearch search)
+              |> Prelude.fmap (Tuple.second >> annotateSearch (HasSearch editor))
         }
+
+resetSpanBreakdownSearch :: SpanBreakdownPageData -> SpanBreakdownPageData
+resetSpanBreakdownSearch spanBreakdownPageData =
+  spanBreakdownPageData
+    { search = NoSearch,
+      spans =
+        spans spanBreakdownPageData
+          |> Prelude.fmap (Tuple.second >> annotateSearch NoSearch)
+    }
 
 annotateSearch :: Search -> Span -> (SearchMatch, Span)
 annotateSearch search span =
@@ -604,6 +617,11 @@ viewKey page clipboardCommand =
       stopEditFilter = "esc: stop filtering"
       applyFilter = "enter: apply filter"
       filter' = "/: filter"
+      adjustSearch = "/: adjust search"
+      clearSearch = "x: clear search"
+      stopEditSearch = "esc: stop searching"
+      applySearch = "enter: apply search"
+      search' = "/: search"
       shortcuts =
         case page of
           NoDataPage filter ->
@@ -616,8 +634,12 @@ viewKey page clipboardCommand =
               NoFilter -> [exit, updown, select, filter']
               HasFilter _ -> [exit, updown, select, adjustFilter, clearFilter]
               EditFilter _ -> [stopEditFilter, applyFilter]
-          SpanBreakdownPage _ ->
-            [exit, updown, unselect]
+          SpanBreakdownPage SpanBreakdownPageData {search} ->
+            ( case search of
+                NoSearch -> [exit, updown, unselect, search']
+                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch]
+                EditSearch _ -> [stopEditSearch, applySearch]
+            )
               ++ ( case clipboardCommand of
                      Nothing -> []
                      Just _ -> [copy]
@@ -942,7 +964,7 @@ handleEvent pushMsg model event =
           liftIO (pushMsg EnterEdit)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'x') []) -> do
-          liftIO (pushMsg ClearFilter)
+          liftIO (pushMsg ClearEdit)
           Brick.continue model
         -- Fallback
         (EditMode, _) -> do
