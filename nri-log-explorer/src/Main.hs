@@ -73,6 +73,7 @@ data RootSpanPageData = RootSpanPageData
 
 data SpanBreakdownPageData = SpanBreakdownPageData
   { currentSpan :: RootSpan,
+    search :: Search,
     spans :: ListWidget.List Name Span
   }
 
@@ -80,6 +81,11 @@ data Filter
   = NoFilter
   | HasFilter (Edit.Editor Text Name)
   | EditFilter (Undo (Edit.Editor Text Name))
+
+data Search
+  = NoSearch
+  | HasSearch (Edit.Editor Text Name)
+  | EditSearch (Undo (Edit.Editor Text Name))
 
 data Undo a = Undo {originalValue :: a, currentValue :: a}
 
@@ -203,7 +209,8 @@ update model msg =
                     SpanBreakdownPage
                       SpanBreakdownPageData
                         { currentSpan,
-                          spans = currentSpan |> logSpan |> toFlatList currentIndex
+                          spans = currentSpan |> logSpan |> toFlatList currentIndex,
+                          search = NoSearch
                         }
                       |> Prelude.pure
         )
@@ -227,7 +234,8 @@ update model msg =
                           SpanBreakdownPage
                             SpanBreakdownPageData
                               { currentSpan,
-                                spans = currentSpan |> logSpan |> toFlatList currentIndex
+                                spans = currentSpan |> logSpan |> toFlatList currentIndex,
+                                search = NoSearch
                               }
         )
         |> andThen continueAfterUserInteraction
@@ -308,14 +316,14 @@ filterRootSpans :: Edit.Editor Text Name -> Filterable.ListWidget Name RootSpan 
 filterRootSpans editor =
   Filterable.filter
     ( \RootSpan {logSpan} ->
-        List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (getFiltersFromEditor editor)
+        List.all (\filter -> Fuzzy.match filter (filterSummary logSpan) "" "" identity False /= Nothing) (getEditContents editor)
     )
 
 hasNoFilters :: Edit.Editor Text Name -> Bool
-hasNoFilters editor = getFiltersFromEditor editor == []
+hasNoFilters editor = getEditContents editor == []
 
-getFiltersFromEditor :: Edit.Editor Text Name -> List Text
-getFiltersFromEditor editor =
+getEditContents :: Edit.Editor Text Name -> List Text
+getEditContents editor =
   Edit.getEditContents editor
     |> Prelude.mconcat
     |> Text.trim
@@ -389,7 +397,7 @@ viewFilter filter =
       Brick.vBox
         [ Brick.hBox
             ( Brick.txt "Filter: " :
-              ( getFiltersFromEditor editor
+              ( getEditContents editor
                   |> List.map (Brick.withAttr "underlined" << Brick.txt)
                   |> List.intersperse (Brick.txt " ")
               )
