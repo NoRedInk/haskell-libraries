@@ -116,7 +116,7 @@ data Msg
   | Cancel
   | SetCurrentTime Time.UTCTime
   | CopyDetails
-  | EnterEditFilter
+  | EnterEdit
   | ClearFilter
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
@@ -261,7 +261,7 @@ update model msg =
                     |> spanToClipboard cmd
                     |> liftIO
       continueAfterUserInteraction model
-    EnterEditFilter ->
+    EnterEdit ->
       withPage
         model
         ( \page -> do
@@ -376,14 +376,14 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ viewMaybeFilter page,
+          [ viewMaybeEditor page,
             viewContents page,
             viewKey page (clipboardCommand model)
           ]
       ]
 
-viewMaybeFilter :: Page -> Brick.Widget Name
-viewMaybeFilter page =
+viewMaybeEditor :: Page -> Brick.Widget Name
+viewMaybeEditor page =
   case page of
     SpanBreakdownPage _ -> Brick.txt ""
     NoDataPage filter -> viewFilter filter
@@ -769,7 +769,7 @@ handleEvent pushMsg model event =
           liftIO (pushMsg CopyDetails)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar '/') []) -> do
-          liftIO (pushMsg EnterEditFilter)
+          liftIO (pushMsg EnterEdit)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'x') []) -> do
           liftIO (pushMsg ClearFilter)
