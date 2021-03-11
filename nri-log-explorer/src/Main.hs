@@ -35,6 +35,7 @@ import qualified Filterable
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
+import qualified Graphics.Vty.Attributes.Color as Vty.Color
 import Lens.Micro ((^.))
 import qualified List
 import NriPrelude
@@ -71,7 +72,7 @@ data RootSpanPageData = RootSpanPageData
     rootSpans :: Filterable.ListWidget Name RootSpan
   }
 
-data SearchMatch = NoMatch | Matches
+data SearchMatch = NoMatch | Matches Text
   deriving (Eq)
 
 data SpanBreakdownPageData = SpanBreakdownPageData
@@ -370,7 +371,7 @@ selectNextMatch spanBreakdownPageData = do
         spans spanBreakdownPageData
           |> ListWidget.listSelectedElement
           |> Maybe.map Tuple.first
-  let nextSpans = ListWidget.listFindBy (Tuple.first >> (==) Matches) (spans spanBreakdownPageData)
+  let nextSpans = ListWidget.listFindBy (Tuple.first >> (/=) NoMatch) (spans spanBreakdownPageData)
   case ListWidget.listSelectedElement nextSpans of
     Just (index, _) ->
       if Just index == currentSelectedIndex
@@ -378,7 +379,7 @@ selectNextMatch spanBreakdownPageData = do
           let nextSpans' =
                 nextSpans
                   |> ListWidget.listMoveTo 0
-                  |> ListWidget.listFindBy (Tuple.first >> (==) Matches)
+                  |> ListWidget.listFindBy (Tuple.first >> (/=) NoMatch)
           case ListWidget.listSelectedElement nextSpans' of
             Just (index', _) -> Just (index', spanBreakdownPageData {spans = nextSpans'})
             Nothing -> Nothing
@@ -411,7 +412,7 @@ updateRootSpanFilter editor rootSpanPageData =
 
 updateSpanBreakdownSearch :: Edit.Editor Text Name -> SpanBreakdownPageData -> SpanBreakdownPageData
 updateSpanBreakdownSearch editor spanBreakdownPageData =
-  if getEditContents editor == []
+  if getEditContents editor == ""
     then resetSpanBreakdownSearch spanBreakdownPageData
     else
       spanBreakdownPageData
@@ -436,8 +437,8 @@ annotateSearch search span =
     NoSearch -> (NoMatch, span)
     EditSearch _ -> (NoMatch, span) -- TODO live update
     HasSearch editor ->
-      if List.all (\searching -> Text.contains searching (rawSummary (original span))) (getEditContents editor)
-        then (Matches, span)
+      if Text.contains (getEditContents editor) (rawSummary (original span))
+        then (Matches (getEditContents editor), span)
         else (NoMatch, span)
 
 resetRootSpanFilter :: RootSpanPageData -> RootSpanPageData
@@ -458,19 +459,23 @@ filterRootSpans :: Edit.Editor Text Name -> Filterable.ListWidget Name RootSpan 
 filterRootSpans editor =
   Filterable.filter
     ( \RootSpan {logSpan} ->
-        List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditContents editor)
+        List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditWords editor)
     )
 
 hasNoFilters :: Edit.Editor Text Name -> Bool
-hasNoFilters editor = getEditContents editor == []
+hasNoFilters editor = getEditWords editor == []
 
-getEditContents :: Edit.Editor Text Name -> List Text
+getEditWords :: Edit.Editor Text Name -> List Text
+getEditWords editor =
+  getEditContents editor
+    |> Text.split " "
+    |> List.filter (not << Text.isEmpty)
+
+getEditContents :: Edit.Editor Text Name -> Text
 getEditContents editor =
   Edit.getEditContents editor
     |> Prelude.mconcat
     |> Text.trim
-    |> Text.split " "
-    |> List.filter (not << Text.isEmpty)
 
 scroll ::
   (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
@@ -548,7 +553,7 @@ viewFilter filter =
       Brick.vBox
         [ Brick.hBox
             ( Brick.txt "Filter: " :
-              ( getEditContents editor
+              ( getEditWords editor
                   |> List.map (Brick.withAttr "underlined" << Brick.txt)
                   |> List.intersperse (Brick.txt " ")
               )
@@ -571,12 +576,11 @@ viewSearch search =
     HasSearch editor ->
       Brick.vBox
         [ Brick.hBox
-            ( Brick.txt "Search: " :
-              ( getEditContents editor
-                  |> List.map (Brick.withAttr "underlined" << Brick.txt)
-                  |> List.intersperse (Brick.txt " ")
-              )
-            ),
+            [ Brick.txt "Search: ",
+              getEditContents editor
+                |> Brick.txt
+                |> Brick.withAttr "underlined"
+            ],
           Border.hBorder
         ]
     EditSearch searchEditor ->
@@ -705,18 +709,28 @@ viewSpanBreakdown spans =
     |> ListWidget.renderList
       ( \hasFocus (matches, span) ->
           Brick.hBox
-            [ Brick.txt (spanSummary (original span))
+            [ ( case matches of
+                  Matches matching ->
+                    let matching' =
+                          if matching == "fail" || matching == "failed"
+                            then "✖ "
+                            else matching
+                     in Text.split matching' (spanSummary (original span))
+                          |> List.map Brick.txt
+                          |> List.intersperse
+                            ( Brick.txt matching'
+                                |> Brick.withAttr "matched"
+                            )
+                          |> Brick.hBox
+                  NoMatch ->
+                    Brick.txt (spanSummary (original span))
+              )
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
                 |> Brick.padRight Brick.Max
             ]
-            |> ( if hasFocus
-                   then Brick.withAttr "selected"
-                   else identity
-               )
-            |> ( case matches of
-                   Matches -> Brick.withAttr "underlined"
-                   NoMatch -> identity
-               )
+            |> if hasFocus
+              then Brick.withAttr "selected"
+              else identity
       )
       True
     |> Brick.padLeftRight 1
@@ -923,7 +937,8 @@ attrMap =
   Brick.attrMap
     Vty.defAttr
     [ ("selected", Vty.withStyle Vty.defAttr Vty.reverseVideo),
-      ("underlined", Vty.withStyle Vty.defAttr Vty.underline)
+      ("underlined", Vty.withStyle Vty.defAttr Vty.underline),
+      ("matched", Vty.withBackColor Vty.defAttr Vty.Color.brightYellow)
     ]
 
 handleEvent ::
