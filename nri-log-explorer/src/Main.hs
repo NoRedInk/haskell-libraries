@@ -22,6 +22,7 @@ import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as ByteString.Lazy
+import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IORef as IORef
 import qualified Data.List
@@ -725,7 +726,7 @@ viewSpanBreakdown spans =
                   NoMatch ->
                     Brick.txt (spanSummary (original span))
               )
-                |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * (nesting span))))
+                |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * nesting span)))
                 |> Brick.padRight Brick.Max
             ]
             |> if hasFocus
@@ -998,9 +999,9 @@ handleEvent pushMsg model event =
             (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
             model
             |> andThen Brick.continue
-    (Brick.MouseDown _ _ _ _) -> Brick.continue model
-    (Brick.MouseUp _ _ _) -> Brick.continue model
-    (Brick.AppEvent msg) -> update model msg
+    Brick.MouseDown {} -> Brick.continue model
+    Brick.MouseUp {} -> Brick.continue model
+    Brick.AppEvent msg -> update model msg
 
 data Mode = NormalMode | EditMode
 
@@ -1060,7 +1061,7 @@ tailLines partOfLine withLine handle = do
       let fullLines =
             firstFullLine :
             Prelude.init rest
-      _ <- Prelude.traverse withLine fullLines
+      Foldable.traverse_ withLine fullLines
       tailLines partOfLine withLine handle
 
 -- Clipboard management
