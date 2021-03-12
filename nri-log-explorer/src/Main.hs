@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -152,13 +153,12 @@ toPage model =
 withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
 withPage model fn =
   map
-    ( \newPage ->
-        case newPage of
-          NoDataPage filter -> model {rootSpanPage = (rootSpanPage model) {filter}}
-          RootSpanPage rootSpanPageData ->
-            model {rootSpanPage = rootSpanPageData, spanBreakdownPage = Nothing}
-          SpanBreakdownPage spanBreakdownPageData ->
-            model {spanBreakdownPage = Just spanBreakdownPageData}
+    ( \case
+        NoDataPage filter -> model {rootSpanPage = (rootSpanPage model) {filter}}
+        RootSpanPage rootSpanPageData ->
+          model {rootSpanPage = rootSpanPageData, spanBreakdownPage = Nothing}
+        SpanBreakdownPage spanBreakdownPageData ->
+          model {spanBreakdownPage = Just spanBreakdownPageData}
     )
     (fn (toPage model))
 
