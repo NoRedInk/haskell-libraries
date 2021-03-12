@@ -27,8 +27,6 @@ module Postgres
     inTestTransaction,
     inTestTransactionIo,
     -- Reexposing useful postgresql-typed types
-    PGArray.PGArray,
-    PGArray.PGArrayType,
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
     -- tests only!
