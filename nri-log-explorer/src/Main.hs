@@ -973,7 +973,7 @@ handleEvent pushMsg model event =
         (_, Vty.EvKey Vty.KEsc []) -> do
           liftIO (pushMsg Cancel)
           Brick.continue model
-        (_, Vty.EvKey (Vty.KChar 'n') []) -> do
+        (NormalMode, Vty.EvKey (Vty.KChar 'n') []) -> do
           liftIO (pushMsg Next)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'h') []) -> do
