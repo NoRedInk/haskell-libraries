@@ -938,7 +938,14 @@ attrMap =
     Vty.defAttr
     [ ("selected", Vty.withStyle Vty.defAttr Vty.reverseVideo),
       ("underlined", Vty.withStyle Vty.defAttr Vty.underline),
-      ("matched", Vty.withBackColor Vty.defAttr Vty.Color.brightYellow)
+      ( "matched",
+        Vty.withForeColor
+          ( Vty.withBackColor
+              Vty.defAttr
+              Vty.Color.brightYellow
+          )
+          Vty.Color.black
+      )
     ]
 
 handleEvent ::
