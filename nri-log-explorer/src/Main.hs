@@ -151,8 +151,13 @@ toPage model =
     (Just spanBreakdownPageData, _) -> SpanBreakdownPage spanBreakdownPageData
     (Nothing, _) -> RootSpanPage (rootSpanPage model)
 
-withPage :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
+-- Update the page when we don't need side effects
+withPage :: Model -> (Page -> Page) -> Brick.EventM Name Model
 withPage model fn =
+  withPageEvent model (fn >> Prelude.pure)
+
+withPageEvent :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name Model
+withPageEvent model fn =
   map
     ( \case
         NoDataPage filter -> model {rootSpanPage = (rootSpanPage model) {filter}}
@@ -207,11 +212,11 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> Prelude.pure page
-              SpanBreakdownPage _ -> Prelude.pure page
+              NoDataPage _ -> page
+              SpanBreakdownPage _ -> page
               RootSpanPage RootSpanPageData {rootSpans} ->
                 case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
-                  Nothing -> Prelude.pure page
+                  Nothing -> page
                   Just (currentIndex, currentSpan) ->
                     SpanBreakdownPage
                       SpanBreakdownPageData
@@ -219,36 +224,34 @@ update model msg =
                           spans = currentSpan |> logSpan |> toFlatList currentIndex,
                           search = NoSearch
                         }
-                      |> Prelude.pure
         )
         |> andThen continueAfterUserInteraction
     Confirm ->
       withPage
         model
         ( \page ->
-            Prelude.pure
-              <| case page of
-                NoDataPage _ -> page
-                SpanBreakdownPage spanBreakdownPageData ->
-                  case search spanBreakdownPageData of
-                    EditSearch searchEditor ->
-                      updateSpanBreakdownSearch (currentValue searchEditor) spanBreakdownPageData
-                        |> SpanBreakdownPage
-                    _ -> page
-                RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
-                  case filter of
-                    EditFilter filterEditor ->
-                      RootSpanPage (updateRootSpanFilter (currentValue filterEditor) rootSpanPageData)
-                    _ ->
-                      case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
-                        Nothing -> page
-                        Just (currentIndex, currentSpan) ->
-                          SpanBreakdownPage
-                            SpanBreakdownPageData
-                              { currentSpan,
-                                spans = currentSpan |> logSpan |> toFlatList currentIndex,
-                                search = NoSearch
-                              }
+            case page of
+              NoDataPage _ -> page
+              SpanBreakdownPage spanBreakdownPageData ->
+                case search spanBreakdownPageData of
+                  EditSearch searchEditor ->
+                    updateSpanBreakdownSearch (currentValue searchEditor) spanBreakdownPageData
+                      |> SpanBreakdownPage
+                  _ -> page
+              RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
+                case filter of
+                  EditFilter filterEditor ->
+                    RootSpanPage (updateRootSpanFilter (currentValue filterEditor) rootSpanPageData)
+                  _ ->
+                    case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
+                      Nothing -> page
+                      Just (currentIndex, currentSpan) ->
+                        SpanBreakdownPage
+                          SpanBreakdownPageData
+                            { currentSpan,
+                              spans = currentSpan |> logSpan |> toFlatList currentIndex,
+                              search = NoSearch
+                            }
         )
         |> andThen continueAfterUserInteraction
     Cancel ->
@@ -259,22 +262,19 @@ update model msg =
               NoDataPage (EditFilter editor) ->
                 updateRootSpanFilter (originalValue editor) (rootSpanPage model)
                   |> RootSpanPage
-                  |> Prelude.pure
-              NoDataPage _ -> Prelude.pure page
+              NoDataPage _ -> page
               SpanBreakdownPage spanBreakdownPage ->
                 case search spanBreakdownPage of
                   EditSearch editor ->
                     updateSpanBreakdownSearch (originalValue editor) spanBreakdownPage
                       |> SpanBreakdownPage
-                      |> Prelude.pure
-                  _ -> Prelude.pure (RootSpanPage (rootSpanPage model))
+                  _ -> RootSpanPage (rootSpanPage model)
               RootSpanPage rootSpanPageData ->
                 case filter rootSpanPageData of
                   EditFilter editor ->
                     updateRootSpanFilter (originalValue editor) rootSpanPageData
                       |> RootSpanPage
-                      |> Prelude.pure
-                  _ -> Prelude.pure page
+                  _ -> page
         )
         |> andThen continueAfterUserInteraction
     CopyDetails -> do
@@ -295,16 +295,15 @@ update model msg =
     EnterEdit ->
       withPage
         model
-        ( \page -> do
+        ( \page ->
             let editor = Edit.editorText FilterField (Just 1) ""
-            Prelude.pure
-              <| case page of
-                SpanBreakdownPage spanBreakdownPageData ->
-                  SpanBreakdownPage
-                    spanBreakdownPageData {search = enterEditSearch (search spanBreakdownPageData) editor}
-                NoDataPage filter' -> NoDataPage (enterEditFilter filter' editor)
-                RootSpanPage rootSpanPageData ->
-                  RootSpanPage rootSpanPageData {filter = enterEditFilter (filter rootSpanPageData) editor}
+             in case page of
+                  SpanBreakdownPage spanBreakdownPageData ->
+                    SpanBreakdownPage
+                      spanBreakdownPageData {search = enterEditSearch (search spanBreakdownPageData) editor}
+                  NoDataPage filter' -> NoDataPage (enterEditFilter filter' editor)
+                  RootSpanPage rootSpanPageData ->
+                    RootSpanPage rootSpanPageData {filter = enterEditFilter (filter rootSpanPageData) editor}
         )
         |> andThen continueAfterUserInteraction
     ClearEdit ->
@@ -320,7 +319,7 @@ update model msg =
         )
     EditorEvent vtyEvent ->
       andThen continueAfterUserInteraction
-        <| withPage model
+        <| withPageEvent model
         <| \page -> do
           case page of
             NoDataPage (EditFilter editor) -> do
@@ -347,7 +346,7 @@ update model msg =
                     |> Prelude.pure
                 _ -> Prelude.pure page
     Next ->
-      withPage
+      withPageEvent
         model
         ( \page ->
             case page of
@@ -483,8 +482,8 @@ scroll ::
   Model ->
   Brick.EventM Name Model
 scroll move model =
-  withPage model <| \page -> do
-    case page of
+  withPageEvent model
+    <| \case
       NoDataPage filter -> Prelude.pure (NoDataPage filter)
       RootSpanPage rootSpanPageData@RootSpanPageData {rootSpans} ->
         move (Filterable.toListWidget rootSpans)
