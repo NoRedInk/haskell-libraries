@@ -13,6 +13,7 @@ module Redis.List
     Settings.decoder,
 
     -- * Creating a redis API
+    flatApi,
     jsonApi,
     textApi,
     byteStringApi,
@@ -45,6 +46,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Flat
 import qualified Redis
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
@@ -87,6 +89,9 @@ data Api key a = Api
     -- https://redis.io/commands/rpush
     rpush :: key -> NonEmpty a -> Internal.Query Int
   }
+
+flatApi :: Flat.Flat a => (key -> Text) -> Api key a
+flatApi = makeApi Codec.flatCodec
 
 jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
 jsonApi = makeApi Codec.jsonCodec
