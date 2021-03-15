@@ -13,6 +13,7 @@ module Redis.Hash
     Settings.decoder,
 
     -- * Creating a redis API
+    flatApi,
     jsonApi,
     textApi,
     byteStringApi,
@@ -53,6 +54,7 @@ import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
+import qualified Flat
 import qualified NonEmptyDict
 import qualified Redis
 import qualified Redis.Codec as Codec
@@ -127,6 +129,14 @@ data Api key field a = Api
     -- https://redis.io/commands/hsetnx
     hsetnx :: key -> field -> a -> Internal.Query Bool
   }
+
+flatApi ::
+  (Flat.Flat a, Ord field) =>
+  (key -> Text) ->
+  (field -> Text) ->
+  (Text -> Maybe field) ->
+  Api key field a
+flatApi = makeApi Codec.flatCodec
 
 jsonApi ::
   (Aeson.ToJSON a, Aeson.FromJSON a, Ord field) =>
