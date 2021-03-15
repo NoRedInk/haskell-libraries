@@ -341,7 +341,12 @@ update model msg =
               case search spanBreakdownPageData of
                 EditSearch editor -> do
                   newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-                  spanBreakdownPageData {search = EditSearch (setCurrent newEditor editor)}
+                  spanBreakdownPageData
+                    { search = EditSearch (setCurrent newEditor editor),
+                      spans =
+                        spans spanBreakdownPageData
+                          |> Prelude.fmap (Tuple.second >> annotateSearch (Just newEditor))
+                    }
                     |> SpanBreakdownPage
                     |> Prelude.pure
                 _ -> Prelude.pure page
@@ -419,7 +424,7 @@ updateSpanBreakdownSearch editor spanBreakdownPageData =
         { search = HasSearch editor,
           spans =
             spans spanBreakdownPageData
-              |> Prelude.fmap (Tuple.second >> annotateSearch (HasSearch editor))
+              |> Prelude.fmap (Tuple.second >> annotateSearch (Just editor))
         }
 
 resetSpanBreakdownSearch :: SpanBreakdownPageData -> SpanBreakdownPageData
@@ -428,16 +433,16 @@ resetSpanBreakdownSearch spanBreakdownPageData =
     { search = NoSearch,
       spans =
         spans spanBreakdownPageData
-          |> Prelude.fmap (Tuple.second >> annotateSearch NoSearch)
+          |> Prelude.fmap (Tuple.second >> annotateSearch Nothing)
     }
 
-annotateSearch :: Search -> Span -> (SearchMatch, Span)
-annotateSearch search span =
-  case search of
-    NoSearch -> (NoMatch, span)
-    EditSearch _ -> (NoMatch, span) -- TODO live update
-    HasSearch editor ->
-      if Text.contains (getEditContents editor) (rawSummary (original span))
+annotateSearch :: Maybe (Edit.Editor Text Name) -> Span -> (SearchMatch, Span)
+annotateSearch maybeEditor span =
+  case maybeEditor of
+    Nothing -> (NoMatch, span)
+    Just editor ->
+      if getEditContents editor /= ""
+        && Text.contains (getEditContents editor) (rawSummary (original span))
         then (Matches (getEditContents editor), span)
         else (NoMatch, span)
 
