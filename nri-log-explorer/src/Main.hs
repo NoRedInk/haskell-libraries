@@ -125,6 +125,7 @@ data Msg
   | EnterEdit
   | ClearEdit
   | Next
+  | Previous
   | EditorEvent Vty.Event
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
@@ -369,6 +370,25 @@ update model msg =
                   _ -> Prelude.pure page
         )
         |> andThen continueAfterUserInteraction
+    Previous ->
+      withPageEvent
+        model
+        ( \page ->
+            case page of
+              NoDataPage _ -> Prelude.pure page
+              RootSpanPage _ -> Prelude.pure page
+              SpanBreakdownPage spanBreakdownPageData ->
+                case search spanBreakdownPageData of
+                  HasSearch _ -> do
+                    case selectPreviousMatch spanBreakdownPageData of
+                      Nothing -> Prelude.pure page
+                      Just (index, spanBreakdownPageData') ->
+                        spanBreakdownPageData'
+                          |> scrollSpanBreakdownPage (Prelude.pure << ListWidget.listMoveTo index)
+                          |> map SpanBreakdownPage
+                  _ -> Prelude.pure page
+        )
+        |> andThen continueAfterUserInteraction
 
 selectNextMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
 selectNextMatch spanBreakdownPageData = do
@@ -389,6 +409,33 @@ selectNextMatch spanBreakdownPageData = do
             Just (index', _) -> Just (index', spanBreakdownPageData {spans = nextSpans'})
             Nothing -> Nothing
         else Just (index, spanBreakdownPageData {spans = nextSpans})
+    Nothing -> Nothing
+
+selectPreviousMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
+selectPreviousMatch spanBreakdownPageData = do
+  let currentSelectedIndex =
+        spans spanBreakdownPageData
+          |> ListWidget.listSelectedElement
+          |> Maybe.map Tuple.first
+  let previousSpans =
+        spans spanBreakdownPageData
+          |> ListWidget.listReverse
+          |> ListWidget.listFindBy (Tuple.first >> (/=) NoMatch)
+          |> ListWidget.listReverse
+  case ListWidget.listSelectedElement previousSpans of
+    Just (index, _) ->
+      if Just index == currentSelectedIndex
+        then do
+          let previousSpans' =
+                previousSpans
+                  |> ListWidget.listMoveTo (Vector.length (ListWidget.listElements previousSpans))
+                  |> ListWidget.listReverse
+                  |> ListWidget.listFindBy (Tuple.first >> (/=) NoMatch)
+                  |> ListWidget.listReverse
+          case ListWidget.listSelectedElement previousSpans' of
+            Just (index', _) -> Just (index', spanBreakdownPageData {spans = previousSpans'})
+            Nothing -> Nothing
+        else Just (index, spanBreakdownPageData {spans = previousSpans})
     Nothing -> Nothing
 
 enterEditFilter :: Filter -> Edit.Editor Text Name -> Filter
@@ -980,6 +1027,9 @@ handleEvent pushMsg model event =
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'n') []) -> do
           liftIO (pushMsg Next)
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar 'N') []) -> do
+          liftIO (pushMsg Previous)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'h') []) -> do
           liftIO (pushMsg Cancel)
