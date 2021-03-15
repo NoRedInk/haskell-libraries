@@ -674,6 +674,7 @@ viewKey page clipboardCommand =
       applyFilter = "enter: apply filter"
       filter' = "/: filter"
       adjustSearch = "/: adjust search"
+      previousMatch = "n: previous match"
       nextMatch = "n: next match"
       clearSearch = "x: clear search"
       stopEditSearch = "esc: stop searching"
@@ -694,17 +695,19 @@ viewKey page clipboardCommand =
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
                 NoSearch -> [exit, updown, unselect, search']
-                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch, nextMatch]
+                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch, nextMatch, previousMatch]
                 EditSearch _ -> [stopEditSearch, applySearch]
             )
               ++ ( case clipboardCommand of
                      Nothing -> []
                      Just _ -> [copy]
                  )
-   in shortcuts
-        |> Text.join "   "
-        |> Brick.txt
-        |> Center.hCenter
+   in Brick.vBox
+        [ Border.hBorder,
+          shortcuts
+            |> Text.join "   "
+            |> Brick.txtWrap
+        ]
 
 viewContents :: Page -> Brick.Widget Name
 viewContents page =
