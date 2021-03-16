@@ -24,24 +24,32 @@ import qualified Prelude
 report :: FilePath.FilePath -> Internal.SuiteResult -> Prelude.IO ()
 report path result = do
   createPathDirIfMissing path
-  JUnit.writeXmlReport path (testResults result)
+  results <- testResults result
+  JUnit.writeXmlReport path results
 
-testResults :: Internal.SuiteResult -> List JUnit.TestSuite
+testResults :: Internal.SuiteResult -> Prelude.IO (List JUnit.TestSuite)
 testResults result =
   case result of
     Internal.AllPassed passed ->
       List.map renderPassed passed
+        |> Prelude.pure
     Internal.OnlysPassed passed skipped ->
-      List.map renderSkipped skipped
-        ++ List.map renderPassed passed
+      Prelude.pure
+        ( List.map renderSkipped skipped
+            ++ List.map renderPassed passed
+        )
     Internal.PassedWithSkipped passed skipped ->
-      List.map renderSkipped skipped
-        ++ List.map renderPassed passed
+      Prelude.pure
+        ( List.map renderSkipped skipped
+            ++ List.map renderPassed passed
+        )
     Internal.TestsFailed passed skipped failed ->
-      List.map renderFailed failed
-        ++ List.map renderSkipped skipped
-        ++ List.map renderPassed passed
-    Internal.NoTestsInSuite -> []
+      Prelude.pure
+        ( List.map renderFailed failed
+            ++ List.map renderSkipped skipped
+            ++ List.map renderPassed passed
+        )
+    Internal.NoTestsInSuite -> Prelude.pure []
 
 renderPassed :: Internal.SingleTest Platform.TracingSpan -> JUnit.TestSuite
 renderPassed test =
