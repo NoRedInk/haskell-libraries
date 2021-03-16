@@ -10,11 +10,13 @@ where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Text
+import qualified Data.Text.IO
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
 import qualified Platform
 import qualified System.Directory as Directory
+import System.FilePath ((</>))
 import qualified System.FilePath as FilePath
 import qualified Test.Internal as Internal
 import qualified Text
@@ -63,12 +65,58 @@ renderSkipped test =
   JUnit.skipped (Internal.name test)
     |> JUnit.inSuite (suiteName test)
 
+extraLinesOnFailure :: Int
+extraLinesOnFailure = 2
+
 renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> Prelude.IO JUnit.TestSuite
 renderFailed test =
   case Internal.body test of
-    (tracingSpan, Internal.FailedAssertion msg _) ->
+    (tracingSpan, Internal.FailedAssertion msg maybeLoc) -> do
+      msg' <- case maybeLoc of
+        Nothing -> Prelude.pure msg
+        Just loc -> do
+          cwd <- Directory.getCurrentDirectory
+          let path = cwd </> Stack.srcLocFile loc
+          exists <- Directory.doesFileExist path
+          if exists
+            then do
+              contents <- Data.Text.IO.readFile path
+              let startLine = Prelude.fromIntegral (Stack.srcLocStartLine loc)
+              let lines =
+                    contents
+                      |> Data.Text.lines
+                      |> List.drop (startLine - extraLinesOnFailure - 1)
+                      |> List.take (extraLinesOnFailure * 2 + 1)
+                      |> List.indexedMap
+                        ( \i l ->
+                            Text.fromList
+                              ( Prelude.show
+                                  <| startLine + i - extraLinesOnFailure
+                              )
+                              ++ ": "
+                              ++ l
+                        )
+              Prelude.pure <| case lines of
+                [] -> ""
+                lines' ->
+                  "\n"
+                    ++ "Expectation failed at "
+                    ++ Text.fromList (Stack.srcLocFile loc)
+                    ++ ":"
+                    ++ Text.fromList (Prelude.show (Stack.srcLocStartLine loc))
+                    ++ "\n"
+                    ++ Prelude.foldMap
+                      ( \(nr, line) ->
+                          if nr == extraLinesOnFailure
+                            then "✗ " ++ line ++ "\n"
+                            else "  " ++ line ++ "\n"
+                      )
+                      (List.indexedMap (,) lines')
+                    ++ "\n"
+                    ++ msg
+            else Prelude.pure msg
       JUnit.failed (Internal.name test)
-        |> JUnit.stderr msg
+        |> JUnit.stderr msg'
         |> ( case stackFrame test of
                Nothing -> identity
                Just frame -> JUnit.failureStackTrace [frame]
