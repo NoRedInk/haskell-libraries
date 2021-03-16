@@ -43,9 +43,10 @@ testResults result =
         ( List.map renderSkipped skipped
             ++ List.map renderPassed passed
         )
-    Internal.TestsFailed passed skipped failed ->
+    Internal.TestsFailed passed skipped failed -> do
+      renderedFailed <- Prelude.traverse renderFailed failed
       Prelude.pure
-        ( List.map renderFailed failed
+        ( renderedFailed
             ++ List.map renderSkipped skipped
             ++ List.map renderPassed passed
         )
@@ -62,7 +63,7 @@ renderSkipped test =
   JUnit.skipped (Internal.name test)
     |> JUnit.inSuite (suiteName test)
 
-renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> JUnit.TestSuite
+renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> Prelude.IO JUnit.TestSuite
 renderFailed test =
   case Internal.body test of
     (tracingSpan, Internal.FailedAssertion msg _) ->
@@ -74,6 +75,7 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
     (tracingSpan, Internal.ThrewException err) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test threw an exception."
@@ -84,6 +86,7 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
     (tracingSpan, Internal.TookTooLong) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test timed out."
@@ -93,6 +96,7 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
     (tracingSpan, Internal.TestRunnerMessedUp msg) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage
@@ -112,6 +116,7 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
 
 suiteName :: Internal.SingleTest a -> Text
 suiteName test =
