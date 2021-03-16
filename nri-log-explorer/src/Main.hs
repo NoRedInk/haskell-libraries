@@ -125,6 +125,7 @@ data Msg
   | EnterEdit
   | ClearEdit
   | Next
+  | Previous
   | EditorEvent Vty.Event
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
@@ -341,7 +342,12 @@ update model msg =
               case search spanBreakdownPageData of
                 EditSearch editor -> do
                   newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-                  spanBreakdownPageData {search = EditSearch (setCurrent newEditor editor)}
+                  spanBreakdownPageData
+                    { search = EditSearch (setCurrent newEditor editor),
+                      spans =
+                        spans spanBreakdownPageData
+                          |> Prelude.fmap (Tuple.second >> annotateSearch (Just newEditor))
+                    }
                     |> SpanBreakdownPage
                     |> Prelude.pure
                 _ -> Prelude.pure page
@@ -356,6 +362,25 @@ update model msg =
                 case search spanBreakdownPageData of
                   HasSearch _ -> do
                     case selectNextMatch spanBreakdownPageData of
+                      Nothing -> Prelude.pure page
+                      Just (index, spanBreakdownPageData') ->
+                        spanBreakdownPageData'
+                          |> scrollSpanBreakdownPage (Prelude.pure << ListWidget.listMoveTo index)
+                          |> map SpanBreakdownPage
+                  _ -> Prelude.pure page
+        )
+        |> andThen continueAfterUserInteraction
+    Previous ->
+      withPageEvent
+        model
+        ( \page ->
+            case page of
+              NoDataPage _ -> Prelude.pure page
+              RootSpanPage _ -> Prelude.pure page
+              SpanBreakdownPage spanBreakdownPageData ->
+                case search spanBreakdownPageData of
+                  HasSearch _ -> do
+                    case selectPreviousMatch spanBreakdownPageData of
                       Nothing -> Prelude.pure page
                       Just (index, spanBreakdownPageData') ->
                         spanBreakdownPageData'
@@ -384,6 +409,33 @@ selectNextMatch spanBreakdownPageData = do
             Just (index', _) -> Just (index', spanBreakdownPageData {spans = nextSpans'})
             Nothing -> Nothing
         else Just (index, spanBreakdownPageData {spans = nextSpans})
+    Nothing -> Nothing
+
+selectPreviousMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
+selectPreviousMatch spanBreakdownPageData = do
+  let currentSelectedIndex =
+        spans spanBreakdownPageData
+          |> ListWidget.listSelectedElement
+          |> Maybe.map Tuple.first
+  let previousSpans =
+        spans spanBreakdownPageData
+          |> ListWidget.listReverse
+          |> ListWidget.listFindBy (Tuple.first >> (/=) NoMatch)
+          |> ListWidget.listReverse
+  case ListWidget.listSelectedElement previousSpans of
+    Just (index, _) ->
+      if Just index == currentSelectedIndex
+        then do
+          let previousSpans' =
+                previousSpans
+                  |> ListWidget.listMoveTo (Vector.length (ListWidget.listElements previousSpans))
+                  |> ListWidget.listReverse
+                  |> ListWidget.listFindBy (Tuple.first >> (/=) NoMatch)
+                  |> ListWidget.listReverse
+          case ListWidget.listSelectedElement previousSpans' of
+            Just (index', _) -> Just (index', spanBreakdownPageData {spans = previousSpans'})
+            Nothing -> Nothing
+        else Just (index, spanBreakdownPageData {spans = previousSpans})
     Nothing -> Nothing
 
 enterEditFilter :: Filter -> Edit.Editor Text Name -> Filter
@@ -419,7 +471,7 @@ updateSpanBreakdownSearch editor spanBreakdownPageData =
         { search = HasSearch editor,
           spans =
             spans spanBreakdownPageData
-              |> Prelude.fmap (Tuple.second >> annotateSearch (HasSearch editor))
+              |> Prelude.fmap (Tuple.second >> annotateSearch (Just editor))
         }
 
 resetSpanBreakdownSearch :: SpanBreakdownPageData -> SpanBreakdownPageData
@@ -428,16 +480,16 @@ resetSpanBreakdownSearch spanBreakdownPageData =
     { search = NoSearch,
       spans =
         spans spanBreakdownPageData
-          |> Prelude.fmap (Tuple.second >> annotateSearch NoSearch)
+          |> Prelude.fmap (Tuple.second >> annotateSearch Nothing)
     }
 
-annotateSearch :: Search -> Span -> (SearchMatch, Span)
-annotateSearch search span =
-  case search of
-    NoSearch -> (NoMatch, span)
-    EditSearch _ -> (NoMatch, span) -- TODO live update
-    HasSearch editor ->
-      if Text.contains (getEditContents editor) (rawSummary (original span))
+annotateSearch :: Maybe (Edit.Editor Text Name) -> Span -> (SearchMatch, Span)
+annotateSearch maybeEditor span =
+  case maybeEditor of
+    Nothing -> (NoMatch, span)
+    Just editor ->
+      if getEditContents editor /= ""
+        && Text.contains (getEditContents editor) (rawSummary (original span))
         then (Matches (getEditContents editor), span)
         else (NoMatch, span)
 
@@ -622,6 +674,7 @@ viewKey page clipboardCommand =
       applyFilter = "enter: apply filter"
       filter' = "/: filter"
       adjustSearch = "/: adjust search"
+      previousMatch = "n: previous match"
       nextMatch = "n: next match"
       clearSearch = "x: clear search"
       stopEditSearch = "esc: stop searching"
@@ -642,17 +695,19 @@ viewKey page clipboardCommand =
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
                 NoSearch -> [exit, updown, unselect, search']
-                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch, nextMatch]
+                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch, nextMatch, previousMatch]
                 EditSearch _ -> [stopEditSearch, applySearch]
             )
               ++ ( case clipboardCommand of
                      Nothing -> []
                      Just _ -> [copy]
                  )
-   in shortcuts
-        |> Text.join "   "
-        |> Brick.txt
-        |> Center.hCenter
+   in Brick.vBox
+        [ Border.hBorder,
+          shortcuts
+            |> Text.join "   "
+            |> Brick.txtWrap
+        ]
 
 viewContents :: Page -> Brick.Widget Name
 viewContents page =
@@ -975,6 +1030,9 @@ handleEvent pushMsg model event =
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'n') []) -> do
           liftIO (pushMsg Next)
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar 'N') []) -> do
+          liftIO (pushMsg Previous)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar 'h') []) -> do
           liftIO (pushMsg Cancel)
