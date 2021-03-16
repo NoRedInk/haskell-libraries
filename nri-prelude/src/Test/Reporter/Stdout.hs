@@ -7,17 +7,16 @@ module Test.Reporter.Stdout
 where
 
 import qualified Control.Exception as Exception
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text.Encoding as TE
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
 import qualified System.Console.ANSI as ANSI
-import qualified System.Directory
-import System.FilePath ((</>))
 import qualified System.IO
 import qualified Test.Internal as Internal
+import Test.Reporter.Internal (black, green, grey, red, sgr, underlined, yellow)
+import qualified Test.Reporter.Internal
 import qualified Tuple
 import qualified Prelude
 
@@ -125,55 +124,14 @@ renderReport styled results =
             ++ "\n"
         )
 
-extraLinesOnFailure :: Int
-extraLinesOnFailure = 2
-
 renderFailureInFile ::
   ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
   Internal.SingleTest Internal.Failure ->
   Prelude.IO Builder.Builder
 renderFailureInFile styled test =
   case Internal.body test of
-    Internal.FailedAssertion _ (Just loc) -> do
-      cwd <- System.Directory.getCurrentDirectory
-      let path = cwd </> Stack.srcLocFile loc
-      exists <- System.Directory.doesFileExist path
-      if exists
-        then do
-          contents <- BS.readFile path
-          let startLine = Prelude.fromIntegral (Stack.srcLocStartLine loc)
-          let lines =
-                contents
-                  |> BS.split 10 -- splitting newlines
-                  |> List.drop (startLine - extraLinesOnFailure - 1)
-                  |> List.take (extraLinesOnFailure * 2 + 1)
-                  |> List.indexedMap
-                    ( \i l ->
-                        Builder.intDec
-                          ( Prelude.fromIntegral
-                              <| startLine + i - extraLinesOnFailure
-                          )
-                          ++ ": "
-                          ++ Builder.byteString l
-                    )
-          Prelude.pure <| case lines of
-            [] -> ""
-            lines' ->
-              "\n"
-                ++ "Expectation failed at "
-                ++ Builder.stringUtf8 (Stack.srcLocFile loc)
-                ++ ":"
-                ++ Builder.intDec (Stack.srcLocStartLine loc)
-                ++ "\n"
-                ++ Prelude.foldMap
-                  ( \(nr, line) ->
-                      if nr == extraLinesOnFailure
-                        then styled [red] ("✗ " ++ line) ++ "\n"
-                        else "  " ++ styled [dullGrey] line ++ "\n"
-                  )
-                  (List.indexedMap (,) lines')
-                ++ "\n"
-        else Prelude.pure ""
+    Internal.FailedAssertion _ (Just loc) ->
+      Test.Reporter.Internal.renderSrcLoc styled loc
     _ -> Prelude.pure ""
 
 prettyPath ::
@@ -217,27 +175,3 @@ testFailure test =
         ++ "This is a bug.\n\n"
         ++ "If you have some time to report the bug it would be much appreciated!\n"
         ++ "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
-
-sgr :: [ANSI.SGR] -> Builder.Builder
-sgr = Builder.stringUtf8 << ANSI.setSGRCode
-
-red :: ANSI.SGR
-red = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Red
-
-yellow :: ANSI.SGR
-yellow = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Yellow
-
-green :: ANSI.SGR
-green = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Green
-
-grey :: ANSI.SGR
-grey = ANSI.SetColor ANSI.Foreground ANSI.Vivid ANSI.Black
-
-dullGrey :: ANSI.SGR
-dullGrey = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Black
-
-black :: ANSI.SGR
-black = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.White
-
-underlined :: ANSI.SGR
-underlined = ANSI.SetUnderlining ANSI.SingleUnderline

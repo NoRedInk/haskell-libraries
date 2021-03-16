@@ -9,16 +9,18 @@ module Test.Reporter.Junit
 where
 
 import qualified Control.Exception.Safe as Exception
+import qualified Data.ByteString.Builder as Builder
+import qualified Data.ByteString.Lazy
 import qualified Data.Text
-import qualified Data.Text.IO
+import qualified Data.Text.Encoding as TE
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
 import qualified Platform
 import qualified System.Directory as Directory
-import System.FilePath ((</>))
 import qualified System.FilePath as FilePath
 import qualified Test.Internal as Internal
+import qualified Test.Reporter.Internal
 import qualified Text
 import qualified Text.XML.JUnit as JUnit
 import qualified Prelude
@@ -65,9 +67,6 @@ renderSkipped test =
   JUnit.skipped (Internal.name test)
     |> JUnit.inSuite (suiteName test)
 
-extraLinesOnFailure :: Int
-extraLinesOnFailure = 2
-
 renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> Prelude.IO JUnit.TestSuite
 renderFailed test =
   case Internal.body test of
@@ -75,46 +74,12 @@ renderFailed test =
       msg' <- case maybeLoc of
         Nothing -> Prelude.pure msg
         Just loc -> do
-          cwd <- Directory.getCurrentDirectory
-          let path = cwd </> Stack.srcLocFile loc
-          exists <- Directory.doesFileExist path
-          if exists
-            then do
-              contents <- Data.Text.IO.readFile path
-              let startLine = Prelude.fromIntegral (Stack.srcLocStartLine loc)
-              let lines =
-                    contents
-                      |> Data.Text.lines
-                      |> List.drop (startLine - extraLinesOnFailure - 1)
-                      |> List.take (extraLinesOnFailure * 2 + 1)
-                      |> List.indexedMap
-                        ( \i l ->
-                            Text.fromList
-                              ( Prelude.show
-                                  <| startLine + i - extraLinesOnFailure
-                              )
-                              ++ ": "
-                              ++ l
-                        )
-              Prelude.pure <| case lines of
-                [] -> ""
-                lines' ->
-                  "\n"
-                    ++ "Expectation failed at "
-                    ++ Text.fromList (Stack.srcLocFile loc)
-                    ++ ":"
-                    ++ Text.fromList (Prelude.show (Stack.srcLocStartLine loc))
-                    ++ "\n"
-                    ++ Prelude.foldMap
-                      ( \(nr, line) ->
-                          if nr == extraLinesOnFailure
-                            then "✗ " ++ line ++ "\n"
-                            else "  " ++ line ++ "\n"
-                      )
-                      (List.indexedMap (,) lines')
-                    ++ "\n"
-                    ++ msg
-            else Prelude.pure msg
+          result <- Test.Reporter.Internal.renderSrcLoc (\_ -> identity) loc
+          Builder.toLazyByteString result
+            |> Data.ByteString.Lazy.toStrict
+            |> TE.decodeUtf8
+            |> (\src -> src ++ "\n" ++ msg)
+            |> Prelude.pure
       JUnit.failed (Internal.name test)
         |> JUnit.stderr msg'
         |> ( case stackFrame test of
