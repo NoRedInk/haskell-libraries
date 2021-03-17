@@ -9,6 +9,7 @@ module Test.Reporter.Junit
 where
 
 import qualified Control.Exception.Safe as Exception
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy
 import qualified Data.Text
@@ -23,6 +24,7 @@ import qualified Test.Internal as Internal
 import qualified Test.Reporter.Internal
 import qualified Text
 import qualified Text.XML.JUnit as JUnit
+import qualified Tuple
 import qualified Prelude
 
 report :: FilePath.FilePath -> Internal.SuiteResult -> Prelude.IO ()
@@ -48,7 +50,10 @@ testResults result =
             ++ List.map renderPassed passed
         )
     Internal.TestsFailed passed skipped failed -> do
-      renderedFailed <- Prelude.traverse renderFailed failed
+      srcLocs <-
+        List.map (map Tuple.second) failed
+          |> Prelude.traverse Test.Reporter.Internal.readSrcLoc
+      let renderedFailed = List.map2 renderFailed failed srcLocs
       Prelude.pure
         ( renderedFailed
             ++ List.map renderSkipped skipped
@@ -67,28 +72,29 @@ renderSkipped test =
   JUnit.skipped (Internal.name test)
     |> JUnit.inSuite (suiteName test)
 
-renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> Prelude.IO JUnit.TestSuite
-renderFailed test =
+renderFailed ::
+  Internal.SingleTest (Platform.TracingSpan, Internal.Failure) ->
+  Maybe (Stack.SrcLoc, BS.ByteString) ->
+  JUnit.TestSuite
+renderFailed test maybeSrcLoc =
   case Internal.body test of
-    (tracingSpan, Internal.FailedAssertion msg maybeLoc) -> do
-      msg' <- case maybeLoc of
-        Nothing -> Prelude.pure msg
-        Just loc -> do
-          result <- Test.Reporter.Internal.renderSrcLoc (\_ -> identity) loc
-          Builder.toLazyByteString result
-            |> Data.ByteString.Lazy.toStrict
-            |> TE.decodeUtf8
-            |> (\src -> src ++ "\n" ++ msg)
-            |> Prelude.pure
-      JUnit.failed (Internal.name test)
-        |> JUnit.stderr msg'
-        |> ( case stackFrame test of
-               Nothing -> identity
-               Just frame -> JUnit.failureStackTrace [frame]
-           )
-        |> JUnit.time (duration tracingSpan)
-        |> JUnit.inSuite (suiteName test)
-        |> Prelude.pure
+    (tracingSpan, Internal.FailedAssertion msg _) ->
+      let msg' = case maybeSrcLoc of
+            Nothing -> msg
+            Just (loc, src) ->
+              Test.Reporter.Internal.renderSrcLoc (\_ -> identity) loc src
+                |> Builder.toLazyByteString
+                |> Data.ByteString.Lazy.toStrict
+                |> TE.decodeUtf8
+                |> (\srcStr -> srcStr ++ "\n" ++ msg)
+       in JUnit.failed (Internal.name test)
+            |> JUnit.stderr msg'
+            |> ( case stackFrame test of
+                   Nothing -> identity
+                   Just frame -> JUnit.failureStackTrace [frame]
+               )
+            |> JUnit.time (duration tracingSpan)
+            |> JUnit.inSuite (suiteName test)
     (tracingSpan, Internal.ThrewException err) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test threw an exception."
@@ -99,7 +105,6 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
-        |> Prelude.pure
     (tracingSpan, Internal.TookTooLong) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test timed out."
@@ -109,7 +114,6 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
-        |> Prelude.pure
     (tracingSpan, Internal.TestRunnerMessedUp msg) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage
@@ -129,7 +133,6 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
-        |> Prelude.pure
 
 suiteName :: Internal.SingleTest a -> Text
 suiteName test =
