@@ -61,6 +61,7 @@ library
       Platform.Internal
       Test.Internal
       Test.Reporter.ExitCode
+      Test.Reporter.Internal
       Test.Reporter.Junit
       Test.Reporter.Logfile
       Test.Reporter.Stdout
@@ -133,6 +134,7 @@ test-suite tests
       Test
       Test.Internal
       Test.Reporter.ExitCode
+      Test.Reporter.Internal
       Test.Reporter.Junit
       Test.Reporter.Logfile
       Test.Reporter.Stdout

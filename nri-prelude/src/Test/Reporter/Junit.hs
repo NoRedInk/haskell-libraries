@@ -9,7 +9,10 @@ module Test.Reporter.Junit
 where
 
 import qualified Control.Exception.Safe as Exception
+import qualified Data.ByteString.Builder as Builder
+import qualified Data.ByteString.Lazy
 import qualified Data.Text
+import qualified Data.Text.Encoding as TE
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
@@ -17,6 +20,7 @@ import qualified Platform
 import qualified System.Directory as Directory
 import qualified System.FilePath as FilePath
 import qualified Test.Internal as Internal
+import qualified Test.Reporter.Internal
 import qualified Text
 import qualified Text.XML.JUnit as JUnit
 import qualified Prelude
@@ -24,24 +28,33 @@ import qualified Prelude
 report :: FilePath.FilePath -> Internal.SuiteResult -> Prelude.IO ()
 report path result = do
   createPathDirIfMissing path
-  JUnit.writeXmlReport path (testResults result)
+  results <- testResults result
+  JUnit.writeXmlReport path results
 
-testResults :: Internal.SuiteResult -> List JUnit.TestSuite
+testResults :: Internal.SuiteResult -> Prelude.IO (List JUnit.TestSuite)
 testResults result =
   case result of
     Internal.AllPassed passed ->
       List.map renderPassed passed
+        |> Prelude.pure
     Internal.OnlysPassed passed skipped ->
-      List.map renderSkipped skipped
-        ++ List.map renderPassed passed
+      Prelude.pure
+        ( List.map renderSkipped skipped
+            ++ List.map renderPassed passed
+        )
     Internal.PassedWithSkipped passed skipped ->
-      List.map renderSkipped skipped
-        ++ List.map renderPassed passed
-    Internal.TestsFailed passed skipped failed ->
-      List.map renderFailed failed
-        ++ List.map renderSkipped skipped
-        ++ List.map renderPassed passed
-    Internal.NoTestsInSuite -> []
+      Prelude.pure
+        ( List.map renderSkipped skipped
+            ++ List.map renderPassed passed
+        )
+    Internal.TestsFailed passed skipped failed -> do
+      renderedFailed <- Prelude.traverse renderFailed failed
+      Prelude.pure
+        ( renderedFailed
+            ++ List.map renderSkipped skipped
+            ++ List.map renderPassed passed
+        )
+    Internal.NoTestsInSuite -> Prelude.pure []
 
 renderPassed :: Internal.SingleTest Platform.TracingSpan -> JUnit.TestSuite
 renderPassed test =
@@ -54,18 +67,28 @@ renderSkipped test =
   JUnit.skipped (Internal.name test)
     |> JUnit.inSuite (suiteName test)
 
-renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> JUnit.TestSuite
+renderFailed :: Internal.SingleTest (Platform.TracingSpan, Internal.Failure) -> Prelude.IO JUnit.TestSuite
 renderFailed test =
   case Internal.body test of
-    (tracingSpan, Internal.FailedAssertion msg _) ->
+    (tracingSpan, Internal.FailedAssertion msg maybeLoc) -> do
+      msg' <- case maybeLoc of
+        Nothing -> Prelude.pure msg
+        Just loc -> do
+          result <- Test.Reporter.Internal.renderSrcLoc (\_ -> identity) loc
+          Builder.toLazyByteString result
+            |> Data.ByteString.Lazy.toStrict
+            |> TE.decodeUtf8
+            |> (\src -> src ++ "\n" ++ msg)
+            |> Prelude.pure
       JUnit.failed (Internal.name test)
-        |> JUnit.stderr msg
+        |> JUnit.stderr msg'
         |> ( case stackFrame test of
                Nothing -> identity
                Just frame -> JUnit.failureStackTrace [frame]
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
     (tracingSpan, Internal.ThrewException err) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test threw an exception."
@@ -76,6 +99,7 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
     (tracingSpan, Internal.TookTooLong) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test timed out."
@@ -85,6 +109,7 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
     (tracingSpan, Internal.TestRunnerMessedUp msg) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage
@@ -104,6 +129,7 @@ renderFailed test =
            )
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
+        |> Prelude.pure
 
 suiteName :: Internal.SingleTest a -> Text
 suiteName test =
