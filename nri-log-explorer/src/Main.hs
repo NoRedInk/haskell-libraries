@@ -673,14 +673,14 @@ viewKey page clipboardCommand =
       unselect = "backspace: back"
       copy = "y: copy details"
       adjustFilter = "/: adjust filter"
-      clearFilter = "x: clear filter"
+      clearFilter = "ctrl-u: clear filter"
       stopEditFilter = "esc: stop filtering"
       applyFilter = "enter: apply filter"
       filter' = "/: filter"
       adjustSearch = "/: adjust search"
       previousMatch = "n: previous match"
       nextMatch = "n: next match"
-      clearSearch = "x: clear search"
+      clearSearch = "ctrl-u: clear search"
       stopEditSearch = "esc: stop searching"
       applySearch = "enter: apply search"
       search' = "/: search"
@@ -689,23 +689,29 @@ viewKey page clipboardCommand =
           NoDataPage filter ->
             case filter of
               NoFilter -> [exit]
-              EditFilter _ -> [exit, stopEditFilter]
-              _ -> [exit, adjustFilter, clearFilter]
+              EditFilter _ -> [exit, stopEditFilter, clearFilter]
+              _ -> [exit, adjustFilter]
           RootSpanPage RootSpanPageData {filter} ->
             case filter of
               NoFilter -> [exit, updown, select, filter']
-              HasFilter _ -> [exit, updown, select, adjustFilter, clearFilter]
-              EditFilter _ -> [stopEditFilter, applyFilter]
+              HasFilter _ -> [exit, updown, select, adjustFilter]
+              EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
-                NoSearch -> [exit, updown, unselect, search']
-                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch, nextMatch, previousMatch]
-                EditSearch _ -> [stopEditSearch, applySearch]
+                NoSearch ->
+                  [exit, updown, unselect, search']
+                    ++ ( case clipboardCommand of
+                           Nothing -> []
+                           Just _ -> [copy]
+                       )
+                HasSearch _ ->
+                  [exit, updown, unselect, adjustSearch, nextMatch, previousMatch]
+                    ++ ( case clipboardCommand of
+                           Nothing -> []
+                           Just _ -> [copy]
+                       )
+                EditSearch _ -> [stopEditSearch, applySearch, clearSearch]
             )
-              ++ ( case clipboardCommand of
-                     Nothing -> []
-                     Just _ -> [copy]
-                 )
    in Brick.vBox
         [ Border.hBorder,
           shortcuts
@@ -1058,7 +1064,7 @@ handleEvent pushMsg model event =
         (NormalMode, Vty.EvKey (Vty.KChar '/') []) -> do
           liftIO (pushMsg EnterEdit)
           Brick.continue model
-        (NormalMode, Vty.EvKey (Vty.KChar 'x') []) -> do
+        (EditMode, Vty.EvKey (Vty.KChar 'u') [Vty.MCtrl]) -> do
           liftIO (pushMsg ClearEdit)
           Brick.continue model
         -- Fallback
