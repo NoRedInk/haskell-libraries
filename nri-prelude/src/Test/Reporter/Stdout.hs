@@ -7,6 +7,7 @@ module Test.Reporter.Stdout
 where
 
 import qualified Control.Exception as Exception
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text.Encoding as TE
 import qualified GHC.Stack as Stack
@@ -94,7 +95,8 @@ renderReport styled results =
       let amountFailed = List.length failed
       let amountSkipped = List.length skipped
       let failures = List.map (map Tuple.second) failed
-      failuresSrcs <- Prelude.traverse (renderFailureInFile styled) failures
+      srcLocs <- Prelude.traverse Test.Reporter.Internal.readSrcLoc failures
+      let failuresSrcs = List.map (renderFailureInFile styled) srcLocs
       Prelude.pure
         ( Prelude.foldMap
             ( \(srcLines, test) ->
@@ -126,13 +128,13 @@ renderReport styled results =
 
 renderFailureInFile ::
   ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
-  Internal.SingleTest Internal.Failure ->
-  Prelude.IO Builder.Builder
-renderFailureInFile styled test =
-  case Internal.body test of
-    Internal.FailedAssertion _ (Just loc) ->
-      Test.Reporter.Internal.renderSrcLoc styled loc
-    _ -> Prelude.pure ""
+  Maybe (Stack.SrcLoc, BS.ByteString) ->
+  Builder.Builder
+renderFailureInFile styled maybeSrcLoc =
+  case maybeSrcLoc of
+    Just (loc, src) ->
+      Test.Reporter.Internal.renderSrcLoc styled loc src
+    Nothing -> ""
 
 prettyPath ::
   ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
