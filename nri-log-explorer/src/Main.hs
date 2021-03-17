@@ -27,6 +27,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IORef as IORef
 import qualified Data.List
 import qualified Data.Text
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
 import qualified Data.Text.Zipper as TZ
@@ -50,6 +51,7 @@ import qualified System.IO
 import qualified System.Process
 import qualified Text
 import qualified Text.Fuzzy as Fuzzy
+import qualified Text.Regex.PCRE.Light as Regex
 import qualified Prelude
 
 data Model = Model
@@ -489,7 +491,9 @@ annotateSearch maybeEditor span =
     Nothing -> (NoMatch, span)
     Just editor ->
       if getEditContents editor /= ""
-        && Text.contains (getEditContents editor) (rawSummary (original span))
+        && Text.contains
+          (Data.Text.toCaseFold <| getEditContents editor)
+          (Data.Text.toCaseFold <| rawSummary (original span))
         then (Matches (getEditContents editor), span)
         else (NoMatch, span)
 
@@ -770,13 +774,23 @@ viewSpanBreakdown spans =
                           if matching == "fail" || matching == "failed"
                             then "✖ "
                             else matching
-                     in Text.split matching' (spanSummary (original span))
-                          |> List.map Brick.txt
-                          |> List.intersperse
-                            ( Brick.txt matching'
-                                |> Brick.withAttr "matched"
-                            )
-                          |> Brick.hBox
+                        regex =
+                          Regex.compile
+                            (TE.encodeUtf8 (Text.join "" ["(.*)(", matching', ")(.*)"]))
+                            [Regex.caseless]
+                     in case Regex.match
+                          regex
+                          (TE.encodeUtf8 (spanSummary (original span)))
+                          [] of
+                          Just [_, before, match, after] ->
+                            Brick.hBox
+                              [ Brick.txt (TE.decodeUtf8 before),
+                                Brick.txt (TE.decodeUtf8 match)
+                                  |> Brick.withAttr "matched",
+                                Brick.txt (TE.decodeUtf8 after)
+                              ]
+                          _ ->
+                            Brick.txt (spanSummary (original span))
                   NoMatch ->
                     Brick.txt (spanSummary (original span))
               )

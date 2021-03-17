@@ -50,5 +50,6 @@ in pkgs.mkShell {
     pkgs.haskellPackages.ghcid
     pkgs.ormolu
     pkgs.gnumake
+    pkgs.pcre
   ];
 }
