@@ -484,32 +484,27 @@ toggleFailureFilter f =
 
 updateRootSpans :: RootSpanPageData -> RootSpanPageData
 updateRootSpans pageData =
-  pageData
-    { rootSpans =
-        case (failureFilter pageData, filter pageData) of
-          (ShowAll, NoFilter) ->
-            Filterable.reset (rootSpans pageData)
-          (ShowAll, EditFilter editor) ->
-            Filterable.reset (rootSpans pageData)
-              |> Filterable.filter (logSpan >> matchesFilter (currentValue editor))
-          (ShowAll, HasFilter editor) ->
-            Filterable.reset (rootSpans pageData)
-              |> Filterable.filter (logSpan >> matchesFilter editor)
-          (ShowOnlyFailures, NoFilter) ->
-            Filterable.filter (logSpan >> failedSpan) (rootSpans pageData)
-          (ShowOnlyFailures, EditFilter editor) ->
+  let matchesFilter :: Edit.Editor Text Name -> Platform.TracingSpan -> Bool
+      matchesFilter editor logSpan =
+        List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditWords editor)
+      failureFilterFunction =
+        case failureFilter pageData of
+          ShowAll -> \_ -> True
+          ShowOnlyFailures -> failedSpan
+      filterFunction =
+        case filter pageData of
+          NoFilter -> \_ -> True
+          EditFilter editor -> matchesFilter (currentValue editor)
+          HasFilter editor -> matchesFilter editor
+   in pageData
+        { rootSpans =
             Filterable.filter
-              (\RootSpan {logSpan} -> failedSpan logSpan && matchesFilter (currentValue editor) logSpan)
+              ( \RootSpan {logSpan} ->
+                  failureFilterFunction logSpan
+                    && filterFunction logSpan
+              )
               (rootSpans pageData)
-          (ShowOnlyFailures, HasFilter editor) ->
-            Filterable.filter
-              (\RootSpan {logSpan} -> failedSpan logSpan && matchesFilter editor logSpan)
-              (rootSpans pageData)
-    }
-  where
-    matchesFilter :: Edit.Editor Text Name -> Platform.TracingSpan -> Bool
-    matchesFilter editor logSpan =
-      List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditWords editor)
+        }
 
 updateFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
 updateFilter editor rootSpanPageData =
