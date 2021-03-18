@@ -8,7 +8,6 @@ library:
   - base
   - bytestring
   - conduit
-  - flat
   - health
   - hedis
   - nri-env-parser
