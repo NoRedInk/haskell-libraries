@@ -251,7 +251,9 @@ update model msg =
               RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
                 case filter of
                   EditFilter filterEditor ->
-                    RootSpanPage (updateRootSpanFilter (currentValue filterEditor) rootSpanPageData)
+                    updateFilter (currentValue filterEditor) rootSpanPageData
+                      |> updateRootSpans
+                      |> RootSpanPage
                   _ ->
                     case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
                       Nothing -> page
@@ -270,7 +272,8 @@ update model msg =
         ( \page ->
             case page of
               NoDataPage (EditFilter editor) _ ->
-                updateRootSpanFilter (originalValue editor) (rootSpanPage model)
+                updateFilter (originalValue editor) (rootSpanPage model)
+                  |> updateRootSpans
                   |> RootSpanPage
               NoDataPage _ _ -> page
               SpanBreakdownPage spanBreakdownPage ->
@@ -282,7 +285,8 @@ update model msg =
               RootSpanPage rootSpanPageData ->
                 case filter rootSpanPageData of
                   EditFilter editor ->
-                    updateRootSpanFilter (originalValue editor) rootSpanPageData
+                    updateFilter (originalValue editor) rootSpanPageData
+                      |> updateRootSpans
                       |> RootSpanPage
                   _ -> page
         )
@@ -502,13 +506,16 @@ updateRootSpans pageData =
               (\RootSpan {logSpan} -> failedSpan logSpan && matchesFilter editor logSpan)
               (rootSpans pageData)
     }
+  where
+    matchesFilter :: Edit.Editor Text Name -> Platform.TracingSpan -> Bool
+    matchesFilter editor logSpan =
+      List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditWords editor)
 
-updateRootSpanFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
-updateRootSpanFilter editor rootSpanPageData =
-  updateRootSpans
-    <| if hasNoFilters editor
-      then rootSpanPageData {filter = NoFilter}
-      else rootSpanPageData {filter = HasFilter editor}
+updateFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
+updateFilter editor rootSpanPageData =
+  if hasNoFilters editor
+    then rootSpanPageData {filter = NoFilter}
+    else rootSpanPageData {filter = HasFilter editor}
 
 updateSpanBreakdownSearch :: Edit.Editor Text Name -> SpanBreakdownPageData -> SpanBreakdownPageData
 updateSpanBreakdownSearch editor spanBreakdownPageData =
@@ -549,10 +556,6 @@ editRootSpanFilter editor rootSpanPageData =
     rootSpanPageData
       { filter = EditFilter editor
       }
-
-matchesFilter :: Edit.Editor Text Name -> Platform.TracingSpan -> Bool
-matchesFilter editor logSpan =
-  List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditWords editor)
 
 hasNoFilters :: Edit.Editor Text Name -> Bool
 hasNoFilters editor = getEditWords editor == []
