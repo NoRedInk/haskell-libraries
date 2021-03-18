@@ -205,7 +205,9 @@ update model msg =
           let rootSpan = RootSpan date span
               newModel =
                 model
-                  { rootSpanPage = (rootSpanPage model) {rootSpans = Filterable.cons rootSpan (rootSpans (rootSpanPage model))}
+                  { rootSpanPage =
+                      (rootSpanPage model) {rootSpans = Filterable.cons rootSpan (rootSpans (rootSpanPage model))}
+                        |> updateRootSpans
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
