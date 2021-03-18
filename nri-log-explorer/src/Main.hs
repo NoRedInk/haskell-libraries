@@ -132,7 +132,7 @@ data Msg
   | Next
   | Previous
   | EditorEvent Vty.Event
-  | ToggleFailures
+  | ShowHideFailures
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -396,18 +396,31 @@ update model msg =
                   _ -> Prelude.pure page
         )
         |> andThen continueAfterUserInteraction
-    ToggleFailures ->
+    ShowHideFailures ->
       withPage
         model
         ( \page ->
             case page of
-              RootSpanPage rootSpanPageData ->
-                RootSpanPage
-                  rootSpanPageData
-                    { failureFilter = case failureFilter rootSpanPageData of
-                        ShowAll -> ShowOnlyFailures
-                        ShowOnlyFailures -> ShowAll
-                    }
+              RootSpanPage rootSpanPageData@RootSpanPageData {failureFilter, rootSpans} ->
+                let (newFailureFilter, newRootSpans) =
+                      case failureFilter of
+                        ShowAll -> (ShowOnlyFailures, Filterable.reset rootSpans)
+                        ShowOnlyFailures ->
+                          ( ShowAll,
+                            Filterable.filter
+                              ( \RootSpan {logSpan} ->
+                                  case Platform.succeeded logSpan of
+                                    Platform.Succeeded -> False
+                                    Platform.Failed -> True
+                                    Platform.FailedWith _ -> True
+                              )
+                              rootSpans
+                          )
+                 in RootSpanPage
+                      rootSpanPageData
+                        { failureFilter = newFailureFilter,
+                          rootSpans = newRootSpans
+                        }
               SpanBreakdownPage _ -> page
               NoDataPage _ -> page
         )
@@ -1108,7 +1121,7 @@ handleEvent pushMsg model event =
           Brick.continue model
         -- Failurefilter
         (NormalMode, Vty.EvKey (Vty.KChar 'f') []) -> do
-          liftIO (pushMsg ToggleFailures)
+          liftIO (pushMsg ShowHideFailures)
           Brick.continue model
         -- Fallback
         (EditMode, _) -> do
