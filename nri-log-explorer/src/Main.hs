@@ -147,14 +147,14 @@ data Name
 -- An alternative data type containing part of the same data as above, in a
 -- format more convenient for some update and view functions.
 data Page
-  = NoDataPage Filter
+  = NoDataPage Filter FailureFilter
   | RootSpanPage RootSpanPageData
   | SpanBreakdownPage SpanBreakdownPageData
 
 toPage :: Model -> Page
 toPage model =
   case (spanBreakdownPage model, ListWidget.listSelectedElement <| Filterable.toListWidget (rootSpans (rootSpanPage model))) of
-    (_, Nothing) -> NoDataPage (filter (rootSpanPage model))
+    (_, Nothing) -> NoDataPage (filter (rootSpanPage model)) (failureFilter (rootSpanPage model))
     (Just spanBreakdownPageData, _) -> SpanBreakdownPage spanBreakdownPageData
     (Nothing, _) -> RootSpanPage (rootSpanPage model)
 
@@ -167,7 +167,7 @@ withPageEvent :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name 
 withPageEvent model fn =
   map
     ( \case
-        NoDataPage filter -> model {rootSpanPage = (rootSpanPage model) {filter}}
+        NoDataPage filter failureFilter -> model {rootSpanPage = (rootSpanPage model) {filter, failureFilter}}
         RootSpanPage rootSpanPageData ->
           model {rootSpanPage = rootSpanPageData, spanBreakdownPage = Nothing}
         SpanBreakdownPage spanBreakdownPageData ->
@@ -222,7 +222,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> page
+              NoDataPage _ _ -> page
               SpanBreakdownPage _ -> page
               RootSpanPage RootSpanPageData {rootSpans} ->
                 case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
@@ -241,7 +241,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> page
+              NoDataPage _ _ -> page
               SpanBreakdownPage spanBreakdownPageData ->
                 case search spanBreakdownPageData of
                   EditSearch searchEditor ->
@@ -269,10 +269,10 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage (EditFilter editor) ->
+              NoDataPage (EditFilter editor) _ ->
                 updateRootSpanFilter (originalValue editor) (rootSpanPage model)
                   |> RootSpanPage
-              NoDataPage _ -> page
+              NoDataPage _ _ -> page
               SpanBreakdownPage spanBreakdownPage ->
                 case search spanBreakdownPage of
                   EditSearch editor ->
@@ -289,7 +289,7 @@ update model msg =
         |> andThen continueAfterUserInteraction
     CopyDetails -> do
       case toPage model of
-        NoDataPage _ -> Prelude.pure ()
+        NoDataPage _ _ -> Prelude.pure ()
         RootSpanPage _ -> Prelude.pure ()
         SpanBreakdownPage SpanBreakdownPageData {spans} ->
           case clipboardCommand model of
@@ -311,7 +311,7 @@ update model msg =
                   SpanBreakdownPage spanBreakdownPageData ->
                     SpanBreakdownPage
                       spanBreakdownPageData {search = enterEditSearch (search spanBreakdownPageData) editor}
-                  NoDataPage filter' -> NoDataPage (enterEditFilter filter' editor)
+                  NoDataPage filter' failureFilter' -> NoDataPage (enterEditFilter filter' editor) failureFilter'
                   RootSpanPage rootSpanPageData ->
                     RootSpanPage rootSpanPageData {filter = enterEditFilter (filter rootSpanPageData) editor}
         )
@@ -321,7 +321,7 @@ update model msg =
         ( case toPage model of
             SpanBreakdownPage spanBreakdownPageData ->
               model {spanBreakdownPage = Just <| resetSpanBreakdownSearch spanBreakdownPageData}
-            NoDataPage (HasFilter _) ->
+            NoDataPage (HasFilter _) _ ->
               model {rootSpanPage = resetRootSpanFilter (rootSpanPage model)}
             RootSpanPage rootSpanPageData ->
               model {rootSpanPage = resetRootSpanFilter rootSpanPageData}
@@ -332,13 +332,11 @@ update model msg =
         <| withPageEvent model
         <| \page -> do
           case page of
-            NoDataPage (EditFilter editor) -> do
+            NoDataPage (EditFilter editor) failureFilter -> do
               newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-              setCurrent newEditor editor
-                |> EditFilter
-                |> NoDataPage
+              NoDataPage (EditFilter (setCurrent newEditor editor)) failureFilter
                 |> Prelude.pure
-            NoDataPage _ -> Prelude.pure page
+            NoDataPage _ _ -> Prelude.pure page
             RootSpanPage rootSpanPageData ->
               case filter rootSpanPageData of
                 EditFilter editor -> do
@@ -365,7 +363,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> Prelude.pure page
+              NoDataPage _ _ -> Prelude.pure page
               RootSpanPage _ -> Prelude.pure page
               SpanBreakdownPage spanBreakdownPageData ->
                 case search spanBreakdownPageData of
@@ -384,7 +382,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> Prelude.pure page
+              NoDataPage _ _ -> Prelude.pure page
               RootSpanPage _ -> Prelude.pure page
               SpanBreakdownPage spanBreakdownPageData ->
                 case search spanBreakdownPageData of
@@ -404,11 +402,11 @@ update model msg =
         ( \page ->
             case page of
               RootSpanPage rootSpanPageData ->
-                toggleFailureFilter rootSpanPageData
+                rootSpanPageData {failureFilter = toggleFailureFilter (failureFilter rootSpanPageData)}
                   |> updateRootSpans
                   |> RootSpanPage
               SpanBreakdownPage _ -> page -- TODO allow toggling back
-              NoDataPage _ -> page
+              NoDataPage filter failureFilter -> NoDataPage filter (toggleFailureFilter failureFilter)
         )
         |> andThen continueAfterUserInteraction
 
@@ -474,13 +472,11 @@ enterEditSearch search' editor =
     EditSearch editor' -> EditSearch editor'
     HasSearch editor' -> EditSearch (initUndo editor')
 
-toggleFailureFilter :: RootSpanPageData -> RootSpanPageData
-toggleFailureFilter pageData =
-  case failureFilter pageData of
-    ShowAll ->
-      pageData {failureFilter = ShowOnlyFailures}
-    ShowOnlyFailures ->
-      pageData {failureFilter = ShowAll}
+toggleFailureFilter :: FailureFilter -> FailureFilter
+toggleFailureFilter f =
+  case f of
+    ShowAll -> ShowOnlyFailures
+    ShowOnlyFailures -> ShowAll
 
 updateRootSpans :: RootSpanPageData -> RootSpanPageData
 updateRootSpans pageData =
@@ -577,7 +573,7 @@ scroll ::
 scroll move model =
   withPageEvent model
     <| \case
-      NoDataPage filter -> Prelude.pure (NoDataPage filter)
+      NoDataPage filter failureFilter -> Prelude.pure (NoDataPage filter failureFilter)
       RootSpanPage rootSpanPageData@RootSpanPageData {rootSpans} ->
         move (Filterable.toListWidget rootSpans)
           |> map (Filterable.setListWidget rootSpans)
@@ -635,7 +631,7 @@ viewMaybeEditor :: Page -> Brick.Widget Name
 viewMaybeEditor page =
   case page of
     SpanBreakdownPage SpanBreakdownPageData {search} -> viewSearch search
-    NoDataPage filter -> viewFilter filter
+    NoDataPage filter _ -> viewFilter filter
     RootSpanPage RootSpanPageData {filter} -> viewFilter filter
 
 viewFilter :: Filter -> Brick.Widget Name
@@ -725,11 +721,15 @@ viewKey page clipboardCommand =
       showOnlyFailures = "f: only failures"
       shortcuts =
         case page of
-          NoDataPage filter ->
-            case filter of
-              NoFilter -> [exit]
-              EditFilter _ -> [exit, stopEditFilter, clearFilter]
-              _ -> [exit, adjustFilter]
+          NoDataPage filter failureFilter ->
+            let failureFilterText =
+                  case failureFilter of
+                    ShowAll -> showOnlyFailures
+                    ShowOnlyFailures -> showAll
+             in case filter of
+                  NoFilter -> [exit, failureFilterText]
+                  EditFilter _ -> [exit, stopEditFilter, clearFilter, failureFilterText]
+                  _ -> [exit, adjustFilter]
           RootSpanPage RootSpanPageData {filter, failureFilter} ->
             let failureFilterText =
                   case failureFilter of
@@ -765,11 +765,11 @@ viewKey page clipboardCommand =
 viewContents :: Page -> Brick.Widget Name
 viewContents page =
   case page of
-    NoDataPage NoFilter ->
+    NoDataPage NoFilter _ ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
         |> Center.hCenter
         |> Brick.padBottom Brick.Max
-    NoDataPage _ ->
+    NoDataPage _ _ ->
       Brick.txt "Waiting for logs or adjust filter...\n\nGo run some tests!"
         |> Center.hCenter
         |> Brick.padBottom Brick.Max
