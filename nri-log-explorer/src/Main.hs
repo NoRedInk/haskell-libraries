@@ -627,11 +627,29 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ viewMaybeEditor page,
+          [ viewMaybeInfoOnlyFailures page,
+            viewMaybeEditor page,
             viewContents page,
             viewKey page (clipboardCommand model)
           ]
       ]
+
+viewMaybeInfoOnlyFailures :: Page -> Brick.Widget Name
+viewMaybeInfoOnlyFailures page =
+  let onlyShowingFailures =
+        Brick.vBox
+          [ Brick.txt "Only Showing Failures"
+              |> Brick.withAttr "only-failures",
+            Border.hBorder
+          ]
+   in case page of
+        SpanBreakdownPage _ -> Brick.txt ""
+        NoDataPage _ ShowAll -> Brick.txt ""
+        NoDataPage _ ShowOnlyFailures -> onlyShowingFailures
+        RootSpanPage RootSpanPageData {failureFilter} ->
+          case failureFilter of
+            ShowAll -> Brick.txt ""
+            ShowOnlyFailures -> onlyShowingFailures
 
 viewMaybeEditor :: Page -> Brick.Widget Name
 viewMaybeEditor page =
@@ -1086,6 +1104,14 @@ attrMap =
           ( Vty.withBackColor
               Vty.defAttr
               Vty.Color.brightYellow
+          )
+          Vty.Color.black
+      ),
+      ( "only-failures",
+        Vty.withForeColor
+          ( Vty.withBackColor
+              Vty.defAttr
+              Vty.Color.red
           )
           Vty.Color.black
       )
