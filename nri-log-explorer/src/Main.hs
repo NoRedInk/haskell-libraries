@@ -401,20 +401,11 @@ update model msg =
         model
         ( \page ->
             case page of
-              RootSpanPage rootSpanPageData@RootSpanPageData {failureFilter, rootSpans} ->
-                RootSpanPage
-                  <| case failureFilter of
-                    ShowAll ->
-                      rootSpanPageData
-                        { failureFilter = ShowOnlyFailures,
-                          rootSpans = Filterable.filter (logSpan >> failedSpan) rootSpans
-                        }
-                    ShowOnlyFailures ->
-                      rootSpanPageData
-                        { failureFilter = ShowAll,
-                          rootSpans = Filterable.reset rootSpans
-                        }
-              SpanBreakdownPage _ -> page
+              RootSpanPage rootSpanPageData ->
+                toggleFailureFilter rootSpanPageData
+                  |> updateRootSpans
+                  |> RootSpanPage
+              SpanBreakdownPage _ -> page -- TODO allow toggling back
               NoDataPage _ -> page
         )
         |> andThen continueAfterUserInteraction
@@ -480,6 +471,23 @@ enterEditSearch search' editor =
     NoSearch -> EditSearch (initUndo editor)
     EditSearch editor' -> EditSearch editor'
     HasSearch editor' -> EditSearch (initUndo editor')
+
+toggleFailureFilter :: RootSpanPageData -> RootSpanPageData
+toggleFailureFilter pageData =
+  case failureFilter pageData of
+    ShowAll ->
+      pageData {failureFilter = ShowOnlyFailures}
+    ShowOnlyFailures ->
+      pageData {failureFilter = ShowAll}
+
+updateRootSpans :: RootSpanPageData -> RootSpanPageData
+updateRootSpans pageData =
+  pageData
+    { rootSpans =
+        case failureFilter pageData of
+          ShowAll -> Filterable.reset (rootSpans pageData)
+          ShowOnlyFailures -> Filterable.filter (logSpan >> failedSpan) (rootSpans pageData)
+    }
 
 updateRootSpanFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
 updateRootSpanFilter editor rootSpanPageData =
