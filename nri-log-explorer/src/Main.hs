@@ -175,15 +175,15 @@ withPageEvent model fn =
     )
     (fn (toPage model))
 
-init :: Maybe Text -> Time.UTCTime -> Model
-init clipboardCommand currentTime =
+init :: Maybe Text -> Time.UTCTime -> FailureFilter -> Model
+init clipboardCommand currentTime failureFilter =
   Model
     { rootSpanPage =
         RootSpanPageData
           { currentTime,
             rootSpans = Filterable.init RootSpanList,
             filter = NoFilter,
-            failureFilter = ShowAll
+            failureFilter
           },
       spanBreakdownPage = Nothing,
       clipboardCommand,
@@ -989,7 +989,8 @@ main :: Prelude.IO ()
 main = do
   args <- System.Environment.getArgs
   case args of
-    [] -> run
+    [] -> run ShowAll
+    ["--failures"] -> run ShowOnlyFailures
     ["--help"] ->
       [ "Usage:",
         "  log-explorer",
@@ -997,6 +998,7 @@ main = do
         "  --help         show this help message",
         "  --version      show application version",
         "  --clear        clear old log entries before starting",
+        "  --failures     only show failures",
         "",
         "log-explorer is a tool for exploring traces produced by the nri-prelude set of libraries."
       ]
@@ -1010,14 +1012,14 @@ main = do
        in Prelude.putStrLn ("log-explorer " ++ version)
     ["--clear"] -> do
       System.Directory.removeFile logFile
-      run
+      (run ShowAll)
     _ -> System.Exit.die "log-explorer was called with unknown arguments"
 
 logFile :: Prelude.String
 logFile = "/tmp/nri-prelude-logs"
 
-run :: Prelude.IO ()
-run = do
+run :: FailureFilter -> Prelude.IO ()
+run failureFilter = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   partOfLine <- IORef.newIORef Prelude.mempty
   System.IO.appendFile logFile "" -- touch file to ensure it exists
@@ -1042,7 +1044,7 @@ run = do
         buildVty
         (Just eventChan)
         (app pushMsgNonBlocking)
-        (init clipboardCommand now)
+        (init clipboardCommand now failureFilter)
     )
 
 app :: (Msg -> Prelude.IO ()) -> Brick.App Model Msg Name
