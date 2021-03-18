@@ -402,24 +402,17 @@ update model msg =
         ( \page ->
             case page of
               RootSpanPage rootSpanPageData@RootSpanPageData {failureFilter, rootSpans} ->
-                let (newFailureFilter, newRootSpans) =
-                      case failureFilter of
-                        ShowAll -> (ShowOnlyFailures, Filterable.reset rootSpans)
-                        ShowOnlyFailures ->
-                          ( ShowAll,
-                            Filterable.filter
-                              ( \RootSpan {logSpan} ->
-                                  case Platform.succeeded logSpan of
-                                    Platform.Succeeded -> False
-                                    Platform.Failed -> True
-                                    Platform.FailedWith _ -> True
-                              )
-                              rootSpans
-                          )
-                 in RootSpanPage
+                RootSpanPage
+                  <| case failureFilter of
+                    ShowAll ->
                       rootSpanPageData
-                        { failureFilter = newFailureFilter,
-                          rootSpans = newRootSpans
+                        { failureFilter = ShowOnlyFailures,
+                          rootSpans = Filterable.reset rootSpans
+                        }
+                    ShowOnlyFailures ->
+                      rootSpanPageData
+                        { failureFilter = ShowAll,
+                          rootSpans = Filterable.filter (logSpan >> failedSpan) rootSpans
                         }
               SpanBreakdownPage _ -> page
               NoDataPage _ -> page
@@ -950,14 +943,20 @@ howFarBack date1 date2
 failSymbol :: Text
 failSymbol = "✖ "
 
+failedSpan :: Platform.TracingSpan -> Bool
+failedSpan span =
+  case Platform.succeeded span of
+    Platform.Succeeded -> False
+    Platform.Failed -> True
+    Platform.FailedWith _ -> True
+
 spanSummary :: Platform.TracingSpan -> Text
 spanSummary span =
   Text.join
     ""
-    [ case Platform.succeeded span of
-        Platform.Succeeded -> "  "
-        Platform.Failed -> failSymbol
-        Platform.FailedWith _ -> failSymbol,
+    [ if failedSpan span
+        then failSymbol
+        else "  ",
       Platform.name span,
       case Platform.summary span of
         Nothing -> ""
