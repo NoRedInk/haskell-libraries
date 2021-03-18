@@ -73,7 +73,8 @@ data RootSpanPageData = RootSpanPageData
   { -- Used to calculate "2 minutes ago" type info for root spans.
     currentTime :: Time.UTCTime,
     filter :: Filter,
-    rootSpans :: Filterable.ListWidget Name RootSpan
+    rootSpans :: Filterable.ListWidget Name RootSpan,
+    failureFilter :: FailureFilter
   }
 
 data SearchMatch = NoMatch | Matches Text
@@ -84,6 +85,8 @@ data SpanBreakdownPageData = SpanBreakdownPageData
     search :: Search,
     spans :: ListWidget.List Name (SearchMatch, Span)
   }
+
+data FailureFilter = ShowAll | ShowOnlyFailures
 
 data Filter
   = NoFilter
@@ -129,6 +132,7 @@ data Msg
   | Next
   | Previous
   | EditorEvent Vty.Event
+  | ToggleFailures
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -178,7 +182,8 @@ init clipboardCommand currentTime =
         RootSpanPageData
           { currentTime,
             rootSpans = Filterable.init RootSpanList,
-            filter = NoFilter
+            filter = NoFilter,
+            failureFilter = ShowAll
           },
       spanBreakdownPage = Nothing,
       clipboardCommand,
@@ -389,6 +394,22 @@ update model msg =
                           |> scrollSpanBreakdownPage (Prelude.pure << ListWidget.listMoveTo index)
                           |> map SpanBreakdownPage
                   _ -> Prelude.pure page
+        )
+        |> andThen continueAfterUserInteraction
+    ToggleFailures ->
+      withPage
+        model
+        ( \page ->
+            case page of
+              RootSpanPage rootSpanPageData ->
+                RootSpanPage
+                  rootSpanPageData
+                    { failureFilter = case failureFilter rootSpanPageData of
+                        ShowAll -> ShowOnlyFailures
+                        ShowOnlyFailures -> ShowAll
+                    }
+              SpanBreakdownPage _ -> page
+              NoDataPage _ -> page
         )
         |> andThen continueAfterUserInteraction
 
@@ -684,6 +705,8 @@ viewKey page clipboardCommand =
       stopEditSearch = "esc: stop searching"
       applySearch = "enter: apply search"
       search' = "/: search"
+      showAll = "f: show all"
+      showOnlyFailures = "f: only failures"
       shortcuts =
         case page of
           NoDataPage filter ->
@@ -691,11 +714,15 @@ viewKey page clipboardCommand =
               NoFilter -> [exit]
               EditFilter _ -> [exit, stopEditFilter, clearFilter]
               _ -> [exit, adjustFilter]
-          RootSpanPage RootSpanPageData {filter} ->
-            case filter of
-              NoFilter -> [exit, updown, select, filter']
-              HasFilter _ -> [exit, updown, select, adjustFilter]
-              EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
+          RootSpanPage RootSpanPageData {filter, failureFilter} ->
+            let failureFilterText =
+                  case failureFilter of
+                    ShowAll -> showOnlyFailures
+                    ShowOnlyFailures -> showAll
+             in case filter of
+                  NoFilter -> [exit, updown, select, filter', failureFilterText]
+                  HasFilter _ -> [exit, updown, select, adjustFilter, failureFilterText]
+                  EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
                 NoSearch ->
@@ -1072,11 +1099,16 @@ handleEvent pushMsg model event =
         (NormalMode, Vty.EvKey (Vty.KChar 'y') []) -> do
           liftIO (pushMsg CopyDetails)
           Brick.continue model
+        -- Filtering
         (NormalMode, Vty.EvKey (Vty.KChar '/') []) -> do
           liftIO (pushMsg EnterEdit)
           Brick.continue model
         (EditMode, Vty.EvKey (Vty.KChar 'u') [Vty.MCtrl]) -> do
           liftIO (pushMsg ClearEdit)
+          Brick.continue model
+        -- Failurefilter
+        (NormalMode, Vty.EvKey (Vty.KChar 'f') []) -> do
+          liftIO (pushMsg ToggleFailures)
           Brick.continue model
         -- Fallback
         (EditMode, _) -> do
