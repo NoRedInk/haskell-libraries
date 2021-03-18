@@ -30,6 +30,7 @@ in pkgs.mkShell {
         microlens
         modern-uri
         network-uri
+        pcre-light
         pretty-show
         process
         random
