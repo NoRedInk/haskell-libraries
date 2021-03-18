@@ -14,7 +14,6 @@ module Redis
     Settings.decoderWithEnvVarPrefix,
 
     -- * Creating a redis API
-    flatApi,
     jsonApi,
     textApi,
     byteStringApi,
@@ -56,7 +55,6 @@ import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
-import qualified Flat
 import qualified Health
 import qualified NonEmptyDict
 import qualified Platform
@@ -158,9 +156,6 @@ data Experimental key a = Experimental
     -- that was set.
     atomicModifyWithContext :: forall b. Internal.Handler -> key -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
   }
-
-flatApi :: Flat.Flat a => (key -> Text) -> Api key a
-flatApi = makeApi Codec.flatCodec
 
 jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
 jsonApi = makeApi Codec.jsonCodec

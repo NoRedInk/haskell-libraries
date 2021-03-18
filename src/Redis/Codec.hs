@@ -7,7 +7,6 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
 import qualified Data.Text.Encoding
 import qualified Debug
-import qualified Flat
 import qualified Redis.Internal as Internal
 import qualified Prelude
 
@@ -19,16 +18,6 @@ data Codec a = Codec
 type Encoder a = a -> ByteString
 
 type Decoder a = ByteString -> Result Internal.Error a
-
-flatCodec :: Flat.Flat a => Codec a
-flatCodec =
-  Codec Flat.flat <| \x ->
-    case Flat.unflat x of
-      Prelude.Right a -> Ok a
-      Prelude.Left err ->
-        Debug.toString err
-          |> Internal.DecodingError
-          |> Err
 
 jsonCodec :: (Aeson.FromJSON a, Aeson.ToJSON a) => Codec a
 jsonCodec = Codec jsonEncoder jsonDecoder
