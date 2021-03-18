@@ -6,7 +6,6 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
 import qualified Data.Text.Encoding
-import qualified Debug
 import qualified Redis.Internal as Internal
 import qualified Prelude
 

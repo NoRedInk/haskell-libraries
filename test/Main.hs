@@ -3,7 +3,6 @@ module Main (main) where
 import qualified Conduit
 import qualified Control.Concurrent.MVar as MVar
 import Data.List.NonEmpty (NonEmpty ((:|)))
-import qualified Debug
 import qualified Dict
 import qualified Environment
 import qualified Expect
