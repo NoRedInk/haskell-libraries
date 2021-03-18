@@ -776,27 +776,7 @@ viewSpanBreakdown spans =
           Brick.hBox
             [ ( case matches of
                   Matches matching ->
-                    let matching' =
-                          if matching == "fail" || matching == "failed"
-                            then "✖ "
-                            else matching
-                        regex =
-                          Regex.compile
-                            (TE.encodeUtf8 (Text.join "" ["(.*)(", matching', ")(.*)"]))
-                            [Regex.caseless]
-                     in case Regex.match
-                          regex
-                          (TE.encodeUtf8 (spanSummary (original span)))
-                          [] of
-                          Just [_, before, match, after] ->
-                            Brick.hBox
-                              [ Brick.txt (TE.decodeUtf8 before),
-                                Brick.txt (TE.decodeUtf8 match)
-                                  |> Brick.withAttr "matched",
-                                Brick.txt (TE.decodeUtf8 after)
-                              ]
-                          _ ->
-                            Brick.txt (spanSummary (original span))
+                    viewSpanBreakdownWithMatch matching span
                   NoMatch ->
                     Brick.txt (spanSummary (original span))
               )
@@ -809,6 +789,29 @@ viewSpanBreakdown spans =
       )
       True
     |> Brick.padLeftRight 1
+
+viewSpanBreakdownWithMatch :: Text -> Span -> Brick.Widget n
+viewSpanBreakdownWithMatch matching span =
+  let matching' =
+        if matching == "fail" || matching == "failed"
+          then "✖ "
+          else matching
+      regex =
+        Regex.compile
+          (TE.encodeUtf8 (Text.join "" ["(.*)(", escapeRegex matching', ")(.*)"]))
+          [Regex.caseless]
+      splitted =
+        Regex.match regex (TE.encodeUtf8 (spanSummary (original span))) []
+   in case splitted of
+        Just [_, before, match, after] ->
+          Brick.hBox
+            [ Brick.txt (TE.decodeUtf8 before),
+              Brick.txt (TE.decodeUtf8 match)
+                |> Brick.withAttr "matched",
+              Brick.txt (TE.decodeUtf8 after)
+            ]
+        _ ->
+          Brick.txt (spanSummary (original span))
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
@@ -1181,3 +1184,35 @@ spanToClipboard cmdAndArgs span =
           (List.map Data.Text.unpack args)
         |> liftIO
         |> map (\_ -> ())
+
+-- | Based on https://hackage.haskell.org/package/regex-1.1.0.0/docs/src/Text.RE.ZeInternals.EscapeREString.html#escapeREString
+-- Convert a string into a regular expression that will match that
+-- string
+escapeRegex :: Text -> Text
+escapeRegex = Text.fromList << List.foldr esc [] << Text.toList
+  where
+    esc char acc =
+      if isMetaChar char
+        then '\\' : char : acc
+        else char : acc
+
+-- | returns True iff the charactr is an RE meta character
+-- ('[', '*', '{', etc.)
+isMetaChar :: Char -> Bool
+isMetaChar char =
+  case char of
+    '^' -> True
+    '\\' -> True
+    '.' -> True
+    '|' -> True
+    '*' -> True
+    '?' -> True
+    '+' -> True
+    '(' -> True
+    ')' -> True
+    '[' -> True
+    ']' -> True
+    '{' -> True
+    '}' -> True
+    '$' -> True
+    _ -> False
