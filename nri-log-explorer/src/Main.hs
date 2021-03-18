@@ -407,12 +407,12 @@ update model msg =
                     ShowAll ->
                       rootSpanPageData
                         { failureFilter = ShowOnlyFailures,
-                          rootSpans = Filterable.reset rootSpans
+                          rootSpans = Filterable.filter (logSpan >> failedSpan) rootSpans
                         }
                     ShowOnlyFailures ->
                       rootSpanPageData
                         { failureFilter = ShowAll,
-                          rootSpans = Filterable.filter (logSpan >> failedSpan) rootSpans
+                          rootSpans = Filterable.reset rootSpans
                         }
               SpanBreakdownPage _ -> page
               NoDataPage _ -> page
