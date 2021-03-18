@@ -27,6 +27,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IORef as IORef
 import qualified Data.List
 import qualified Data.Text
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
 import qualified Data.Text.Zipper as TZ
@@ -50,6 +51,7 @@ import qualified System.IO
 import qualified System.Process
 import qualified Text
 import qualified Text.Fuzzy as Fuzzy
+import qualified Text.Regex.PCRE.Light as Regex
 import qualified Prelude
 
 data Model = Model
@@ -489,7 +491,9 @@ annotateSearch maybeEditor span =
     Nothing -> (NoMatch, span)
     Just editor ->
       if getEditContents editor /= ""
-        && Text.contains (getEditContents editor) (rawSummary (original span))
+        && Text.contains
+          (Data.Text.toCaseFold <| getEditContents editor)
+          (Data.Text.toCaseFold <| rawSummary (original span))
         then (Matches (getEditContents editor), span)
         else (NoMatch, span)
 
@@ -669,14 +673,14 @@ viewKey page clipboardCommand =
       unselect = "backspace: back"
       copy = "y: copy details"
       adjustFilter = "/: adjust filter"
-      clearFilter = "x: clear filter"
+      clearFilter = "ctrl-u: clear filter"
       stopEditFilter = "esc: stop filtering"
       applyFilter = "enter: apply filter"
       filter' = "/: filter"
       adjustSearch = "/: adjust search"
       previousMatch = "n: previous match"
       nextMatch = "n: next match"
-      clearSearch = "x: clear search"
+      clearSearch = "ctrl-u: clear search"
       stopEditSearch = "esc: stop searching"
       applySearch = "enter: apply search"
       search' = "/: search"
@@ -685,23 +689,29 @@ viewKey page clipboardCommand =
           NoDataPage filter ->
             case filter of
               NoFilter -> [exit]
-              EditFilter _ -> [exit, stopEditFilter]
-              _ -> [exit, adjustFilter, clearFilter]
+              EditFilter _ -> [exit, stopEditFilter, clearFilter]
+              _ -> [exit, adjustFilter]
           RootSpanPage RootSpanPageData {filter} ->
             case filter of
               NoFilter -> [exit, updown, select, filter']
-              HasFilter _ -> [exit, updown, select, adjustFilter, clearFilter]
-              EditFilter _ -> [stopEditFilter, applyFilter]
+              HasFilter _ -> [exit, updown, select, adjustFilter]
+              EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
-                NoSearch -> [exit, updown, unselect, search']
-                HasSearch _ -> [exit, updown, unselect, adjustSearch, clearSearch, nextMatch, previousMatch]
-                EditSearch _ -> [stopEditSearch, applySearch]
+                NoSearch ->
+                  [exit, updown, unselect, search']
+                    ++ ( case clipboardCommand of
+                           Nothing -> []
+                           Just _ -> [copy]
+                       )
+                HasSearch _ ->
+                  [exit, updown, unselect, adjustSearch, nextMatch, previousMatch]
+                    ++ ( case clipboardCommand of
+                           Nothing -> []
+                           Just _ -> [copy]
+                       )
+                EditSearch _ -> [stopEditSearch, applySearch, clearSearch]
             )
-              ++ ( case clipboardCommand of
-                     Nothing -> []
-                     Just _ -> [copy]
-                 )
    in Brick.vBox
         [ Border.hBorder,
           shortcuts
@@ -766,17 +776,7 @@ viewSpanBreakdown spans =
           Brick.hBox
             [ ( case matches of
                   Matches matching ->
-                    let matching' =
-                          if matching == "fail" || matching == "failed"
-                            then "✖ "
-                            else matching
-                     in Text.split matching' (spanSummary (original span))
-                          |> List.map Brick.txt
-                          |> List.intersperse
-                            ( Brick.txt matching'
-                                |> Brick.withAttr "matched"
-                            )
-                          |> Brick.hBox
+                    viewSpanBreakdownWithMatch matching span
                   NoMatch ->
                     Brick.txt (spanSummary (original span))
               )
@@ -789,6 +789,28 @@ viewSpanBreakdown spans =
       )
       True
     |> Brick.padLeftRight 1
+
+viewSpanBreakdownWithMatch :: Text -> Span -> Brick.Widget n
+viewSpanBreakdownWithMatch matching span =
+  let eitherRegex =
+        Regex.compileM
+          ( TE.encodeUtf8
+              ("(.*)(" ++ escapeRegex (failToSymbol matching) ++ ")(.*)")
+          )
+          [Regex.caseless]
+   in case eitherRegex of
+        Prelude.Left _ -> Brick.txt (spanSummary (original span))
+        Prelude.Right regex ->
+          case Regex.match regex (TE.encodeUtf8 (spanSummary (original span))) [] of
+            Just [_, before, match, after] ->
+              Brick.hBox
+                [ Brick.txt (TE.decodeUtf8 before),
+                  Brick.txt (TE.decodeUtf8 match)
+                    |> Brick.withAttr "matched",
+                  Brick.txt (TE.decodeUtf8 after)
+                ]
+            _ ->
+              Brick.txt (spanSummary (original span))
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
@@ -885,19 +907,28 @@ howFarBack date1 date2
         |> Prelude.round
         |> abs
 
+failSymbol :: Text
+failSymbol = "✖ "
+
 spanSummary :: Platform.TracingSpan -> Text
 spanSummary span =
   Text.join
     ""
     [ case Platform.succeeded span of
         Platform.Succeeded -> "  "
-        Platform.Failed -> "✖ "
-        Platform.FailedWith _ -> "✖ ",
+        Platform.Failed -> failSymbol
+        Platform.FailedWith _ -> failSymbol,
       Platform.name span,
       case Platform.summary span of
         Nothing -> ""
         Just summary -> ": " ++ summary
     ]
+
+failToSymbol :: Text -> Text
+failToSymbol txt =
+  if txt == "fail" || txt == "failed"
+    then failSymbol
+    else txt
 
 rawSummary :: Platform.TracingSpan -> Text
 rawSummary span =
@@ -1044,7 +1075,7 @@ handleEvent pushMsg model event =
         (NormalMode, Vty.EvKey (Vty.KChar '/') []) -> do
           liftIO (pushMsg EnterEdit)
           Brick.continue model
-        (NormalMode, Vty.EvKey (Vty.KChar 'x') []) -> do
+        (EditMode, Vty.EvKey (Vty.KChar 'u') [Vty.MCtrl]) -> do
           liftIO (pushMsg ClearEdit)
           Brick.continue model
         -- Fallback
@@ -1161,3 +1192,35 @@ spanToClipboard cmdAndArgs span =
           (List.map Data.Text.unpack args)
         |> liftIO
         |> map (\_ -> ())
+
+-- | Based on https://hackage.haskell.org/package/regex-1.1.0.0/docs/src/Text.RE.ZeInternals.EscapeREString.html#escapeREString
+-- Convert a string into a regular expression that will match that
+-- string
+escapeRegex :: Text -> Text
+escapeRegex = Text.fromList << List.foldr esc [] << Text.toList
+  where
+    esc char acc =
+      if isMetaChar char
+        then '\\' : char : acc
+        else char : acc
+
+-- | returns True iff the charactr is an RE meta character
+-- ('[', '*', '{', etc.)
+isMetaChar :: Char -> Bool
+isMetaChar char =
+  case char of
+    '^' -> True
+    '\\' -> True
+    '.' -> True
+    '|' -> True
+    '*' -> True
+    '?' -> True
+    '+' -> True
+    '(' -> True
+    ')' -> True
+    '[' -> True
+    ']' -> True
+    '{' -> True
+    '}' -> True
+    '$' -> True
+    _ -> False

@@ -30,6 +30,7 @@ in pkgs.mkShell {
         microlens
         modern-uri
         network-uri
+        pcre-light
         pretty-show
         process
         random
@@ -50,5 +51,6 @@ in pkgs.mkShell {
     pkgs.haskellPackages.ghcid
     pkgs.ormolu
     pkgs.gnumake
+    pkgs.pcre
   ];
 }
