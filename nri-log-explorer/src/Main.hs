@@ -792,26 +792,25 @@ viewSpanBreakdown spans =
 
 viewSpanBreakdownWithMatch :: Text -> Span -> Brick.Widget n
 viewSpanBreakdownWithMatch matching span =
-  let matching' =
-        if matching == "fail" || matching == "failed"
-          then "✖ "
-          else matching
-      regex =
-        Regex.compile
-          (TE.encodeUtf8 (Text.join "" ["(.*)(", escapeRegex matching', ")(.*)"]))
+  let eitherRegex =
+        Regex.compileM
+          ( TE.encodeUtf8
+              ("(.*)(" ++ escapeRegex (failToSymbol matching) ++ ")(.*)")
+          )
           [Regex.caseless]
-      splitted =
-        Regex.match regex (TE.encodeUtf8 (spanSummary (original span))) []
-   in case splitted of
-        Just [_, before, match, after] ->
-          Brick.hBox
-            [ Brick.txt (TE.decodeUtf8 before),
-              Brick.txt (TE.decodeUtf8 match)
-                |> Brick.withAttr "matched",
-              Brick.txt (TE.decodeUtf8 after)
-            ]
-        _ ->
-          Brick.txt (spanSummary (original span))
+   in case eitherRegex of
+        Prelude.Left _ -> Brick.txt (spanSummary (original span))
+        Prelude.Right regex ->
+          case Regex.match regex (TE.encodeUtf8 (spanSummary (original span))) [] of
+            Just [_, before, match, after] ->
+              Brick.hBox
+                [ Brick.txt (TE.decodeUtf8 before),
+                  Brick.txt (TE.decodeUtf8 match)
+                    |> Brick.withAttr "matched",
+                  Brick.txt (TE.decodeUtf8 after)
+                ]
+            _ ->
+              Brick.txt (spanSummary (original span))
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
@@ -908,19 +907,28 @@ howFarBack date1 date2
         |> Prelude.round
         |> abs
 
+failSymbol :: Text
+failSymbol = "✖ "
+
 spanSummary :: Platform.TracingSpan -> Text
 spanSummary span =
   Text.join
     ""
     [ case Platform.succeeded span of
         Platform.Succeeded -> "  "
-        Platform.Failed -> "✖ "
-        Platform.FailedWith _ -> "✖ ",
+        Platform.Failed -> failSymbol
+        Platform.FailedWith _ -> failSymbol,
       Platform.name span,
       case Platform.summary span of
         Nothing -> ""
         Just summary -> ": " ++ summary
     ]
+
+failToSymbol :: Text -> Text
+failToSymbol txt =
+  if txt == "fail" || txt == "failed"
+    then failSymbol
+    else txt
 
 rawSummary :: Platform.TracingSpan -> Text
 rawSummary span =
