@@ -336,9 +336,10 @@ update model msg =
         <| withPageEvent model
         <| \page -> do
           case page of
-            NoDataPage (EditFilter editor) failureFilter -> do
+            NoDataPage (EditFilter editor) _ -> do
               newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-              NoDataPage (EditFilter (setCurrent newEditor editor)) failureFilter
+              editRootSpanFilter (setCurrent newEditor editor) (rootSpanPage model)
+                |> RootSpanPage
                 |> Prelude.pure
             NoDataPage _ _ -> Prelude.pure page
             RootSpanPage rootSpanPageData ->
