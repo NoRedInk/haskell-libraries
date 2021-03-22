@@ -37,7 +37,9 @@ grep "Copyright (c) $(date +'%Y')" < LICENSE > /dev/null \
 # check github release tag exists
 git fetch --tags
 git tag -l --points-at HEAD | grep "^$name-$version$" > /dev/null \
-  || fail "No git tag for current version exists. Please create tag with name: $name-$version"
+  || fail "No git tag for current version exists. Please create tag:
+  
+$ git tag $name-$version && git push --tags"
 
 hpack
 if git status --porcelain | grep . ; then
