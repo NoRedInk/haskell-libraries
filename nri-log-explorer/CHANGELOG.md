@@ -1,5 +1,7 @@
 # Unreleased
 
+# 0.1.1.1
+
 ### Enhancements:
 
 - Filtering! Use '/' to filter. 'n' for next match and 'N' for previous match. (#53, #56, #57, #58, #59, #62)
