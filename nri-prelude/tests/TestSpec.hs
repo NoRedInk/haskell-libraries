@@ -5,6 +5,7 @@ import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Text.IO
+import qualified Debug
 import qualified Expect
 import qualified Fuzz
 import qualified GHC.Exts
@@ -18,6 +19,7 @@ import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, test, todo)
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
+import qualified Text
 import qualified Prelude
 
 tests :: Test
@@ -125,7 +127,20 @@ api =
           |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
       test "source location of `fuzz3` are the file in which the test is defined" <| \_ ->
         fuzz3 Fuzz.int Fuzz.int Fuzz.int "test 1" (\_ _ _ -> Expect.pass)
-          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs")
+          |> expectSingleTest (expectSrcFile "tests/TestSpec.hs"),
+      test "Debug.todo gives reasonable stack traces" <| \_ -> do
+        contents <-
+          Expect.fromIO
+            ( do
+                Exception.handle
+                  ( \(exception :: Exception.SomeException) ->
+                      Exception.displayException exception
+                        |> Text.fromList
+                        |> Prelude.pure
+                  )
+                  (Debug.todo "foo" :: Prelude.IO Text)
+            )
+        Expect.equalToContentsOf "tests/golden-results/debug-todo-stacktrace" contents
     ]
 
 floatComparison :: Test
