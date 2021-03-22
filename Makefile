@@ -13,3 +13,9 @@ nri-env-parser/nri-env-parser.cabal: nri-env-parser/package.yaml
 
 nri-log-explorer/nri-log-explorer.cabal: nri-log-explorer/package.yaml
 	hpack nri-log-explorer
+
+ghcid-nri-prelude-test:
+	cd nri-prelude && ghcid --command "cabal repl nri-prelude:test:tests" --test Main.main
+
+ghcid-nri-prelude:
+	cd nri-prelude && ghcid 
