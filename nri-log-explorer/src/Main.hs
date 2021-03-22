@@ -73,7 +73,8 @@ data RootSpanPageData = RootSpanPageData
   { -- Used to calculate "2 minutes ago" type info for root spans.
     currentTime :: Time.UTCTime,
     filter :: Filter,
-    rootSpans :: Filterable.ListWidget Name RootSpan
+    rootSpans :: Filterable.ListWidget Name RootSpan,
+    failureFilter :: FailureFilter
   }
 
 data SearchMatch = NoMatch | Matches Text
@@ -84,6 +85,8 @@ data SpanBreakdownPageData = SpanBreakdownPageData
     search :: Search,
     spans :: ListWidget.List Name (SearchMatch, Span)
   }
+
+data FailureFilter = ShowAll | ShowOnlyFailures
 
 data Filter
   = NoFilter
@@ -129,6 +132,7 @@ data Msg
   | Next
   | Previous
   | EditorEvent Vty.Event
+  | ShowHideFailures
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -143,14 +147,14 @@ data Name
 -- An alternative data type containing part of the same data as above, in a
 -- format more convenient for some update and view functions.
 data Page
-  = NoDataPage Filter
+  = NoDataPage Filter FailureFilter
   | RootSpanPage RootSpanPageData
   | SpanBreakdownPage SpanBreakdownPageData
 
 toPage :: Model -> Page
 toPage model =
   case (spanBreakdownPage model, ListWidget.listSelectedElement <| Filterable.toListWidget (rootSpans (rootSpanPage model))) of
-    (_, Nothing) -> NoDataPage (filter (rootSpanPage model))
+    (_, Nothing) -> NoDataPage (filter (rootSpanPage model)) (failureFilter (rootSpanPage model))
     (Just spanBreakdownPageData, _) -> SpanBreakdownPage spanBreakdownPageData
     (Nothing, _) -> RootSpanPage (rootSpanPage model)
 
@@ -163,7 +167,7 @@ withPageEvent :: Model -> (Page -> Brick.EventM Name Page) -> Brick.EventM Name 
 withPageEvent model fn =
   map
     ( \case
-        NoDataPage filter -> model {rootSpanPage = (rootSpanPage model) {filter}}
+        NoDataPage filter failureFilter -> model {rootSpanPage = (rootSpanPage model) {filter, failureFilter}}
         RootSpanPage rootSpanPageData ->
           model {rootSpanPage = rootSpanPageData, spanBreakdownPage = Nothing}
         SpanBreakdownPage spanBreakdownPageData ->
@@ -171,14 +175,15 @@ withPageEvent model fn =
     )
     (fn (toPage model))
 
-init :: Maybe Text -> Time.UTCTime -> Model
-init clipboardCommand currentTime =
+init :: Maybe Text -> Time.UTCTime -> FailureFilter -> Model
+init clipboardCommand currentTime failureFilter =
   Model
     { rootSpanPage =
         RootSpanPageData
           { currentTime,
             rootSpans = Filterable.init RootSpanList,
-            filter = NoFilter
+            filter = NoFilter,
+            failureFilter
           },
       spanBreakdownPage = Nothing,
       clipboardCommand,
@@ -200,7 +205,9 @@ update model msg =
           let rootSpan = RootSpan date span
               newModel =
                 model
-                  { rootSpanPage = (rootSpanPage model) {rootSpans = Filterable.cons rootSpan (rootSpans (rootSpanPage model))}
+                  { rootSpanPage =
+                      (rootSpanPage model) {rootSpans = Filterable.cons rootSpan (rootSpans (rootSpanPage model))}
+                        |> updateRootSpans
                   }
           -- If the user hasn't interacted yet keep the focus on the top span,
           -- so we don't start the user off at the bottom of the page (spans are
@@ -215,7 +222,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> page
+              NoDataPage _ _ -> page
               SpanBreakdownPage _ -> page
               RootSpanPage RootSpanPageData {rootSpans} ->
                 case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
@@ -234,7 +241,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> page
+              NoDataPage _ _ -> page
               SpanBreakdownPage spanBreakdownPageData ->
                 case search spanBreakdownPageData of
                   EditSearch searchEditor ->
@@ -244,7 +251,9 @@ update model msg =
               RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
                 case filter of
                   EditFilter filterEditor ->
-                    RootSpanPage (updateRootSpanFilter (currentValue filterEditor) rootSpanPageData)
+                    updateFilter (currentValue filterEditor) rootSpanPageData
+                      |> updateRootSpans
+                      |> RootSpanPage
                   _ ->
                     case ListWidget.listSelectedElement (Filterable.toListWidget rootSpans) of
                       Nothing -> page
@@ -262,10 +271,11 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage (EditFilter editor) ->
-                updateRootSpanFilter (originalValue editor) (rootSpanPage model)
+              NoDataPage (EditFilter editor) _ ->
+                updateFilter (originalValue editor) (rootSpanPage model)
+                  |> updateRootSpans
                   |> RootSpanPage
-              NoDataPage _ -> page
+              NoDataPage _ _ -> page
               SpanBreakdownPage spanBreakdownPage ->
                 case search spanBreakdownPage of
                   EditSearch editor ->
@@ -275,14 +285,15 @@ update model msg =
               RootSpanPage rootSpanPageData ->
                 case filter rootSpanPageData of
                   EditFilter editor ->
-                    updateRootSpanFilter (originalValue editor) rootSpanPageData
+                    updateFilter (originalValue editor) rootSpanPageData
+                      |> updateRootSpans
                       |> RootSpanPage
                   _ -> page
         )
         |> andThen continueAfterUserInteraction
     CopyDetails -> do
       case toPage model of
-        NoDataPage _ -> Prelude.pure ()
+        NoDataPage _ _ -> Prelude.pure ()
         RootSpanPage _ -> Prelude.pure ()
         SpanBreakdownPage SpanBreakdownPageData {spans} ->
           case clipboardCommand model of
@@ -304,7 +315,7 @@ update model msg =
                   SpanBreakdownPage spanBreakdownPageData ->
                     SpanBreakdownPage
                       spanBreakdownPageData {search = enterEditSearch (search spanBreakdownPageData) editor}
-                  NoDataPage filter' -> NoDataPage (enterEditFilter filter' editor)
+                  NoDataPage filter' failureFilter' -> NoDataPage (enterEditFilter filter' editor) failureFilter'
                   RootSpanPage rootSpanPageData ->
                     RootSpanPage rootSpanPageData {filter = enterEditFilter (filter rootSpanPageData) editor}
         )
@@ -314,10 +325,10 @@ update model msg =
         ( case toPage model of
             SpanBreakdownPage spanBreakdownPageData ->
               model {spanBreakdownPage = Just <| resetSpanBreakdownSearch spanBreakdownPageData}
-            NoDataPage (HasFilter _) ->
-              model {rootSpanPage = resetRootSpanFilter (rootSpanPage model)}
+            NoDataPage (EditFilter _) _ ->
+              model {rootSpanPage = updateRootSpans (rootSpanPage model) {filter = NoFilter}}
             RootSpanPage rootSpanPageData ->
-              model {rootSpanPage = resetRootSpanFilter rootSpanPageData}
+              model {rootSpanPage = updateRootSpans rootSpanPageData {filter = NoFilter}}
             _ -> model
         )
     EditorEvent vtyEvent ->
@@ -325,13 +336,12 @@ update model msg =
         <| withPageEvent model
         <| \page -> do
           case page of
-            NoDataPage (EditFilter editor) -> do
+            NoDataPage (EditFilter editor) _ -> do
               newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-              setCurrent newEditor editor
-                |> EditFilter
-                |> NoDataPage
+              editRootSpanFilter (setCurrent newEditor editor) (rootSpanPage model)
+                |> RootSpanPage
                 |> Prelude.pure
-            NoDataPage _ -> Prelude.pure page
+            NoDataPage _ _ -> Prelude.pure page
             RootSpanPage rootSpanPageData ->
               case filter rootSpanPageData of
                 EditFilter editor -> do
@@ -358,7 +368,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> Prelude.pure page
+              NoDataPage _ _ -> Prelude.pure page
               RootSpanPage _ -> Prelude.pure page
               SpanBreakdownPage spanBreakdownPageData ->
                 case search spanBreakdownPageData of
@@ -377,7 +387,7 @@ update model msg =
         model
         ( \page ->
             case page of
-              NoDataPage _ -> Prelude.pure page
+              NoDataPage _ _ -> Prelude.pure page
               RootSpanPage _ -> Prelude.pure page
               SpanBreakdownPage spanBreakdownPageData ->
                 case search spanBreakdownPageData of
@@ -389,6 +399,19 @@ update model msg =
                           |> scrollSpanBreakdownPage (Prelude.pure << ListWidget.listMoveTo index)
                           |> map SpanBreakdownPage
                   _ -> Prelude.pure page
+        )
+        |> andThen continueAfterUserInteraction
+    ShowHideFailures ->
+      withPage
+        model
+        ( \page ->
+            case page of
+              RootSpanPage rootSpanPageData ->
+                rootSpanPageData {failureFilter = toggleFailureFilter (failureFilter rootSpanPageData)}
+                  |> updateRootSpans
+                  |> RootSpanPage
+              SpanBreakdownPage _ -> page -- TODO allow toggling back
+              NoDataPage filter failureFilter -> NoDataPage filter (toggleFailureFilter failureFilter)
         )
         |> andThen continueAfterUserInteraction
 
@@ -454,15 +477,41 @@ enterEditSearch search' editor =
     EditSearch editor' -> EditSearch editor'
     HasSearch editor' -> EditSearch (initUndo editor')
 
-updateRootSpanFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
-updateRootSpanFilter editor rootSpanPageData =
-  if hasNoFilters editor
-    then resetRootSpanFilter rootSpanPageData
-    else
-      rootSpanPageData
-        { filter = HasFilter editor,
-          rootSpans = filterRootSpans editor (rootSpans rootSpanPageData)
+toggleFailureFilter :: FailureFilter -> FailureFilter
+toggleFailureFilter f =
+  case f of
+    ShowAll -> ShowOnlyFailures
+    ShowOnlyFailures -> ShowAll
+
+updateRootSpans :: RootSpanPageData -> RootSpanPageData
+updateRootSpans pageData =
+  let matchesFilter :: Edit.Editor Text Name -> Platform.TracingSpan -> Bool
+      matchesFilter editor logSpan =
+        List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditWords editor)
+      failureFilterFunction =
+        case failureFilter pageData of
+          ShowAll -> \_ -> True
+          ShowOnlyFailures -> failedSpan
+      filterFunction =
+        case filter pageData of
+          NoFilter -> \_ -> True
+          EditFilter editor -> matchesFilter (currentValue editor)
+          HasFilter editor -> matchesFilter editor
+   in pageData
+        { rootSpans =
+            Filterable.filter
+              ( \RootSpan {logSpan} ->
+                  failureFilterFunction logSpan
+                    && filterFunction logSpan
+              )
+              (rootSpans pageData)
         }
+
+updateFilter :: Edit.Editor Text Name -> RootSpanPageData -> RootSpanPageData
+updateFilter editor rootSpanPageData =
+  if hasNoFilters editor
+    then rootSpanPageData {filter = NoFilter}
+    else rootSpanPageData {filter = HasFilter editor}
 
 updateSpanBreakdownSearch :: Edit.Editor Text Name -> SpanBreakdownPageData -> SpanBreakdownPageData
 updateSpanBreakdownSearch editor spanBreakdownPageData =
@@ -497,26 +546,12 @@ annotateSearch maybeEditor span =
         then (Matches (getEditContents editor), span)
         else (NoMatch, span)
 
-resetRootSpanFilter :: RootSpanPageData -> RootSpanPageData
-resetRootSpanFilter rootSpanPageData =
-  rootSpanPageData {filter = NoFilter, rootSpans = Filterable.reset (rootSpans rootSpanPageData)}
-
 editRootSpanFilter :: Undo (Edit.Editor Text Name) -> RootSpanPageData -> RootSpanPageData
 editRootSpanFilter editor rootSpanPageData =
-  rootSpanPageData
-    { filter = EditFilter editor,
-      rootSpans =
-        if hasNoFilters (currentValue editor)
-          then Filterable.reset (rootSpans rootSpanPageData)
-          else filterRootSpans (currentValue editor) (rootSpans rootSpanPageData)
-    }
-
-filterRootSpans :: Edit.Editor Text Name -> Filterable.ListWidget Name RootSpan -> Filterable.ListWidget Name RootSpan
-filterRootSpans editor =
-  Filterable.filter
-    ( \RootSpan {logSpan} ->
-        List.all (\filter -> Fuzzy.match filter (rawSummary logSpan) "" "" identity False /= Nothing) (getEditWords editor)
-    )
+  updateRootSpans
+    rootSpanPageData
+      { filter = EditFilter editor
+      }
 
 hasNoFilters :: Edit.Editor Text Name -> Bool
 hasNoFilters editor = getEditWords editor == []
@@ -540,7 +575,7 @@ scroll ::
 scroll move model =
   withPageEvent model
     <| \case
-      NoDataPage filter -> Prelude.pure (NoDataPage filter)
+      NoDataPage filter failureFilter -> Prelude.pure (NoDataPage filter failureFilter)
       RootSpanPage rootSpanPageData@RootSpanPageData {rootSpans} ->
         move (Filterable.toListWidget rootSpans)
           |> map (Filterable.setListWidget rootSpans)
@@ -588,17 +623,35 @@ view :: Model -> [Brick.Widget Name]
 view model =
   let page = toPage model
    in [ Brick.vBox
-          [ viewMaybeEditor page,
+          [ viewMaybeInfoOnlyFailures page,
+            viewMaybeEditor page,
             viewContents page,
             viewKey page (clipboardCommand model)
           ]
       ]
 
+viewMaybeInfoOnlyFailures :: Page -> Brick.Widget Name
+viewMaybeInfoOnlyFailures page =
+  let onlyShowingFailures =
+        Brick.vBox
+          [ Brick.txt "Only Showing Failures"
+              |> Brick.withAttr "only-failures",
+            Border.hBorder
+          ]
+   in case page of
+        SpanBreakdownPage _ -> Brick.txt ""
+        NoDataPage _ ShowAll -> Brick.txt ""
+        NoDataPage _ ShowOnlyFailures -> onlyShowingFailures
+        RootSpanPage RootSpanPageData {failureFilter} ->
+          case failureFilter of
+            ShowAll -> Brick.txt ""
+            ShowOnlyFailures -> onlyShowingFailures
+
 viewMaybeEditor :: Page -> Brick.Widget Name
 viewMaybeEditor page =
   case page of
     SpanBreakdownPage SpanBreakdownPageData {search} -> viewSearch search
-    NoDataPage filter -> viewFilter filter
+    NoDataPage filter _ -> viewFilter filter
     RootSpanPage RootSpanPageData {filter} -> viewFilter filter
 
 viewFilter :: Filter -> Brick.Widget Name
@@ -684,18 +737,28 @@ viewKey page clipboardCommand =
       stopEditSearch = "esc: stop searching"
       applySearch = "enter: apply search"
       search' = "/: search"
+      showAll = "f: show all"
+      showOnlyFailures = "f: only failures"
       shortcuts =
         case page of
-          NoDataPage filter ->
-            case filter of
-              NoFilter -> [exit]
-              EditFilter _ -> [exit, stopEditFilter, clearFilter]
-              _ -> [exit, adjustFilter]
-          RootSpanPage RootSpanPageData {filter} ->
-            case filter of
-              NoFilter -> [exit, updown, select, filter']
-              HasFilter _ -> [exit, updown, select, adjustFilter]
-              EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
+          NoDataPage filter failureFilter ->
+            let failureFilterText =
+                  case failureFilter of
+                    ShowAll -> showOnlyFailures
+                    ShowOnlyFailures -> showAll
+             in case filter of
+                  NoFilter -> [exit, failureFilterText]
+                  EditFilter _ -> [exit, stopEditFilter, clearFilter, failureFilterText]
+                  _ -> [exit, adjustFilter]
+          RootSpanPage RootSpanPageData {filter, failureFilter} ->
+            let failureFilterText =
+                  case failureFilter of
+                    ShowAll -> showOnlyFailures
+                    ShowOnlyFailures -> showAll
+             in case filter of
+                  NoFilter -> [exit, updown, select, filter', failureFilterText]
+                  HasFilter _ -> [exit, updown, select, adjustFilter, failureFilterText]
+                  EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
                 NoSearch ->
@@ -722,11 +785,11 @@ viewKey page clipboardCommand =
 viewContents :: Page -> Brick.Widget Name
 viewContents page =
   case page of
-    NoDataPage NoFilter ->
+    NoDataPage NoFilter _ ->
       Brick.txt "Waiting for logs...\n\nGo run some tests!"
         |> Center.hCenter
         |> Brick.padBottom Brick.Max
-    NoDataPage _ ->
+    NoDataPage _ _ ->
       Brick.txt "Waiting for logs or adjust filter...\n\nGo run some tests!"
         |> Center.hCenter
         |> Brick.padBottom Brick.Max
@@ -910,14 +973,20 @@ howFarBack date1 date2
 failSymbol :: Text
 failSymbol = "✖ "
 
+failedSpan :: Platform.TracingSpan -> Bool
+failedSpan span =
+  case Platform.succeeded span of
+    Platform.Succeeded -> False
+    Platform.Failed -> True
+    Platform.FailedWith _ -> True
+
 spanSummary :: Platform.TracingSpan -> Text
 spanSummary span =
   Text.join
     ""
-    [ case Platform.succeeded span of
-        Platform.Succeeded -> "  "
-        Platform.Failed -> failSymbol
-        Platform.FailedWith _ -> failSymbol,
+    [ if failedSpan span
+        then failSymbol
+        else "  ",
       Platform.name span,
       case Platform.summary span of
         Nothing -> ""
@@ -950,7 +1019,8 @@ main :: Prelude.IO ()
 main = do
   args <- System.Environment.getArgs
   case args of
-    [] -> run
+    [] -> run ShowAll
+    ["--failures"] -> run ShowOnlyFailures
     ["--help"] ->
       [ "Usage:",
         "  log-explorer",
@@ -958,6 +1028,7 @@ main = do
         "  --help         show this help message",
         "  --version      show application version",
         "  --clear        clear old log entries before starting",
+        "  --failures     only show failures",
         "",
         "log-explorer is a tool for exploring traces produced by the nri-prelude set of libraries."
       ]
@@ -971,14 +1042,14 @@ main = do
        in Prelude.putStrLn ("log-explorer " ++ version)
     ["--clear"] -> do
       System.Directory.removeFile logFile
-      run
+      (run ShowAll)
     _ -> System.Exit.die "log-explorer was called with unknown arguments"
 
 logFile :: Prelude.String
 logFile = "/tmp/nri-prelude-logs"
 
-run :: Prelude.IO ()
-run = do
+run :: FailureFilter -> Prelude.IO ()
+run failureFilter = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   partOfLine <- IORef.newIORef Prelude.mempty
   System.IO.appendFile logFile "" -- touch file to ensure it exists
@@ -1003,7 +1074,7 @@ run = do
         buildVty
         (Just eventChan)
         (app pushMsgNonBlocking)
-        (init clipboardCommand now)
+        (init clipboardCommand now failureFilter)
     )
 
 app :: (Msg -> Prelude.IO ()) -> Brick.App Model Msg Name
@@ -1029,6 +1100,14 @@ attrMap =
           ( Vty.withBackColor
               Vty.defAttr
               Vty.Color.brightYellow
+          )
+          Vty.Color.black
+      ),
+      ( "only-failures",
+        Vty.withForeColor
+          ( Vty.withBackColor
+              Vty.defAttr
+              Vty.Color.red
           )
           Vty.Color.black
       )
@@ -1072,11 +1151,16 @@ handleEvent pushMsg model event =
         (NormalMode, Vty.EvKey (Vty.KChar 'y') []) -> do
           liftIO (pushMsg CopyDetails)
           Brick.continue model
+        -- Filtering
         (NormalMode, Vty.EvKey (Vty.KChar '/') []) -> do
           liftIO (pushMsg EnterEdit)
           Brick.continue model
         (EditMode, Vty.EvKey (Vty.KChar 'u') [Vty.MCtrl]) -> do
           liftIO (pushMsg ClearEdit)
+          Brick.continue model
+        -- Failurefilter
+        (NormalMode, Vty.EvKey (Vty.KChar 'f') []) -> do
+          liftIO (pushMsg ShowHideFailures)
           Brick.continue model
         -- Fallback
         (EditMode, _) -> do
