@@ -1,5 +1,12 @@
 # Unreleased next version
 
+# 0.5.0.1
+
+### Enhancements:
+
+- JUnit report includes failure location (#60)
+- Debug.todo returns callstack of where it was called, not inside of library (#65)
+
 # 0.5.0.0
 
 ### Breaking changes:

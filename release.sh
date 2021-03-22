@@ -34,15 +34,18 @@ grep "^copyright: $(date +'%Y')" < package.yaml > /dev/null \
 grep "Copyright (c) $(date +'%Y')" < LICENSE > /dev/null \
   || fail "The copyright line in the LICENSE file does not match the current year."
 
-# check github release tag exists
-git fetch --tags
-git tag -l --points-at HEAD | grep "^$name-$version$" > /dev/null \
-  || fail "No git tag for current version exists. Please create tag with name: $name-$version"
-
 hpack
 if git status --porcelain | grep . ; then
   fail "Cabal file changed after running hpack. Check in latest cabal file before releasing."
 fi
+
+# check github release tag exists
+git fetch --tags
+git tag -l --points-at HEAD | grep "^$name-$version$" > /dev/null \
+  || fail "No git tag for current version exists. Please create tag:
+  
+$ git tag $name-$version && git push --tags"
+
 cabal sdist -o - > "$bundle"
 cabal upload --publish "$bundle"
 # Documentation upload doesn't seem to work, not sure why. If you find a fix
