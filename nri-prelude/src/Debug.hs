@@ -11,6 +11,7 @@ where
 import Basics ((>>))
 import Data.Text (pack, unpack)
 import qualified Debug.Trace
+import qualified GHC.Stack as Stack
 import Text (Text, concat)
 import qualified Text.Show.Pretty
 import Prelude (Show, error)
@@ -61,6 +62,6 @@ log message value =
 --
 -- When you call this it throws an exception with the message you give. That
 -- exception is catchable... but don't.
-todo :: Text -> a
+todo :: Stack.HasCallStack => Text -> a
 todo =
-  unpack >> error
+  Stack.withFrozenCallStack (unpack >> error)
