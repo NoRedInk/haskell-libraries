@@ -1,5 +1,7 @@
 # Unreleased next version
 
+# 0.5.0.1
+
 ### Enhancements:
 
 - JUnit report includes failure location (#60)
