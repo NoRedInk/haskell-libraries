@@ -4,6 +4,7 @@ import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString as BS
 import qualified Data.Int
 import qualified Data.String
+import qualified Data.Time.Calendar as Calendar
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Format as Format
 import qualified Data.Time.LocalTime as LocalTime
@@ -75,4 +76,8 @@ instance MySQLColumn a => MySQLColumn (Maybe a) where
 
 instance MySQLColumn Clock.UTCTime where
   decodeParam (Base.MySQLDateTime n) = LocalTime.localTimeToUTC LocalTime.utc n
+  decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "UTCTime" n)
+
+instance MySQLColumn Calendar.Day where
+  decodeParam (Base.MySQLDate n) = n
   decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "UTCTime" n)
