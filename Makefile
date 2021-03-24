@@ -19,3 +19,12 @@ ghcid-nri-prelude-test:
 
 ghcid-nri-prelude:
 	cd nri-prelude && ghcid 
+
+ghcid-nri-log-explorer:
+	cd nri-log-explorer && ghcid 
+
+ghcid-nri-env-parser:
+	cd nri-env-parser && ghcid 
+
+ghcid-nri-observability:
+	cd nri-observability && ghcid 
