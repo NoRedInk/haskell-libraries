@@ -650,7 +650,7 @@ viewMaybeInfoOnlyFailures page =
 viewMaybeEditor :: Page -> Brick.Widget Name
 viewMaybeEditor page =
   case page of
-    SpanBreakdownPage SpanBreakdownPageData {search} -> viewSearch search
+    SpanBreakdownPage SpanBreakdownPageData {search, spans} -> viewSearch search spans
     NoDataPage filter _ -> viewFilter filter
     RootSpanPage RootSpanPageData {filter} -> viewFilter filter
 
@@ -678,28 +678,57 @@ viewFilter filter =
           Border.hBorder
         ]
 
-viewSearch :: Search -> Brick.Widget Name
-viewSearch search =
-  case search of
-    NoSearch -> Brick.txt ""
-    HasSearch editor ->
-      Brick.vBox
-        [ Brick.hBox
-            [ Brick.txt "Search: ",
-              getEditContents editor
-                |> Brick.txt
-                |> Brick.withAttr "underlined"
-            ],
-          Border.hBorder
+viewSearch :: Search -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
+viewSearch search spans =
+  let matchingSpans =
+        spans
+          |> ListWidget.listElements
+          |> Vector.imapMaybe
+            ( \index (match, _) ->
+                if match /= NoMatch
+                  then Just index
+                  else Nothing
+            )
+      selectedSpanIndex =
+        Vector.findIndex (\index -> ListWidget.listSelected spans == Just index) matchingSpans
+      matchCounter =
+        [ selectedSpanIndex
+            |> Maybe.map (+ 1)
+            |> Maybe.withDefault 0
+            |> Prelude.fromIntegral
+            |> Text.fromInt,
+          "of",
+          matchingSpans
+            |> Vector.length
+            |> Prelude.fromIntegral
+            |> Text.fromInt,
+          "matches"
         ]
-    EditSearch searchEditor ->
-      Brick.vBox
-        [ Brick.hBox
-            [ Brick.txt "Search: ",
-              Edit.renderEditor (editorWithCursor (currentValue searchEditor)) True (currentValue searchEditor)
-            ],
-          Border.hBorder
-        ]
+          |> Text.join " "
+          |> Brick.txt
+          |> Brick.padLeft Brick.Max
+   in case search of
+        NoSearch -> Brick.txt ""
+        HasSearch editor ->
+          Brick.vBox
+            [ Brick.hBox
+                [ Brick.txt "Search: ",
+                  getEditContents editor
+                    |> Brick.txt
+                    |> Brick.withAttr "underlined",
+                  matchCounter
+                ],
+              Border.hBorder
+            ]
+        EditSearch searchEditor ->
+          Brick.vBox
+            [ Brick.hBox
+                [ Brick.txt "Search: ",
+                  Edit.renderEditor (editorWithCursor (currentValue searchEditor)) True (currentValue searchEditor),
+                  matchCounter
+                ],
+              Border.hBorder
+            ]
 
 editorWithCursor :: Edit.Editor Text Name -> List Text -> Brick.Widget Name
 editorWithCursor editor t =
