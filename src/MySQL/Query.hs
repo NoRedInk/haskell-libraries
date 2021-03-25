@@ -73,6 +73,7 @@ qqSQL queryWithPgTypedFlags = do
   let forCompilation =
         Text.fromList queryWithPgTypedFlags
           |> inToAny
+          |> backquotesToQuotes
           |> Text.toList
   -- Drop the special flags the `pgSQL` quasiquoter from `postgresql-typed` suppots.
   let query =
@@ -240,6 +241,10 @@ inToAny =
     )
     -- Replace `IN` with `= ANY`
     "= ANY"
+
+backquotesToQuotes :: Text -> Text
+backquotesToQuotes =
+  Text.replace "`" "\""
 
 -- | MySQL doesn't support `= ANY`, we can use `IN` when running the query.
 anyToIn :: Text -> Text
