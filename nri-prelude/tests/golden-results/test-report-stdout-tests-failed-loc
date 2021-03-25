@@ -275,7 +275,7 @@ Expectation failed at tests/TestSpec.hs:313
 2
 ▲
 
-TEST RUN FAILED
+[4mTEST RUN FAILED[m
 
 Passed:    0
 Failed:    17

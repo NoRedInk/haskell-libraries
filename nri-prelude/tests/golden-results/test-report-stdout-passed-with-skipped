@@ -10,7 +10,7 @@ This test was skipped.
 ✗ test 4
 This test was skipped.
 
-TEST RUN INCOMPLETE because 2 tests were skipped
+[4mTEST RUN INCOMPLETE[m because 2 tests were skipped
 
 Passed:    2
 Skipped:   2

@@ -10,8 +10,6 @@ where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Builder as Builder
-import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Text.Encoding as TE
 import qualified GHC.Stack as Stack
@@ -23,6 +21,7 @@ import qualified System.FilePath as FilePath
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.Internal
 import qualified Text
+import qualified Text.Colour
 import qualified Text.XML.JUnit as JUnit
 import qualified Tuple
 import qualified Prelude
@@ -82,9 +81,8 @@ renderFailed test maybeSrcLoc =
       let msg' = case maybeSrcLoc of
             Nothing -> msg
             Just (loc, src) ->
-              Test.Reporter.Internal.renderSrcLoc (\_ -> identity) loc src
-                |> Builder.toLazyByteString
-                |> Data.ByteString.Lazy.toStrict
+              Test.Reporter.Internal.renderSrcLoc loc src
+                |> Text.Colour.renderChunksBS Text.Colour.WithoutColours
                 |> TE.decodeUtf8
                 |> (\srcStr -> srcStr ++ "\n" ++ msg)
        in JUnit.failed (Internal.name test)
