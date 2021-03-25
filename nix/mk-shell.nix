@@ -34,6 +34,7 @@ in pkgs.mkShell {
         pretty-show
         process
         random
+        safe-coloured-text
         safe-exceptions
         stm
         terminal-size
