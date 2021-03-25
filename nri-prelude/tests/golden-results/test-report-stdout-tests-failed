@@ -32,7 +32,7 @@ This is a bug.
 If you have some time to report the bug it would be much appreciated!
 You can do so here: https://github.com/NoRedInk/haskell-libraries/issues
 
-TEST RUN FAILED
+[4mTEST RUN FAILED[m
 
 Passed:    2
 Skipped:   2

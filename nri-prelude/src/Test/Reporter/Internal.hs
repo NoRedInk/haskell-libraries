@@ -1,14 +1,16 @@
 module Test.Reporter.Internal where
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Builder as Builder
+import qualified Data.Text.Encoding as TE
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
-import qualified System.Console.ANSI as ANSI
 import qualified System.Directory
 import System.FilePath ((</>))
 import qualified Test.Internal as Internal
+import qualified Text
+import Text.Colour (chunk)
+import qualified Text.Colour
 import qualified Prelude
 
 extraLinesOnFailure :: Int
@@ -28,12 +30,8 @@ readSrcLoc test =
         else Prelude.pure Nothing
     _ -> Prelude.pure Nothing
 
-renderSrcLoc ::
-  ([ANSI.SGR] -> Builder.Builder -> Builder.Builder) ->
-  Stack.SrcLoc ->
-  BS.ByteString ->
-  Builder.Builder
-renderSrcLoc styled loc contents = do
+renderSrcLoc :: Stack.SrcLoc -> BS.ByteString -> List Text.Colour.Chunk
+renderSrcLoc loc contents = do
   let startLine = Prelude.fromIntegral (Stack.srcLocStartLine loc)
   let lines =
         contents
@@ -42,51 +40,45 @@ renderSrcLoc styled loc contents = do
           |> List.take (extraLinesOnFailure * 2 + 1)
           |> List.indexedMap
             ( \i l ->
-                Builder.intDec
-                  ( Prelude.fromIntegral
-                      <| startLine + i - extraLinesOnFailure
-                  )
+                Text.fromInt (startLine + i - extraLinesOnFailure)
                   ++ ": "
-                  ++ Builder.byteString l
+                  ++ TE.decodeUtf8 l
             )
   case lines of
-    [] -> ""
+    [] -> []
     lines' ->
-      "\n"
-        ++ "Expectation failed at "
-        ++ Builder.stringUtf8 (Stack.srcLocFile loc)
-        ++ ":"
-        ++ Builder.intDec (Stack.srcLocStartLine loc)
-        ++ "\n"
-        ++ Prelude.foldMap
-          ( \(nr, line) ->
-              if nr == extraLinesOnFailure
-                then styled [red] ("✗ " ++ line) ++ "\n"
-                else "  " ++ styled [dullGrey] line ++ "\n"
-          )
-          (List.indexedMap (,) lines')
-        ++ "\n"
+      List.concat
+        [ [ "\n",
+            "Expectation failed at ",
+            chunk (Text.fromList (Stack.srcLocFile loc)),
+            ":",
+            chunk (Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine loc))),
+            "\n"
+          ],
+          List.indexedMap
+            ( \nr line ->
+                if nr == extraLinesOnFailure
+                  then red (chunk ("✗ " ++ line ++ "\n"))
+                  else dullGrey (chunk ("  " ++ line ++ "\n"))
+            )
+            lines',
+          ["\n"]
+        ]
 
-sgr :: [ANSI.SGR] -> Builder.Builder
-sgr = Builder.stringUtf8 << ANSI.setSGRCode
+red :: Text.Colour.Chunk -> Text.Colour.Chunk
+red = Text.Colour.fore Text.Colour.red
 
-red :: ANSI.SGR
-red = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Red
+yellow :: Text.Colour.Chunk -> Text.Colour.Chunk
+yellow = Text.Colour.fore Text.Colour.yellow
 
-yellow :: ANSI.SGR
-yellow = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Yellow
+green :: Text.Colour.Chunk -> Text.Colour.Chunk
+green = Text.Colour.fore Text.Colour.green
 
-green :: ANSI.SGR
-green = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Green
+grey :: Text.Colour.Chunk -> Text.Colour.Chunk
+grey = Text.Colour.fore Text.Colour.brightBlack
 
-grey :: ANSI.SGR
-grey = ANSI.SetColor ANSI.Foreground ANSI.Vivid ANSI.Black
+dullGrey :: Text.Colour.Chunk -> Text.Colour.Chunk
+dullGrey = Text.Colour.fore Text.Colour.black
 
-dullGrey :: ANSI.SGR
-dullGrey = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.Black
-
-black :: ANSI.SGR
-black = ANSI.SetColor ANSI.Foreground ANSI.Dull ANSI.White
-
-underlined :: ANSI.SGR
-underlined = ANSI.SetUnderlining ANSI.SingleUnderline
+black :: Text.Colour.Chunk -> Text.Colour.Chunk
+black = Text.Colour.fore Text.Colour.white

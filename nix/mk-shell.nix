@@ -9,7 +9,6 @@ in pkgs.mkShell {
         (callCabal2nix "pretty-diff" sources.pretty-diff { })
         aeson
         aeson-pretty
-        ansi-terminal
         async
         auto-update
         base
@@ -34,6 +33,8 @@ in pkgs.mkShell {
         pretty-show
         process
         random
+        (callCabal2nix "safe-coloured-text"
+          "${sources.safe-coloured-text}/safe-coloured-text" { })
         safe-exceptions
         stm
         terminal-size

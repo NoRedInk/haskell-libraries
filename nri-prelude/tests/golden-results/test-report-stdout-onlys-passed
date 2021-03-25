@@ -14,7 +14,7 @@ This test passed, but there is a `Test.only` in your test.
 I failed the test, because it's easy to forget to remove `Test.only`.
 
 
-TEST RUN INCOMPLETE because there is an `only` in your tests.
+[4mTEST RUN INCOMPLETE[m because there is an `only` in your tests.
 
 Passed:    2
 Skipped:   2
