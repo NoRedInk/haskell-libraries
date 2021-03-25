@@ -1,5 +1,9 @@
 # Unreleased
 
+### Enhancements:
+
+- Add match count to search interface (#67)
+
 # 0.1.1.1
 
 ### Enhancements:
