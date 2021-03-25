@@ -1,6 +1,7 @@
 module MySQL.MySQLParameter (MySQLParameter (..)) where
 
 import qualified Data.Int
+import qualified Data.Time.Calendar as Calendar
 import qualified Data.Time.Clock as Clock
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Data.Word
@@ -47,6 +48,9 @@ instance MySQLParameter Float where
 
 instance MySQLParameter Clock.UTCTime where
   mysqlEncode = Base.MySQLDateTime << LocalTime.utcToLocalTime LocalTime.utc
+
+instance MySQLParameter Calendar.Day where
+  mysqlEncode = Base.MySQLDate
 
 instance MySQLParameter Text where
   mysqlEncode = Base.MySQLText
