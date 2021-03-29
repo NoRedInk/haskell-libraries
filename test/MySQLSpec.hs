@@ -21,6 +21,7 @@ tests =
     [ unsafeBulkifyInsertsTests,
       onDuplicateDoNothingTests,
       queriesWithQuestionMarks,
+      queriesWithBackquotesTests,
       exceptionTests
     ]
 
@@ -58,6 +59,27 @@ queriesWithQuestionMarks =
             fromResult
             |> Expect.succeeds
         Expect.equal [("?", 5) :: (Text, Int)] res
+    ]
+
+queriesWithBackquotesTests :: Test
+queriesWithBackquotesTests =
+  describe
+    "queries with backquotes work (they get replaces by double quotes)"
+    [ MySQL.Test.test "inserts and selects" <| \conn -> do
+        let x = "`hello`" :: Text
+        (_ :: Int) <-
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!INSERT INTO monolith.topics (`name`, `percent_correct`) VALUES (${x}, 5)|]
+            fromResult
+            |> Expect.succeeds
+        res <-
+          MySQL.doQuery
+            conn
+            [MySQL.sql|!SELECT `name`, `percent_correct` FROM monolith.topics WHERE `name` = ${x}|]
+            fromResult
+            |> Expect.succeeds
+        Expect.equal [("`hello`", 5) :: (Text, Int)] res
     ]
 
 fromResult :: Result err a -> Task err a
