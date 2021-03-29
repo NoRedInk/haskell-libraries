@@ -1,3 +1,7 @@
+# 0.1.0.6
+
+- Relax version bounds to ecompass `base-4.15.x`.
+
 # 0.1.0.5
 
 - Relax version bounds to encompass `nri-prelude-0.5.0.0`.

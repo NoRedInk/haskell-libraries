@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-prelude
-version:        0.5.0.1
+version:        0.5.0.2
 synopsis:       A Prelude inspired by the Elm programming language
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
 category:       Web
@@ -75,7 +75,7 @@ library
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , auto-update >=0.1.6 && <0.2
-    , base >=4.12.0.0 && <4.15
+    , base >=4.12.0.0 && <4.16
     , bytestring >=0.10.8.2 && <0.12
     , containers >=0.6.0.1 && <0.7
     , directory >=1.3.3.0 && <1.4
@@ -151,7 +151,7 @@ test-suite tests
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , auto-update >=0.1.6 && <0.2
-    , base >=4.12.0.0 && <4.15
+    , base >=4.12.0.0 && <4.16
     , bytestring >=0.10.8.2 && <0.12
     , containers >=0.6.0.1 && <0.7
     , directory >=1.3.3.0 && <1.4

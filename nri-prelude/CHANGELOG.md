@@ -1,5 +1,11 @@
 # Unreleased next version
 
+# 0.5.0.2
+
+### Enhancements:
+
+- Relax version bounds to ecompass `base-4.15.x`.
+
 # 0.5.0.1
 
 ### Enhancements:
