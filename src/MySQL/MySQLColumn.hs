@@ -27,8 +27,9 @@ instance MySQLColumn Bool where
   decodeParam (Base.MySQLInt8 n) = n > 0
   decodeParam (Base.MySQLInt16U n) = n > 0
   decodeParam (Base.MySQLInt16 n) = n > 0
-  -- HACK WARNING: We get a Int64 from calculated values in selects
+  -- HACK WARNING: We get a Int32 or Int64 from calculated values in selects
   -- unfortunatelly even if it should be a Int16 that represents a boolean.
+  decodeParam (Base.MySQLInt32 n) = n > 0
   decodeParam (Base.MySQLInt64 n) = n > 0
   decodeParam n = Exception.impureThrow (UnexpectedMySQLValue "Bool" n)
 
