@@ -392,3 +392,8 @@ instance PGTypes.PGType "jsonb" => PGTypes.PGType "jsonb[]" where
 
 instance PGTypes.PGType "jsonb" => PGArray.PGArrayType "jsonb[]" where
   type PGElemType "jsonb[]" = "jsonb"
+
+instance PGTypes.PGStringType "view_type"
+
+instance PGTypes.PGType "text" => PGTypes.PGType "view_type" where
+  type PGVal "view_type" = PGTypes.PGVal "text"
