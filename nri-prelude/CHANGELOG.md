@@ -1,9 +1,11 @@
 # Unreleased next version
 
+# 0.5.0.3
+
 ### Enhancements
 
 - Log.Context can be shown, which should lead us to better test outputs. (#71)
-- Platform.rootTracingSpanIO doesn't let `onFinish` break the worker.
+- Platform.rootTracingSpanIO doesn't let `onFinish` break the worker. (#73)
 
 # 0.5.0.2
 
