@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Platform.Internal where
@@ -7,6 +8,7 @@ module Platform.Internal where
 import Basics
 import Control.Applicative ((<|>))
 import qualified Control.AutoUpdate as AutoUpdate
+import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
@@ -24,6 +26,8 @@ import qualified List
 import Maybe (Maybe (..))
 import Result (Result (Err, Ok))
 import qualified System.Mem
+import qualified System.Mem as Mem
+import qualified System.Timeout as Timeout
 import Text (Text)
 import qualified Tuple
 import Prelude
@@ -773,9 +777,56 @@ rootTracingSpanIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Tex
 rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError
-    (Stack.withFrozenCallStack mkHandler requestId clock' onFinish name)
+    (Stack.withFrozenCallStack mkHandler requestId clock' (onFinish >> reportSafely) name)
     (Prelude.flip finishTracingSpan)
     runIO
+
+-- After a root action (HTTP request, perform a job from a queue, etc) is done
+-- we run our reporting logic, which sends debugging information to platforms
+-- like Bugsnag and NewRelic.
+--
+-- This information is important when helping us debug our applications, but it
+-- shouldn't be able to cause problems for the non-reporting logic, i.e. the
+-- parts responsible for sending a response back to the user.
+--
+-- This function might kill the reporting thread if it thinks it's misbehaving.
+-- It's up to the reporting logic to implement cleanup logic or notifications
+-- of failed reporting using functions like `bracket`.
+reportSafely :: IO () -> IO ()
+reportSafely report = do
+  -- Spawning a separate thread for the reporting logic ensures the main request
+  -- thread doesn't need to wait with responding to the user until reporting
+  -- logic finishes. It also ensures exceptions thrown in reporting logic won't
+  -- result in failure responses to requests.
+  _ <-
+    Async.async <| do
+      -- Setting an allocation limit helps protect us from reporting logic using
+      -- lots of CPU time and negatively affecting application performance.
+      Mem.setAllocationCounter reportingAllocationLimitInBytes
+      Mem.enableAllocationLimit
+      -- This thread is spawned without anybody watching how it does. We set a
+      -- maximum running time here to ensure it eventually completes.
+      Timeout.timeout reportingTimeoutInMicroSeconds report
+  Prelude.pure ()
+
+-- | The maximum amount of bytes the reporting logic is allowed to allocate.
+-- Note that this is more of a limit on CPU time then maximum live memory. See
+-- the documentation on `setAllocationCounter` for more details:
+--
+-- https://hackage.haskell.org/package/base-4.14.0.0/docs/System-Mem.html#v:enableAllocationLimit
+--
+-- The current value is a somewhat arbitrary initial value, intentionally not
+-- very strict. The hope is experience will help us tighten this value a bit.
+reportingAllocationLimitInBytes :: Int
+reportingAllocationLimitInBytes = 1024 * 1024 * 1024
+
+-- | The maximum amount of time reporting logic is allowed to run for a single
+-- request.
+--
+-- The current value is a somewhat arbitrary initial value, intentionally not
+-- very strict. The hope is experience will help us tighten this value a bit.
+reportingTimeoutInMicroSeconds :: Prelude.Int
+reportingTimeoutInMicroSeconds = 5_000_000
 
 --
 -- CLOCK
