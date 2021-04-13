@@ -3,6 +3,7 @@
 ### Enhancements:
 
 - Add match count to search interface (#67)
+- Fix default.nix to make log-explorer buildable
 
 # 0.1.1.1
 
