@@ -1,10 +1,16 @@
 # Unreleased next version
 
+### Enhancements
+
+- Log.Context can be shown, which should lead us to better test outputs. (#71)
+- Platform.rootTracingSpanIO doesn't let `onFinish` break the worker.
+
 # 0.5.0.2
 
 ### Enhancements:
 
-- Relax version bounds to ecompass `base-4.15.x`.
+- use safe-color-text instead of ansi-terminal (#68)
+- Relax version bounds to ecompass `base-4.15.x`. (#69)
 
 # 0.5.0.1
 
