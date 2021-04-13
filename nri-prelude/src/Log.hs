@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -- | This module is dedicated to logging information in production, to help
 -- understand what the application is doing when something goes wrong. This sets
@@ -143,13 +144,15 @@ withContext name contexts task =
 
 -- | A key-value pair that can be added to a log context. All log expressions
 -- within the context will always log this key-value pair.
-context :: (Aeson.ToJSON a) => Text -> a -> Context
+context :: (Show a, Aeson.ToJSON a) => Text -> a -> Context
 context = Context
 
 -- | Extra information to attach to a log message. It is passed a string key
 -- defining what the data is and a value with a @ToJSON@ instance.
 data Context where
-  Context :: Aeson.ToJSON a => Text -> a -> Context
+  Context :: (Show a, Aeson.ToJSON a) => Text -> a -> Context
+
+deriving instance Show Context
 
 -- | A set of log contexts.
 newtype LogContexts
@@ -224,7 +227,7 @@ data LogLevel
   | Info
   | Warn
   | Error
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Aeson.ToJSON LogLevel
 

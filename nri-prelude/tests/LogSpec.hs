@@ -158,7 +158,11 @@ tests =
       test "`Debug.toString` can pretty-print values containing secrets" <| \_ ->
         Log.mkSecret ()
           |> Text.Show.Pretty.reify
-          |> Expect.notEqual Nothing
+          |> Expect.notEqual Nothing,
+      test "`Log.Context` can be shown" <| \_ ->
+        Log.context "hello" "world"
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-context-show"
     ]
 
 data TestException = TestException deriving (Show)
