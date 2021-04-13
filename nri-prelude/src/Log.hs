@@ -151,6 +151,11 @@ context = Context
 data Context where
   Context :: Aeson.ToJSON a => Text -> a -> Context
 
+instance Show Context where
+  show (Context key value) =
+    Aeson.encode (key, value)
+      |> Prelude.show
+
 -- | A set of log contexts.
 newtype LogContexts
   = LogContexts [Context]
