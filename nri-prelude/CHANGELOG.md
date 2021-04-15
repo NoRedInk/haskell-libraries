@@ -1,5 +1,11 @@
 # Unreleased next version
 
+# 0.6.0.0
+
+### Bugfix
+
+- #71 was actually a breaking change! Whoops
+
 # 0.5.0.3
 
 ### Enhancements
