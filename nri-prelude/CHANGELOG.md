@@ -18,7 +18,7 @@
 ### Enhancements:
 
 - use safe-color-text instead of ansi-terminal (#68)
-- Relax version bounds to ecompass `base-4.15.x`. (#69)
+- Relax version bounds to ecompass `****base****-4.15.x`. (#69)
 
 # 0.5.0.1
 

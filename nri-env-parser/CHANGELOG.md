@@ -1,6 +1,10 @@
+# 0.1.0.7
+
+- Relax version bounds to encompass `prelude-0.6.x`.
+
 # 0.1.0.6
 
-- Relax version bounds to ecompass `base-4.15.x`.
+- Relax version bounds to encompass `base-4.15.x`.
 
 # 0.1.0.5
 
