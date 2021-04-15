@@ -1,5 +1,11 @@
 # Unreleased next version
 
+# 0.6.0.0
+
+### Bugfix
+
+- #71 was actually a breaking change! Whoops
+
 # 0.5.0.3
 
 ### Enhancements
@@ -12,7 +18,7 @@
 ### Enhancements:
 
 - use safe-color-text instead of ansi-terminal (#68)
-- Relax version bounds to ecompass `base-4.15.x`. (#69)
+- Relax version bounds to ecompass `****base****-4.15.x`. (#69)
 
 # 0.5.0.1
 
