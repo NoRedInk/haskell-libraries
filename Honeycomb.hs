@@ -321,7 +321,8 @@ deNoise maybeDetails =
       originalDetails
         |> Platform.renderTracingSpanDetails
           [ Platform.Renderer deNoiseLog,
-            Platform.Renderer deNoiseRedis
+            Platform.Renderer deNoiseRedis,
+            Platform.Renderer deNoiseKafka
           ]
         -- `renderTracingSpanDetails` returns Nothing when type of details
         -- doesn't match any in our list of functions above.
@@ -379,6 +380,17 @@ deNoiseRedis redisInfo =
           ("port", RedisCommands.port redisInfo |> Maybe.map Text.fromInt |> Maybe.withDefault "unknown") :
           commandsCount
         )
+
+deNoiseKafka :: Kafka.Consumer -> HashMap.HashMap Text Text
+deNoiseKafka kafkaInfo =
+  HashMap.fromList
+    [ ("topic", Kafka.topic kafkaInfo),
+      ("partition_id", Kafka.partitionId kafkaInfo |> Text.fromInt),
+      ("key", Kafka.key kafkaInfo |> Maybe.withDefault "none"),
+      ("create_time", Aeson.encode (Kafka.createTime kafkaInfo) |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict),
+      ("log_append_time", Aeson.encode (Kafka.logAppendTime kafkaInfo) |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict),
+      ("contents", Aeson.encode (Kafka.contents kafkaInfo) |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict)
+    ]
 
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
