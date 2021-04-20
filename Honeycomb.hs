@@ -266,17 +266,16 @@ toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span
 -- with the root's endpoint, and shaving some excess columns in `details`
 crunch ::
   BatchEvent ->
-  (HashMap.HashMap Text [Float], [BatchEvent]) ->
-  (HashMap.HashMap Text [Float], [BatchEvent])
-crunch x (acc, xs) =
+  HashMap.HashMap Text [Float] ->
+  HashMap.HashMap Text [Float]
+crunch x acc =
   let duration = x |> batchevent_data |> durationMs
       updateFn (Just durations) = Just (duration : durations)
       updateFn Nothing = Just [duration]
       span = batchevent_data x
       key = name span
       acc' = HashMap.alter updateFn key acc
-      x' = x
-   in (acc', x' : xs)
+   in acc'
 
 enrich :: [BatchEvent] -> [BatchEvent]
 enrich [] = []
@@ -284,7 +283,7 @@ enrich [x] = [x]
 -- Ensure we have a root and a rest to enrich
 enrich (root : rest) =
   let -- chose foldr to preserve order, not super important tho
-      (durationsByName, newRest) = List.foldr crunch (HashMap.empty, []) rest
+      durationsByName = List.foldr crunch HashMap.empty rest
       stats (name, durations) =
         let total = List.sum durations
             calls = List.length durations
@@ -298,7 +297,7 @@ enrich (root : rest) =
       rootSpan = batchevent_data root
       rootSpanWithStats = rootSpan {enrichedData = perSpanNameStats}
       newRoot = root {batchevent_data = rootSpanWithStats}
-   in newRoot : newRest
+   in newRoot : rest
 
 -- Some of our TracingSpanDetails instances create a lot of noise in the column
 -- space of Honeycomb.
