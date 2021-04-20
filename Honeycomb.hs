@@ -46,6 +46,7 @@ import qualified Http
 import qualified List
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
+import qualified Log.Kafka as Kafka
 import qualified Log.RedisCommands as RedisCommands
 import qualified Maybe
 import qualified Network.HostName
@@ -131,7 +132,8 @@ getSpanEndpoint span =
     |> Platform.details
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
-          [ Platform.Renderer (\(HttpRequest.Incoming details) -> HttpRequest.endpoint details)
+          [ Platform.Renderer (\(HttpRequest.Incoming details) -> HttpRequest.endpoint details),
+            Platform.Renderer (Just << Kafka.topic)
           ]
       )
     |> Maybe.andThen identity
