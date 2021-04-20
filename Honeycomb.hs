@@ -258,34 +258,40 @@ toBatchEvents' commonFields sampleRate parentSpanId spanIndex span = do
     List.concat children
     )
 
+-- Grab all durations by span name (e.g. "MySQL Query") while tagging them
+-- with the root's endpoint, and shaving some excess columns in `details`
+crunch ::
+  Maybe Text ->
+  BatchEvent ->
+  (HashMap.HashMap Text [Float], [BatchEvent]) ->
+  (HashMap.HashMap Text [Float], [BatchEvent])
+crunch maybeEndpoint x (acc, xs) =
+  let duration = x |> batchevent_data |> durationMs
+      updateFn (Just durations) = Just (duration : durations)
+      updateFn Nothing = Just [duration]
+      span = batchevent_data x
+      key = name span
+      acc' = HashMap.alter updateFn key acc
+      x' = case maybeEndpoint of
+        Just endpoint ->
+          x
+            { batchevent_data =
+                span
+                  { enrichedData =
+                      ("details.endpoint", endpoint) : enrichedData span
+                  }
+            }
+        Nothing ->
+          x
+   in (acc', x' : xs)
+
 enrich :: Maybe Text -> [BatchEvent] -> [BatchEvent]
 enrich _ [] = []
 enrich _ [x] = [x]
 -- Ensure we have a root and a rest to enrich
 enrich maybeEndpoint (root : rest) =
-  let -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
-      -- with the root's endpoint, and shaving some excess columns in `details`
-      crunch x (acc, xs) =
-        let duration = x |> batchevent_data |> durationMs
-            updateFn (Just durations) = Just (duration : durations)
-            updateFn Nothing = Just [duration]
-            span = batchevent_data x
-            key = name span
-            acc' = HashMap.alter updateFn key acc
-            x' = case maybeEndpoint of
-              Just endpoint ->
-                x
-                  { batchevent_data =
-                      span
-                        { enrichedData =
-                            ("details.endpoint", endpoint) : enrichedData span
-                        }
-                  }
-              Nothing ->
-                x
-         in (acc', x' : xs)
-      -- chose foldr to preserve order, not super important tho
-      (durationsByName, newRest) = List.foldr crunch (HashMap.empty, []) rest
+  let -- chose foldr to preserve order, not super important tho
+      (durationsByName, newRest) = List.foldr (crunch maybeEndpoint) (HashMap.empty, []) rest
       stats (name, durations) =
         let total = List.sum durations
             calls = List.length durations
