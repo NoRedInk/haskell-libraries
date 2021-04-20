@@ -204,14 +204,14 @@ calculateApdex handler' span =
 
 toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> List BatchEvent
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span =
-  let (_, events) = toBatchEvents' commonFields sampleRate parentSpanId spanIndex span
+  let (_, events) = toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span
       maybeEndpoint = getSpanEndpoint span
-   in enrich maybeEndpoint events
+   in enrich events
 
-toBatchEvents' :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
-toBatchEvents' commonFields sampleRate parentSpanId spanIndex span = do
+toBatchEvents' :: CommonFields -> Maybe Text -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
+toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
-  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents' commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
+  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents' commonFields maybeEndpoint sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration =
         Timer.difference (Platform.started span) (Platform.finished span)
           |> Platform.inMicroseconds
@@ -242,7 +242,11 @@ toBatchEvents' commonFields sampleRate parentSpanId spanIndex span = do
             failed = isError,
             sourceLocation = sourceLocation,
             apdex = common_apdex commonFields,
-            enrichedData = [],
+            enrichedData =
+              case maybeEndpoint of
+                Nothing -> []
+                Just endpoint ->
+                  [("details.endpoint", endpoint)],
             details =
               Platform.details span
                 |> deNoise
@@ -261,37 +265,26 @@ toBatchEvents' commonFields sampleRate parentSpanId spanIndex span = do
 -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
 -- with the root's endpoint, and shaving some excess columns in `details`
 crunch ::
-  Maybe Text ->
   BatchEvent ->
   (HashMap.HashMap Text [Float], [BatchEvent]) ->
   (HashMap.HashMap Text [Float], [BatchEvent])
-crunch maybeEndpoint x (acc, xs) =
+crunch x (acc, xs) =
   let duration = x |> batchevent_data |> durationMs
       updateFn (Just durations) = Just (duration : durations)
       updateFn Nothing = Just [duration]
       span = batchevent_data x
       key = name span
       acc' = HashMap.alter updateFn key acc
-      x' = case maybeEndpoint of
-        Just endpoint ->
-          x
-            { batchevent_data =
-                span
-                  { enrichedData =
-                      ("details.endpoint", endpoint) : enrichedData span
-                  }
-            }
-        Nothing ->
-          x
+      x' = x
    in (acc', x' : xs)
 
-enrich :: Maybe Text -> [BatchEvent] -> [BatchEvent]
-enrich _ [] = []
-enrich _ [x] = [x]
+enrich :: [BatchEvent] -> [BatchEvent]
+enrich [] = []
+enrich [x] = [x]
 -- Ensure we have a root and a rest to enrich
-enrich maybeEndpoint (root : rest) =
+enrich (root : rest) =
   let -- chose foldr to preserve order, not super important tho
-      (durationsByName, newRest) = List.foldr (crunch maybeEndpoint) (HashMap.empty, []) rest
+      (durationsByName, newRest) = List.foldr crunch (HashMap.empty, []) rest
       stats (name, durations) =
         let total = List.sum durations
             calls = List.length durations
