@@ -254,8 +254,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
                   ("details.endpoint", endpoint) : stats,
             details =
               Platform.details span
-                |> deNoise
-                |> Aeson.toJSON,
+                |> deNoise,
             sampleRate
           }
   ( lastSpanIndex,
@@ -308,7 +307,7 @@ perSpanNameStats childSpans =
 --
 -- It is manual labor, but we must ensure our TracingSpanDetails don't serialize
 -- to an unbounded number of column names.
-deNoise :: Maybe Platform.SomeTracingSpanDetails -> Aeson.Value
+deNoise :: Maybe Platform.SomeTracingSpanDetails -> HashMap.HashMap Text Text
 deNoise maybeDetails =
   case maybeDetails of
     Just originalDetails ->
@@ -321,8 +320,8 @@ deNoise maybeDetails =
         -- doesn't match any in our list of functions above.
         --
         -- Default to the original details then so we don't lose data
-        |> Maybe.withDefault (Aeson.toJSON originalDetails)
-    Nothing -> Aeson.Object HashMap.empty
+        |> Maybe.withDefault (toHashMap originalDetails)
+    Nothing -> HashMap.empty
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
 -- stuff in them. Aeson flatens the nesting, so:
@@ -339,26 +338,24 @@ deNoise maybeDetails =
 --
 -- We don't need Honeycomb to collect rich error information.
 -- That's what we pay Bugsnag for.
-deNoiseLog :: Log.LogContexts -> Aeson.Value
+deNoiseLog :: Log.LogContexts -> HashMap.HashMap Text Text
 deNoiseLog context@(Log.LogContexts contexts) =
   let tojson thing = case thing |> Aeson.toJSON of
         Aeson.String txt -> txt
         value -> value |> Aeson.encode |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict
-      deets =
-        if List.length contexts > 5
-          then HashMap.singleton "context" (tojson context)
-          else
-            contexts
-              |> map (\(Log.Context key val) -> (key, tojson val))
-              |> HashMap.fromList
-   in Aeson.toJSON deets
+   in if List.length contexts > 5
+        then HashMap.singleton "context" (tojson context)
+        else
+          contexts
+            |> map (\(Log.Context key val) -> (key, tojson val))
+            |> HashMap.fromList
 
 -- Redis creates one column per command for batches
 -- Let's trace what matters:
 -- - How many of each command
 -- - The full blob in a single column
 -- - The rest of our Info record
-deNoiseRedis :: RedisCommands.Details -> Aeson.Value
+deNoiseRedis :: RedisCommands.Details -> HashMap.HashMap Text Text
 deNoiseRedis redisInfo =
   let commandsCount =
         redisInfo
@@ -375,7 +372,6 @@ deNoiseRedis redisInfo =
           ("port", RedisCommands.port redisInfo |> Maybe.map Text.fromInt |> Maybe.withDefault "unknown") :
           commandsCount
         )
-        |> Aeson.toJSON
 
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
@@ -417,7 +413,7 @@ data Span = Span
     sourceLocation :: Maybe Text,
     apdex :: Float,
     enrichedData :: [(Text, Text)],
-    details :: Aeson.Value,
+    details :: HashMap.HashMap Text Text,
     sampleRate :: Int
   }
   deriving (Generic, Show)
