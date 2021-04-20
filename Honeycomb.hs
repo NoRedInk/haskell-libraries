@@ -232,7 +232,19 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
   let stats =
         if spanIndex == 0
           then perSpanNameStats children
-          else []
+          else HashMap.empty
+  let endpointDetail =
+        case maybeEndpoint of
+          Nothing -> HashMap.empty
+          Just endpoint ->
+            HashMap.singleton "details.endpoint" endpoint
+  let spanDetails =
+        deNoise (Platform.details span)
+          |> HashMap.foldrWithKey (\key value acc -> HashMap.insert ("details." ++ key) value acc) HashMap.empty
+  let details =
+        spanDetails
+          ++ endpointDetail
+          ++ stats
   let hcSpan =
         Span
           { name = Platform.name span,
@@ -247,14 +259,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
             failed = isError,
             sourceLocation = sourceLocation,
             apdex = common_apdex commonFields,
-            enrichedData =
-              case maybeEndpoint of
-                Nothing -> stats
-                Just endpoint ->
-                  ("details.endpoint", endpoint) : stats,
-            details =
-              Platform.details span
-                |> deNoise,
+            details,
             sampleRate
           }
   ( lastSpanIndex,
@@ -281,7 +286,7 @@ crunch x acc =
       acc' = HashMap.alter updateFn key acc
    in acc'
 
-perSpanNameStats :: [BatchEvent] -> [(Text, Text)]
+perSpanNameStats :: [BatchEvent] -> HashMap.HashMap Text Text
 perSpanNameStats childSpans =
   let -- chose foldr to preserve order, not super important tho
       durationsByName = List.foldr crunch HashMap.empty childSpans
@@ -295,6 +300,7 @@ perSpanNameStats childSpans =
               ("stats.count." ++ saneName, NriText.fromInt calls)
             ]
    in List.concatMap stats (HashMap.toList durationsByName)
+        |> HashMap.fromList
 
 -- Some of our TracingSpanDetails instances create a lot of noise in the column
 -- space of Honeycomb.
@@ -412,7 +418,6 @@ data Span = Span
     failed :: Bool,
     sourceLocation :: Maybe Text,
     apdex :: Float,
-    enrichedData :: [(Text, Text)],
     details :: HashMap.HashMap Text Text,
     sampleRate :: Int
   }
@@ -439,11 +444,9 @@ instance Aeson.ToJSON Span where
         detailsPairs =
           span
             |> details
-            |> toHashMap
-            |> HashMap.mapWithKey (\key value -> ("details." ++ key) .= value)
+            |> HashMap.mapWithKey (\key value -> key .= value)
             |> HashMap.elems
-        enrichedData' = map (\(key, value) -> key .= value) (enrichedData span)
-     in Aeson.object (basePairs ++ detailsPairs ++ enrichedData')
+     in Aeson.object (basePairs ++ detailsPairs)
 
 newtype SpanId = SpanId Text
   deriving (Aeson.ToJSON, Show)
