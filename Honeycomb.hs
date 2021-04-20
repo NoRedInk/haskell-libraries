@@ -21,7 +21,6 @@ module Observability.Honeycomb
     decoder,
     -- for tests
     toBatchEvents,
-    enrich,
     CommonFields (..),
     BatchEvent (..),
     Span (..),
@@ -97,9 +96,8 @@ report handler' _requestId span = do
           (Data.UUID.toText uuid)
           (Text.fromList hostname')
           (calculateApdex handler' span)
-  let (_, events) = toBatchEvents commonFields sampleRate Nothing 0 span
-  let enrichedEvents = enrich events
-  let body = Http.jsonBody enrichedEvents
+  let events = toBatchEvents commonFields sampleRate Nothing 0 span
+  let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
   let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
   let url = batchApiEndpoint datasetName
@@ -127,11 +125,10 @@ getRootSpanRequestPath rootSpan =
       )
     |> Maybe.andThen identity
 
-getBatchEventEndpoint :: BatchEvent -> Maybe Text
-getBatchEventEndpoint event =
-  event
-    |> batchevent_data
-    |> details
+getSpanEndpoint :: Platform.TracingSpan -> Maybe Text
+getSpanEndpoint span =
+  span
+    |> Platform.details
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
           [ Platform.Renderer (\(HttpRequest.Incoming details) -> HttpRequest.endpoint details)
@@ -205,10 +202,16 @@ calculateApdex handler' span =
                 then 0.5
                 else 0
 
-toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
-toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
+toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> List BatchEvent
+toBatchEvents commonFields sampleRate parentSpanId spanIndex span =
+  let (_, events) = toBatchEvents' commonFields sampleRate parentSpanId spanIndex span
+      maybeEndpoint = getSpanEndpoint span
+   in enrich maybeEndpoint events
+
+toBatchEvents' :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
+toBatchEvents' commonFields sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
-  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
+  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents' commonFields sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let duration =
         Timer.difference (Platform.started span) (Platform.finished span)
           |> Platform.inMicroseconds
@@ -240,7 +243,10 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
             sourceLocation = sourceLocation,
             apdex = common_apdex commonFields,
             enrichedData = [],
-            details = Platform.details span,
+            details =
+              Platform.details span
+                |> deNoise
+                |> Aeson.toJSON,
             sampleRate
           }
   ( lastSpanIndex,
@@ -252,13 +258,12 @@ toBatchEvents commonFields sampleRate parentSpanId spanIndex span = do
     List.concat children
     )
 
-enrich :: [BatchEvent] -> [BatchEvent]
-enrich [] = []
-enrich [x] = [x]
+enrich :: Maybe Text -> [BatchEvent] -> [BatchEvent]
+enrich _ [] = []
+enrich _ [x] = [x]
 -- Ensure we have a root and a rest to enrich
-enrich (root : rest) =
-  let maybeEndpoint = getBatchEventEndpoint root
-      -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
+enrich maybeEndpoint (root : rest) =
+  let -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
       -- with the root's endpoint, and shaving some excess columns in `details`
       crunch x (acc, xs) =
         let duration = x |> batchevent_data |> durationMs
@@ -273,15 +278,11 @@ enrich (root : rest) =
                   { batchevent_data =
                       span
                         { enrichedData =
-                            ("details.endpoint", endpoint) : enrichedData span,
-                          details = span |> details |> deNoise
+                            ("details.endpoint", endpoint) : enrichedData span
                         }
                   }
               Nothing ->
                 x
-                  { batchevent_data =
-                      span {details = span |> details |> deNoise}
-                  }
          in (acc', x' : xs)
       -- chose foldr to preserve order, not super important tho
       (durationsByName, newRest) = List.foldr crunch (HashMap.empty, []) rest
@@ -311,7 +312,7 @@ enrich (root : rest) =
 --
 -- It is manual labor, but we must ensure our TracingSpanDetails don't serialize
 -- to an unbounded number of column names.
-deNoise :: Maybe Platform.SomeTracingSpanDetails -> Maybe Platform.SomeTracingSpanDetails
+deNoise :: Maybe Platform.SomeTracingSpanDetails -> Aeson.Value
 deNoise maybeDetails =
   case maybeDetails of
     Just originalDetails ->
@@ -324,9 +325,8 @@ deNoise maybeDetails =
         -- doesn't match any in our list of functions above.
         --
         -- Default to the original details then so we don't lose data
-        |> Maybe.withDefault originalDetails
-        |> Just
-    Nothing -> Nothing
+        |> Maybe.withDefault (Aeson.toJSON originalDetails)
+    Nothing -> Aeson.Object HashMap.empty
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
 -- stuff in them. Aeson flatens the nesting, so:
@@ -343,7 +343,7 @@ deNoise maybeDetails =
 --
 -- We don't need Honeycomb to collect rich error information.
 -- That's what we pay Bugsnag for.
-deNoiseLog :: Log.LogContexts -> Platform.SomeTracingSpanDetails
+deNoiseLog :: Log.LogContexts -> Aeson.Value
 deNoiseLog context@(Log.LogContexts contexts) =
   let tojson thing = case thing |> Aeson.toJSON of
         Aeson.String txt -> txt
@@ -355,14 +355,14 @@ deNoiseLog context@(Log.LogContexts contexts) =
             contexts
               |> map (\(Log.Context key val) -> (key, tojson val))
               |> HashMap.fromList
-   in Platform.toTracingSpanDetails (GenericTracingSpanDetails deets)
+   in Aeson.toJSON deets
 
 -- Redis creates one column per command for batches
 -- Let's trace what matters:
 -- - How many of each command
 -- - The full blob in a single column
 -- - The rest of our Info record
-deNoiseRedis :: RedisCommands.Details -> Platform.SomeTracingSpanDetails
+deNoiseRedis :: RedisCommands.Details -> Aeson.Value
 deNoiseRedis redisInfo =
   let commandsCount =
         redisInfo
@@ -379,15 +379,7 @@ deNoiseRedis redisInfo =
           ("port", RedisCommands.port redisInfo |> Maybe.map Text.fromInt |> Maybe.withDefault "unknown") :
           commandsCount
         )
-        |> GenericTracingSpanDetails
-        |> Platform.toTracingSpanDetails
-
-newtype GenericTracingSpanDetails = GenericTracingSpanDetails (HashMap.HashMap Text Text)
-  deriving (Generic)
-
-instance Aeson.ToJSON GenericTracingSpanDetails
-
-instance Platform.TracingSpanDetails GenericTracingSpanDetails
+        |> Aeson.toJSON
 
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
@@ -429,7 +421,7 @@ data Span = Span
     sourceLocation :: Maybe Text,
     apdex :: Float,
     enrichedData :: [(Text, Text)],
-    details :: Maybe Platform.SomeTracingSpanDetails,
+    details :: Aeson.Value,
     sampleRate :: Int
   }
   deriving (Generic, Show)
