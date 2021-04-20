@@ -204,8 +204,7 @@ calculateApdex handler' span =
 
 toBatchEvents :: CommonFields -> Int -> Platform.TracingSpan -> List BatchEvent
 toBatchEvents commonFields sampleRate span =
-  let (_, events) = batchEventsHelper commonFields maybeEndpoint sampleRate Nothing 0 span
-      maybeEndpoint = getSpanEndpoint span
+  let (_, events) = batchEventsHelper commonFields (getSpanEndpoint span) sampleRate Nothing 0 span
    in events
 
 batchEventsHelper :: CommonFields -> Maybe Text -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
