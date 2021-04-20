@@ -206,12 +206,13 @@ toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingS
 toBatchEvents commonFields sampleRate parentSpanId spanIndex span =
   let (_, events) = toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span
       maybeEndpoint = getSpanEndpoint span
-   in enrich events
+   in events
 
 toBatchEvents' :: CommonFields -> Maybe Text -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
 toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
-  let (lastSpanIndex, children) = Data.List.mapAccumL (toBatchEvents' commonFields maybeEndpoint sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
+  let (lastSpanIndex, nestedChildren) = Data.List.mapAccumL (toBatchEvents' commonFields maybeEndpoint sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
+  let children = List.concat nestedChildren
   let duration =
         Timer.difference (Platform.started span) (Platform.finished span)
           |> Platform.inMicroseconds
@@ -228,6 +229,10 @@ toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span
         Platform.Succeeded -> False
         Platform.Failed -> True
         Platform.FailedWith _ -> True
+  let stats =
+        if spanIndex == 0
+          then perSpanNameStats children
+          else []
   let hcSpan =
         Span
           { name = Platform.name span,
@@ -244,9 +249,9 @@ toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span
             apdex = common_apdex commonFields,
             enrichedData =
               case maybeEndpoint of
-                Nothing -> []
+                Nothing -> stats
                 Just endpoint ->
-                  [("details.endpoint", endpoint)],
+                  ("details.endpoint", endpoint) : stats,
             details =
               Platform.details span
                 |> deNoise
@@ -259,7 +264,7 @@ toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span
         batchevent_data = hcSpan,
         batchevent_samplerate = sampleRate
       } :
-    List.concat children
+    children
     )
 
 -- Grab all durations by span name (e.g. "MySQL Query") while tagging them
@@ -277,13 +282,10 @@ crunch x acc =
       acc' = HashMap.alter updateFn key acc
    in acc'
 
-enrich :: [BatchEvent] -> [BatchEvent]
-enrich [] = []
-enrich [x] = [x]
--- Ensure we have a root and a rest to enrich
-enrich (root : rest) =
+perSpanNameStats :: [BatchEvent] -> [(Text, Text)]
+perSpanNameStats childSpans =
   let -- chose foldr to preserve order, not super important tho
-      durationsByName = List.foldr crunch HashMap.empty rest
+      durationsByName = List.foldr crunch HashMap.empty childSpans
       stats (name, durations) =
         let total = List.sum durations
             calls = List.length durations
@@ -293,11 +295,7 @@ enrich (root : rest) =
               ("stats.average_time_ms." ++ saneName, NriText.fromFloat average),
               ("stats.count." ++ saneName, NriText.fromInt calls)
             ]
-      perSpanNameStats = List.concatMap stats (HashMap.toList durationsByName)
-      rootSpan = batchevent_data root
-      rootSpanWithStats = rootSpan {enrichedData = perSpanNameStats}
-      newRoot = root {batchevent_data = rootSpanWithStats}
-   in newRoot : rest
+   in List.concatMap stats (HashMap.toList durationsByName)
 
 -- Some of our TracingSpanDetails instances create a lot of noise in the column
 -- space of Honeycomb.
