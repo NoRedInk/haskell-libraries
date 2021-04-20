@@ -96,7 +96,7 @@ report handler' _requestId span = do
           (Data.UUID.toText uuid)
           (Text.fromList hostname')
           (calculateApdex handler' span)
-  let events = toBatchEvents commonFields sampleRate Nothing 0 span
+  let events = toBatchEvents commonFields sampleRate span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
   let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
@@ -202,16 +202,16 @@ calculateApdex handler' span =
                 then 0.5
                 else 0
 
-toBatchEvents :: CommonFields -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> List BatchEvent
-toBatchEvents commonFields sampleRate parentSpanId spanIndex span =
-  let (_, events) = toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span
+toBatchEvents :: CommonFields -> Int -> Platform.TracingSpan -> List BatchEvent
+toBatchEvents commonFields sampleRate span =
+  let (_, events) = batchEventsHelper commonFields maybeEndpoint sampleRate Nothing 0 span
       maybeEndpoint = getSpanEndpoint span
    in events
 
-toBatchEvents' :: CommonFields -> Maybe Text -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
-toBatchEvents' commonFields maybeEndpoint sampleRate parentSpanId spanIndex span = do
+batchEventsHelper :: CommonFields -> Maybe Text -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
+batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
-  let (lastSpanIndex, nestedChildren) = Data.List.mapAccumL (toBatchEvents' commonFields maybeEndpoint sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
+  let (lastSpanIndex, nestedChildren) = Data.List.mapAccumL (batchEventsHelper commonFields maybeEndpoint sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
   let children = List.concat nestedChildren
   let duration =
         Timer.difference (Platform.started span) (Platform.finished span)
