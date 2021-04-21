@@ -35,8 +35,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Text.Encoding as Encoding
-import qualified Data.Text.Lazy as LazyText
-import qualified Data.Text.Lazy.Encoding as Lazy.Encoding
 import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified Environment
@@ -50,7 +48,6 @@ import qualified Log.Kafka as Kafka
 import qualified Log.RedisCommands as RedisCommands
 import qualified Maybe
 import qualified Network.HostName
-import Observability.Helpers (toHashMap)
 import qualified Observability.Timer as Timer
 import qualified Platform
 import qualified System.Random as Random
@@ -238,7 +235,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
         case maybeEndpoint of
           Nothing -> HashMap.empty
           Just endpoint ->
-            HashMap.singleton "details.endpoint" endpoint
+            HashMap.singleton "details.endpoint" (Aeson.toJSON endpoint)
   let spanDetails =
         deNoise (Platform.details span)
           |> HashMap.foldrWithKey (\key value acc -> HashMap.insert ("details." ++ key) value acc) HashMap.empty
@@ -287,7 +284,7 @@ crunch x acc =
       acc' = HashMap.alter updateFn key acc
    in acc'
 
-perSpanNameStats :: [BatchEvent] -> HashMap.HashMap Text Text
+perSpanNameStats :: [BatchEvent] -> HashMap.HashMap Text Aeson.Value
 perSpanNameStats childSpans =
   let -- chose foldr to preserve order, not super important tho
       durationsByName = List.foldr crunch HashMap.empty childSpans
@@ -296,9 +293,9 @@ perSpanNameStats childSpans =
             calls = List.length durations
             average = total / Prelude.fromIntegral calls
             saneName = name |> NriText.toLower |> NriText.replace " " "_"
-         in [ ("stats.total_time_ms." ++ saneName, NriText.fromFloat total),
-              ("stats.average_time_ms." ++ saneName, NriText.fromFloat average),
-              ("stats.count." ++ saneName, NriText.fromInt calls)
+         in [ ("stats.total_time_ms." ++ saneName, Aeson.toJSON total),
+              ("stats.average_time_ms." ++ saneName, Aeson.toJSON average),
+              ("stats.count." ++ saneName, Aeson.toJSON calls)
             ]
    in List.concatMap stats (HashMap.toList durationsByName)
         |> HashMap.fromList
@@ -314,7 +311,7 @@ perSpanNameStats childSpans =
 --
 -- It is manual labor, but we must ensure our TracingSpanDetails don't serialize
 -- to an unbounded number of column names.
-deNoise :: Maybe Platform.SomeTracingSpanDetails -> HashMap.HashMap Text Text
+deNoise :: Maybe Platform.SomeTracingSpanDetails -> HashMap.HashMap Text Aeson.Value
 deNoise maybeDetails =
   case maybeDetails of
     Just originalDetails ->
@@ -328,7 +325,11 @@ deNoise maybeDetails =
         -- doesn't match any in our list of functions above.
         --
         -- Default to the original details then so we don't lose data
-        |> Maybe.withDefault (toHashMap originalDetails)
+        |> Maybe.withDefault (case Aeson.toJSON originalDetails of
+            Aeson.Object hashMap -> hashMap
+            jsonVal -> HashMap.singleton "val" jsonVal
+
+        )
     Nothing -> HashMap.empty
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
@@ -346,16 +347,13 @@ deNoise maybeDetails =
 --
 -- We don't need Honeycomb to collect rich error information.
 -- That's what we pay Bugsnag for.
-deNoiseLog :: Log.LogContexts -> HashMap.HashMap Text Text
+deNoiseLog :: Log.LogContexts -> HashMap.HashMap Text Aeson.Value
 deNoiseLog context@(Log.LogContexts contexts) =
-  let tojson thing = case thing |> Aeson.toJSON of
-        Aeson.String txt -> txt
-        value -> value |> Aeson.encode |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict
-   in if List.length contexts > 5
-        then HashMap.singleton "context" (tojson context)
+   if List.length contexts > 5
+        then HashMap.singleton "context" (Aeson.toJSON context)
         else
           contexts
-            |> map (\(Log.Context key val) -> (key, tojson val))
+            |> map (\(Log.Context key val) -> (key, Aeson.toJSON val))
             |> HashMap.fromList
 
 -- Redis creates one column per command for batches
@@ -363,33 +361,33 @@ deNoiseLog context@(Log.LogContexts contexts) =
 -- - How many of each command
 -- - The full blob in a single column
 -- - The rest of our Info record
-deNoiseRedis :: RedisCommands.Details -> HashMap.HashMap Text Text
+deNoiseRedis :: RedisCommands.Details -> HashMap.HashMap Text Aeson.Value
 deNoiseRedis redisInfo =
   let commandsCount =
         redisInfo
           |> RedisCommands.commands
           |> List.filterMap (NriText.words >> List.head)
-          |> (\x -> [(the key ++ ".count", key |> List.length |> NriText.fromInt) | key <- x, then group by key using groupWith])
+          |> (\x -> [(the key ++ ".count", key |> List.length |> Aeson.toJSON) | key <- x, then group by key using groupWith])
       fullBlob =
         redisInfo
           |> RedisCommands.commands
-          |> NriText.join "\n"
+          |> Aeson.toJSON
    in HashMap.fromList
         ( ("commands", fullBlob) :
-          ("host", RedisCommands.host redisInfo |> Maybe.withDefault "unknown") :
-          ("port", RedisCommands.port redisInfo |> Maybe.map Text.fromInt |> Maybe.withDefault "unknown") :
+          ("host", RedisCommands.host redisInfo |> Aeson.toJSON) :
+          ("port", RedisCommands.port redisInfo |> Aeson.toJSON) :
           commandsCount
         )
 
-deNoiseKafka :: Kafka.Consumer -> HashMap.HashMap Text Text
+deNoiseKafka :: Kafka.Consumer -> HashMap.HashMap Text Aeson.Value
 deNoiseKafka kafkaInfo =
   HashMap.fromList
-    [ ("topic", Kafka.topic kafkaInfo),
-      ("partition_id", Kafka.partitionId kafkaInfo |> Text.fromInt),
-      ("key", Kafka.key kafkaInfo |> Maybe.withDefault "none"),
-      ("create_time", Aeson.encode (Kafka.createTime kafkaInfo) |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict),
-      ("log_append_time", Aeson.encode (Kafka.logAppendTime kafkaInfo) |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict),
-      ("contents", Aeson.encode (Kafka.contents kafkaInfo) |> Lazy.Encoding.decodeUtf8 |> LazyText.toStrict)
+    [ ("topic", Aeson.toJSON (Kafka.topic kafkaInfo)),
+      ("partition_id", Kafka.partitionId kafkaInfo |> Aeson.toJSON),
+      ("key", Kafka.key kafkaInfo |> Aeson.toJSON),
+      ("create_time", Aeson.toJSON (Kafka.createTime kafkaInfo) ),
+      ("log_append_time", Aeson.toJSON (Kafka.logAppendTime kafkaInfo) ),
+      ("contents", Aeson.toJSON (Kafka.contents kafkaInfo) )
     ]
 
 data BatchEvent = BatchEvent
@@ -431,7 +429,7 @@ data Span = Span
     failed :: Bool,
     sourceLocation :: Maybe Text,
     apdex :: Float,
-    details :: HashMap.HashMap Text Text,
+    details :: HashMap.HashMap Text Aeson.Value,
     sampleRate :: Int
   }
   deriving (Generic, Show)
