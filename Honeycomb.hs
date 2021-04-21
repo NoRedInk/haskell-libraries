@@ -237,7 +237,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
           Just endpoint ->
             HashMap.singleton "details.endpoint" (Aeson.toJSON endpoint)
   let spanDetails =
-        deNoise (Platform.details span)
+        renderDetails (Platform.details span)
           |> HashMap.foldrWithKey (\key value acc -> HashMap.insert ("details." ++ key) value acc) HashMap.empty
   let details =
         spanDetails
@@ -300,31 +300,36 @@ perSpanNameStats childSpans =
    in List.concatMap stats (HashMap.toList durationsByName)
         |> HashMap.fromList
 
--- Some of our TracingSpanDetails instances create a lot of noise in the column
--- space of Honeycomb.
+-- Customize how we render span details for different kinds of spans to
+-- Honeycomb.
+--
+-- In the past we used the toHashMap helper to generate the JSON representations
+-- we send to honeycomb (see its documentation in the Helpers module to learn
+-- more about it). This turned out to be a poor fit because it creates a ton of
+-- top-level JSON keys, each of which Honeycomb will create a unique column for.
 --
 -- If we ever hit 10k unique column names (and we were past the thousands when
 -- this code was introduced) Honeycomb will stop accepting traces from us.
 --
 -- "Unique column names" means different column names that Honeycomb has seen us
 -- report on a span.
---
--- It is manual labor, but we must ensure our TracingSpanDetails don't serialize
--- to an unbounded number of column names.
-deNoise :: Maybe Platform.SomeTracingSpanDetails -> HashMap.HashMap Text Aeson.Value
-deNoise maybeDetails =
+renderDetails :: Maybe Platform.SomeTracingSpanDetails -> HashMap.HashMap Text Aeson.Value
+renderDetails maybeDetails =
   case maybeDetails of
     Just originalDetails ->
       originalDetails
         |> Platform.renderTracingSpanDetails
-          [ Platform.Renderer deNoiseLog,
-            Platform.Renderer deNoiseRedis,
-            Platform.Renderer deNoiseKafka
+          [ Platform.Renderer renderDetailsLog,
+            Platform.Renderer renderDetailsRedis,
+            Platform.Renderer renderDetailsKafka
           ]
         -- `renderTracingSpanDetails` returns Nothing when type of details
         -- doesn't match any in our list of functions above.
         --
-        -- Default to the original details then so we don't lose data
+        -- We'll default to using the default JSON encoding of the span.
+        -- Assuming it encodes into a JSON object with multiple keys (every
+        -- known details object we have does this) we'll use that object
+        -- directly.
         |> Maybe.withDefault (case Aeson.toJSON originalDetails of
             Aeson.Object hashMap -> hashMap
             jsonVal -> HashMap.singleton "val" jsonVal
@@ -347,8 +352,8 @@ deNoise maybeDetails =
 --
 -- We don't need Honeycomb to collect rich error information.
 -- That's what we pay Bugsnag for.
-deNoiseLog :: Log.LogContexts -> HashMap.HashMap Text Aeson.Value
-deNoiseLog context@(Log.LogContexts contexts) =
+renderDetailsLog :: Log.LogContexts -> HashMap.HashMap Text Aeson.Value
+renderDetailsLog context@(Log.LogContexts contexts) =
    if List.length contexts > 5
         then HashMap.singleton "context" (Aeson.toJSON context)
         else
@@ -361,8 +366,8 @@ deNoiseLog context@(Log.LogContexts contexts) =
 -- - How many of each command
 -- - The full blob in a single column
 -- - The rest of our Info record
-deNoiseRedis :: RedisCommands.Details -> HashMap.HashMap Text Aeson.Value
-deNoiseRedis redisInfo =
+renderDetailsRedis :: RedisCommands.Details -> HashMap.HashMap Text Aeson.Value
+renderDetailsRedis redisInfo =
   let commandsCount =
         redisInfo
           |> RedisCommands.commands
@@ -379,8 +384,8 @@ deNoiseRedis redisInfo =
           commandsCount
         )
 
-deNoiseKafka :: Kafka.Consumer -> HashMap.HashMap Text Aeson.Value
-deNoiseKafka kafkaInfo =
+renderDetailsKafka :: Kafka.Consumer -> HashMap.HashMap Text Aeson.Value
+renderDetailsKafka kafkaInfo =
   HashMap.fromList
     [ ("topic", Aeson.toJSON (Kafka.topic kafkaInfo)),
       ("partition_id", Kafka.partitionId kafkaInfo |> Aeson.toJSON),
