@@ -320,8 +320,7 @@ renderDetails maybeDetails =
       originalDetails
         |> Platform.renderTracingSpanDetails
           [ Platform.Renderer renderDetailsLog,
-            Platform.Renderer renderDetailsRedis,
-            Platform.Renderer renderDetailsKafka
+            Platform.Renderer renderDetailsRedis
           ]
         -- `renderTracingSpanDetails` returns Nothing when type of details
         -- doesn't match any in our list of functions above.
@@ -383,17 +382,6 @@ renderDetailsRedis redisInfo =
           ("port", RedisCommands.port redisInfo |> Aeson.toJSON) :
           commandsCount
         )
-
-renderDetailsKafka :: Kafka.Consumer -> HashMap.HashMap Text Aeson.Value
-renderDetailsKafka kafkaInfo =
-  HashMap.fromList
-    [ ("topic", Aeson.toJSON (Kafka.topic kafkaInfo)),
-      ("partition_id", Kafka.partitionId kafkaInfo |> Aeson.toJSON),
-      ("key", Kafka.key kafkaInfo |> Aeson.toJSON),
-      ("create_time", Aeson.toJSON (Kafka.createTime kafkaInfo) ),
-      ("log_append_time", Aeson.toJSON (Kafka.logAppendTime kafkaInfo) ),
-      ("contents", Aeson.toJSON (Kafka.contents kafkaInfo) )
-    ]
 
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
