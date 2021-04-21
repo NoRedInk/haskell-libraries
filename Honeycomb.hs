@@ -329,11 +329,11 @@ renderDetails maybeDetails =
         -- Assuming it encodes into a JSON object with multiple keys (every
         -- known details object we have does this) we'll use that object
         -- directly.
-        |> Maybe.withDefault (case Aeson.toJSON originalDetails of
-            Aeson.Object hashMap -> hashMap
-            jsonVal -> HashMap.singleton "val" jsonVal
-
-        )
+        |> Maybe.withDefault
+          ( case Aeson.toJSON originalDetails of
+              Aeson.Object hashMap -> hashMap
+              jsonVal -> HashMap.singleton "val" jsonVal
+          )
     Nothing -> HashMap.empty
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
@@ -353,12 +353,12 @@ renderDetails maybeDetails =
 -- That's what we pay Bugsnag for.
 renderDetailsLog :: Log.LogContexts -> HashMap.HashMap Text Aeson.Value
 renderDetailsLog context@(Log.LogContexts contexts) =
-   if List.length contexts > 5
-        then HashMap.singleton "context" (Aeson.toJSON context)
-        else
-          contexts
-            |> map (\(Log.Context key val) -> (key, Aeson.toJSON val))
-            |> HashMap.fromList
+  if List.length contexts > 5
+    then HashMap.singleton "context" (Aeson.toJSON context)
+    else
+      contexts
+        |> map (\(Log.Context key val) -> (key, Aeson.toJSON val))
+        |> HashMap.fromList
 
 -- Redis creates one column per command for batches
 -- Let's trace what matters:
