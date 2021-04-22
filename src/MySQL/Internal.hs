@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -48,26 +49,28 @@ newtype TransactionCount
   = TransactionCount Int
   deriving (Eq)
 
-data Connection = Connection
-  { baseConnection :: RealConnection,
-    executeCommand ::
-      Stack.HasCallStack =>
-      RealConnection ->
-      Query.Query () ->
-      Task Error.Error Int,
-    executeQuery ::
-      forall row.
-      Stack.HasCallStack =>
-      FromRow.FromRow (FromRow.CountColumns row) row =>
-      RealConnection ->
-      Query.Query row ->
-      Task Error.Error [row],
-    withTransaction ::
-      forall e a.
-      RealConnection ->
-      (RealConnection -> Task e a) ->
-      Task e a
-  }
+data Connection where
+  Connection ::
+    { baseConnection :: conn,
+      executeCommand ::
+        Stack.HasCallStack =>
+        conn ->
+        Query.Query () ->
+        Task Error.Error Int,
+      executeQuery ::
+        forall row.
+        Stack.HasCallStack =>
+        FromRow.FromRow (FromRow.CountColumns row) row =>
+        conn ->
+        Query.Query row ->
+        Task Error.Error [row],
+      withTransaction ::
+        forall e a.
+        conn ->
+        (TransactionCount -> conn -> Task e a) ->
+        Task e a
+    } ->
+    Connection
 
 data RealConnection = RealConnection
   { doAnything :: Platform.DoAnythingHandler,
@@ -104,15 +107,26 @@ data SingleOrPool c
     Single TransactionCount c
 
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
-connection settings =
+connection settings = do
+  baseConnection <- realConnection settings
+  Prelude.pure
+    ( Connection
+        baseConnection
+        realExecuteCommand
+        realExecuteQuery
+        realWithTransaction
+    )
+
+realConnection :: Settings.Settings -> Data.Acquire.Acquire RealConnection
+realConnection settings =
   Data.Acquire.mkAcquire (acquire settings) release
   where
-    release Connection {baseConnection} =
-      case singleOrPool baseConnection of
+    release conn =
+      case singleOrPool conn of
         Pool pool -> Data.Pool.destroyAllResources pool
         Single _ c -> Base.close c
 
-acquire :: Settings.Settings -> Prelude.IO Connection
+acquire :: Settings.Settings -> Prelude.IO RealConnection
 acquire settings = do
   doAnything <- Platform.doAnythingHandler
   pool <-
@@ -124,16 +138,11 @@ acquire settings = do
         maxIdleTime
         size
   Prelude.pure
-    ( Connection
-        ( RealConnection
-            doAnything
-            pool
-            (connectionDetails settings)
-            (Settings.mysqlQueryTimeoutSeconds settings)
-        )
-        realExecuteCommand
-        realExecuteQuery
-        realWithTransaction
+    ( RealConnection
+        doAnything
+        pool
+        (connectionDetails settings)
+        (Settings.mysqlQueryTimeoutSeconds settings)
     )
   where
     stripes =
@@ -208,10 +217,10 @@ toConnectInfo settings =
 -- |
 -- Check that we are ready to be take traffic.
 readiness :: Stack.HasCallStack => Connection -> Health.Check
-readiness conn =
+readiness Connection {executeQuery, baseConnection} =
   Health.mkCheck "mysql" <| do
     log <- Platform.silentHandler
-    Stack.withFrozenCallStack (executeQuery conn) (baseConnection conn) (queryFromText "SELECT 1")
+    Stack.withFrozenCallStack executeQuery baseConnection (queryFromText "SELECT 1")
       |> Task.map (\(_ :: [Int]) -> ())
       |> Task.mapError (Text.fromList << Exception.displayException)
       |> Task.attempt log
@@ -237,10 +246,12 @@ class MySqlQueryable query result | result -> query where
   executeSql :: Stack.HasCallStack => Connection -> Query.Query query -> Task Error.Error result
 
 instance FromRow.FromRow (FromRow.CountColumns row) row => MySqlQueryable row [row] where
-  executeSql c query = Stack.withFrozenCallStack (executeQuery c) (baseConnection c) query
+  executeSql Connection {executeQuery, baseConnection} query =
+    Stack.withFrozenCallStack executeQuery baseConnection query
 
 instance MySqlQueryable () Int where
-  executeSql c query = Stack.withFrozenCallStack (executeCommand c) (baseConnection c) query
+  executeSql Connection {executeCommand, baseConnection} query =
+    Stack.withFrozenCallStack executeCommand baseConnection query
 
 instance MySqlQueryable () () where
   executeSql c query = Stack.withFrozenCallStack executeCommand_ c query
@@ -284,8 +295,8 @@ realExecuteQuery conn query =
           |> withTimeout conn
 
 executeCommand_ :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error ()
-executeCommand_ conn query = do
-  _ <- Stack.withFrozenCallStack (executeCommand conn) (baseConnection conn) query
+executeCommand_ Connection {executeCommand, baseConnection} query = do
+  _ <- Stack.withFrozenCallStack executeCommand baseConnection query
   Task.succeed ()
 
 realExecuteCommand :: Stack.HasCallStack => RealConnection -> Query.Query () -> Task Error.Error Int
@@ -390,52 +401,43 @@ withTimeout conn task =
 -- |
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
-transaction conn' func =
-  withTransaction conn' (baseConnection conn') <| \newBaseConnection -> do
-    let conn = conn' {baseConnection = newBaseConnection}
+transaction Connection {baseConnection, executeCommand, executeQuery, withTransaction} func =
+  withTransaction baseConnection <| \transactionCount newBaseConnection -> do
+    let conn = Connection {baseConnection = newBaseConnection, executeCommand, executeQuery, withTransaction}
     Platform.bracketWithError
-      (begin conn)
+      (begin transactionCount conn)
       ( \succeeded () ->
           case succeeded of
-            Platform.Succeeded -> commit conn
-            Platform.Failed -> rollback conn
-            Platform.FailedWith _ -> rollback conn
+            Platform.Succeeded -> commit transactionCount conn
+            Platform.Failed -> rollback transactionCount conn
+            Platform.FailedWith _ -> rollback transactionCount conn
       )
       (\() -> func conn)
 
-transactionCount :: Connection -> Maybe TransactionCount
-transactionCount conn =
-  case singleOrPool (baseConnection conn) of
-    Single tc _ -> Just tc
-    Pool _ -> Nothing
-
 -- | Begin a new transaction. If there is already a transaction in progress (created with 'begin' or 'pgTransaction') instead creates a savepoint.
-begin :: Connection -> Task e ()
-begin conn =
+begin :: TransactionCount -> Connection -> Task e ()
+begin transactionCount conn =
   throwRuntimeError
-    <| case transactionCount conn of
-      Nothing -> Prelude.pure ()
-      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "BEGIN")
-      Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("SAVEPOINT pgt" ++ Text.fromInt current))
+    <| case transactionCount of
+      TransactionCount 0 -> executeCommand_ conn (queryFromText "BEGIN")
+      TransactionCount current -> executeCommand_ conn (queryFromText ("SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Rollback to the most recent 'begin'.
-rollback :: Connection -> Task e ()
-rollback conn =
+rollback :: TransactionCount -> Connection -> Task e ()
+rollback transactionCount conn =
   throwRuntimeError
-    <| case transactionCount conn of
-      Nothing -> Prelude.pure ()
-      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "ROLLBACK")
-      Just (TransactionCount current) ->
+    <| case transactionCount of
+      TransactionCount 0 -> executeCommand_ conn (queryFromText "ROLLBACK")
+      TransactionCount current ->
         executeCommand_ conn (queryFromText ("ROLLBACK TO SAVEPOINT pgt" ++ Text.fromInt current))
 
 -- | Commit the most recent 'begin'.
-commit :: Connection -> Task e ()
-commit conn =
+commit :: TransactionCount -> Connection -> Task e ()
+commit transactionCount conn =
   throwRuntimeError
-    <| case transactionCount conn of
-      Nothing -> Prelude.pure ()
-      Just (TransactionCount 0) -> executeCommand_ conn (queryFromText "COMMIT")
-      Just (TransactionCount current) -> executeCommand_ conn (queryFromText ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current))
+    <| case transactionCount of
+      TransactionCount 0 -> executeCommand_ conn (queryFromText "COMMIT")
+      TransactionCount current -> executeCommand_ conn (queryFromText ("RELEASE SAVEPOINT pgt" ++ Text.fromInt current))
 
 throwRuntimeError :: Task Error.Error a -> Task e a
 throwRuntimeError task =
@@ -447,14 +449,14 @@ throwRuntimeError task =
     )
     task
 
-realWithTransaction :: RealConnection -> (RealConnection -> Task e a) -> Task e a
+realWithTransaction :: RealConnection -> (TransactionCount -> RealConnection -> Task e a) -> Task e a
 realWithTransaction conn func =
   case singleOrPool conn of
     Single (TransactionCount tc) c ->
-      func conn {singleOrPool = Single (TransactionCount (tc + 1)) c}
+      func (TransactionCount (tc + 1)) conn {singleOrPool = Single (TransactionCount (tc + 1)) c}
     Pool _ ->
       withConnection conn <| \c ->
-        func conn {singleOrPool = Single (TransactionCount 0) c}
+        func (TransactionCount 0) conn {singleOrPool = Single (TransactionCount 0) c}
 
 -- | by default, queries pull a connection from the connection pool.
 --   For SQL transactions, we want all queries within the transaction to run

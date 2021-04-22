@@ -53,21 +53,30 @@ getTestConnection =
             Just conn -> Prelude.pure conn
             Nothing -> do
               settings <- Environment.decode Settings.decoder
-              acquire
-                settings
-                  { Settings.mysqlPool =
-                      Settings.defaultPoolSettings
-                        { Settings.mysqlPoolSize = Settings.MysqlPoolSize 1
-                        },
-                    Settings.mysqlConnection =
-                      Settings.defaultConnectionSettings
-                        { Settings.database = Settings.Database "noredink_test",
-                          Settings.connection =
-                            Settings.ConnectTcp
-                              (Settings.Host "127.0.0.1")
-                              (Settings.Port 3306)
-                        }
-                  }
+              baseConnection <-
+                acquire
+                  settings
+                    { Settings.mysqlPool =
+                        Settings.defaultPoolSettings
+                          { Settings.mysqlPoolSize = Settings.MysqlPoolSize 1
+                          },
+                      Settings.mysqlConnection =
+                        Settings.defaultConnectionSettings
+                          { Settings.database = Settings.Database "noredink_test",
+                            Settings.connection =
+                              Settings.ConnectTcp
+                                (Settings.Host "127.0.0.1")
+                                (Settings.Port 3306)
+                          }
+                    }
+              Prelude.pure
+                ( Connection
+                    baseConnection
+                    realExecuteCommand
+                    realExecuteQuery
+                    realWithTransaction
+                )
+
         Prelude.pure (Just conn, conn)
     )
     |> map Ok
@@ -76,21 +85,18 @@ getTestConnection =
 -- | Run code in a transaction, then roll that transaction back.
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
-inTestTransaction conn' func =
-  withTransaction conn' (baseConnection conn') <| \newBaseConnection -> do
-    let conn = conn' {baseConnection = newBaseConnection}
+inTestTransaction Connection {baseConnection, executeCommand, executeQuery, withTransaction} func =
+  withTransaction baseConnection <| \transactionCount newBaseConnection -> do
+    let conn = Connection {baseConnection = newBaseConnection, executeCommand, executeQuery, withTransaction}
     Platform.bracketWithError
-      (do rollbackAll conn; begin conn)
+      (do rollbackAll conn; begin transactionCount conn)
       (\_ () -> rollbackAll conn)
       (\() -> func conn)
 
 -- | Rollback all active 'begin's.
 rollbackAll :: Connection -> Task e ()
 rollbackAll conn =
-  throwRuntimeError
-    <| case transactionCount conn of
-      Nothing -> Prelude.pure ()
-      Just _ -> executeCommand_ conn (queryFromText "ROLLBACK")
+  throwRuntimeError <| executeCommand_ conn (queryFromText "ROLLBACK")
 
 -- | Create a 'global' variable containing the connection we want to use in
 -- tests.
