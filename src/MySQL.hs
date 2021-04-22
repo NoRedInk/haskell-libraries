@@ -9,6 +9,7 @@ module MySQL
     Connection,
     connection,
     readiness,
+    dryRunConnection,
 
     -- * Settings
     MySQL.Settings.Settings,

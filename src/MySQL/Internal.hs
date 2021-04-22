@@ -117,6 +117,16 @@ connection settings = do
         realWithTransaction
     )
 
+dryRunConnection :: Connection
+dryRunConnection =
+  Connection
+    { baseConnection = TransactionCount (-1),
+      executeCommand = \_ _ -> Task.succeed 1,
+      executeQuery = \_ _ -> Task.fail (Error.Other "Cannot perform SELECT queries using dry-run connection. Dry-run connection wouldn't know what data to return!" []),
+      withTransaction = \(TransactionCount tc) f ->
+        f (TransactionCount (tc + 1)) (TransactionCount (tc + 1))
+    }
+
 realConnection :: Settings.Settings -> Data.Acquire.Acquire RealConnection
 realConnection settings =
   Data.Acquire.mkAcquire (acquire settings) release
