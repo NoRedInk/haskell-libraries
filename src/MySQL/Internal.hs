@@ -117,6 +117,11 @@ connection settings = do
         realWithTransaction
     )
 
+-- | A fake connection for use in tests or some migration scenarios. It does
+-- not perform any queries, and only logs what it's supposed to do.
+--
+-- Note: this connection only supports write queries such as INSERT, UPDATE,
+-- and DELETE. Any SELECT query will result in an error.
 dryRunConnection :: Connection
 dryRunConnection =
   Connection
