@@ -49,6 +49,22 @@ newtype TransactionCount
   deriving (Eq)
 
 data Connection = Connection
+  { baseConnection :: RealConnection,
+    executeCommand ::
+      Stack.HasCallStack =>
+      RealConnection ->
+      Query.Query () ->
+      Task Error.Error Int,
+    executeQuery ::
+      forall row.
+      Stack.HasCallStack =>
+      FromRow.FromRow (FromRow.CountColumns row) row =>
+      RealConnection ->
+      Query.Query row ->
+      Task Error.Error [row]
+  }
+
+data RealConnection = RealConnection
   { doAnything :: Platform.DoAnythingHandler,
     -- | In this IORef we keep a list of statements we've prepared with
     -- MySQL. These are SQL commands with some placeholders that MySQL has
@@ -67,19 +83,7 @@ data Connection = Connection
     -- in the dictionary below instead of the query itself.
     singleOrPool :: SingleOrPool Base.MySQLConn,
     connDetails :: SqlQuery.Details,
-    timeout :: Time.Interval,
-    executeCommand ::
-      Stack.HasCallStack =>
-      Connection ->
-      Query.Query () ->
-      Task Error.Error Int,
-    executeQuery ::
-      forall row.
-      Stack.HasCallStack =>
-      FromRow.FromRow (FromRow.CountColumns row) row =>
-      Connection ->
-      Query.Query row ->
-      Task Error.Error [row]
+    timeout :: Time.Interval
   }
 
 -- | A database connection type.
@@ -98,8 +102,8 @@ connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
   Data.Acquire.mkAcquire (acquire settings) release
   where
-    release Connection {singleOrPool} =
-      case singleOrPool of
+    release Connection {baseConnection} =
+      case singleOrPool baseConnection of
         Pool pool -> Data.Pool.destroyAllResources pool
         Single _ c -> Base.close c
 
@@ -116,10 +120,12 @@ acquire settings = do
         size
   Prelude.pure
     ( Connection
-        doAnything
-        pool
-        (connectionDetails settings)
-        (Settings.mysqlQueryTimeoutSeconds settings)
+        ( RealConnection
+            doAnything
+            pool
+            (connectionDetails settings)
+            (Settings.mysqlQueryTimeoutSeconds settings)
+        )
         executeCommand'
         executeQuery'
     )
@@ -199,7 +205,7 @@ readiness :: Stack.HasCallStack => Connection -> Health.Check
 readiness conn =
   Health.mkCheck "mysql" <| do
     log <- Platform.silentHandler
-    Stack.withFrozenCallStack (executeQuery conn) conn (queryFromText "SELECT 1")
+    Stack.withFrozenCallStack (executeQuery conn) (baseConnection conn) (queryFromText "SELECT 1")
       |> Task.map (\(_ :: [Int]) -> ())
       |> Task.mapError (Text.fromList << Exception.displayException)
       |> Task.attempt log
@@ -225,10 +231,10 @@ class MySqlQueryable query result | result -> query where
   executeSql :: Stack.HasCallStack => Connection -> Query.Query query -> Task Error.Error result
 
 instance FromRow.FromRow (FromRow.CountColumns row) row => MySqlQueryable row [row] where
-  executeSql c query = Stack.withFrozenCallStack (executeQuery c) c query
+  executeSql c query = Stack.withFrozenCallStack (executeQuery c) (baseConnection c) query
 
 instance MySqlQueryable () Int where
-  executeSql c query = Stack.withFrozenCallStack (executeCommand c) c query
+  executeSql c query = Stack.withFrozenCallStack (executeCommand c) (baseConnection c) query
 
 instance MySqlQueryable () () where
   executeSql c query = Stack.withFrozenCallStack executeCommand_ c query
@@ -253,7 +259,7 @@ executeQuery' ::
   forall row.
   Stack.HasCallStack =>
   FromRow.FromRow (FromRow.CountColumns row) row =>
-  Connection ->
+  RealConnection ->
   Query.Query row ->
   Task Error.Error [row]
 executeQuery' conn query =
@@ -273,10 +279,10 @@ executeQuery' conn query =
 
 executeCommand_ :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error ()
 executeCommand_ conn query = do
-  _ <- Stack.withFrozenCallStack (executeCommand conn) conn query
+  _ <- Stack.withFrozenCallStack (executeCommand conn) (baseConnection conn) query
   Task.succeed ()
 
-executeCommand' :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error Int
+executeCommand' :: Stack.HasCallStack => RealConnection -> Query.Query () -> Task Error.Error Int
 executeCommand' conn query =
   withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
@@ -288,7 +294,7 @@ executeCommand' conn query =
           |> Stack.withFrozenCallStack traceQuery conn Nothing query
           |> withTimeout conn
 
-traceQuery :: Stack.HasCallStack => Connection -> Maybe (a -> Int) -> Query.Query q -> Task e a -> Task e a
+traceQuery :: Stack.HasCallStack => RealConnection -> Maybe (a -> Int) -> Query.Query q -> Task e a -> Task e a
 traceQuery conn maybeCountRows query task =
   let infoForContext = Query.details query (connDetails conn)
    in Stack.withFrozenCallStack Platform.tracingSpan "MySQL Query" <| do
@@ -361,7 +367,7 @@ handleMySqlException io =
         )
     ]
 
-withTimeout :: Connection -> Task Error.Error a -> Task Error.Error a
+withTimeout :: RealConnection -> Task Error.Error a -> Task Error.Error a
 withTimeout conn task =
   if Time.microseconds (timeout conn) > 0
     then
@@ -379,7 +385,8 @@ withTimeout conn task =
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction conn' func =
-  withTransaction conn' <| \conn ->
+  withTransaction (baseConnection conn') <| \newBaseConnection -> do
+    let conn = conn' {baseConnection = newBaseConnection}
     Platform.bracketWithError
       (begin conn)
       ( \succeeded () ->
@@ -392,7 +399,7 @@ transaction conn' func =
 
 transactionCount :: Connection -> Maybe TransactionCount
 transactionCount conn =
-  case singleOrPool conn of
+  case singleOrPool (baseConnection conn) of
     Single tc _ -> Just tc
     Pool _ -> Nothing
 
@@ -434,7 +441,7 @@ throwRuntimeError task =
     )
     task
 
-withTransaction :: Connection -> (Connection -> Task e a) -> Task e a
+withTransaction :: RealConnection -> (RealConnection -> Task e a) -> Task e a
 withTransaction conn func =
   case singleOrPool conn of
     Single (TransactionCount tc) c ->
@@ -447,7 +454,7 @@ withTransaction conn func =
 --   For SQL transactions, we want all queries within the transaction to run
 --   on the same connection. withConnection lets transaction bundle
 --   queries on the same connection.
-withConnection :: Stack.HasCallStack => Connection -> (Base.MySQLConn -> Task e a) -> Task e a
+withConnection :: Stack.HasCallStack => RealConnection -> (Base.MySQLConn -> Task e a) -> Task e a
 withConnection conn func =
   let acquire' :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire' pool =
@@ -636,7 +643,7 @@ boolToSmallInt b =
     then 1
     else 0
 
-doIO :: Connection -> Prelude.IO a -> Task x a
+doIO :: RealConnection -> Prelude.IO a -> Task x a
 doIO conn io =
   Platform.doAnything (doAnything conn) (io |> map Ok)
 

@@ -77,7 +77,8 @@ getTestConnection =
 --   Useful in tests that shouldn't leave anything behind in the DB.
 inTestTransaction :: Connection -> (Connection -> Task x a) -> Task x a
 inTestTransaction conn' func =
-  withTransaction conn' <| \conn ->
+  withTransaction (baseConnection conn') <| \newBaseConnection -> do
+    let conn = conn' {baseConnection = newBaseConnection}
     Platform.bracketWithError
       (do rollbackAll conn; begin conn)
       (\_ () -> rollbackAll conn)
