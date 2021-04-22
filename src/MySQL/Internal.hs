@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -66,7 +67,19 @@ data Connection = Connection
     -- in the dictionary below instead of the query itself.
     singleOrPool :: SingleOrPool Base.MySQLConn,
     connDetails :: SqlQuery.Details,
-    timeout :: Time.Interval
+    timeout :: Time.Interval,
+    executeCommand ::
+      Stack.HasCallStack =>
+      Connection ->
+      Query.Query () ->
+      Task Error.Error Int,
+    executeQuery ::
+      forall row.
+      Stack.HasCallStack =>
+      FromRow.FromRow (FromRow.CountColumns row) row =>
+      Connection ->
+      Query.Query row ->
+      Task Error.Error [row]
   }
 
 -- | A database connection type.
@@ -107,6 +120,8 @@ acquire settings = do
         pool
         (connectionDetails settings)
         (Settings.mysqlQueryTimeoutSeconds settings)
+        executeCommand'
+        executeQuery'
     )
   where
     stripes =
@@ -184,7 +199,7 @@ readiness :: Stack.HasCallStack => Connection -> Health.Check
 readiness conn =
   Health.mkCheck "mysql" <| do
     log <- Platform.silentHandler
-    Stack.withFrozenCallStack executeQuery conn (queryFromText "SELECT 1")
+    Stack.withFrozenCallStack (executeQuery conn) conn (queryFromText "SELECT 1")
       |> Task.map (\(_ :: [Int]) -> ())
       |> Task.mapError (Text.fromList << Exception.displayException)
       |> Task.attempt log
@@ -210,10 +225,10 @@ class MySqlQueryable query result | result -> query where
   executeSql :: Stack.HasCallStack => Connection -> Query.Query query -> Task Error.Error result
 
 instance FromRow.FromRow (FromRow.CountColumns row) row => MySqlQueryable row [row] where
-  executeSql c query = Stack.withFrozenCallStack executeQuery c query
+  executeSql c query = Stack.withFrozenCallStack (executeQuery c) c query
 
 instance MySqlQueryable () Int where
-  executeSql c query = Stack.withFrozenCallStack executeCommand c query
+  executeSql c query = Stack.withFrozenCallStack (executeCommand c) c query
 
 instance MySqlQueryable () () where
   executeSql c query = Stack.withFrozenCallStack executeCommand_ c query
@@ -234,14 +249,14 @@ doQuery conn query handleResponse =
     |> Task.onError (Task.succeed << Err)
     |> Task.andThen handleResponse
 
-executeQuery ::
+executeQuery' ::
   forall row.
   Stack.HasCallStack =>
   FromRow.FromRow (FromRow.CountColumns row) row =>
   Connection ->
   Query.Query row ->
   Task Error.Error [row]
-executeQuery conn query =
+executeQuery' conn query =
   withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
         toRows stream =
@@ -258,11 +273,11 @@ executeQuery conn query =
 
 executeCommand_ :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error ()
 executeCommand_ conn query = do
-  _ <- Stack.withFrozenCallStack executeCommand conn query
+  _ <- Stack.withFrozenCallStack (executeCommand conn) conn query
   Task.succeed ()
 
-executeCommand :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error Int
-executeCommand conn query =
+executeCommand' :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error Int
+executeCommand' conn query =
   withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
         encodedQuery = toBaseQuery query
