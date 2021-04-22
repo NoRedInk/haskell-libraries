@@ -121,8 +121,28 @@ dryRunConnection :: Connection
 dryRunConnection =
   Connection
     { baseConnection = TransactionCount (-1),
-      executeCommand = \_ _ -> Task.succeed 1,
-      executeQuery = \_ _ -> Task.fail (Error.Other "Cannot perform SELECT queries using dry-run connection. Dry-run connection wouldn't know what data to return!" []),
+      executeCommand = \_ query ->
+        traceQuery
+          SqlQuery.emptyDetails
+            { SqlQuery.databaseType = Just SqlQuery.mysql,
+              SqlQuery.host = Just "fake-database",
+              SqlQuery.port = Nothing,
+              SqlQuery.database = Just "fake-database"
+            }
+          Nothing
+          query
+          (Task.succeed 1),
+      executeQuery = \_ query ->
+        traceQuery
+          SqlQuery.emptyDetails
+            { SqlQuery.databaseType = Just SqlQuery.mysql,
+              SqlQuery.host = Just "fake-database",
+              SqlQuery.port = Nothing,
+              SqlQuery.database = Just "fake-database"
+            }
+          Nothing
+          query
+          (Task.fail (Error.Other "Cannot perform SELECT queries using dry-run connection. Dry-run connection wouldn't know what data to return!" [])),
       withTransaction = \(TransactionCount tc) f ->
         f (TransactionCount (tc + 1)) (TransactionCount (tc + 1))
     }
@@ -301,7 +321,7 @@ realExecuteQuery conn query =
           |> andThen (toRows << Tuple.second)
           |> handleMySqlException
           |> Platform.doAnything (doAnything conn)
-          |> Stack.withFrozenCallStack traceQuery conn (Just List.length) query
+          |> Stack.withFrozenCallStack (traceQuery (connDetails conn)) (Just List.length) query
           |> withTimeout conn
 
 executeCommand_ :: Stack.HasCallStack => Connection -> Query.Query () -> Task Error.Error ()
@@ -318,12 +338,12 @@ realExecuteCommand conn query =
           |> map (Prelude.fromIntegral << Base.okLastInsertID)
           |> handleMySqlException
           |> Platform.doAnything (doAnything conn)
-          |> Stack.withFrozenCallStack traceQuery conn Nothing query
+          |> Stack.withFrozenCallStack (traceQuery (connDetails conn)) Nothing query
           |> withTimeout conn
 
-traceQuery :: Stack.HasCallStack => RealConnection -> Maybe (a -> Int) -> Query.Query q -> Task e a -> Task e a
-traceQuery conn maybeCountRows query task =
-  let infoForContext = Query.details query (connDetails conn)
+traceQuery :: Stack.HasCallStack => SqlQuery.Details -> Maybe (a -> Int) -> Query.Query q -> Task e a -> Task e a
+traceQuery details maybeCountRows query task =
+  let infoForContext = Query.details query details
    in Stack.withFrozenCallStack Platform.tracingSpan "MySQL Query" <| do
         res <-
           Platform.finally
