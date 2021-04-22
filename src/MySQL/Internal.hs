@@ -61,7 +61,12 @@ data Connection = Connection
       FromRow.FromRow (FromRow.CountColumns row) row =>
       RealConnection ->
       Query.Query row ->
-      Task Error.Error [row]
+      Task Error.Error [row],
+    withTransaction ::
+      forall e a.
+      RealConnection ->
+      (RealConnection -> Task e a) ->
+      Task e a
   }
 
 data RealConnection = RealConnection
@@ -128,6 +133,7 @@ acquire settings = do
         )
         realExecuteCommand
         realExecuteQuery
+        realWithTransaction
     )
   where
     stripes =
@@ -385,7 +391,7 @@ withTimeout conn task =
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction conn' func =
-  realWithTransaction (baseConnection conn') <| \newBaseConnection -> do
+  withTransaction conn' (baseConnection conn') <| \newBaseConnection -> do
     let conn = conn' {baseConnection = newBaseConnection}
     Platform.bracketWithError
       (begin conn)
