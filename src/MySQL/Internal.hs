@@ -126,8 +126,8 @@ acquire settings = do
             (connectionDetails settings)
             (Settings.mysqlQueryTimeoutSeconds settings)
         )
-        executeCommand'
-        executeQuery'
+        realExecuteCommand
+        realExecuteQuery
     )
   where
     stripes =
@@ -255,14 +255,14 @@ doQuery conn query handleResponse =
     |> Task.onError (Task.succeed << Err)
     |> Task.andThen handleResponse
 
-executeQuery' ::
+realExecuteQuery ::
   forall row.
   Stack.HasCallStack =>
   FromRow.FromRow (FromRow.CountColumns row) row =>
   RealConnection ->
   Query.Query row ->
   Task Error.Error [row]
-executeQuery' conn query =
+realExecuteQuery conn query =
   withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
         toRows stream =
@@ -282,8 +282,8 @@ executeCommand_ conn query = do
   _ <- Stack.withFrozenCallStack (executeCommand conn) (baseConnection conn) query
   Task.succeed ()
 
-executeCommand' :: Stack.HasCallStack => RealConnection -> Query.Query () -> Task Error.Error Int
-executeCommand' conn query =
+realExecuteCommand :: Stack.HasCallStack => RealConnection -> Query.Query () -> Task Error.Error Int
+realExecuteCommand conn query =
   withConnection conn <| \backend ->
     let params = Query.params query |> Log.unSecret
         encodedQuery = toBaseQuery query
@@ -385,7 +385,7 @@ withTimeout conn task =
 -- Perform a database transaction.
 transaction :: Connection -> (Connection -> Task e a) -> Task e a
 transaction conn' func =
-  withTransaction (baseConnection conn') <| \newBaseConnection -> do
+  realWithTransaction (baseConnection conn') <| \newBaseConnection -> do
     let conn = conn' {baseConnection = newBaseConnection}
     Platform.bracketWithError
       (begin conn)
@@ -441,8 +441,8 @@ throwRuntimeError task =
     )
     task
 
-withTransaction :: RealConnection -> (RealConnection -> Task e a) -> Task e a
-withTransaction conn func =
+realWithTransaction :: RealConnection -> (RealConnection -> Task e a) -> Task e a
+realWithTransaction conn func =
   case singleOrPool conn of
     Single (TransactionCount tc) c ->
       func conn {singleOrPool = Single (TransactionCount (tc + 1)) c}
