@@ -122,8 +122,8 @@ connection settings = do
 --
 -- Note: this connection only supports write queries such as INSERT, UPDATE,
 -- and DELETE. Any SELECT query will result in an error.
-dryRunConnection :: Connection
-dryRunConnection =
+mockConnection :: Connection
+mockConnection =
   Connection
     { baseConnection = TransactionCount (-1),
       executeCommand = \_ query ->
@@ -147,7 +147,7 @@ dryRunConnection =
             }
           Nothing
           query
-          (Task.fail (Error.Other "Cannot perform SELECT queries using dry-run connection. Dry-run connection wouldn't know what data to return!" [])),
+          (Task.fail (Error.Other "Cannot perform SELECT queries using mock connection. Mock connection wouldn't know what data to return!" [])),
       withTransaction = \(TransactionCount tc) f ->
         f (TransactionCount (tc + 1)) (TransactionCount (tc + 1))
     }
