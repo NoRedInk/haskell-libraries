@@ -9,7 +9,8 @@ module MySQL
     Connection,
     connection,
     readiness,
-    mockConnection,
+    readOnlyConnection,
+    ReadOnlyConnection (..),
 
     -- * Settings
     MySQL.Settings.Settings,

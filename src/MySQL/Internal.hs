@@ -72,6 +72,8 @@ data Connection where
     } ->
     Connection
 
+newtype ReadOnlyConnection = ReadOnlyConnection {readOnly :: Connection}
+
 data RealConnection = RealConnection
   { doAnything :: Platform.DoAnythingHandler,
     -- | In this IORef we keep a list of statements we've prepared with
@@ -117,40 +119,29 @@ connection settings = do
         realWithTransaction
     )
 
--- | A fake connection for use in tests or some migration scenarios. It does
--- not perform any queries, and only logs what it's supposed to do.
---
--- Note: this connection only supports write queries such as INSERT, UPDATE,
--- and DELETE. Any SELECT query will result in an error.
-mockConnection :: Connection
-mockConnection =
-  Connection
-    { baseConnection = TransactionCount (-1),
-      executeCommand = \_ query ->
-        traceQuery
-          SqlQuery.emptyDetails
-            { SqlQuery.databaseType = Just SqlQuery.mysql,
-              SqlQuery.host = Just "fake-database",
-              SqlQuery.port = Nothing,
-              SqlQuery.database = Just "fake-database"
+readOnlyConnection :: Settings.Settings -> Data.Acquire.Acquire ReadOnlyConnection
+readOnlyConnection settings = do
+  baseConnection <- realConnection settings
+  Prelude.pure
+    ( ReadOnlyConnection
+        ( Connection
+            { baseConnection,
+              executeQuery = realExecuteQuery,
+              withTransaction = realWithTransaction,
+              executeCommand = \_ query ->
+                traceQuery
+                  SqlQuery.emptyDetails
+                    { SqlQuery.databaseType = Just SqlQuery.mysql,
+                      SqlQuery.host = Just "read-only-database",
+                      SqlQuery.port = Nothing,
+                      SqlQuery.database = Just "read-only-database"
+                    }
+                  Nothing
+                  query
+                  (Task.succeed 1)
             }
-          Nothing
-          query
-          (Task.succeed 1),
-      executeQuery = \_ query ->
-        traceQuery
-          SqlQuery.emptyDetails
-            { SqlQuery.databaseType = Just SqlQuery.mysql,
-              SqlQuery.host = Just "fake-database",
-              SqlQuery.port = Nothing,
-              SqlQuery.database = Just "fake-database"
-            }
-          Nothing
-          query
-          (Task.fail (Error.Other "Cannot perform SELECT queries using mock connection. Mock connection wouldn't know what data to return!" [])),
-      withTransaction = \(TransactionCount tc) f ->
-        f (TransactionCount (tc + 1)) (TransactionCount (tc + 1))
-    }
+        )
+    )
 
 realConnection :: Settings.Settings -> Data.Acquire.Acquire RealConnection
 realConnection settings =
