@@ -41,6 +41,14 @@ type family CountColumns (c :: Type) :: ColumnCount where
   CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) = 'MultipleColumns
   CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q) = 'MultipleColumns
   CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y) = 'MultipleColumns
+  CountColumns (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z) = 'MultipleColumns
   CountColumns x = 'SingleColumn
 
 instance (MySQLColumn a) => FromRow 'SingleColumn a where
