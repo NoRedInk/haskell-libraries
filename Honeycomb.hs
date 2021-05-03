@@ -482,17 +482,25 @@ handler timer settings = do
       }
 
 data Settings = Settings
-  { appName :: Text,
+  { generalAppName :: Text,
+    honeycombAppName :: Text,
     appEnvironment :: Text,
     honeycombApiKey :: Log.Secret Text,
     fractionOfSuccessRequestsLogged :: Float,
     appdexTimeMs :: Int
   }
 
+appName :: Settings -> Text
+appName settings =
+  case honeycombAppName settings of
+    "" -> generalAppName settings
+    honeycombSpecific -> honeycombSpecific
+
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
     |> andMap appNameDecoder
+    |> andMap honeycombAppNameDecoder
     |> andMap appEnvironmentDecoder
     |> andMap honeycombApiKeyDecoder
     |> andMap fractionOfSuccessRequestsLoggedDecoder
@@ -525,6 +533,16 @@ appNameDecoder =
       { Environment.name = "LOG_ROOT_NAMESPACE",
         Environment.description = "Root of the log namespace. This should be the name of the application.",
         Environment.defaultValue = "your-application-name-here"
+      }
+    Environment.text
+
+honeycombAppNameDecoder :: Environment.Decoder Text
+honeycombAppNameDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "HONEYCOMB_SERVICE_NAME",
+        Environment.description = "Variable that sets the honeycomb service name without using an environment variable that would also affect other configurations, such as Bugsnag. Takes precedence over LOG_ROOT_NAMESPACE if it is set.",
+        Environment.defaultValue = ""
       }
     Environment.text
 
