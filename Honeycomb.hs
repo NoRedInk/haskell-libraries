@@ -97,8 +97,7 @@ report handler' _requestId span = do
   let events = toBatchEvents commonFields sampleRate span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
-  let datasetName = handler_serviceName handler' ++ "-" ++ handler_environment handler'
-  let url = batchApiEndpoint datasetName
+  let url = batchApiEndpoint (handler_datasetName handler')
   let requestSettings =
         Http.Settings
           { Http._method = "POST",
@@ -460,6 +459,7 @@ data Handler = Handler
     -- to spans into real timestamps.
     handler_timer :: Timer.Timer,
     handler_http :: Http.Handler,
+    handler_datasetName :: Text,
     handler_serviceName :: Text,
     handler_environment :: Text,
     handler_honeycombApiKey :: Log.Secret Text,
@@ -470,11 +470,16 @@ data Handler = Handler
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
   http <- Http.handler
+
   Prelude.pure
     Handler
       { handler_timer = timer,
         handler_http = http,
-        handler_serviceName = appName settings,
+        handler_serviceName =
+          case optionalServiceName settings of
+            "" -> appName settings
+            name -> name,
+        handler_datasetName = appName settings ++ "-" ++ appEnvironment settings,
         handler_environment = appEnvironment settings,
         handler_honeycombApiKey = honeycombApiKey settings,
         handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings,
@@ -482,19 +487,13 @@ handler timer settings = do
       }
 
 data Settings = Settings
-  { generalAppName :: Text,
-    honeycombAppName :: Text,
+  { appName :: Text,
+    optionalServiceName :: Text,
     appEnvironment :: Text,
     honeycombApiKey :: Log.Secret Text,
     fractionOfSuccessRequestsLogged :: Float,
     appdexTimeMs :: Int
   }
-
-appName :: Settings -> Text
-appName settings =
-  case honeycombAppName settings of
-    "" -> generalAppName settings
-    honeycombSpecific -> honeycombSpecific
 
 decoder :: Environment.Decoder Settings
 decoder =
@@ -541,7 +540,7 @@ honeycombAppNameDecoder =
   Environment.variable
     Environment.Variable
       { Environment.name = "HONEYCOMB_SERVICE_NAME",
-        Environment.description = "Variable that sets the honeycomb service name without using an environment variable that would also affect other configurations, such as Bugsnag. Takes precedence over LOG_ROOT_NAMESPACE if it is set.",
+        Environment.description = "Variable that sets the honeycomb service name without using an. If not set the LOG_ROOT_NAMESPACE value is used instead.",
         Environment.defaultValue = ""
       }
     Environment.text
