@@ -24,17 +24,21 @@ module Observability.Honeycomb
     CommonFields (..),
     BatchEvent (..),
     Span (..),
+    Revision (..),
     sampleRateForDuration,
   )
 where
 
 import qualified Conduit
+import qualified Control.Exception.Safe as Exception
 import Control.Monad (unless)
+import Control.Monad.IO.Class (liftIO)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Text.Encoding as Encoding
+import qualified Data.Text.IO
 import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified Environment
@@ -94,6 +98,7 @@ report handler' _requestId span = do
           (Data.UUID.toText uuid)
           (Text.fromList hostname')
           (calculateApdex handler' span)
+          (handler_revision handler')
   let events = toBatchEvents commonFields sampleRate span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
@@ -256,6 +261,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
             failed = isError,
             sourceLocation = sourceLocation,
             apdex = common_apdex commonFields,
+            revision = common_revision commonFields,
             details,
             sampleRate
           }
@@ -405,7 +411,8 @@ data CommonFields = CommonFields
     common_environment :: Text,
     common_requestId :: Text,
     common_hostname :: Text,
-    common_apdex :: Float
+    common_apdex :: Float,
+    common_revision :: Revision
   }
 
 data Span = Span
@@ -420,6 +427,7 @@ data Span = Span
     hostname :: Text,
     failed :: Bool,
     sourceLocation :: Maybe Text,
+    revision :: Revision,
     apdex :: Float,
     details :: HashMap.HashMap Text Aeson.Value,
     sampleRate :: Int
@@ -441,6 +449,7 @@ instance Aeson.ToJSON Span where
             "allocated_bytes" .= allocatedBytes span,
             "source_location" .= sourceLocation span,
             "hostname" .= hostname span,
+            "revision" .= revision span,
             "failed" .= failed span,
             "apdex" .= apdex span
           ]
@@ -462,6 +471,7 @@ data Handler = Handler
     handler_datasetName :: Text,
     handler_serviceName :: Text,
     handler_environment :: Text,
+    handler_revision :: Revision,
     handler_honeycombApiKey :: Log.Secret Text,
     handler_fractionOfSuccessRequestsLogged :: Float,
     handler_apdexTimeMs :: Int
@@ -470,7 +480,7 @@ data Handler = Handler
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
   http <- Http.handler
-
+  revision <- liftIO getRevision
   Prelude.pure
     Handler
       { handler_timer = timer,
@@ -481,10 +491,23 @@ handler timer settings = do
             name -> name,
         handler_datasetName = appName settings ++ "-" ++ appEnvironment settings,
         handler_environment = appEnvironment settings,
+        handler_revision = revision,
         handler_honeycombApiKey = honeycombApiKey settings,
         handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings,
         handler_apdexTimeMs = appdexTimeMs settings
       }
+
+newtype Revision = Revision Text
+  deriving (Show, Aeson.ToJSON)
+
+-- | Get the GIT revision of the current code. We do this by reading a file that
+-- our K8S setup is supposed to provide.
+getRevision :: Prelude.IO Revision
+getRevision = do
+  eitherRevision <- Exception.tryAny <| Data.Text.IO.readFile "revision"
+  case eitherRevision of
+    Prelude.Left _err -> Prelude.pure (Revision "no revision file found")
+    Prelude.Right version -> Prelude.pure (Revision version)
 
 data Settings = Settings
   { appName :: Text,
