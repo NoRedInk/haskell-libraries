@@ -239,7 +239,7 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
           Just endpoint -> addField "details.endpoint" endpoint span'
   let addDetails span' =
         HashMap.foldrWithKey
-          (\key value -> addField ("details." ++ key) value)
+          (\key value -> addField key value)
           span'
           (renderDetails (Platform.details span))
   let hcSpan =
@@ -340,8 +340,12 @@ renderDetails maybeDetails =
         -- directly.
         |> Maybe.withDefault
           ( case Aeson.toJSON originalDetails of
-              Aeson.Object hashMap -> hashMap
-              jsonVal -> HashMap.singleton "val" jsonVal
+              Aeson.Object hashMap ->
+                HashMap.foldrWithKey
+                  (\key value -> HashMap.insert ("details." ++ key) value)
+                  HashMap.empty
+                  hashMap
+              jsonVal -> HashMap.singleton "details.val" jsonVal
           )
     Nothing -> HashMap.empty
 
@@ -363,10 +367,10 @@ renderDetails maybeDetails =
 renderDetailsLog :: Log.LogContexts -> HashMap.HashMap Text Aeson.Value
 renderDetailsLog context@(Log.LogContexts contexts) =
   if List.length contexts > 5
-    then HashMap.singleton "context" (Aeson.toJSON context)
+    then HashMap.singleton "details.context" (Aeson.toJSON context)
     else
       contexts
-        |> map (\(Log.Context key val) -> (key, Aeson.toJSON val))
+        |> map (\(Log.Context key val) -> ("details." ++ key, Aeson.toJSON val))
         |> HashMap.fromList
 
 -- Redis creates one column per command for batches
@@ -380,15 +384,15 @@ renderDetailsRedis redisInfo =
         redisInfo
           |> RedisCommands.commands
           |> List.filterMap (NriText.words >> List.head)
-          |> (\x -> [(the key ++ ".count", key |> List.length |> Aeson.toJSON) | key <- x, then group by key using groupWith])
+          |> (\x -> [("details." ++ the key ++ ".count", key |> List.length |> Aeson.toJSON) | key <- x, then group by key using groupWith])
       fullBlob =
         redisInfo
           |> RedisCommands.commands
           |> Aeson.toJSON
    in HashMap.fromList
-        ( ("commands", fullBlob) :
-          ("host", RedisCommands.host redisInfo |> Aeson.toJSON) :
-          ("port", RedisCommands.port redisInfo |> Aeson.toJSON) :
+        ( ("details.commands", fullBlob) :
+          ("details.host", RedisCommands.host redisInfo |> Aeson.toJSON) :
+          ("details.port", RedisCommands.port redisInfo |> Aeson.toJSON) :
           commandsCount
         )
 
