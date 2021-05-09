@@ -89,17 +89,13 @@ report handler' _requestId span = do
         Prelude.pure (roll > probability, round (1 / probability))
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
-  hostname' <- Network.HostName.getHostName
   uuid <- Data.UUID.V4.nextRandom
   let commonFields =
         CommonFields
           (handler_timer handler')
           (Data.UUID.toText uuid)
-          ( emptySpan
-              |> addField "service_name" (handler_serviceName handler')
-              |> addField "hostname" (Text.fromList hostname')
+          ( handler_initSpan handler'
               |> addField "apdex" (calculateApdex handler' span)
-              |> addField "revision" (handler_revision handler')
               -- Don't use requestId if we don't do Distributed Tracing
               -- Else, it will create traces with no parent sharing the same TraceId
               -- Which makes Honeycomb's UI confused
@@ -485,32 +481,34 @@ data Handler = Handler
     handler_timer :: Timer.Timer,
     handler_http :: Http.Handler,
     handler_datasetName :: Text,
-    handler_serviceName :: Text,
-    handler_environment :: Text,
-    handler_revision :: Revision,
     handler_honeycombApiKey :: Log.Secret Text,
     handler_fractionOfSuccessRequestsLogged :: Float,
-    handler_apdexTimeMs :: Int
+    handler_apdexTimeMs :: Int,
+    handler_initSpan :: Span
   }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
   http <- Http.handler
   revision <- liftIO getRevision
+  hostname' <- liftIO Network.HostName.getHostName
+  let serviceName =
+        case optionalServiceName settings of
+          "" -> appName settings
+          name -> name
   Prelude.pure
     Handler
       { handler_timer = timer,
         handler_http = http,
-        handler_serviceName =
-          case optionalServiceName settings of
-            "" -> appName settings
-            name -> name,
         handler_datasetName = appName settings ++ "-" ++ appEnvironment settings,
-        handler_environment = appEnvironment settings,
-        handler_revision = revision,
         handler_honeycombApiKey = honeycombApiKey settings,
         handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings,
-        handler_apdexTimeMs = appdexTimeMs settings
+        handler_apdexTimeMs = appdexTimeMs settings,
+        handler_initSpan =
+          emptySpan
+            |> addField "service_name" serviceName
+            |> addField "hostname" (Text.fromList hostname')
+            |> addField "revision" revision
       }
 
 newtype Revision = Revision Text
