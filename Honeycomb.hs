@@ -41,6 +41,7 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.IO
 import qualified Data.UUID
 import qualified Data.UUID.V4
+import qualified Data.Word
 import qualified Dict
 import qualified Environment
 import GHC.Exts (groupWith, the)
@@ -195,7 +196,7 @@ calculateApdex handler' span =
     Platform.FailedWith _ -> 0
     Platform.Succeeded ->
       let duration =
-            Timer.difference (Platform.started span) (Platform.finished span)
+            spanDuration span
               |> Platform.inMicroseconds
               |> Prelude.fromIntegral
           apdexTUs = 1000 * handler_apdexTimeMs handler'
@@ -208,13 +209,37 @@ calculateApdex handler' span =
 
 toBatchEvents :: CommonFields -> Int -> Platform.TracingSpan -> List BatchEvent
 toBatchEvents commonFields sampleRate span =
-  let (_, events) = batchEventsHelper commonFields (getSpanEndpoint span) sampleRate Nothing 0 span
+  let (_, events) =
+        batchEventsHelper
+          commonFields
+          (getSpanEndpoint span)
+          sampleRate
+          Nothing
+          (emptyStatsByName, 0)
+          span
    in events
 
-batchEventsHelper :: CommonFields -> Maybe Text -> Int -> Maybe SpanId -> Int -> Platform.TracingSpan -> (Int, [BatchEvent])
-batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex span = do
+batchEventsHelper ::
+  CommonFields ->
+  Maybe Text ->
+  Int ->
+  Maybe SpanId ->
+  (StatsByName, Int) ->
+  Platform.TracingSpan ->
+  ((StatsByName, Int), [BatchEvent])
+batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByName, spanIndex) span = do
   let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
-  let (lastSpanIndex, nestedChildren) = Data.List.mapAccumL (batchEventsHelper commonFields maybeEndpoint sampleRate (Just thisSpansId)) (spanIndex + 1) (Platform.children span)
+  let ((lastStatsByName, lastSpanIndex), nestedChildren) =
+        Data.List.mapAccumL
+          (batchEventsHelper commonFields maybeEndpoint sampleRate (Just thisSpansId))
+          ( -- Don't record the root span. We have only one of those per trace,
+            -- so there's no statistics we can do with it.
+            if spanIndex == 0
+              then statsByName
+              else recordStats span statsByName,
+            spanIndex + 1
+          )
+          (Platform.children span)
   let children = List.concat nestedChildren
   let duration =
         Timer.difference (Platform.started span) (Platform.finished span)
@@ -234,7 +259,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
         Platform.FailedWith _ -> True
   let addStats span' =
         if spanIndex == 0
-          then perSpanNameStats children span'
+          then perSpanNameStats lastStatsByName span'
           else span'
   let addEndpoint span' =
         case maybeEndpoint of
@@ -262,7 +287,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
           |> addDetails
           |> addEndpoint
           |> addStats
-  ( lastSpanIndex,
+  ( (lastStatsByName, lastSpanIndex),
     BatchEvent
       { batchevent_time = timestamp,
         batchevent_data = hcSpan,
@@ -271,34 +296,51 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
     children
     )
 
--- Grab all durations by span name (e.g. "MySQL Query") while tagging them
--- with the root's endpoint, and shaving some excess columns in `details`
-crunch ::
-  BatchEvent ->
-  HashMap.HashMap Text [Float] ->
-  HashMap.HashMap Text [Float]
-crunch x acc =
-  let duration = x |> batchevent_data |> Debug.todo "get span duration"
-      updateFn (Just durations) = Just (duration : durations)
-      updateFn Nothing = Just [duration]
-      key = Debug.todo "get span name"
-      acc' = HashMap.alter updateFn key acc
-   in acc'
+data Stats = Stats
+  { count :: Int,
+    totalTimeMicroseconds :: Data.Word.Word64
+  }
 
-perSpanNameStats :: [BatchEvent] -> Span -> Span
-perSpanNameStats childSpans span' =
+newtype StatsByName = StatsByName (Dict.Dict Text Stats)
+
+emptyStatsByName :: StatsByName
+emptyStatsByName = StatsByName Dict.empty
+
+recordStats :: Platform.TracingSpan -> StatsByName -> StatsByName
+recordStats span (StatsByName statsByName) =
+  let name = Platform.name span
+      duration = Platform.inMicroseconds (spanDuration span)
+      newStats =
+        case Dict.get name statsByName of
+          Nothing ->
+            Stats
+              { count = 1,
+                totalTimeMicroseconds = duration
+              }
+          Just stats ->
+            Stats
+              { count = 1 + count stats,
+                totalTimeMicroseconds = duration + totalTimeMicroseconds stats
+              }
+   in StatsByName (Dict.insert name newStats statsByName)
+
+spanDuration :: Platform.TracingSpan -> Platform.MonotonicTime
+spanDuration span =
+  Timer.difference (Platform.started span) (Platform.finished span)
+
+perSpanNameStats :: StatsByName -> Span -> Span
+perSpanNameStats (StatsByName statsByName) span =
   let -- chose foldr to preserve order, not super important tho
-      durationsByName = List.foldr crunch HashMap.empty childSpans
-      statsForCategory (name, durations) acc =
-        let total = List.sum durations
-            calls = List.length durations
+      statsForCategory (name, stats) acc =
+        let calls = count stats
+            total = (Prelude.fromIntegral (totalTimeMicroseconds stats)) / 1000
             average = total / Prelude.fromIntegral calls
             saneName = name |> NriText.toLower |> NriText.replace " " "_"
          in acc
               |> addField ("stats.total_time_ms." ++ saneName) total
               |> addField ("stats.average_time_ms." ++ saneName) average
               |> addField ("stats.count." ++ saneName) calls
-   in List.foldl statsForCategory span' (HashMap.toList durationsByName)
+   in List.foldl statsForCategory span (Dict.toList statsByName)
 
 -- Customize how we render span details for different kinds of spans to
 -- Honeycomb.
