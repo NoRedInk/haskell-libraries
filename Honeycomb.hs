@@ -37,6 +37,7 @@ import qualified Control.Exception.Safe as Exception
 import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as ByteString
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Text.Encoding as Encoding
@@ -108,7 +109,13 @@ report handler' _requestId span = do
   let requestSettings =
         Http.Settings
           { Http._method = "POST",
-            Http._headers = [("X-Honeycomb-Team", Encoding.encodeUtf8 <| Log.unSecret <| handler_honeycombApiKey handler')],
+            Http._headers =
+              [ ( "X-Honeycomb-Team",
+                  handler_settings handler'
+                    |> honeycombApiKey
+                    |> Log.unSecret
+                )
+              ],
             Http._url = url,
             Http._body = body,
             Http._timeout = Nothing,
@@ -150,13 +157,13 @@ deriveSampleRate rootSpan handler' =
           -- healthcheck endpoints don't populate `HttpRequest.endpoint`.
           -- Fix that first before trying this.
           Just requestPath -> List.any (requestPath ==) ["/health/readiness", "/metrics", "/health/liveness"]
-      baseRate = handler_fractionOfSuccessRequestsLogged handler'
+      baseRate = fractionOfSuccessRequestsLogged (handler_settings handler')
       requestDurationMs =
         Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
           |> (*) 1e-3
-      apdexTMs = Prelude.fromIntegral (handler_apdexTimeMs handler')
+      apdexTMs = Prelude.fromIntegral (apdexTimeMs (handler_settings handler'))
    in if isNonAppRequestPath
         then --
         -- We have 2678400 seconds in a month
@@ -199,7 +206,7 @@ calculateApdex handler' span =
             spanDuration span
               |> Platform.inMicroseconds
               |> Prelude.fromIntegral
-          apdexTUs = 1000 * handler_apdexTimeMs handler'
+          apdexTUs = 1000 * apdexTimeMs (handler_settings handler')
        in if duration < apdexTUs
             then 1
             else
@@ -481,9 +488,7 @@ data Handler = Handler
     handler_timer :: Timer.Timer,
     handler_http :: Http.Handler,
     handler_datasetName :: Text,
-    handler_honeycombApiKey :: Log.Secret Text,
-    handler_fractionOfSuccessRequestsLogged :: Float,
-    handler_apdexTimeMs :: Int,
+    handler_settings :: Settings,
     handler_initSpan :: Span
   }
 
@@ -501,9 +506,7 @@ handler timer settings = do
       { handler_timer = timer,
         handler_http = http,
         handler_datasetName = appName settings ++ "-" ++ appEnvironment settings,
-        handler_honeycombApiKey = honeycombApiKey settings,
-        handler_fractionOfSuccessRequestsLogged = fractionOfSuccessRequestsLogged settings,
-        handler_apdexTimeMs = appdexTimeMs settings,
+        handler_settings = settings,
         handler_initSpan =
           emptySpan
             |> addField "service_name" serviceName
@@ -527,9 +530,9 @@ data Settings = Settings
   { appName :: Text,
     optionalServiceName :: Text,
     appEnvironment :: Text,
-    honeycombApiKey :: Log.Secret Text,
+    honeycombApiKey :: Log.Secret ByteString.ByteString,
     fractionOfSuccessRequestsLogged :: Float,
-    appdexTimeMs :: Int
+    apdexTimeMs :: Int
   }
 
 decoder :: Environment.Decoder Settings
@@ -542,7 +545,7 @@ decoder =
     |> andMap fractionOfSuccessRequestsLoggedDecoder
     |> andMap apdexTimeMsDecoder
 
-honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret Text)
+honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret ByteString.ByteString)
 honeycombApiKeyDecoder =
   Environment.variable
     Environment.Variable
@@ -550,7 +553,7 @@ honeycombApiKeyDecoder =
         Environment.description = "The API key for Honeycomb",
         Environment.defaultValue = "*****"
       }
-    (Environment.text |> Environment.secret)
+    (Environment.text |> map Encoding.encodeUtf8 |> Environment.secret)
 
 appEnvironmentDecoder :: Environment.Decoder Text
 appEnvironmentDecoder =
