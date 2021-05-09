@@ -90,17 +90,17 @@ report handler' _requestId span = do
         Prelude.pure (roll > probability, round (1 / probability))
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
-  commonFields <- handler_makeCommonFields handler' span
+  commonFields <- makeCommonFields handler' span
   let events = toBatchEvents commonFields sampleRate span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
-  let url = batchApiEndpoint (handler_datasetName handler')
+  let url = batchApiEndpoint (datasetName handler')
   let requestSettings =
         Http.Settings
           { Http._method = "POST",
             Http._headers =
               [ ( "X-Honeycomb-Team",
-                  handler_settings handler'
+                  settings handler'
                     |> honeycombApiKey
                     |> Log.unSecret
                 )
@@ -110,7 +110,7 @@ report handler' _requestId span = do
             Http._timeout = Nothing,
             Http._expect = Http.expectText
           }
-  Http.request (handler_http handler') requestSettings
+  Http.request (http handler') requestSettings
     |> Task.attempt silentHandler'
     |> map (\_ -> ())
     |> unless skipLogging
@@ -146,13 +146,13 @@ deriveSampleRate rootSpan handler' =
           -- healthcheck endpoints don't populate `HttpRequest.endpoint`.
           -- Fix that first before trying this.
           Just requestPath -> List.any (requestPath ==) ["/health/readiness", "/metrics", "/health/liveness"]
-      baseRate = fractionOfSuccessRequestsLogged (handler_settings handler')
+      baseRate = fractionOfSuccessRequestsLogged (settings handler')
       requestDurationMs =
         Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
           |> (*) 1e-3
-      apdexTMs = Prelude.fromIntegral (apdexTimeMs (handler_settings handler'))
+      apdexTMs = Prelude.fromIntegral (apdexTimeMs (settings handler'))
    in if isNonAppRequestPath
         then --
         -- We have 2678400 seconds in a month
@@ -474,10 +474,10 @@ newtype SpanId = SpanId Text
 data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
     -- to spans into real timestamps.
-    handler_http :: Http.Handler,
-    handler_datasetName :: Text,
-    handler_settings :: Settings,
-    handler_makeCommonFields :: Platform.TracingSpan -> Prelude.IO CommonFields
+    http :: Http.Handler,
+    datasetName :: Text,
+    settings :: Settings,
+    makeCommonFields :: Platform.TracingSpan -> Prelude.IO CommonFields
   }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
@@ -496,10 +496,10 @@ handler timer settings = do
           |> addField "revision" revision
   Prelude.pure
     Handler
-      { handler_http = http,
-        handler_datasetName = appName settings ++ "-" ++ appEnvironment settings,
-        handler_settings = settings,
-        handler_makeCommonFields = \span -> do
+      { http = http,
+        datasetName = appName settings ++ "-" ++ appEnvironment settings,
+        settings = settings,
+        makeCommonFields = \span -> do
           uuid <- Data.UUID.V4.nextRandom
           Prelude.pure
             CommonFields
