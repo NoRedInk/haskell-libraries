@@ -40,6 +40,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.IO
 import qualified Data.UUID
@@ -47,7 +48,6 @@ import qualified Data.UUID.V4
 import qualified Data.Word
 import qualified Dict
 import qualified Environment
-import GHC.Exts (groupWith, the)
 import qualified GHC.Stack as Stack
 import qualified Http
 import qualified List
@@ -237,11 +237,6 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
         case endpoint commonFields of
           Nothing -> span'
           Just endpoint -> addField "details.endpoint" endpoint span'
-  let addDetails span' =
-        HashMap.foldrWithKey
-          (\key value -> addField key value)
-          span'
-          (renderDetails (Platform.details span))
   let hcSpan =
         initSpan commonFields
           |> addField "name" (Platform.name span)
@@ -251,7 +246,7 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
           |> addField "allocated_bytes" (Platform.allocated span)
           |> addField "failed" isError
           |> addField "source_location" sourceLocation
-          |> addDetails
+          |> addDetails (Platform.details span)
           |> addEndpoint
           |> addStats
   ( (lastStatsByName, lastSpanIndex),
@@ -322,14 +317,14 @@ perSpanNameStats (StatsByName statsByName) span =
 --
 -- "Unique column names" means different column names that Honeycomb has seen us
 -- report on a span.
-renderDetails :: Maybe Platform.SomeTracingSpanDetails -> HashMap.HashMap Text Aeson.Value
-renderDetails maybeDetails =
+addDetails :: Maybe Platform.SomeTracingSpanDetails -> Span -> Span
+addDetails maybeDetails span =
   case maybeDetails of
     Just originalDetails ->
       originalDetails
         |> Platform.renderTracingSpanDetails
-          [ Platform.Renderer renderDetailsLog,
-            Platform.Renderer renderDetailsRedis
+          [ Platform.Renderer (renderDetailsLog span),
+            Platform.Renderer (renderDetailsRedis span)
           ]
         -- `renderTracingSpanDetails` returns Nothing when type of details
         -- doesn't match any in our list of functions above.
@@ -342,12 +337,12 @@ renderDetails maybeDetails =
           ( case Aeson.toJSON originalDetails of
               Aeson.Object hashMap ->
                 HashMap.foldrWithKey
-                  (\key value -> HashMap.insert ("details." ++ key) value)
-                  HashMap.empty
+                  (\key value -> addField ("details." ++ key) value)
+                  span
                   hashMap
-              jsonVal -> HashMap.singleton "details.val" jsonVal
+              jsonVal -> addField "details.val" jsonVal span
           )
-    Nothing -> HashMap.empty
+    Nothing -> span
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
 -- stuff in them. Aeson flatens the nesting, so:
@@ -364,37 +359,44 @@ renderDetails maybeDetails =
 --
 -- We don't need Honeycomb to collect rich error information.
 -- That's what we pay Bugsnag for.
-renderDetailsLog :: Log.LogContexts -> HashMap.HashMap Text Aeson.Value
-renderDetailsLog context@(Log.LogContexts contexts) =
+renderDetailsLog :: Span -> Log.LogContexts -> Span
+renderDetailsLog span context@(Log.LogContexts contexts) =
   if List.length contexts > 5
-    then HashMap.singleton "details.context" (Aeson.toJSON context)
+    then addField "details.context" context span
     else
-      contexts
-        |> map (\(Log.Context key val) -> ("details." ++ key, Aeson.toJSON val))
-        |> HashMap.fromList
+      List.foldl
+        (\(Log.Context key val) -> addField ("details." ++ key) val)
+        span
+        contexts
 
 -- Redis creates one column per command for batches
 -- Let's trace what matters:
 -- - How many of each command
 -- - The full blob in a single column
 -- - The rest of our Info record
-renderDetailsRedis :: RedisCommands.Details -> HashMap.HashMap Text Aeson.Value
-renderDetailsRedis redisInfo =
-  let commandsCount =
+renderDetailsRedis :: Span -> RedisCommands.Details -> Span
+renderDetailsRedis span redisInfo =
+  let addCommandCounts span' =
         redisInfo
           |> RedisCommands.commands
           |> List.filterMap (NriText.words >> List.head)
-          |> (\x -> [("details." ++ the key ++ ".count", key |> List.length |> Aeson.toJSON) | key <- x, then group by key using groupWith])
+          |> NonEmpty.groupWith identity
+          |> List.foldr
+            ( \xs ->
+                addField
+                  ("details." ++ NonEmpty.head xs ++ ".count")
+                  (NonEmpty.length xs)
+            )
+            span'
       fullBlob =
         redisInfo
           |> RedisCommands.commands
           |> Aeson.toJSON
-   in HashMap.fromList
-        ( ("details.commands", fullBlob) :
-          ("details.host", RedisCommands.host redisInfo |> Aeson.toJSON) :
-          ("details.port", RedisCommands.port redisInfo |> Aeson.toJSON) :
-          commandsCount
-        )
+   in span
+        |> addField "details.commands" fullBlob
+        |> addField "details.host" (RedisCommands.host redisInfo)
+        |> addField "details.port" (RedisCommands.port redisInfo)
+        |> addCommandCounts
 
 data BatchEvent = BatchEvent
   { batchevent_time :: Text,
