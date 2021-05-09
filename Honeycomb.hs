@@ -228,7 +228,7 @@ batchEventsHelper ::
   Platform.TracingSpan ->
   ((StatsByName, Int), [BatchEvent])
 batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByName, spanIndex) span = do
-  let thisSpansId = SpanId (common_requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
+  let thisSpansId = SpanId (requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
   let ((lastStatsByName, lastSpanIndex), nestedChildren) =
         Data.List.mapAccumL
           (batchEventsHelper commonFields maybeEndpoint sampleRate (Just thisSpansId))
@@ -244,7 +244,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByNam
   let duration =
         Timer.difference (Platform.started span) (Platform.finished span)
           |> Platform.inMicroseconds
-  let timestamp = Timer.toISO8601 (common_timer commonFields) (Platform.started span)
+  let timestamp = Timer.toISO8601 (timer commonFields) (Platform.started span)
   let sourceLocation =
         Platform.frame span
           |> Maybe.map
@@ -271,7 +271,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByNam
           span'
           (renderDetails (Platform.details span))
   let hcSpan =
-        common_initSpan commonFields
+        initSpan commonFields
           |> addField "name" (Platform.name span)
           |> addField "trace.span_id" thisSpansId
           |> addField "trace.parent_id" parentSpanId
@@ -438,9 +438,9 @@ instance Aeson.ToJSON BatchEvent where
   toJSON = Aeson.genericToJSON options
 
 data CommonFields = CommonFields
-  { common_timer :: Timer.Timer,
-    common_requestId :: Text,
-    common_initSpan :: Span
+  { timer :: Timer.Timer,
+    requestId :: Text,
+    initSpan :: Span
   }
 
 -- | Honeycomb defines a span to be a list of key-value pairs, which we model
