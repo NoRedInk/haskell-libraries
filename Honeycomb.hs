@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TransformListComp #-}
 
 -- | Honeycomb
@@ -33,7 +34,6 @@ import qualified Conduit
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
-import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
@@ -41,6 +41,7 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.IO
 import qualified Data.UUID
 import qualified Data.UUID.V4
+import qualified Dict
 import qualified Environment
 import GHC.Exts (groupWith, the)
 import qualified GHC.Stack as Stack
@@ -231,40 +232,36 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId spanIndex s
         Platform.Succeeded -> False
         Platform.Failed -> True
         Platform.FailedWith _ -> True
-  let stats =
+  let addStats span' =
         if spanIndex == 0
-          then perSpanNameStats children
-          else HashMap.empty
-  let endpointDetail =
+          then perSpanNameStats children span'
+          else span'
+  let addEndpoint span' =
         case maybeEndpoint of
-          Nothing -> HashMap.empty
-          Just endpoint ->
-            HashMap.singleton "details.endpoint" (Aeson.toJSON endpoint)
-  let spanDetails =
-        renderDetails (Platform.details span)
-          |> HashMap.foldrWithKey (\key value acc -> HashMap.insert ("details." ++ key) value acc) HashMap.empty
-  let details =
-        spanDetails
-          ++ endpointDetail
-          ++ stats
+          Nothing -> span'
+          Just endpoint -> addField "details.endpoint" endpoint span'
+  let addDetails span' =
+        HashMap.foldrWithKey
+          (\key value -> addField ("details." ++ key) value)
+          span'
+          (renderDetails (Platform.details span))
   let hcSpan =
-        Span
-          { name = Platform.name span,
-            spanId = thisSpansId,
-            parentId = parentSpanId,
-            traceId = common_requestId commonFields,
-            serviceName = common_serviceName commonFields,
-            environment = common_environment commonFields,
-            durationMs = Prelude.fromIntegral duration / 1000,
-            allocatedBytes = Platform.allocated span,
-            hostname = common_hostname commonFields,
-            failed = isError,
-            sourceLocation = sourceLocation,
-            apdex = common_apdex commonFields,
-            revision = common_revision commonFields,
-            details,
-            sampleRate
-          }
+        emptySpan
+          |> addField "name" (Platform.name span)
+          |> addField "trace.span_id" thisSpansId
+          |> addField "trace.parent_id" parentSpanId
+          |> addField "trace.trace_id" (common_requestId commonFields)
+          |> addField "service_name" (common_serviceName commonFields)
+          |> addField "duration_ms" (Prelude.fromIntegral duration / 1000)
+          |> addField "allocated_bytes" (Platform.allocated span)
+          |> addField "hostname" (common_hostname commonFields)
+          |> addField "failed" isError
+          |> addField "source_location" sourceLocation
+          |> addField "apdex" (common_apdex commonFields)
+          |> addField "revision" (common_revision commonFields)
+          |> addDetails
+          |> addEndpoint
+          |> addStats
   ( lastSpanIndex,
     BatchEvent
       { batchevent_time = timestamp,
@@ -281,29 +278,27 @@ crunch ::
   HashMap.HashMap Text [Float] ->
   HashMap.HashMap Text [Float]
 crunch x acc =
-  let duration = x |> batchevent_data |> durationMs
+  let duration = x |> batchevent_data |> Debug.todo "get span duration"
       updateFn (Just durations) = Just (duration : durations)
       updateFn Nothing = Just [duration]
-      span = batchevent_data x
-      key = name span
+      key = Debug.todo "get span name"
       acc' = HashMap.alter updateFn key acc
    in acc'
 
-perSpanNameStats :: [BatchEvent] -> HashMap.HashMap Text Aeson.Value
-perSpanNameStats childSpans =
+perSpanNameStats :: [BatchEvent] -> Span -> Span
+perSpanNameStats childSpans span' =
   let -- chose foldr to preserve order, not super important tho
       durationsByName = List.foldr crunch HashMap.empty childSpans
-      stats (name, durations) =
+      statsForCategory (name, durations) acc =
         let total = List.sum durations
             calls = List.length durations
             average = total / Prelude.fromIntegral calls
             saneName = name |> NriText.toLower |> NriText.replace " " "_"
-         in [ ("stats.total_time_ms." ++ saneName, Aeson.toJSON total),
-              ("stats.average_time_ms." ++ saneName, Aeson.toJSON average),
-              ("stats.count." ++ saneName, Aeson.toJSON calls)
-            ]
-   in List.concatMap stats (HashMap.toList durationsByName)
-        |> HashMap.fromList
+         in acc
+              |> addField ("stats.total_time_ms." ++ saneName) total
+              |> addField ("stats.average_time_ms." ++ saneName) average
+              |> addField ("stats.count." ++ saneName) calls
+   in List.foldl statsForCategory span' (HashMap.toList durationsByName)
 
 -- Customize how we render span details for different kinds of spans to
 -- Honeycomb.
@@ -415,50 +410,34 @@ data CommonFields = CommonFields
     common_revision :: Revision
   }
 
-data Span = Span
-  { name :: Text,
-    spanId :: SpanId,
-    parentId :: Maybe SpanId,
-    traceId :: Text,
-    serviceName :: Text,
-    environment :: Text,
-    durationMs :: Float,
-    allocatedBytes :: Int,
-    hostname :: Text,
-    failed :: Bool,
-    sourceLocation :: Maybe Text,
-    revision :: Revision,
-    apdex :: Float,
-    details :: HashMap.HashMap Text Aeson.Value,
-    sampleRate :: Int
-  }
-  deriving (Generic, Show)
+-- | Honeycomb defines a span to be a list of key-value pairs, which we model
+-- using a dictionary. Honeycomb expects as values anything that's valid JSON.
+--
+-- We could use the `Aeson.Value` type to model values, but that mean we'd be
+-- encoding spans for honeycomb in two steps: first from our original types to
+-- `Aeson.Value`, then to the `ByteString` we send in the network request.
+-- `Aeson` has a more efficient encoding strategy that is able to encode types
+-- into JSON in one go. To use that we accept as keys any value we know we'll be
+-- able to encode into JSON later, once we got the whole payload we want to send
+-- to honeycomb together.
+newtype Span = Span (Dict.Dict Text JsonEncodable)
+  deriving (Aeson.ToJSON, Show)
 
-instance Aeson.ToJSON Span where
-  toJSON span =
-    -- Use honeycomb's field names, srcs:
-    -- https://docs.honeycomb.io/getting-data-in/tracing/send-trace-data/#manual-tracing
-    -- https://docs.honeycomb.io/working-with-your-data/managing-your-data/definitions/
-    let basePairs =
-          [ "name" .= name span,
-            "trace.span_id" .= spanId span,
-            "trace.parent_id" .= parentId span,
-            "trace.trace_id" .= traceId span,
-            "service_name" .= serviceName span,
-            "duration_ms" .= durationMs span,
-            "allocated_bytes" .= allocatedBytes span,
-            "source_location" .= sourceLocation span,
-            "hostname" .= hostname span,
-            "revision" .= revision span,
-            "failed" .= failed span,
-            "apdex" .= apdex span
-          ]
-        detailsPairs =
-          span
-            |> details
-            |> HashMap.mapWithKey (\key value -> key .= value)
-            |> HashMap.elems
-     in Aeson.object (basePairs ++ detailsPairs)
+data JsonEncodable where
+  JsonEncodable :: Aeson.ToJSON a => a -> JsonEncodable
+
+instance Aeson.ToJSON JsonEncodable where
+  toEncoding (JsonEncodable x) = Aeson.toEncoding x
+  toJSON (JsonEncodable x) = Aeson.toJSON x
+
+instance Show JsonEncodable where
+  show (JsonEncodable x) = Prelude.show (Aeson.toJSON x)
+
+emptySpan :: Span
+emptySpan = Span Dict.empty
+
+addField :: Aeson.ToJSON a => Text -> a -> Span -> Span
+addField key val (Span span) = Span (Dict.insert key (JsonEncodable val) span)
 
 newtype SpanId = SpanId Text
   deriving (Aeson.ToJSON, Show)
