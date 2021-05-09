@@ -70,28 +70,8 @@ batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetNam
 
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span = do
-  -- This is an initial implementation of sampling, based on
-  -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
-  -- using Dynamic Sampling based on whether the request was successful or not.
-  --
-  -- We can go further and:
-  --
-  --  * Not sample requests above a certain configurable threshold, to replicate
-  --    NewRelic's slow request tracing.
-  --  * Apply some sampling rate to errors
-  --  * Apply different sample rates depending on traffic (easiest approximation
-  --    is basing it off of time of day) so we sample less at low traffic
-
-  (skipLogging, sampleRate) <-
-    case Platform.succeeded span of
-      Platform.Succeeded -> do
-        let probability = deriveSampleRate span handler'
-        roll <- Random.randomRIO (0.0, 1.0)
-        Prelude.pure (roll > probability, round (1 / probability))
-      Platform.Failed -> Prelude.pure (False, 1)
-      Platform.FailedWith _ -> Prelude.pure (False, 1)
   commonFields <- makeCommonFields handler' span
-  let events = toBatchEvents commonFields sampleRate span
+  let events = toBatchEvents commonFields span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
   let url = batchApiEndpoint (datasetName handler')
@@ -113,7 +93,7 @@ report handler' _requestId span = do
   Http.request (http handler') requestSettings
     |> Task.attempt silentHandler'
     |> map (\_ -> ())
-    |> unless skipLogging
+    |> unless (skipLogging commonFields)
 
 getRootSpanRequestPath :: Platform.TracingSpan -> Maybe Text
 getRootSpanRequestPath rootSpan =
@@ -137,8 +117,8 @@ getSpanEndpoint span =
       )
     |> Maybe.andThen identity
 
-deriveSampleRate :: Platform.TracingSpan -> Handler -> Float
-deriveSampleRate rootSpan handler' =
+deriveSampleRate :: Platform.TracingSpan -> Settings -> Float
+deriveSampleRate rootSpan settings =
   let isNonAppRequestPath =
         case getRootSpanRequestPath rootSpan of
           Nothing -> False
@@ -146,13 +126,13 @@ deriveSampleRate rootSpan handler' =
           -- healthcheck endpoints don't populate `HttpRequest.endpoint`.
           -- Fix that first before trying this.
           Just requestPath -> List.any (requestPath ==) ["/health/readiness", "/metrics", "/health/liveness"]
-      baseRate = fractionOfSuccessRequestsLogged (settings handler')
+      baseRate = fractionOfSuccessRequestsLogged settings
       requestDurationMs =
         Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
           |> (*) 1e-3
-      apdexTMs = Prelude.fromIntegral (apdexTimeMs (settings handler'))
+      apdexTMs = Prelude.fromIntegral (apdexTimeMs settings)
    in if isNonAppRequestPath
         then --
         -- We have 2678400 seconds in a month
@@ -203,13 +183,11 @@ calculateApdex settings span =
                 then 0.5
                 else 0
 
-toBatchEvents :: CommonFields -> Int -> Platform.TracingSpan -> List BatchEvent
-toBatchEvents commonFields sampleRate span =
+toBatchEvents :: CommonFields -> Platform.TracingSpan -> List BatchEvent
+toBatchEvents commonFields span =
   let (_, events) =
         batchEventsHelper
           commonFields
-          (getSpanEndpoint span)
-          sampleRate
           Nothing
           (emptyStatsByName, 0)
           span
@@ -217,17 +195,15 @@ toBatchEvents commonFields sampleRate span =
 
 batchEventsHelper ::
   CommonFields ->
-  Maybe Text ->
-  Int ->
   Maybe SpanId ->
   (StatsByName, Int) ->
   Platform.TracingSpan ->
   ((StatsByName, Int), [BatchEvent])
-batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByName, spanIndex) span = do
+batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
   let thisSpansId = SpanId (requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
   let ((lastStatsByName, lastSpanIndex), nestedChildren) =
         Data.List.mapAccumL
-          (batchEventsHelper commonFields maybeEndpoint sampleRate (Just thisSpansId))
+          (batchEventsHelper commonFields (Just thisSpansId))
           ( -- Don't record the root span. We have only one of those per trace,
             -- so there's no statistics we can do with it.
             if spanIndex == 0
@@ -258,7 +234,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByNam
           then perSpanNameStats lastStatsByName span'
           else span'
   let addEndpoint span' =
-        case maybeEndpoint of
+        case endpoint commonFields of
           Nothing -> span'
           Just endpoint -> addField "details.endpoint" endpoint span'
   let addDetails span' =
@@ -282,7 +258,7 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByNam
     BatchEvent
       { batchevent_time = timestamp,
         batchevent_data = hcSpan,
-        batchevent_samplerate = sampleRate
+        batchevent_samplerate = sampleRate commonFields
       } :
     children
     )
@@ -324,7 +300,7 @@ perSpanNameStats (StatsByName statsByName) span =
   let -- chose foldr to preserve order, not super important tho
       statsForCategory (name, stats) acc =
         let calls = count stats
-            total = (Prelude.fromIntegral (totalTimeMicroseconds stats)) / 1000
+            total = Prelude.fromIntegral (totalTimeMicroseconds stats) / 1000
             average = total / Prelude.fromIntegral calls
             saneName = name |> NriText.toLower |> NriText.replace " " "_"
          in acc
@@ -436,7 +412,10 @@ instance Aeson.ToJSON BatchEvent where
 data CommonFields = CommonFields
   { timer :: Timer.Timer,
     requestId :: Text,
-    initSpan :: Span
+    initSpan :: Span,
+    endpoint :: Maybe Text,
+    sampleRate :: Int,
+    skipLogging :: Bool
   }
 
 -- | Honeycomb defines a span to be a list of key-value pairs, which we model
@@ -500,11 +479,34 @@ handler timer settings = do
         datasetName = appName settings ++ "-" ++ appEnvironment settings,
         settings = settings,
         makeCommonFields = \span -> do
+          -- This is an initial implementation of sampling, based on
+          -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
+          -- using Dynamic Sampling based on whether the request was successful or not.
+          --
+          -- We can go further and:
+          --
+          --  * Not sample requests above a certain configurable threshold, to replicate
+          --    NewRelic's slow request tracing.
+          --  * Apply some sampling rate to errors
+          --  * Apply different sample rates depending on traffic (easiest approximation
+          --    is basing it off of time of day) so we sample less at low traffic
+
+          (skipLogging, sampleRate) <-
+            case Platform.succeeded span of
+              Platform.Succeeded -> do
+                let probability = deriveSampleRate span settings
+                roll <- Random.randomRIO (0.0, 1.0)
+                Prelude.pure (roll > probability, round (1 / probability))
+              Platform.Failed -> Prelude.pure (False, 1)
+              Platform.FailedWith _ -> Prelude.pure (False, 1)
           uuid <- Data.UUID.V4.nextRandom
           Prelude.pure
             CommonFields
-              { timer = timer,
+              { timer,
+                sampleRate,
+                skipLogging,
                 requestId = Data.UUID.toText uuid,
+                endpoint = getSpanEndpoint span,
                 initSpan =
                   baseSpan
                     |> addField "apdex" (calculateApdex settings span)
