@@ -90,18 +90,7 @@ report handler' _requestId span = do
         Prelude.pure (roll > probability, round (1 / probability))
       Platform.Failed -> Prelude.pure (False, 1)
       Platform.FailedWith _ -> Prelude.pure (False, 1)
-  uuid <- Data.UUID.V4.nextRandom
-  let commonFields =
-        CommonFields
-          (handler_timer handler')
-          (Data.UUID.toText uuid)
-          ( handler_initSpan handler'
-              |> addField "apdex" (calculateApdex handler' span)
-              -- Don't use requestId if we don't do Distributed Tracing
-              -- Else, it will create traces with no parent sharing the same TraceId
-              -- Which makes Honeycomb's UI confused
-              |> addField "trace.trace_id" (Data.UUID.toText uuid)
-          )
+  commonFields <- handler_makeCommonFields handler' span
   let events = toBatchEvents commonFields sampleRate span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
@@ -196,8 +185,8 @@ sampleRateForDuration baseRate requestDurationMs apdexTMs =
   baseRate * (1.5 ^ (requestDurationMs / apdexTMs))
     |> clamp baseRate 1
 
-calculateApdex :: Handler -> Platform.TracingSpan -> Float
-calculateApdex handler' span =
+calculateApdex :: Settings -> Platform.TracingSpan -> Float
+calculateApdex settings span =
   case Platform.succeeded span of
     Platform.Failed -> 0
     Platform.FailedWith _ -> 0
@@ -206,7 +195,7 @@ calculateApdex handler' span =
             spanDuration span
               |> Platform.inMicroseconds
               |> Prelude.fromIntegral
-          apdexTUs = 1000 * apdexTimeMs (handler_settings handler')
+          apdexTUs = 1000 * apdexTimeMs settings
        in if duration < apdexTUs
             then 1
             else
@@ -485,11 +474,10 @@ newtype SpanId = SpanId Text
 data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
     -- to spans into real timestamps.
-    handler_timer :: Timer.Timer,
     handler_http :: Http.Handler,
     handler_datasetName :: Text,
     handler_settings :: Settings,
-    handler_initSpan :: Span
+    handler_makeCommonFields :: Platform.TracingSpan -> Prelude.IO CommonFields
   }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
@@ -501,17 +489,30 @@ handler timer settings = do
         case optionalServiceName settings of
           "" -> appName settings
           name -> name
+  let baseSpan =
+        emptySpan
+          |> addField "service_name" serviceName
+          |> addField "hostname" (Text.fromList hostname')
+          |> addField "revision" revision
   Prelude.pure
     Handler
-      { handler_timer = timer,
-        handler_http = http,
+      { handler_http = http,
         handler_datasetName = appName settings ++ "-" ++ appEnvironment settings,
         handler_settings = settings,
-        handler_initSpan =
-          emptySpan
-            |> addField "service_name" serviceName
-            |> addField "hostname" (Text.fromList hostname')
-            |> addField "revision" revision
+        handler_makeCommonFields = \span -> do
+          uuid <- Data.UUID.V4.nextRandom
+          Prelude.pure
+            CommonFields
+              { timer = timer,
+                requestId = Data.UUID.toText uuid,
+                initSpan =
+                  baseSpan
+                    |> addField "apdex" (calculateApdex settings span)
+                    -- Don't use requestId if we don't do Distributed Tracing
+                    -- Else, it will create traces with no parent sharing the same TraceId
+                    -- Which makes Honeycomb's UI confused
+                    |> addField "trace.trace_id" (Data.UUID.toText uuid)
+              }
       }
 
 newtype Revision = Revision Text
