@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TransformListComp #-}
 
 -- | Honeycomb
 --
@@ -246,7 +245,7 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
           |> addField "allocated_bytes" (Platform.allocated span)
           |> addField "failed" isError
           |> addField "source_location" sourceLocation
-          |> addDetails (Platform.details span)
+          |> addDetails span
           |> addEndpoint
           |> addStats
   ( (lastStatsByName, lastSpanIndex),
@@ -297,12 +296,18 @@ perSpanNameStats (StatsByName statsByName) span =
         let calls = count stats
             total = Prelude.fromIntegral (totalTimeMicroseconds stats) / 1000
             average = total / Prelude.fromIntegral calls
-            saneName = name |> NriText.toLower |> NriText.replace " " "_"
+            saneName = useAsKey name
          in acc
               |> addField ("stats.total_time_ms." ++ saneName) total
               |> addField ("stats.average_time_ms." ++ saneName) average
               |> addField ("stats.count." ++ saneName) calls
    in List.foldl statsForCategory span (Dict.toList statsByName)
+
+useAsKey :: Text -> Text
+useAsKey str =
+  str
+    |> NriText.toLower
+    |> NriText.replace " " "_"
 
 -- Customize how we render span details for different kinds of spans to
 -- Honeycomb.
@@ -317,32 +322,33 @@ perSpanNameStats (StatsByName statsByName) span =
 --
 -- "Unique column names" means different column names that Honeycomb has seen us
 -- report on a span.
-addDetails :: Maybe Platform.SomeTracingSpanDetails -> Span -> Span
-addDetails maybeDetails span =
-  case maybeDetails of
+addDetails :: Platform.TracingSpan -> Span -> Span
+addDetails tracingSpan honeycombSpan =
+  case Platform.details tracingSpan of
     Just originalDetails ->
       originalDetails
         |> Platform.renderTracingSpanDetails
-          [ Platform.Renderer (renderDetailsLog span),
-            Platform.Renderer (renderDetailsRedis span)
+          [ Platform.Renderer (renderDetailsLog honeycombSpan),
+            Platform.Renderer (renderDetailsRedis honeycombSpan)
           ]
         -- `renderTracingSpanDetails` returns Nothing when type of details
         -- doesn't match any in our list of functions above.
         --
-        -- We'll default to using the default JSON encoding of the span.
+        -- We'll default to using the default JSON encoding of the honeycombSpan.
         -- Assuming it encodes into a JSON object with multiple keys (every
         -- known details object we have does this) we'll use that object
         -- directly.
         |> Maybe.withDefault
-          ( case Aeson.toJSON originalDetails of
-              Aeson.Object hashMap ->
-                HashMap.foldrWithKey
-                  (\key value -> addField ("details." ++ key) value)
-                  span
-                  hashMap
-              jsonVal -> addField "details.val" jsonVal span
+          ( let keyPrefix = useAsKey (Platform.name tracingSpan)
+             in case Aeson.toJSON originalDetails of
+                  Aeson.Object hashMap ->
+                    HashMap.foldrWithKey
+                      (\key value -> addField (keyPrefix ++ "." ++ key) value)
+                      honeycombSpan
+                      hashMap
+                  jsonVal -> addField keyPrefix jsonVal honeycombSpan
           )
-    Nothing -> span
+    Nothing -> honeycombSpan
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
 -- stuff in them. Aeson flatens the nesting, so:
@@ -362,10 +368,10 @@ addDetails maybeDetails span =
 renderDetailsLog :: Span -> Log.LogContexts -> Span
 renderDetailsLog span context@(Log.LogContexts contexts) =
   if List.length contexts > 5
-    then addField "details.context" context span
+    then addField "log.context" context span
     else
       List.foldl
-        (\(Log.Context key val) -> addField ("details." ++ key) val)
+        (\(Log.Context key val) -> addField ("log." ++ key) val)
         span
         contexts
 
@@ -384,7 +390,7 @@ renderDetailsRedis span redisInfo =
           |> List.foldr
             ( \xs ->
                 addField
-                  ("details." ++ NonEmpty.head xs ++ ".count")
+                  ("redis." ++ NonEmpty.head xs ++ ".count")
                   (NonEmpty.length xs)
             )
             span'
@@ -393,9 +399,9 @@ renderDetailsRedis span redisInfo =
           |> RedisCommands.commands
           |> Aeson.toJSON
    in span
-        |> addField "details.commands" fullBlob
-        |> addField "details.host" (RedisCommands.host redisInfo)
-        |> addField "details.port" (RedisCommands.port redisInfo)
+        |> addField "redis.commands" fullBlob
+        |> addField "redis.host" (RedisCommands.host redisInfo)
+        |> addField "redis.port" (RedisCommands.port redisInfo)
         |> addCommandCounts
 
 data BatchEvent = BatchEvent
