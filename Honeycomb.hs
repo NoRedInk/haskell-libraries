@@ -24,7 +24,9 @@ module Observability.Honeycomb
     toBatchEvents,
     CommonFields (..),
     BatchEvent (..),
-    Span (..),
+    Span,
+    emptySpan,
+    addField,
     Revision (..),
     sampleRateForDuration,
   )
@@ -92,15 +94,17 @@ report handler' _requestId span = do
   let commonFields =
         CommonFields
           (handler_timer handler')
-          (handler_serviceName handler')
-          (handler_environment handler')
-          -- Don't use requestId if we don't do Distributed Tracing
-          -- Else, it will create traces with no parent sharing the same TraceId
-          -- Which makes Honeycomb's UI confused
           (Data.UUID.toText uuid)
-          (Text.fromList hostname')
-          (calculateApdex handler' span)
-          (handler_revision handler')
+          ( emptySpan
+              |> addField "service_name" (handler_serviceName handler')
+              |> addField "hostname" (Text.fromList hostname')
+              |> addField "apdex" (calculateApdex handler' span)
+              |> addField "revision" (handler_revision handler')
+              -- Don't use requestId if we don't do Distributed Tracing
+              -- Else, it will create traces with no parent sharing the same TraceId
+              -- Which makes Honeycomb's UI confused
+              |> addField "trace.trace_id" (Data.UUID.toText uuid)
+          )
   let events = toBatchEvents commonFields sampleRate span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
@@ -271,19 +275,14 @@ batchEventsHelper commonFields maybeEndpoint sampleRate parentSpanId (statsByNam
           span'
           (renderDetails (Platform.details span))
   let hcSpan =
-        emptySpan
+        common_initSpan commonFields
           |> addField "name" (Platform.name span)
           |> addField "trace.span_id" thisSpansId
           |> addField "trace.parent_id" parentSpanId
-          |> addField "trace.trace_id" (common_requestId commonFields)
-          |> addField "service_name" (common_serviceName commonFields)
           |> addField "duration_ms" (Prelude.fromIntegral duration / 1000)
           |> addField "allocated_bytes" (Platform.allocated span)
-          |> addField "hostname" (common_hostname commonFields)
           |> addField "failed" isError
           |> addField "source_location" sourceLocation
-          |> addField "apdex" (common_apdex commonFields)
-          |> addField "revision" (common_revision commonFields)
           |> addDetails
           |> addEndpoint
           |> addStats
@@ -444,12 +443,8 @@ instance Aeson.ToJSON BatchEvent where
 
 data CommonFields = CommonFields
   { common_timer :: Timer.Timer,
-    common_serviceName :: Text,
-    common_environment :: Text,
     common_requestId :: Text,
-    common_hostname :: Text,
-    common_apdex :: Float,
-    common_revision :: Revision
+    common_initSpan :: Span
   }
 
 -- | Honeycomb defines a span to be a list of key-value pairs, which we model
