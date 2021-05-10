@@ -54,6 +54,7 @@ import qualified Log
 import qualified Log.HttpRequest as HttpRequest
 import qualified Log.Kafka as Kafka
 import qualified Log.RedisCommands as RedisCommands
+import qualified Log.SqlQuery as SqlQuery
 import qualified Maybe
 import qualified Network.HostName
 import qualified Observability.Timer as Timer
@@ -329,7 +330,19 @@ addDetails tracingSpan honeycombSpan =
       details
         |> Platform.renderTracingSpanDetails
           [ Platform.Renderer (renderDetailsLog honeycombSpan),
-            Platform.Renderer (renderDetailsRedis honeycombSpan)
+            Platform.Renderer (renderDetailsRedis honeycombSpan),
+            Platform.Renderer
+              ( \(_ :: HttpRequest.Incoming) ->
+                  renderDetailsGeneric "http" details honeycombSpan
+              ),
+            Platform.Renderer
+              ( \(_ :: SqlQuery.Details) ->
+                  renderDetailsGeneric "sql" details honeycombSpan
+              ),
+            Platform.Renderer
+              ( \(_ :: Kafka.Consumer) ->
+                  renderDetailsGeneric "kafka" details honeycombSpan
+              )
           ]
         -- `renderTracingSpanDetails` returns Nothing when type of details
         -- doesn't match any in our list of functions above.
