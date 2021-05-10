@@ -188,10 +188,10 @@ calculateApdex settings span =
                 else 0
 
 toBatchEvents :: SharedTraceData -> Platform.TracingSpan -> List BatchEvent
-toBatchEvents commonFields span =
+toBatchEvents sharedTraceData span =
   let (_, events) =
         batchEventsHelper
-          commonFields
+          sharedTraceData
           Nothing
           (emptyStatsByName, 0)
           span
@@ -203,12 +203,12 @@ batchEventsHelper ::
   (StatsByName, Int) ->
   Platform.TracingSpan ->
   ((StatsByName, Int), [BatchEvent])
-batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
+batchEventsHelper sharedTraceData parentSpanId (statsByName, spanIndex) span = do
   let isRootSpan = parentSpanId == Nothing
-  let thisSpansId = SpanId (requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
+  let thisSpansId = SpanId (requestId sharedTraceData ++ "-" ++ NriText.fromInt spanIndex)
   let ((lastStatsByName, lastSpanIndex), nestedChildren) =
         Data.List.mapAccumL
-          (batchEventsHelper commonFields (Just thisSpansId))
+          (batchEventsHelper sharedTraceData (Just thisSpansId))
           ( -- Don't record the root span. We have only one of those per trace,
             -- so there's no statistics we can do with it.
             if isRootSpan
@@ -221,7 +221,7 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
   let duration =
         Timer.difference (Platform.started span) (Platform.finished span)
           |> Platform.inMicroseconds
-  let timestamp = Timer.toISO8601 (timer commonFields) (Platform.started span)
+  let timestamp = Timer.toISO8601 (timer sharedTraceData) (Platform.started span)
   let sourceLocation =
         Platform.frame span
           |> Maybe.map
@@ -239,11 +239,11 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
           then perSpanNameStats lastStatsByName span'
           else span'
   let addEndpoint span' =
-        case endpoint commonFields of
+        case endpoint sharedTraceData of
           Nothing -> span'
           Just endpoint -> addField "details.endpoint" endpoint span'
   let hcSpan =
-        initSpan commonFields
+        initSpan sharedTraceData
           |> addField "name" (Platform.name span)
           |> addField "trace.span_id" thisSpansId
           |> addField "trace.parent_id" parentSpanId
@@ -258,7 +258,7 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
     BatchEvent
       { batchevent_time = timestamp,
         batchevent_data = hcSpan,
-        batchevent_samplerate = sampleRate commonFields
+        batchevent_samplerate = sampleRate sharedTraceData
       } :
     children
     )
