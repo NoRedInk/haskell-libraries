@@ -352,9 +352,7 @@ addDetails tracingSpan honeycombSpan =
         -- known details object we have does this) we'll use that object
         -- directly.
         |> Maybe.withDefault
-          ( let keyPrefix = useAsKey (Platform.name tracingSpan)
-             in renderDetailsGeneric keyPrefix details honeycombSpan
-          )
+          (renderDetailsGeneric (Platform.name tracingSpan) details honeycombSpan)
     Nothing -> honeycombSpan
 
 renderDetailsGeneric :: Text -> Platform.SomeTracingSpanDetails -> Span -> Span
@@ -362,7 +360,7 @@ renderDetailsGeneric keyPrefix details honeycombSpan =
   case Aeson.toJSON details of
     Aeson.Object hashMap ->
       HashMap.foldrWithKey
-        (\key value -> addField (keyPrefix ++ "." ++ key) value)
+        (\key value -> addField (useAsKey (keyPrefix ++ "." ++ key)) value)
         honeycombSpan
         hashMap
     jsonVal -> addField keyPrefix jsonVal honeycombSpan
