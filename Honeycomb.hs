@@ -200,13 +200,14 @@ batchEventsHelper ::
   Platform.TracingSpan ->
   ((StatsByName, Int), [BatchEvent])
 batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
+  let isRootSpan = parentSpanId == Nothing
   let thisSpansId = SpanId (requestId commonFields ++ "-" ++ NriText.fromInt spanIndex)
   let ((lastStatsByName, lastSpanIndex), nestedChildren) =
         Data.List.mapAccumL
           (batchEventsHelper commonFields (Just thisSpansId))
           ( -- Don't record the root span. We have only one of those per trace,
             -- so there's no statistics we can do with it.
-            if spanIndex == 0
+            if isRootSpan
               then statsByName
               else recordStats span statsByName,
             spanIndex + 1
@@ -230,7 +231,7 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
         Platform.Failed -> True
         Platform.FailedWith _ -> True
   let addStats span' =
-        if spanIndex == 0
+        if isRootSpan
           then perSpanNameStats lastStatsByName span'
           else span'
   let addEndpoint span' =
@@ -475,7 +476,7 @@ addField :: Aeson.ToJSON a => Text -> a -> Span -> Span
 addField key val (Span span) = Span (Dict.insert key (JsonEncodable val) span)
 
 newtype SpanId = SpanId Text
-  deriving (Aeson.ToJSON, Show)
+  deriving (Aeson.ToJSON, Eq, Show)
 
 data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
