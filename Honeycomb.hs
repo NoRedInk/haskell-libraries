@@ -33,7 +33,6 @@ where
 
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
-import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
@@ -70,8 +69,14 @@ batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetNam
 
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span = do
-  commonFields <- makeSharedTraceData handler' span
-  let events = toBatchEvents commonFields span
+  sendOrSample <- makeSharedTraceData handler' span
+  case sendOrSample of
+    SampledOut -> Prelude.pure ()
+    SendToHoneycomb sharedTraceData -> sendToHoneycomb handler' sharedTraceData span
+
+sendToHoneycomb :: Handler -> SharedTraceData -> Platform.TracingSpan -> Prelude.IO ()
+sendToHoneycomb handler' sharedTraceData span = do
+  let events = toBatchEvents sharedTraceData span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
   let url = batchApiEndpoint (datasetName handler')
@@ -93,7 +98,6 @@ report handler' _requestId span = do
   Http.request (http handler') requestSettings
     |> Task.attempt silentHandler'
     |> map (\_ -> ())
-    |> unless (skipLogging commonFields)
 
 getRootSpanRequestPath :: Platform.TracingSpan -> Maybe Text
 getRootSpanRequestPath rootSpan =
@@ -450,9 +454,7 @@ data SharedTraceData = SharedTraceData
     -- | The amount of similar traces this one trace represents. For example,
     -- if we send this trace but sampled out 9 similar ones, sample rate will be
     -- 10. This will let honeycomb know it should count this trace as 10.
-    sampleRate :: Int,
-    -- | Whether to skip logging this trace, because it was sampled out.
-    skipLogging :: Bool
+    sampleRate :: Int
   }
 
 -- | Honeycomb defines a span to be a list of key-value pairs, which we model
@@ -493,8 +495,12 @@ data Handler = Handler
     http :: Http.Handler,
     datasetName :: Text,
     settings :: Settings,
-    makeSharedTraceData :: Platform.TracingSpan -> Prelude.IO SharedTraceData
+    makeSharedTraceData :: Platform.TracingSpan -> Prelude.IO SendOrSample
   }
+
+data SendOrSample
+  = SendToHoneycomb SharedTraceData
+  | SampledOut
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
@@ -537,21 +543,24 @@ handler timer settings = do
               Platform.Failed -> Prelude.pure (False, 1)
               Platform.FailedWith _ -> Prelude.pure (False, 1)
           uuid <- Data.UUID.V4.nextRandom
-          Prelude.pure
-            SharedTraceData
-              { timer,
-                sampleRate,
-                skipLogging,
-                requestId = Data.UUID.toText uuid,
-                endpoint = getSpanEndpoint span,
-                initSpan =
-                  baseSpan
-                    |> addField "apdex" (calculateApdex settings span)
-                    -- Don't use requestId if we don't do Distributed Tracing
-                    -- Else, it will create traces with no parent sharing the same TraceId
-                    -- Which makes Honeycomb's UI confused
-                    |> addField "trace.trace_id" (Data.UUID.toText uuid)
-              }
+          if skipLogging
+            then Prelude.pure SampledOut
+            else
+              Prelude.pure
+                <| SendToHoneycomb
+                  SharedTraceData
+                    { timer,
+                      sampleRate,
+                      requestId = Data.UUID.toText uuid,
+                      endpoint = getSpanEndpoint span,
+                      initSpan =
+                        baseSpan
+                          |> addField "apdex" (calculateApdex settings span)
+                          -- Don't use requestId if we don't do Distributed Tracing
+                          -- Else, it will create traces with no parent sharing the same TraceId
+                          -- Which makes Honeycomb's UI confused
+                          |> addField "trace.trace_id" (Data.UUID.toText uuid)
+                    }
       }
 
 newtype Revision = Revision Text
