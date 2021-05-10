@@ -21,7 +21,7 @@ module Observability.Honeycomb
     decoder,
     -- for tests
     toBatchEvents,
-    CommonFields (..),
+    SharedTraceData (..),
     BatchEvent (..),
     Span,
     emptySpan,
@@ -70,7 +70,7 @@ batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetNam
 
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span = do
-  commonFields <- makeCommonFields handler' span
+  commonFields <- makeSharedTraceData handler' span
   let events = toBatchEvents commonFields span
   let body = Http.jsonBody events
   silentHandler' <- Platform.silentHandler
@@ -183,7 +183,7 @@ calculateApdex settings span =
                 then 0.5
                 else 0
 
-toBatchEvents :: CommonFields -> Platform.TracingSpan -> List BatchEvent
+toBatchEvents :: SharedTraceData -> Platform.TracingSpan -> List BatchEvent
 toBatchEvents commonFields span =
   let (_, events) =
         batchEventsHelper
@@ -194,7 +194,7 @@ toBatchEvents commonFields span =
    in events
 
 batchEventsHelper ::
-  CommonFields ->
+  SharedTraceData ->
   Maybe SpanId ->
   (StatsByName, Int) ->
   Platform.TracingSpan ->
@@ -437,12 +437,21 @@ options =
 instance Aeson.ToJSON BatchEvent where
   toJSON = Aeson.genericToJSON options
 
-data CommonFields = CommonFields
-  { timer :: Timer.Timer,
+data SharedTraceData = SharedTraceData
+  { -- | We use this to turn GHC.Clock-produced timestamps into regular times.
+    timer :: Timer.Timer,
+    -- | Each request has a unique id, for correlating spans for the same request.
     requestId :: Text,
+    -- | A honeycomb span with the common fields for this request pre-applied.
     initSpan :: Span,
+    -- | The 'endpoint' of the request this trace describes. Honeycomb uses
+    -- this for a breakdown-by-endpoint on the dataset home.
     endpoint :: Maybe Text,
+    -- | The amount of similar traces this one trace represents. For example,
+    -- if we send this trace but sampled out 9 similar ones, sample rate will be
+    -- 10. This will let honeycomb know it should count this trace as 10.
     sampleRate :: Int,
+    -- | Whether to skip logging this trace, because it was sampled out.
     skipLogging :: Bool
   }
 
@@ -484,7 +493,7 @@ data Handler = Handler
     http :: Http.Handler,
     datasetName :: Text,
     settings :: Settings,
-    makeCommonFields :: Platform.TracingSpan -> Prelude.IO CommonFields
+    makeSharedTraceData :: Platform.TracingSpan -> Prelude.IO SharedTraceData
   }
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
@@ -506,7 +515,7 @@ handler timer settings = do
       { http = http,
         datasetName = appName settings ++ "-" ++ appEnvironment settings,
         settings = settings,
-        makeCommonFields = \span -> do
+        makeSharedTraceData = \span -> do
           -- This is an initial implementation of sampling, based on
           -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
           -- using Dynamic Sampling based on whether the request was successful or not.
@@ -529,7 +538,7 @@ handler timer settings = do
               Platform.FailedWith _ -> Prelude.pure (False, 1)
           uuid <- Data.UUID.V4.nextRandom
           Prelude.pure
-            CommonFields
+            SharedTraceData
               { timer,
                 sampleRate,
                 skipLogging,
