@@ -325,8 +325,8 @@ useAsKey str =
 addDetails :: Platform.TracingSpan -> Span -> Span
 addDetails tracingSpan honeycombSpan =
   case Platform.details tracingSpan of
-    Just originalDetails ->
-      originalDetails
+    Just details ->
+      details
         |> Platform.renderTracingSpanDetails
           [ Platform.Renderer (renderDetailsLog honeycombSpan),
             Platform.Renderer (renderDetailsRedis honeycombSpan)
@@ -340,15 +340,19 @@ addDetails tracingSpan honeycombSpan =
         -- directly.
         |> Maybe.withDefault
           ( let keyPrefix = useAsKey (Platform.name tracingSpan)
-             in case Aeson.toJSON originalDetails of
-                  Aeson.Object hashMap ->
-                    HashMap.foldrWithKey
-                      (\key value -> addField (keyPrefix ++ "." ++ key) value)
-                      honeycombSpan
-                      hashMap
-                  jsonVal -> addField keyPrefix jsonVal honeycombSpan
+             in renderDetailsGeneric keyPrefix details honeycombSpan
           )
     Nothing -> honeycombSpan
+
+renderDetailsGeneric :: Text -> Platform.SomeTracingSpanDetails -> Span -> Span
+renderDetailsGeneric keyPrefix details honeycombSpan =
+  case Aeson.toJSON details of
+    Aeson.Object hashMap ->
+      HashMap.foldrWithKey
+        (\key value -> addField (keyPrefix ++ "." ++ key) value)
+        honeycombSpan
+        hashMap
+    jsonVal -> addField keyPrefix jsonVal honeycombSpan
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
 -- stuff in them. Aeson flatens the nesting, so:
