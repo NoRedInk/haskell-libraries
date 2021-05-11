@@ -236,7 +236,7 @@ batchEventsHelper commonFields parentSpanId (statsByName, spanIndex) span = do
   let addEndpoint span' =
         case endpoint commonFields of
           Nothing -> span'
-          Just endpoint -> addField "details.endpoint" endpoint span'
+          Just endpoint -> addField "endpoint" endpoint span'
   let hcSpan =
         initSpan commonFields
           |> addField "name" (Platform.name span)
