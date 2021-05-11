@@ -241,7 +241,7 @@ batchEventsHelper sharedTraceData parentSpanId (statsByName, spanIndex) span = d
   let addEndpoint span' =
         case endpoint sharedTraceData of
           Nothing -> span'
-          Just endpoint -> addField "details.endpoint" endpoint span'
+          Just endpoint -> addField "endpoint" endpoint span'
   let hcSpan =
         initSpan sharedTraceData
           |> addField "name" (Platform.name span)
