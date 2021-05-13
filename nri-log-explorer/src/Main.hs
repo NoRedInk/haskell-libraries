@@ -1105,7 +1105,13 @@ run failureFilter historyLength = do
                   MostRecent -> do
                     size <- System.IO.hFileSize handle
                     System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
-                streamLines (AddRootSpan >> pushMsg) handle
+                stream <-
+                  handleToInputStream handle
+                    |> andThen Streams.ByteString.lines
+                    |> andThen Streams.lockingInputStream
+                stream
+                  |> Streams.mapM_ (AddRootSpan >> pushMsg)
+                  |> andThen Streams.skipToEof
             )
         )
         (updateTime (SetCurrentTime >> pushMsgNonBlocking))
@@ -1234,26 +1240,10 @@ updateTime withTime = do
   Control.Concurrent.threadDelay 10_000_000 {- 10 s -}
   updateTime withTime
 
-streamLines :: (ByteString.ByteString -> Prelude.IO ()) -> System.IO.Handle -> Prelude.IO ()
-streamLines withLine handle = do
-  stream <-
-    handleToInputStream handle
-      |> andThen Streams.ByteString.lines
-      |> andThen Streams.lockingInputStream
-  tailLines withLine stream
-
 handleToInputStream :: System.IO.Handle -> Prelude.IO (Streams.InputStream ByteString.ByteString)
 handleToInputStream h =
   map Just (ByteString.hGetSome h 32752)
     |> Streams.makeInputStream
-
-tailLines :: (ByteString.ByteString -> Prelude.IO ()) -> Streams.InputStream ByteString.ByteString -> Prelude.IO ()
-tailLines withLine stream = do
-  maybeLines <- Streams.read stream
-  case maybeLines of
-    Just lines -> withLine lines
-    Nothing -> Prelude.pure ()
-  tailLines withLine stream
 
 -- Clipboard management
 
