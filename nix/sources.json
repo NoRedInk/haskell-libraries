@@ -1,4 +1,16 @@
 {
+    "hedis": {
+        "branch": "v0.14.0",
+        "description": "A Redis client library for Haskell.",
+        "homepage": "http://hackage.haskell.org/package/hedis",
+        "owner": "informatikr",
+        "repo": "hedis",
+        "rev": "bbe302050a2efae31ca3150f07e4fb82941a7d31",
+        "sha256": "1nkg4dbq5i1ir034prqgrm1y6qz9mn59hrcyma55dmw9c2gf1nnk",
+        "type": "tarball",
+        "url": "https://github.com/informatikr/hedis/archive/bbe302050a2efae31ca3150f07e4fb82941a7d31.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "niv": {
         "branch": "master",
         "description": "Easy dependency management for Nix projects",

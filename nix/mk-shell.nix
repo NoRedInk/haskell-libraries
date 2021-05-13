@@ -6,7 +6,6 @@ in pkgs.mkShell {
   buildInputs = [
     (haskellPackages.ghcWithPackages (haskellPackges:
       with haskellPackges; [
-        (callCabal2nix "pretty-diff" sources.pretty-diff { })
         aeson
         aeson-pretty
         async
@@ -22,6 +21,7 @@ in pkgs.mkShell {
         fuzzy
         ghc
         hedgehog
+        (pkgs.haskell.lib.dontCheck (callCabal2nix "hedis" sources.hedis { }))
         hostname
         http-client
         http-client-tls
@@ -30,6 +30,7 @@ in pkgs.mkShell {
         modern-uri
         network-uri
         pcre-light
+        (callCabal2nix "pretty-diff" sources.pretty-diff { })
         pretty-show
         process
         random
