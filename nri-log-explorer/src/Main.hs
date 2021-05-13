@@ -20,11 +20,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Builder as Builder
-import qualified Data.ByteString.Lazy as ByteString.Lazy
-import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.IORef as IORef
 import qualified Data.List
 import qualified Data.Text
 import qualified Data.Text.Encoding as TE
@@ -48,6 +44,8 @@ import qualified System.Directory
 import qualified System.Environment
 import qualified System.Exit
 import qualified System.IO
+import qualified System.IO.Streams as Streams
+import qualified System.IO.Streams.ByteString as Streams.ByteString
 import qualified System.Process
 import qualified Text
 import qualified Text.Fuzzy as Fuzzy
@@ -1088,7 +1086,6 @@ logFile = "/tmp/nri-prelude-logs"
 run :: FailureFilter -> HistoryLength -> Prelude.IO ()
 run failureFilter historyLength = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
-  partOfLine <- IORef.newIORef Prelude.mempty
   System.IO.appendFile logFile "" -- touch file to ensure it exists
   eventChan <- Brick.BChan.newBChan 10
   let buildVty = Vty.mkVty Vty.defaultConfig
@@ -1107,9 +1104,14 @@ run failureFilter historyLength = do
                   FullHistory -> Prelude.pure ()
                   MostRecent -> do
                     size <- System.IO.hFileSize handle
-                    _ <- System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
-                    Prelude.pure ()
-                tailLines partOfLine (AddRootSpan >> pushMsg) handle
+                    System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
+                stream <-
+                  handleToInputStream handle
+                    |> andThen Streams.ByteString.lines
+                    |> andThen Streams.lockingInputStream
+                stream
+                  |> Streams.mapM_ (AddRootSpan >> pushMsg)
+                  |> andThen Streams.skipToEof
             )
         )
         (updateTime (SetCurrentTime >> pushMsgNonBlocking))
@@ -1238,50 +1240,10 @@ updateTime withTime = do
   Control.Concurrent.threadDelay 10_000_000 {- 10 s -}
   updateTime withTime
 
--- Tail a file handle, calling a callback function every time a new line is
--- read. This function will intentionally hang, waiting for additional input to
--- the handle it's reading from.
-tailLines ::
-  IORef.IORef Builder.Builder ->
-  (ByteString.ByteString -> Prelude.IO ()) ->
-  System.IO.Handle ->
-  Prelude.IO ()
-tailLines partOfLine withLine handle = do
-  -- We're using the relatively primitive operation `hGetSome` because it's one
-  -- of the few that doesn't automatically close the file handle if the
-  -- end-of-file is reached (this would be bad because we want to tail the file,
-  -- wait for additional content to appear). The downside of this is that we
-  -- need to split on newlines ourselves.
-  chunk <- ByteString.hGetSome handle 10_000 {- 10 kb -}
-
-  -- Splitting a bytestring on the newline symbol is safe, because UTF8
-  -- guarantees the byte-encodings of ASCII characters (which include \n) never
-  -- appear anywhere in multi-byte character encoders.
-  case ByteString.split 10 {- \n -} chunk of
-    [] -> do
-      Control.Concurrent.threadDelay 100_000 {- 100 ms -}
-      tailLines partOfLine withLine handle
-    [""] -> do
-      Control.Concurrent.threadDelay 100_000 {- 100 ms -}
-      tailLines partOfLine withLine handle
-    [segment] -> do
-      IORef.modifyIORef' partOfLine (\acc -> acc ++ Builder.byteString segment)
-      tailLines partOfLine withLine handle
-    endOfOldLine : rest -> do
-      let startOfNewLine = Builder.byteString (Prelude.last rest)
-      startOfOldLine <-
-        IORef.atomicModifyIORef'
-          partOfLine
-          (\acc -> (startOfNewLine, acc))
-      let firstFullLine =
-            startOfOldLine ++ Builder.byteString endOfOldLine
-              |> Builder.toLazyByteString
-              |> ByteString.Lazy.toStrict
-      let fullLines =
-            firstFullLine :
-            Prelude.init rest
-      Foldable.traverse_ withLine fullLines
-      tailLines partOfLine withLine handle
+handleToInputStream :: System.IO.Handle -> Prelude.IO (Streams.InputStream ByteString.ByteString)
+handleToInputStream h =
+  map Just (ByteString.hGetSome h 32752)
+    |> Streams.makeInputStream
 
 -- Clipboard management
 
