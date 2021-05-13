@@ -12,7 +12,6 @@ extra-doc-files:
   - README.md
   - LICENSE
   - CHANGELOG.md
-
 library:
   dependencies: &dependencies
     - aeson >= 1.4.6.0 && < 1.6
@@ -39,6 +38,32 @@ library:
     - Redis.Mock
   source-dirs:
     - src
+default-extensions:
+  - DataKinds
+  - DeriveGeneric
+  - ExtendedDefaultRules
+  - FlexibleContexts
+  - FlexibleInstances
+  - GeneralizedNewtypeDeriving
+  - MultiParamTypeClasses
+  - NamedFieldPuns
+  - NoImplicitPrelude
+  - NumericUnderscores
+  - OverloadedStrings
+  - PartialTypeSignatures
+  - ScopedTypeVariables
+  - Strict
+  - TypeOperators
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wpartial-fields
+  - -Wredundant-constraints
+  - -Wincomplete-uni-patterns
+  - -fno-warn-type-defaults
+  - -fplugin=NriPrelude.Plugin
 tests:
   tests:
     dependencies: *dependencies
