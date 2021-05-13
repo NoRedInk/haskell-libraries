@@ -40,7 +40,7 @@ library:
   source-dirs:
     - src
 tests:
-  spec:
+  tests:
     dependencies: *dependencies
     main: Main.hs
     source-dirs:

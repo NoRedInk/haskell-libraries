@@ -1,6 +1,6 @@
 all: cabal
 
-cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal
+cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal nri-redis/nri-redis.cabal
 
 nri-observability/nri-observability.cabal: nri-observability/package.yaml
 	hpack nri-observability
@@ -13,6 +13,9 @@ nri-env-parser/nri-env-parser.cabal: nri-env-parser/package.yaml
 
 nri-log-explorer/nri-log-explorer.cabal: nri-log-explorer/package.yaml
 	hpack nri-log-explorer
+
+nri-redis/nri-redis.cabal: nri-redis/package.yaml
+	hpack nri-redis
 
 ghcid-nri-prelude-test: nri-prelude-test/nri-prelude-test.cabal
 	cd nri-prelude && ghcid --command "cabal repl nri-prelude:test:tests" --test Main.main
@@ -28,3 +31,9 @@ ghcid-nri-env-parser: nri-env-parser/nri-env-parser.cabal
 
 ghcid-nri-observability: nri-observability/nri-observability
 	cd nri-observability && ghcid 
+
+ghcid-nri-redis: nri-redis/nri-redis.cabal
+	cd nri-redis && ghcid 
+
+ghcid-nri-redis-test: nri-redis/nri-redis.cabal
+	cd nri-redis && ghcid --command "cabal repl nri-redis:test:tests" --test Main.main
