@@ -1094,7 +1094,11 @@ run failureFilter = do
         ( System.IO.withFile
             logFile
             System.IO.ReadMode
-            (tailLines partOfLine (AddRootSpan >> pushMsg))
+            ( \handle -> do
+                size <- System.IO.hFileSize handle
+                _ <- System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 10_000_000))
+                tailLines partOfLine (AddRootSpan >> pushMsg) handle
+            )
         )
         (updateTime (SetCurrentTime >> pushMsgNonBlocking))
     )
