@@ -1103,7 +1103,7 @@ run failureFilter = do
             System.IO.ReadMode
             ( \handle -> do
                 size <- System.IO.hFileSize handle
-                _ <- System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 10_000_000))
+                _ <- System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
                 tailLines partOfLine (AddRootSpan >> pushMsg) handle
             )
         )
