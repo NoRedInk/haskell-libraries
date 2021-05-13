@@ -46,7 +46,6 @@ import qualified System.Exit
 import qualified System.IO
 import qualified System.IO.Streams as Streams
 import qualified System.IO.Streams.ByteString as Streams.ByteString
-import qualified System.IO.Streams.Handle as Streams.Handle
 import qualified System.Process
 import qualified Text
 import qualified Text.Fuzzy as Fuzzy
@@ -1238,15 +1237,15 @@ updateTime withTime = do
 streamLines :: (ByteString.ByteString -> Prelude.IO ()) -> System.IO.Handle -> Prelude.IO ()
 streamLines withLine handle = do
   stream <-
-    Streams.Handle.handleToInputStream handle
+    handleToInputStream handle
       |> andThen Streams.ByteString.lines
       |> andThen Streams.lockingInputStream
-      |> andThen
-        ( Streams.atEndOfInput <| do
-            Control.Concurrent.threadDelay 100_000 {- 100 ms -}
-            streamLines withLine handle
-        )
   tailLines withLine stream
+
+handleToInputStream :: System.IO.Handle -> Prelude.IO (Streams.InputStream ByteString.ByteString)
+handleToInputStream h =
+  map Just (ByteString.hGetSome h 32752)
+    |> Streams.makeInputStream
 
 tailLines :: (ByteString.ByteString -> Prelude.IO ()) -> Streams.InputStream ByteString.ByteString -> Prelude.IO ()
 tailLines withLine stream = do
