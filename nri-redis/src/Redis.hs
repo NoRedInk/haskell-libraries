@@ -44,9 +44,6 @@ module Redis
     Internal.map2,
     Internal.map3,
     Internal.sequence,
-
-    -- * Observability hepers
-    readiness,
   )
 where
 
@@ -65,18 +62,6 @@ import qualified Redis.Settings as Settings
 import qualified Task
 import qualified Tuple
 import qualified Prelude
-
--- |
--- Check that we are ready to be take traffic.
-readiness :: Internal.Handler -> Health.Check
-readiness handler =
-  Health.mkCheck "redis" <| do
-    log <- Platform.silentHandler
-    Internal.Ping
-      |> Internal.query handler
-      |> Task.map (\_ -> Health.Good)
-      |> Task.onError (\err -> Task.succeed (Health.Bad (Internal.errorForHumans err)))
-      |> Task.perform log
 
 data Api key a = Api
   { -- | Removes the specified keys. A key is ignored if it does not exist.

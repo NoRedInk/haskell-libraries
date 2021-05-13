@@ -41,9 +41,6 @@ module Redis.Hash
     Internal.map2,
     Internal.map3,
     Internal.sequence,
-
-    -- * Observability helpers
-    Redis.readiness,
   )
 where
 
