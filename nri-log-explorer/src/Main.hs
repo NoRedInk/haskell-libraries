@@ -135,6 +135,7 @@ data Msg
   | Previous
   | EditorEvent Vty.Event
   | ShowHideFailures
+  | Quit
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -416,6 +417,11 @@ update model msg =
               NoDataPage filter failureFilter -> NoDataPage filter (toggleFailureFilter failureFilter)
         )
         |> andThen continueAfterUserInteraction
+    Quit ->
+      case toPage model of
+        NoDataPage _ _ -> Brick.halt model
+        RootSpanPage _ -> Brick.halt model
+        SpanBreakdownPage _ -> update model Cancel
 
 selectNextMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
 selectNextMatch spanBreakdownPageData = do
@@ -752,6 +758,7 @@ editorWithCursor editor t =
 viewKey :: Page -> Maybe Text -> Brick.Widget Name
 viewKey page clipboardCommand =
   let exit = "q: exit"
+      goBack = "q: root spans"
       updown = "↑↓: select"
       select = "enter: details"
       unselect = "backspace: back"
@@ -793,13 +800,13 @@ viewKey page clipboardCommand =
           SpanBreakdownPage SpanBreakdownPageData {search} ->
             ( case search of
                 NoSearch ->
-                  [exit, updown, unselect, search']
+                  [goBack, updown, unselect, search']
                     ++ ( case clipboardCommand of
                            Nothing -> []
                            Just _ -> [copy]
                        )
                 HasSearch _ ->
-                  [exit, updown, unselect, adjustSearch, nextMatch, previousMatch]
+                  [goBack, updown, unselect, adjustSearch, nextMatch, previousMatch]
                     ++ ( case clipboardCommand of
                            Nothing -> []
                            Just _ -> [copy]
@@ -1161,7 +1168,9 @@ handleEvent pushMsg model event =
     (Brick.VtyEvent vtyEvent) -> do
       case (toMode model, vtyEvent) of
         -- Quitting
-        (NormalMode, Vty.EvKey (Vty.KChar 'q') []) -> do Brick.halt model
+        (NormalMode, Vty.EvKey (Vty.KChar 'q') []) -> do
+          liftIO (pushMsg Quit)
+          Brick.continue model
         (_, Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl]) -> Brick.halt model
         -- Navigation
         (_, Vty.EvKey Vty.KEnter []) -> do
