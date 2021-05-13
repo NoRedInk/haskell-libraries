@@ -40,7 +40,6 @@ where
 
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Redis
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real

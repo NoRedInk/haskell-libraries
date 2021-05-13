@@ -55,6 +55,7 @@ default-extensions:
   - Strict
   - TypeOperators
 ghc-options:
+  - -Werror
   - -Wall
   - -Wcompat
   - -Widentities
