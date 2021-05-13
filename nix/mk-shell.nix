@@ -25,6 +25,7 @@ in pkgs.mkShell {
         hostname
         http-client
         http-client-tls
+        io-streams
         junit-xml
         microlens
         modern-uri
