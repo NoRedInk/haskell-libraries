@@ -88,6 +88,8 @@ data SpanBreakdownPageData = SpanBreakdownPageData
 
 data FailureFilter = ShowAll | ShowOnlyFailures
 
+data HistoryLength = FullHistory | MostRecent
+
 data Filter
   = NoFilter
   | HasFilter (Edit.Editor Text Name)
@@ -1048,15 +1050,15 @@ main :: Prelude.IO ()
 main = do
   args <- System.Environment.getArgs
   case args of
-    [] -> run ShowAll
-    ["--failures"] -> run ShowOnlyFailures
+    [] -> run ShowAll MostRecent
+    ["--failures"] -> run ShowOnlyFailures MostRecent
     ["--help"] ->
       [ "Usage:",
         "  log-explorer",
         "",
         "  --help         show this help message",
         "  --version      show application version",
-        "  --clear        clear old log entries before starting",
+        "  --all          load all old log entries",
         "  --failures     only show failures",
         "",
         "log-explorer is a tool for exploring traces produced by the nri-prelude set of libraries."
@@ -1069,16 +1071,15 @@ main = do
               |> map Prelude.show
               |> Data.List.intercalate "."
        in Prelude.putStrLn ("log-explorer " ++ version)
-    ["--clear"] -> do
-      System.Directory.removeFile logFile
-      (run ShowAll)
+    ["--all"] -> do
+      run ShowAll FullHistory
     _ -> System.Exit.die "log-explorer was called with unknown arguments"
 
 logFile :: Prelude.String
 logFile = "/tmp/nri-prelude-logs"
 
-run :: FailureFilter -> Prelude.IO ()
-run failureFilter = do
+run :: FailureFilter -> HistoryLength -> Prelude.IO ()
+run failureFilter historyLength = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   partOfLine <- IORef.newIORef Prelude.mempty
   System.IO.appendFile logFile "" -- touch file to ensure it exists
@@ -1095,8 +1096,12 @@ run failureFilter = do
             logFile
             System.IO.ReadMode
             ( \handle -> do
-                size <- System.IO.hFileSize handle
-                _ <- System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
+                case historyLength of
+                  FullHistory -> Prelude.pure ()
+                  MostRecent -> do
+                    size <- System.IO.hFileSize handle
+                    _ <- System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
+                    Prelude.pure ()
                 tailLines partOfLine (AddRootSpan >> pushMsg) handle
             )
         )
