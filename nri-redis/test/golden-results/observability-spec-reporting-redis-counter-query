@@ -1,0 +1,49 @@
+TracingSpan
+  { name = "test-root"
+  , started = MonotonicTime { inMicroseconds = 0 }
+  , finished = MonotonicTime { inMicroseconds = 0 }
+  , frame =
+      Just
+        ( "rootTracingSpanIO"
+        , SrcLoc
+            { srcLocPackage = "main"
+            , srcLocModule = "Main"
+            , srcLocFile = "test/Main.hs"
+            , srcLocStartLine = 34
+            , srcLocStartCol = 7
+            , srcLocEndLine = 38
+            , srcLocEndCol = 40
+            }
+        )
+  , details = Nothing
+  , summary = Nothing
+  , succeeded = Succeeded
+  , allocated = 0
+  , children =
+      [ TracingSpan
+          { name = "Redis Query"
+          , started = MonotonicTime { inMicroseconds = 0 }
+          , finished = MonotonicTime { inMicroseconds = 0 }
+          , frame =
+              Just
+                ( "query"
+                , SrcLoc
+                    { srcLocPackage = "main"
+                    , srcLocModule = "Main"
+                    , srcLocFile = "test/Main.hs"
+                    , srcLocStartLine = 108
+                    , srcLocStartCol = 9
+                    , srcLocEndLine = 108
+                    , srcLocEndCol = 68
+                    }
+                )
+          , details =
+              Just
+                "{\"commands\":[\"PING\"],\"host\":\"localhost\",\"port\":6379}"
+          , summary = Just "PING"
+          , succeeded = Succeeded
+          , allocated = 0
+          , children = []
+          }
+      ]
+  }

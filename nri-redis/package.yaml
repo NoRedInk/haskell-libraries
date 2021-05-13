@@ -1,0 +1,36 @@
+<<: !include ../package-yaml-support/base-package.yaml
+name: redis
+synopsis: Redis helper for NRI code
+library:
+  dependencies: &dependencies
+  - aeson
+  - async
+  - base
+  - bytestring
+  - conduit
+  - health
+  - hedis
+  - nri-env-parser
+  - nri-observability
+  - nri-prelude
+  - resourcet
+  - safe-exceptions
+  - text
+  - unordered-containers
+  - uuid
+  exposed-modules:
+  - NonEmptyDict
+  - Redis
+  - Redis.Counter
+  - Redis.Hash
+  - Redis.List
+  - Redis.Mock
+  source-dirs:
+  - src
+tests:
+  spec:
+    dependencies: *dependencies
+    main: Main.hs
+    source-dirs:
+      - test
+      - src
