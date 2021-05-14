@@ -54,6 +54,7 @@ in pkgs.mkShell {
     pkgs.niv
     pkgs.ormolu
     pkgs.pcre
+    pkgs.redis
     pkgs.zlib
   ];
 }
