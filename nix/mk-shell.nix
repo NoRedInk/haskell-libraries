@@ -14,6 +14,7 @@ in pkgs.mkShell {
         brick
         bugsnag-hs
         bytestring
+        conduit
         containers
         directory
         exceptions
@@ -35,6 +36,7 @@ in pkgs.mkShell {
         pretty-show
         process
         random
+        resourcet
         (callCabal2nix "safe-coloured-text"
           "${sources.safe-coloured-text}/safe-coloured-text" { })
         safe-exceptions
@@ -44,6 +46,7 @@ in pkgs.mkShell {
         text-zipper
         time
         unordered-containers
+        uuid
         vector
         vty
       ]))
