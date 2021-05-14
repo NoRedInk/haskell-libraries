@@ -48,12 +48,12 @@ in pkgs.mkShell {
         vty
       ]))
     pkgs.cabal-install
+    pkgs.gnumake
+    pkgs.haskellPackages.ghcid
     pkgs.haskellPackages.hpack
     pkgs.niv
-    pkgs.zlib
-    pkgs.haskellPackages.ghcid
     pkgs.ormolu
-    pkgs.gnumake
     pkgs.pcre
+    pkgs.zlib
   ];
 }
