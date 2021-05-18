@@ -10,8 +10,6 @@ module Examples
     example,
     concat,
     toList,
-    toFileName,
-    toTestName,
   )
 where
 
@@ -84,18 +82,3 @@ instance HasExamples Int where
 
 instance HasExamples () where
   examples _ = (example "unit" (), [])
-
--- | Creates a filename from an example.
-toFileName :: Example -> Text
-toFileName example' =
-  Text.join
-    ""
-    [ "encoding-",
-      Text.replace " " "_" (description example'),
-      ".json"
-    ]
-
--- | Creates a test name from an example.
-toTestName :: Example -> Text
-toTestName example' =
-  "Encoding of " ++ description example'
