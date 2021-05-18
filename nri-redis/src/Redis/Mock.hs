@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
+-- | Redis.Mock is useful for writing tests without Redis running
 module Redis.Mock
   ( handler,
     handlerIO,
