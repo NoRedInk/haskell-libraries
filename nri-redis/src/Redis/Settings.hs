@@ -7,10 +7,29 @@ import Prelude (Either (Left, Right))
 
 data ClusterMode = Cluster | NotCluster
 
+-- | Settings required to initiate a redis connection.
 data Settings = Settings
-  { connectionInfo :: ConnectInfo,
+  { -- | Full redis connection string.
+    --
+    -- Default env var name is REDIS_CONNECTION_STRING
+    -- default is "redis://localhost:6379"
+    connectionInfo :: ConnectInfo,
+    -- | Set to 1 for cluster, everything else is not.
+    --
+    -- Default env var name is REDIS_CLUSTER
+    -- Default is 0
     clusterMode :: ClusterMode,
+    -- | Set a default amount of seconds after which all keys touched by this
+    -- handler will expire. The expire time of a key is reset every time it is
+    -- read or written. A value of 0 means no default expiry.
+    --
+    -- Default env var name is REDIS_DEFAULT_EXPIRY_SECONDS
+    -- default is 0
     defaultExpiry :: DefaultExpiry,
+    -- | 0 means no timeout, every other value is a timeout in milliseconds.
+    --
+    -- Default env var name is REDIS_QUERY_TIMEOUT_MILLISECONDS
+    -- default is 1000
     queryTimeout :: QueryTimeout
   }
 
@@ -18,10 +37,13 @@ data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
 
 data QueryTimeout = NoQueryTimeout | TimeoutQueryAfterMilliseconds Int
 
+-- decodes Settings from environmental variables
 decoder :: Environment.Decoder Settings
 decoder =
   decoderWithEnvVarPrefix ""
 
+-- decodes Settings from environmental variables prefixed with a Text
+-- >>> decoderWithEnvVarPrefix "WORKER_"
 decoderWithEnvVarPrefix :: Text -> Environment.Decoder Settings
 decoderWithEnvVarPrefix prefix =
   map4
