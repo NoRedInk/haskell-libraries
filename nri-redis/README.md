@@ -57,6 +57,7 @@ data User =
   deriving (Generic)
 -- payload needs this!
 instance Aeson.ToJSON User
+instance Aeson.FromJSON User
 
 -- using this enforces this key-value mapping
 redisApi :: Redis.Api Key User
