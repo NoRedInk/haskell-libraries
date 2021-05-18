@@ -9,6 +9,7 @@ module Examples
     Examples,
     example,
     concat,
+    render,
   )
 where
 
@@ -17,8 +18,10 @@ import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Proxy (Proxy (Proxy))
+import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Dict
+import qualified List
 import NriPrelude
 import qualified Prelude
 
@@ -54,6 +57,19 @@ class HasExamples t where
 -- | Concat two "nonempty" lists of examples together.
 concat :: Examples -> Examples -> Examples
 concat (Examples xs) (Examples ys) = Examples (xs ++ ys)
+
+-- | Render example values to a Text.
+render :: Examples -> Text
+render (Examples examples') =
+  NonEmpty.toList examples'
+    |> List.map renderExample
+    |> Data.Text.intercalate "\n\n"
+
+renderExample :: Example -> Text
+renderExample example' =
+  description example'
+    ++ "\n"
+    ++ encodedValue example'
 
 instance (HasExamples a, HasExamples b) => HasExamples (a, b) where
   examples _ = concat (examples (Proxy :: Proxy a)) (examples (Proxy :: Proxy b))
