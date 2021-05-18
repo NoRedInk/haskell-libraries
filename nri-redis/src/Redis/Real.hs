@@ -20,6 +20,7 @@ import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 import qualified Prelude
 
+-- | Produce a namespaced handler for Redis access.
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings = do
   (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler

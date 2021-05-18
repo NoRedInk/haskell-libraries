@@ -21,6 +21,7 @@ import qualified Text
 import qualified Tuple
 import qualified Prelude
 
+-- | Redis Errors, scoped by where they orginate.
 data Error
   = RedisError Text
   | ConnectionLost
@@ -84,6 +85,7 @@ cmds query'' =
 unwords :: [Text] -> Text
 unwords = Text.join " "
 
+-- | A Redis query
 data Query a where
   Del :: NonEmpty Text -> Query Int
   Exists :: Text -> Query Bool
@@ -117,21 +119,30 @@ data Query a where
 instance Prelude.Functor Query where
   fmap = map
 
+-- | Used to map the type of a query to another type
+-- useful in combination with 'transaction'
 map :: (a -> b) -> Query a -> Query b
 map f q = WithResult (f >> Ok) q
 
+-- | Used to combine two queries
+-- useful in combination with 'transaction'
 map2 :: (a -> b -> c) -> Query a -> Query b -> Query c
 map2 f queryA queryB =
   Apply (map f queryA) queryB
 
+-- | Used to combine three queries
+-- useful in combination with 'transaction'
 map3 :: (a -> b -> c -> d) -> Query a -> Query b -> Query c -> Query d
 map3 f queryA queryB queryC =
   Apply (Apply (map f queryA) queryB) queryC
 
+-- | Used to run a series of queries in sequence.
+-- useful in combination with 'transaction'
 sequence :: List (Query a) -> Query (List a)
 sequence =
   List.foldr (map2 (:)) (Pure [])
 
+-- | The redis handler allows applications to run scoped IO
 data Handler = Handler
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
@@ -139,7 +150,10 @@ data Handler = Handler
     namespace :: Text
   }
 
--- | Run a redis Query.
+-- | Run a 'Query'.
+-- Note: A 'Query' in this library can consist of one or more queries in sequence.
+-- if a 'Query' contains multiple queries, it may make more sense, if possible
+-- to run them using 'transaction'
 query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'

@@ -61,6 +61,14 @@ import qualified Task
 import qualified Tuple
 import qualified Prelude
 
+-- | a API type can be used to enforce a mapping of keys to values.
+-- without an API type, it can be easy to naiively serialize the wrong type
+-- into a redis key.
+--
+-- Out of the box, we have helpers to support
+-- - 'jsonApi' for json-encodable and decodable values
+-- - 'textApi' for 'Text' values
+-- - 'byteStringApi' for 'ByteString' values
 data Api key a = Api
   { -- | Removes the specified keys. A key is ignored if it does not exist.
     --
