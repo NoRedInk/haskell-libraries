@@ -121,7 +121,7 @@ data Span = Span
   }
 
 data Msg
-  = AddRootSpan ByteString.ByteString
+  = AddRootSpan (Time.UTCTime, Platform.TracingSpan)
   | ShowDetails
   | Confirm
   | Cancel
@@ -197,27 +197,21 @@ update model msg =
     SetCurrentTime currentTime ->
       model {rootSpanPage = (rootSpanPage model) {currentTime}}
         |> Brick.continue
-    AddRootSpan line ->
-      case Aeson.decodeStrict' line of
-        Nothing ->
-          -- If a line cannot be parsed we ignore it for now.
-          Brick.continue model
-        Just (date, span) -> do
-          let rootSpan = RootSpan date span
-              newModel =
-                model
-                  { rootSpanPage =
-                      (rootSpanPage model) {rootSpans = Filterable.cons rootSpan (rootSpans (rootSpanPage model))}
-                        |> updateRootSpans
-                  }
-          -- If the user hasn't interacted yet keep the focus on the top span,
-          -- so we don't start the user off at the bottom of the page (spans are
-          -- read in oldest-first).
-          if userDidSomething model
-            then Brick.continue newModel
-            else
-              scroll (Prelude.pure << ListWidget.listMoveTo 0) newModel
-                |> andThen Brick.continue
+    AddRootSpan (date, span) -> do
+      let newModel =
+            model
+              { rootSpanPage =
+                  (rootSpanPage model) {rootSpans = Filterable.cons (RootSpan date span) (rootSpans (rootSpanPage model))}
+                    |> updateRootSpans
+              }
+      -- If the user hasn't interacted yet keep the focus on the top span,
+      -- so we don't start the user off at the bottom of the page (spans are
+      -- read in oldest-first).
+      if userDidSomething model
+        then Brick.continue newModel
+        else
+          scroll (Prelude.pure << ListWidget.listMoveTo 0) newModel
+            |> andThen Brick.continue
     ShowDetails ->
       withPage
         model
@@ -1106,8 +1100,10 @@ run failureFilter historyLength = do
                     size <- System.IO.hFileSize handle
                     System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
                 stream <-
-                  handleToInputStream handle
+                  map Just (ByteString.hGetSome handle 32752)
+                    |> Streams.makeInputStream
                     |> andThen Streams.ByteString.lines
+                    |> andThen (Streams.mapMaybe Aeson.decodeStrict')
                     |> andThen Streams.lockingInputStream
                 stream
                   |> Streams.mapM_ (AddRootSpan >> pushMsg)
@@ -1239,11 +1235,6 @@ updateTime withTime = do
   withTime time
   Control.Concurrent.threadDelay 10_000_000 {- 10 s -}
   updateTime withTime
-
-handleToInputStream :: System.IO.Handle -> Prelude.IO (Streams.InputStream ByteString.ByteString)
-handleToInputStream h =
-  map Just (ByteString.hGetSome h 32752)
-    |> Streams.makeInputStream
 
 -- Clipboard management
 
