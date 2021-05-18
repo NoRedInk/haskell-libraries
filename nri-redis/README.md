@@ -80,6 +80,12 @@ redisApi =
 ```haskell
 _ <- Redis.query handler (Redis.set redisApi (Key 1 2) (User "alice" "orange"))
 Redis.query (Redis.get redisApi (Key 1 2))  -- Just (User "alice" "orange")
+-- or, perhaps better
+[ (Redis.set redisApi (Key 1 2) (User "alice" "orange"))
+, (Redis.get redisApi (Key 1 2))
+]
+  |> Redis.sequence
+  |> Redis.transaction -- Transaction ensures these commands are run together
 ```
 
 ## FAQ
