@@ -21,7 +21,7 @@ import qualified Text
 import qualified Tuple
 import qualified Prelude
 
--- | Redis Errors, scoped by where they orginate.
+-- | Redis Errors, scoped by where they originate.
 data Error
   = RedisError Text
   | ConnectionLost
@@ -125,19 +125,31 @@ map :: (a -> b) -> Query a -> Query b
 map f q = WithResult (f >> Ok) q
 
 -- | Used to combine two queries
--- useful in combination with 'transaction'
+-- Useful to combine two queries.
+-- @
+-- Redis.map2
+--   (Maybe.map2 (,))
+--   (Redis.get api1 key)
+--   (Redis.get api2 key)
+--   |> Redis.query redis
+-- @
 map2 :: (a -> b -> c) -> Query a -> Query b -> Query c
 map2 f queryA queryB =
   Apply (map f queryA) queryB
 
 -- | Used to combine three queries
--- useful in combination with 'transaction'
+-- Useful to combine three queries.
 map3 :: (a -> b -> c -> d) -> Query a -> Query b -> Query c -> Query d
 map3 f queryA queryB queryC =
   Apply (Apply (map f queryA) queryB) queryC
 
 -- | Used to run a series of queries in sequence.
--- useful in combination with 'transaction'
+-- Useful to run a list of queries in sequence.
+-- @
+-- queries
+--   |> Redis.sequence
+--   |> Redis.query redis
+-- @
 sequence :: List (Query a) -> Query (List a)
 sequence =
   List.foldr (map2 (:)) (Pure [])

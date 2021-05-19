@@ -150,21 +150,24 @@ data Experimental key a = Experimental
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
 -- @
--- JsonApi :: Key -> Api Key Val
--- jsonApi (\Key {fieldA fieldB}-> Text.join "-" [fieldA, fieldB, "v1"])  )
+-- data Key = Key { fieldA: Text, fieldB: Text }
+-- data Val = Val { ... }
+--
+-- myJsonApi :: Redis.Api Key Val
+-- myJsonApi = Redis.jsonApi (\Key {fieldA, fieldB}-> Text.join "-" [fieldA, fieldB, "v1"])
 -- @
 jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
 jsonApi = makeApi Codec.jsonCodec
 
--- | Creates a json API mapping a 'key' to Text
+-- | Creates a Redis API mapping a 'key' to Text
 textApi :: (key -> Text) -> Api key Text
 textApi = makeApi Codec.textCodec
 
--- | Creates a json API mapping a 'key' to a ByteString
+-- | Creates a Redis API mapping a 'key' to a ByteString
 byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
 byteStringApi = makeApi Codec.byteStringCodec
 
--- | private api used to  make an API
+-- | Private API used to make an API
 makeApi :: Codec.Codec a -> (key -> Text) -> Api key a
 makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
   Api
