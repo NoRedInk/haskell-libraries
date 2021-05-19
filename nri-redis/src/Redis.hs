@@ -139,14 +139,24 @@ data Api key a = Api
 
 -- | These functions are experimental and may not work.
 data Experimental key a = Experimental
-  { -- | Retrieve a value from Redis, apply it to the function provided and set the value to the result.
+  { -- | Warning: This method is known to not work, because it depends on
+    -- running multiple commands on the same connection, but our redis library
+    -- has connection pooling.
+    --
+    -- Retrieve a value from Redis, apply it to the function provided and set the value to the result.
     -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
     -- The returned value is the value that was set.
     atomicModify :: Internal.Handler -> key -> (Maybe a -> a) -> Task Internal.Error a,
-    -- | As `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
+    -- | Warning: This method is known to not work, because it depends on
+    -- running multiple commands on the same connection, but our redis library
+    -- has connection pooling.
+    --
+    -- Same as `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
     -- that was set.
     atomicModifyWithContext :: forall b. Internal.Handler -> key -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
   }
+
+{-# WARNING atomicModify, atomicModifyWithContext "These functions are known to not work" #-}
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
 -- @

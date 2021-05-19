@@ -186,6 +186,10 @@ transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Stack.withFrozenCallStack doTransaction handler
 
+-- | Warning: This method is known to not work, because it depends on
+-- running multiple commands on the same connection, but our redis library
+-- has connection pooling.
+--
 -- Runs the redis `WATCH` command. This isn't one of the `Query`
 -- constructors because we're not able to run `WATCH` in a transaction,
 -- only as a separate command.
@@ -193,6 +197,7 @@ watch :: Handler -> List Text -> Task Error ()
 watch handler keys =
   List.map (\key -> namespace handler ++ ":" ++ key) keys
     |> doWatch handler
+{-# WARNING watch "This functions is known to not work" #-}
 
 namespaceQuery :: Text -> Query a -> Query a
 namespaceQuery prefix query' =
