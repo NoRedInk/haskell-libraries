@@ -181,6 +181,9 @@ timeoutAfterMilliseconds milliseconds handler =
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
 -- requests won't be able change values in between.
+--
+-- In redis terms, this is wrappping the 'Query' in `MULTI` and `EXEC
+-- see redis transaction semantics here: https://redis.io/topics/transactions
 transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
