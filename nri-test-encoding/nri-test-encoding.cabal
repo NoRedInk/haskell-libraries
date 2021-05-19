@@ -14,6 +14,7 @@ bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com
 copyright:      2021 NoRedInk Corp.
+license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-doc-files:
@@ -29,6 +30,7 @@ source-repository head
 library
   exposed-modules:
       Examples
+      Test.Encoding
       Test.Encoding.Routes
   other-modules:
       Paths_nri_test_encoding

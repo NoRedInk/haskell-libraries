@@ -24,9 +24,8 @@ import qualified Servant
 import Servant.API (Capture', QueryFlag, Raw, ReqBody, Verb, (:<|>), (:>))
 import Servant.API.Generic (ToServantApi)
 import qualified Servant.Auth.Server
-import System.FilePath ((</>))
-import qualified System.FilePath as FilePath
 import Test (Test, describe, test)
+import qualified Test.Encoding
 import qualified Text
 
 -- | Creates tests for routes and custom types used in routes.
@@ -48,12 +47,7 @@ tests _ =
               |> routesWithExamples
               |> List.map
                 ( \(route, examples) ->
-                    test ("Examples for route `" ++ routeName route ++ "`") <| \() ->
-                      Expect.equalToContentsOf
-                        ( FilePath.makeValid ("test" </> "golden-results" </> Text.toList (routeToFileName route))
-                            |> Text.fromList
-                        )
-                        (Examples.render examples)
+                    Test.Encoding.examplesToTest ("Examples for route `" ++ routeName route ++ "`") examples
                 )
           )
       ]
@@ -83,10 +77,6 @@ routesWithExamples routes =
 routeName :: Route -> Text
 routeName route =
   Text.join " " [method route, Text.join "/" (path route)]
-
-routeToFileName :: Route -> Text
-routeToFileName route =
-  method route ++ "-" ++ Text.join "-" (path route) ++ ".json"
 
 routesToText :: List Route -> Text
 routesToText routes =

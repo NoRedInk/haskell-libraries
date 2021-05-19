@@ -26,6 +26,7 @@ library:
     - nri-prelude >= 0.1.0.0 && < 0.7
   exposed-modules:
     - Examples
+    - Test.Encoding
     - Test.Encoding.Routes
   source-dirs:
     - src
