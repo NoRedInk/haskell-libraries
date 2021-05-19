@@ -6,33 +6,37 @@
 -- our types change, potentially in backwards-incompatible ways.
 module Examples
   ( HasExamples (..),
-    Example (..),
+    Examples,
     example,
     concat,
-    toList,
-    toFileName,
-    toTestName,
+    render,
   )
 where
 
 import qualified Data.Aeson
 import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Proxy (Proxy (Proxy))
+import qualified Data.Text
 import qualified Data.Text.Encoding
 import qualified Dict
+import qualified List
 import NriPrelude
-import qualified Text
+import qualified Prelude
 
--- | An example consists of a description and an encoded value.
+-- | Example values of a type.
+newtype Examples = Examples (NonEmpty.NonEmpty Example)
+
 data Example = Example
   { description :: Text,
     encodedValue :: Text
   }
   deriving (Eq, Ord)
 
--- | Helper to produce and `Example`
-example :: Data.Aeson.ToJSON a => Text -> a -> Example
+-- | Create an example for a type. Examples consists of a description and an
+-- encoded value.
+example :: Data.Aeson.ToJSON a => Text -> a -> Examples
 example description x =
   Example
     { description,
@@ -41,19 +45,31 @@ example description x =
           |> Data.ByteString.Lazy.toStrict
           |> Data.Text.Encoding.decodeUtf8
     }
+    |> Prelude.pure
+    |> Examples
 
 -- | A helper type class that provides us example values of particular types.
 -- The `IsApi` typeclass below will demand we define an instance of this type
 -- class for each type used in a request or response body.
 class HasExamples t where
-  examples :: Proxy t -> (Example, List Example)
+  examples :: Proxy t -> Examples
 
 -- | Concat two "nonempty" lists of examples together.
-concat :: (a, List a) -> (a, List a) -> (a, List a)
-concat (x, xs) (y, ys) = (x, xs ++ (y : ys))
+concat :: Examples -> Examples -> Examples
+concat (Examples xs) (Examples ys) = Examples (xs ++ ys)
 
-toList :: (a, List a) -> List a
-toList (x, xs) = x : xs
+-- | Render example values to a Text.
+render :: Examples -> Text
+render (Examples examples') =
+  NonEmpty.toList examples'
+    |> List.map renderExample
+    |> Data.Text.intercalate "\n\n"
+
+renderExample :: Example -> Text
+renderExample example' =
+  description example'
+    ++ "\n"
+    ++ encodedValue example'
 
 instance (HasExamples a, HasExamples b) => HasExamples (a, b) where
   examples _ = concat (examples (Proxy :: Proxy a)) (examples (Proxy :: Proxy b))
@@ -80,22 +96,7 @@ instance (HasExamples a) => HasExamples (List a) where
   examples _ = examples (Proxy :: Proxy a)
 
 instance HasExamples Int where
-  examples _ = (example "int" (1 :: Int), [])
+  examples _ = example "int" (1 :: Int)
 
 instance HasExamples () where
-  examples _ = (example "unit" (), [])
-
--- | Creates a filename from an example.
-toFileName :: Example -> Text
-toFileName example' =
-  Text.join
-    ""
-    [ "encoding-",
-      Text.replace " " "_" (description example'),
-      ".json"
-    ]
-
--- | Creates a test name from an example.
-toTestName :: Example -> Text
-toTestName example' =
-  "Encoding of " ++ description example'
+  examples _ = example "unit" ()
