@@ -8,7 +8,6 @@ module Examples
   ( HasExamples (..),
     Examples,
     example,
-    concat,
     render,
   )
 where
@@ -23,6 +22,7 @@ import qualified Data.Text.Encoding
 import qualified Dict
 import qualified List
 import NriPrelude
+import Prelude ((<>))
 import qualified Prelude
 
 -- | Example values of a type.
@@ -54,9 +54,8 @@ example description x =
 class HasExamples t where
   examples :: Proxy t -> Examples
 
--- | Concat two "nonempty" lists of examples together.
-concat :: Examples -> Examples -> Examples
-concat (Examples xs) (Examples ys) = Examples (xs ++ ys)
+instance Prelude.Semigroup Examples where
+  (Examples xs) <> (Examples ys) = Examples (xs <> ys)
 
 -- | Render example values to a Text.
 render :: Examples -> Text
@@ -72,19 +71,16 @@ renderExample example' =
     ++ encodedValue example'
 
 instance (HasExamples a, HasExamples b) => HasExamples (a, b) where
-  examples _ = concat (examples (Proxy :: Proxy a)) (examples (Proxy :: Proxy b))
+  examples _ = examples (Proxy :: Proxy a) ++ examples (Proxy :: Proxy b)
 
 instance (HasExamples a, HasExamples b, HasExamples c) => HasExamples (a, b, c) where
   examples _ =
-    concat
-      (examples (Proxy :: Proxy a))
-      ( concat
-          (examples (Proxy :: Proxy b))
-          (examples (Proxy :: Proxy c))
-      )
+    examples (Proxy :: Proxy a)
+      ++ examples (Proxy :: Proxy b)
+      ++ examples (Proxy :: Proxy c)
 
 instance (HasExamples a, HasExamples b) => HasExamples (Dict.Dict a b) where
-  examples _ = concat (examples (Proxy :: Proxy a)) (examples (Proxy :: Proxy b))
+  examples _ = examples (Proxy :: Proxy a) ++ examples (Proxy :: Proxy b)
 
 instance (HasExamples a) => HasExamples (Maybe a) where
   examples _ = examples (Proxy :: Proxy a)
