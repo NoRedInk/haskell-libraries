@@ -21,5 +21,4 @@ if git status --porcelain | grep . ; then
   exit 1
 fi
 
-cabal build all
-cabal test all
+./run-tests.sh

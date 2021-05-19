@@ -6,7 +6,6 @@ in pkgs.mkShell {
   buildInputs = [
     (haskellPackages.ghcWithPackages (haskellPackges:
       with haskellPackges; [
-        (callCabal2nix "pretty-diff" sources.pretty-diff { })
         aeson
         aeson-pretty
         async
@@ -15,6 +14,7 @@ in pkgs.mkShell {
         brick
         bugsnag-hs
         bytestring
+        conduit
         containers
         directory
         exceptions
@@ -22,6 +22,7 @@ in pkgs.mkShell {
         fuzzy
         ghc
         hedgehog
+        (pkgs.haskell.lib.dontCheck (callCabal2nix "hedis" sources.hedis { }))
         hostname
         http-client
         http-client-tls
@@ -31,9 +32,11 @@ in pkgs.mkShell {
         modern-uri
         network-uri
         pcre-light
+        (callCabal2nix "pretty-diff" sources.pretty-diff { })
         pretty-show
         process
         random
+        resourcet
         (callCabal2nix "safe-coloured-text"
           "${sources.safe-coloured-text}/safe-coloured-text" { })
         safe-exceptions
@@ -46,16 +49,18 @@ in pkgs.mkShell {
         text-zipper
         time
         unordered-containers
+        uuid
         vector
         vty
       ]))
     pkgs.cabal-install
+    pkgs.gnumake
+    pkgs.haskellPackages.ghcid
     pkgs.haskellPackages.hpack
     pkgs.niv
-    pkgs.zlib
-    pkgs.haskellPackages.ghcid
     pkgs.ormolu
-    pkgs.gnumake
     pkgs.pcre
+    pkgs.redis
+    pkgs.zlib
   ];
 }
