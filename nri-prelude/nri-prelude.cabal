@@ -37,7 +37,6 @@ library
       Char
       Debug
       Dict
-      Examples
       Expect
       Fuzz
       List
@@ -114,7 +113,6 @@ test-suite tests
       Char
       Debug
       Dict
-      Examples
       Expect
       Fuzz
       Internal.Shortcut
