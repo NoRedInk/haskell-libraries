@@ -38,50 +38,28 @@ handlerIO = do
   modelRef <- init
   doAnything <- Platform.doAnythingHandler
   Internal.Handler
-    { Internal.doQuery = \query ->
-        atomicModifyIORef'
-          modelRef
-          ( \model ->
-              let (newHash, res) = doQuery query (hash model)
-               in ( model {hash = newHash},
-                    res
-                  )
-          )
-          |> Platform.doAnything doAnything
-          |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" Nothing,
-      Internal.doTransaction = \query ->
-        atomicModifyIORef'
-          modelRef
-          ( \Model {hash, watchedKeys} ->
-              let (newHash, res) =
-                    if snapshotKeys (HM.keys watchedKeys) hash == watchedKeys
-                      then doQuery query hash
-                      else (hash, Err Internal.TransactionAborted)
-               in ( Model {hash = newHash, watchedKeys = HM.empty},
-                    res
-                  )
-          )
-          |> Platform.doAnything doAnything
-          |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" Nothing,
-      Internal.doWatch = \keys ->
-        atomicModifyIORef'
-          modelRef
-          ( \model ->
-              ( watchKeys keys model,
-                Ok ()
-              )
-          )
-          |> Platform.doAnything doAnything,
+    { Internal.doQuery = doQuery' modelRef doAnything,
+      Internal.doTransaction = doQuery' modelRef doAnything,
       Internal.namespace = "tests"
     }
     |> Prelude.pure
+  where
+    doQuery' modelRef doAnything = \query ->
+      atomicModifyIORef'
+        modelRef
+        ( \model ->
+            let (newHash, res) = doQuery query (hash model)
+             in ( model {hash = newHash},
+                  res
+                )
+        )
+        |> Platform.doAnything doAnything
+        |> Internal.traceQuery (Internal.cmds query) "Redis.Mock" Nothing
 
 -- | This is our mock implementation of the Redis state. Our mock implementation
 -- will store a single value of this type, and redis commands will modify it.
 data Model = Model
-  { hash :: HM.HashMap Text RedisType,
-    watchedKeys :: HM.HashMap Text (Maybe RedisType)
-  }
+  {hash :: HM.HashMap Text RedisType}
 
 -- | Redis supports a small number of types and most of its commands expect a
 -- particular type in the keys the command is used on.
@@ -125,25 +103,8 @@ expectInt val =
     RedisList _ -> Err wrongTypeErr
     RedisSet _ -> Err wrongTypeErr
 
-watchKeys :: [Text] -> Model -> Model
-watchKeys keys model =
-  model
-    { watchedKeys =
-        -- If this command watches a key that already was watched,
-        -- keep the value from the original snapshot: We want to
-        -- ensure transactions don't change keys since they were
-        -- first watched.
-        snapshotKeys keys (hash model) ++ watchedKeys model
-    }
-
-snapshotKeys :: [Text] -> HM.HashMap Text RedisType -> HM.HashMap Text (Maybe RedisType)
-snapshotKeys keys hm =
-  Prelude.foldMap
-    (\key -> HM.singleton key (HM.lookup key hm))
-    keys
-
 init :: IO (IORef Model)
-init = newIORef (Model HM.empty HM.empty)
+init = newIORef (Model HM.empty)
 
 doQuery ::
   Internal.Query a ->

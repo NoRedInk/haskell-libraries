@@ -1,22 +1,36 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Redis.Internal where
+module Redis.Internal
+  ( Error (..),
+    Handler (..),
+    Query (..),
+    cmds,
+    map,
+    map2,
+    map3,
+    sequence,
+    query,
+    transaction,
+    -- internal tools
+    traceQuery,
+    maybesToDict,
+    keysTouchedByQuery,
+  )
+where
 
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified List
 import qualified Log.RedisCommands as RedisCommands
-import NriPrelude hiding (map, map2)
+import NriPrelude hiding (map, map2, map3)
 import qualified Platform
 import qualified Set
-import qualified Task
 import qualified Text
 import qualified Tuple
 import qualified Prelude
@@ -45,7 +59,7 @@ errorForHumans topError =
     LibraryError err -> "Library error when executing (probably due to a bug in the library): " ++ err
     DecodingError err -> "Could not decode value in key: " ++ err
     DecodingFieldError err -> "Could not decode field of hash: " ++ err
-    TransactionAborted -> "Transaction aborted. Watched key has changed."
+    TransactionAborted -> "Transaction aborted."
     TimeoutError -> "Redis query took too long."
 
 -- | Render the commands a query is going to run for monitoring and debugging
@@ -166,7 +180,6 @@ sequence =
 data Handler = Handler
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
-    doWatch :: [Text] -> Task Error (),
     namespace :: Text
   }
 
@@ -179,13 +192,6 @@ query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Stack.withFrozenCallStack doQuery handler
 
-timeoutAfterMilliseconds :: Float -> Handler -> Handler
-timeoutAfterMilliseconds milliseconds handler =
-  handler
-    { doQuery = Stack.withFrozenCallStack doQuery handler >> Task.timeout milliseconds TimeoutError,
-      doTransaction = Stack.withFrozenCallStack doTransaction handler >> Task.timeout milliseconds TimeoutError
-    }
-
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
 -- requests won't be able change values in between.
@@ -196,19 +202,6 @@ transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Stack.withFrozenCallStack doTransaction handler
-
--- | Warning: This method is known to not work, because it depends on
--- running multiple commands on the same connection, but our redis library
--- has connection pooling.
---
--- Runs the redis `WATCH` command. This isn't one of the `Query`
--- constructors because we're not able to run `WATCH` in a transaction,
--- only as a separate command.
-watch :: Handler -> List Text -> Task Error ()
-watch handler keys =
-  List.map (\key -> namespace handler ++ ":" ++ key) keys
-    |> doWatch handler
-{-# WARNING watch "This functions is known to not work" #-}
 
 namespaceQuery :: Text -> Query a -> Query a
 namespaceQuery prefix query' =
@@ -243,24 +236,6 @@ namespaceQuery prefix query' =
     Pure x -> Pure x
     Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
     WithResult f q -> WithResult f (namespaceQuery prefix q)
-
-defaultExpiryKeysAfterSeconds :: Int -> Handler -> Handler
-defaultExpiryKeysAfterSeconds secs handler =
-  let wrapWithExpire :: Query a -> Query a
-      wrapWithExpire query' =
-        keysTouchedByQuery query'
-          |> Set.toList
-          |> List.map (\key -> Expire key secs)
-          |> sequence
-          |> map2 (\res _ -> res) query'
-   in handler
-        { doQuery = \query' ->
-            wrapWithExpire query'
-              |> Stack.withFrozenCallStack doQuery handler,
-          doTransaction = \query' ->
-            wrapWithExpire query'
-              |> Stack.withFrozenCallStack doTransaction handler
-        }
 
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
@@ -297,9 +272,6 @@ keysTouchedByQuery query' =
     Srem key _ -> Set.singleton key
     Smembers key -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
-
-toB :: Text -> ByteString
-toB = Data.Text.Encoding.encodeUtf8
 
 maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
 maybesToDict keys values =

@@ -16,6 +16,7 @@ import qualified GHC.Stack as Stack
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
+import qualified Set
 import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 import qualified Prelude
@@ -29,15 +30,44 @@ handler namespace settings = do
            case Settings.defaultExpiry settings of
              Settings.NoDefaultExpiry -> handler'
              Settings.ExpireKeysAfterSeconds secs ->
-               Internal.defaultExpiryKeysAfterSeconds secs handler'
+               defaultExpiryKeysAfterSeconds secs handler'
        )
     |> ( \handler' ->
            case Settings.queryTimeout settings of
              Settings.NoQueryTimeout -> handler'
              Settings.TimeoutQueryAfterMilliseconds milliseconds ->
-               Internal.timeoutAfterMilliseconds (toFloat milliseconds) handler'
+               timeoutAfterMilliseconds (toFloat milliseconds) handler'
        )
     |> Prelude.pure
+
+timeoutAfterMilliseconds :: Float -> Internal.Handler -> Internal.Handler
+timeoutAfterMilliseconds milliseconds handler' =
+  handler'
+    { Internal.doQuery =
+        Stack.withFrozenCallStack Internal.doQuery handler'
+          >> Task.timeout milliseconds Internal.TimeoutError,
+      Internal.doTransaction =
+        Stack.withFrozenCallStack Internal.doTransaction handler'
+          >> Task.timeout milliseconds Internal.TimeoutError
+    }
+
+defaultExpiryKeysAfterSeconds :: Int -> Internal.Handler -> Internal.Handler
+defaultExpiryKeysAfterSeconds secs handler' =
+  let wrapWithExpire :: Internal.Query a -> Internal.Query a
+      wrapWithExpire query' =
+        Internal.keysTouchedByQuery query'
+          |> Set.toList
+          |> List.map (\key -> Internal.Expire key secs)
+          |> Internal.sequence
+          |> Internal.map2 (\res _ -> res) query'
+   in handler'
+        { Internal.doQuery = \query' ->
+            wrapWithExpire query'
+              |> Stack.withFrozenCallStack Internal.doQuery handler',
+          Internal.doTransaction = \query' ->
+            wrapWithExpire query'
+              |> Stack.withFrozenCallStack Internal.doTransaction handler'
+        }
 
 acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler, Connection)
 acquireHandler namespace settings = do
@@ -73,10 +103,6 @@ acquireHandler namespace settings = do
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Text.fromList err)))
                     )
                   |> Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything,
-          Internal.doWatch = \keys ->
-            Database.Redis.watch (map toB keys)
-              |> map (map (\_ -> Ok ()))
-              |> Stack.withFrozenCallStack platformRedis (Internal.cmds (Internal.Pure ())) connection anything,
           Internal.namespace = namespace
         },
       connection

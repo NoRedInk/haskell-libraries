@@ -31,9 +31,6 @@ module Redis
     set,
     setex,
     setnx,
-    experimental,
-    atomicModify,
-    atomicModifyWithContext,
 
     -- * Running Redis queries
     Internal.query,
@@ -57,8 +54,6 @@ import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
-import qualified Task
-import qualified Tuple
 import qualified Prelude
 
 -- | a API type can be used to enforce a mapping of keys to values.
@@ -133,30 +128,8 @@ data Api key a = Api
     -- performed. SETNX is short for "SET if Not eXists".
     --
     -- https://redis.io/commands/setnx
-    setnx :: key -> a -> Internal.Query Bool,
-    experimental :: Experimental key a
+    setnx :: key -> a -> Internal.Query Bool
   }
-
--- | These functions are experimental and may not work.
-data Experimental key a = Experimental
-  { -- | Warning: This method is known to not work, because it depends on
-    -- running multiple commands on the same connection, but our redis library
-    -- has connection pooling.
-    --
-    -- Retrieve a value from Redis, apply it to the function provided and set the value to the result.
-    -- This update is guaranteed to be atomic (i.e. no one changed the value between it being read and being set).
-    -- The returned value is the value that was set.
-    atomicModify :: Internal.Handler -> key -> (Maybe a -> a) -> Task Internal.Error a,
-    -- | Warning: This method is known to not work, because it depends on
-    -- running multiple commands on the same connection, but our redis library
-    -- has connection pooling.
-    --
-    -- Same as `atomicModifyJSON`, but allows you to pass contextual information back as well as the new value
-    -- that was set.
-    atomicModifyWithContext :: forall b. Internal.Handler -> key -> (Maybe a -> (a, b)) -> Task Internal.Error (a, b)
-  }
-
-{-# WARNING atomicModify, atomicModifyWithContext "These functions are known to not work" #-}
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
 -- @
@@ -198,59 +171,5 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setex = \key seconds value -> Internal.Setex (toKey key) seconds (codecEncoder value),
-      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
-      experimental =
-        Experimental
-          { atomicModify = \handler key f ->
-              atomicModifyWithContext handler key (\x -> (f x, ()))
-                |> map Tuple.first,
-            atomicModifyWithContext
-          }
+      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value)
     }
-  where
-    atomicModifyWithContext handler key f =
-      atomicModifyWithContext'
-        handler
-        key
-        ( \maybeByteString ->
-            let context = Prelude.traverse codecDecoder maybeByteString
-             in ( case context of
-                    Ok maybeText -> maybeText
-                    Err _ -> Nothing
-                )
-                  |> f
-                  |> (\r@(res, _ctx) -> (codecEncoder res, (r, context)))
-        )
-        |> Task.andThen
-          ( \(_, (res, context)) ->
-              case context of
-                Err _ -> Task.fail unparsableKeyError
-                Ok _ -> Task.succeed res
-          )
-    atomicModifyWithContext' handler key f =
-      loop (100 :: Int)
-      where
-        loop count =
-          action
-            |> Task.onError (handleError count)
-        handleError count err =
-          case err of
-            Internal.TransactionAborted ->
-              if count > 0
-                then loop (count - 1)
-                else Task.fail <| Internal.RedisError "Attempted atomic update 100 times without success."
-            Internal.ConnectionLost -> Task.fail err
-            Internal.RedisError _ -> Task.fail err
-            Internal.DecodingError _ -> Task.fail err
-            Internal.DecodingFieldError _ -> Task.fail err
-            Internal.LibraryError _ -> Task.fail err
-            Internal.TimeoutError -> Task.fail err
-        action = do
-          Internal.watch handler [toKey key]
-          oldValue <- Internal.query handler (Internal.Get (toKey key))
-          let (setValue, returnValue) = f oldValue
-          Internal.transaction handler (Internal.Set (toKey key) setValue)
-          Task.succeed (setValue, returnValue)
-
-unparsableKeyError :: Internal.Error
-unparsableKeyError = Internal.LibraryError "key exists but not parsable json"
