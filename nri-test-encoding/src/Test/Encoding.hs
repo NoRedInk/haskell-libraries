@@ -10,11 +10,11 @@ import Test (Test, test)
 import qualified Text
 
 -- | Creates tests for some examples
-examplesToTest :: Text -> Examples.Examples -> Test
-examplesToTest name examples =
+examplesToTest :: Text -> Text -> Examples.Examples -> Test
+examplesToTest name fileName examples =
   test name <| \() ->
     Expect.equalToContentsOf
-      ( "test" </> "golden-results" </> Text.toList name
+      ( "test" </> "golden-results" </> Text.toList fileName
           |> FilePath.makeValid
           |> Text.fromList
       )

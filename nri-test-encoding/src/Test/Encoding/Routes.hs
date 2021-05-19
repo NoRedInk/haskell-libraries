@@ -47,7 +47,7 @@ tests _ =
               |> routesWithExamples
               |> List.map
                 ( \(route, examples) ->
-                    Test.Encoding.examplesToTest ("Examples for route `" ++ routeName route ++ "`") examples
+                    Test.Encoding.examplesToTest ("Examples for route `" ++ routeName route ++ "`") (routeToFileName route) examples
                 )
           )
       ]
@@ -77,6 +77,10 @@ routesWithExamples routes =
 routeName :: Route -> Text
 routeName route =
   Text.join " " [method route, Text.join "/" (path route)]
+
+routeToFileName :: Route -> Text
+routeToFileName route =
+  method route ++ "-" ++ Text.join "-" (path route) ++ ".json"
 
 routesToText :: List Route -> Text
 routesToText routes =
