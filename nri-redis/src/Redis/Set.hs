@@ -48,6 +48,7 @@ import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
+import qualified Set
 import qualified Prelude
 
 data Api key a = Api
@@ -91,10 +92,10 @@ data Api key a = Api
     -- | Returns all the members of the set value stored at key.
     --
     -- https://redis.io/commands/smembers
-    smembers :: key -> Internal.Query (List a)
+    smembers :: key -> Internal.Query (Set.Set a)
   }
 
-jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
+jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a, Ord a) => (key -> Text) -> Api key a
 jsonApi = makeApi Codec.jsonCodec
 
 textApi :: (key -> Text) -> Api key Text
@@ -104,6 +105,7 @@ byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
 byteStringApi = makeApi Codec.byteStringCodec
 
 makeApi ::
+  Ord a =>
   Codec.Codec a ->
   (key -> Text) ->
   Api key a
@@ -122,4 +124,5 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       smembers = \key ->
         Internal.Smembers (toKey key)
           |> Internal.WithResult (Prelude.traverse codecDecoder)
+          |> Internal.map Set.fromList
     }
