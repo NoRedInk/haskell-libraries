@@ -9,6 +9,7 @@ where
 
 import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HS
 import Data.IORef (IORef, atomicModifyIORef', newIORef)
 import qualified Data.List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -91,6 +92,7 @@ data RedisType
   = RedisByteString ByteString
   | RedisHash (HM.HashMap Text ByteString)
   | RedisList [ByteString]
+  | RedisSet (HS.HashSet ByteString)
   deriving (Eq)
 
 expectByteString :: RedisType -> Result Internal.Error ByteString
@@ -99,6 +101,7 @@ expectByteString val =
     RedisByteString bytestring -> Ok bytestring
     RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
+    RedisSet _ -> Err wrongTypeErr
 
 expectHash :: RedisType -> Result Internal.Error (HM.HashMap Text ByteString)
 expectHash val =
@@ -106,6 +109,7 @@ expectHash val =
     RedisByteString _ -> Err wrongTypeErr
     RedisHash hash -> Ok hash
     RedisList _ -> Err wrongTypeErr
+    RedisSet _ -> Err wrongTypeErr
 
 expectInt :: RedisType -> Result Internal.Error Int
 expectInt val =
@@ -119,6 +123,7 @@ expectInt val =
             Just int -> Ok int
     RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
+    RedisSet _ -> Err wrongTypeErr
 
 watchKeys :: [Text] -> Model -> Model
 watchKeys keys model =
@@ -385,6 +390,52 @@ doQuery query hm =
                 Err a -> Err a
                 Ok res -> f res
           )
+    Internal.Sadd key vals ->
+      let valsSet = HS.fromList (NonEmpty.toList vals)
+       in case HM.lookup key hm of
+            Nothing ->
+              ( HM.insert key (RedisSet valsSet) hm,
+                Ok (Prelude.fromIntegral (HS.size valsSet))
+              )
+            Just (RedisSet set) ->
+              let newSet = valsSet ++ set
+               in ( HM.insert key (RedisSet newSet) hm,
+                    Ok (Prelude.fromIntegral (HS.size newSet - HS.size set))
+                  )
+            Just _ ->
+              ( hm,
+                Err wrongTypeErr
+              )
+    Internal.Scard key ->
+      ( hm,
+        case HM.lookup key hm of
+          Nothing -> Ok 0
+          Just (RedisSet set) -> Ok (Prelude.fromIntegral (HS.size set))
+          Just _ -> Err wrongTypeErr
+      )
+    Internal.Srem key vals ->
+      let valsSet = HS.fromList (NonEmpty.toList vals)
+       in case HM.lookup key hm of
+            Nothing ->
+              ( hm,
+                Ok 0
+              )
+            Just (RedisSet set) ->
+              let newSet = HS.difference set valsSet
+               in ( HM.insert key (RedisSet newSet) hm,
+                    Ok (Prelude.fromIntegral (HS.size set - HS.size newSet))
+                  )
+            Just _ ->
+              ( hm,
+                Err wrongTypeErr
+              )
+    Internal.Smembers key ->
+      ( hm,
+        case HM.lookup key hm of
+          Nothing -> Ok []
+          Just (RedisSet set) -> Ok (HS.toList set)
+          Just _ -> Err wrongTypeErr
+      )
 
 wrongTypeErr :: Internal.Error
 wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"

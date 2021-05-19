@@ -35,6 +35,7 @@ library
       Redis.Hash
       Redis.List
       Redis.Mock
+      Redis.Set
   other-modules:
       Redis.Codec
       Redis.Internal
@@ -75,6 +76,7 @@ test-suite tests
       Redis.List
       Redis.Mock
       Redis.Real
+      Redis.Set
       Redis.Settings
       Paths_nri_redis
   hs-source-dirs:

@@ -215,6 +215,22 @@ doRawQuery query =
       Database.Redis.setnx (toB key) val
         |> PreparedQuery
         |> map Ok
+    Internal.Sadd key vals ->
+      Database.Redis.sadd (toB key) (NonEmpty.toList vals)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
+    Internal.Scard key ->
+      Database.Redis.scard (toB key)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
+    Internal.Srem key vals ->
+      Database.Redis.srem (toB key) (NonEmpty.toList vals)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
+    Internal.Smembers key ->
+      Database.Redis.smembers (toB key)
+        |> PreparedQuery
+        |> map Ok
     Internal.WithResult f q ->
       let PreparedQuery redisCtx = doRawQuery q
        in PreparedQuery

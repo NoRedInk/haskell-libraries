@@ -78,6 +78,10 @@ cmds query'' =
     Set key _ -> [unwords ["SET", key, "*****"]]
     Setex key seconds _ -> [unwords ["SETEX", key, Text.fromInt seconds, "*****"]]
     Setnx key _ -> [unwords ["SETNX", key, "*****"]]
+    Sadd key vals -> [unwords ("SADD" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
+    Scard key -> [unwords ["SCARD", key]]
+    Srem key vals -> [unwords ("SREM" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
+    Smembers key -> [unwords ["SMEMBERS", key]]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
     WithResult _ x -> cmds x
@@ -110,6 +114,10 @@ data Query a where
   Set :: Text -> ByteString -> Query ()
   Setex :: Text -> Int -> ByteString -> Query ()
   Setnx :: Text -> ByteString -> Query Bool
+  Sadd :: Text -> NonEmpty ByteString -> Query Int
+  Scard :: Text -> Query Int
+  Srem :: Text -> NonEmpty ByteString -> Query Int
+  Smembers :: Text -> Query (List ByteString)
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a
@@ -228,6 +236,10 @@ namespaceQuery prefix query' =
     Expire key secs -> Expire (prefix ++ key) secs
     Lrange key lower upper -> Lrange (prefix ++ key) lower upper
     Rpush key vals -> Rpush (prefix ++ key) vals
+    Sadd key vals -> Sadd (prefix ++ key) vals
+    Scard key -> Scard (prefix ++ key)
+    Srem key vals -> Srem (prefix ++ key) vals
+    Smembers key -> Smembers (prefix ++ key)
     Pure x -> Pure x
     Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
     WithResult f q -> WithResult f (namespaceQuery prefix q)
@@ -280,6 +292,10 @@ keysTouchedByQuery query' =
     Set key _ -> Set.singleton key
     Setex key _ _ -> Set.singleton key
     Setnx key _ -> Set.singleton key
+    Sadd key _ -> Set.singleton key
+    Scard key -> Set.singleton key
+    Srem key _ -> Set.singleton key
+    Smembers key -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
 
 toB :: Text -> ByteString
