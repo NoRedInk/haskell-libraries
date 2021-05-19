@@ -32,8 +32,5 @@ ghcid-nri-env-parser:
 ghcid-nri-observability:
 	cd nri-observability && ghcid 
 
-ghcid-nri-test-encoding-test:
-	cd nri-test-encoding && ghcid --command "cabal repl nri-test-encoding:test:tests" --test Main.main
-
 ghcid-nri-test-encoding:
 	cd nri-test-encoding && ghcid 
