@@ -40,6 +40,9 @@ in pkgs.mkShell {
         (callCabal2nix "safe-coloured-text"
           "${sources.safe-coloured-text}/safe-coloured-text" { })
         safe-exceptions
+        servant
+        servant-auth-server
+        servant-server
         stm
         terminal-size
         text
