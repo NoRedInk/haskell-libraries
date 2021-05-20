@@ -32,6 +32,7 @@ module Redis.List
     -- | This instance is used to generate golden-tests for the api's value.
     -- | You can use `Redis.Test.fromExamples yourRedisApi` in your test suite.
     Examples.HasExamples (..),
+    Examples.example,
 
     -- * Running Redis queries
     Internal.query,
