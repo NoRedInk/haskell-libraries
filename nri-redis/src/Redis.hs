@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 -- | A simple Redis library providing high level access to Redis features we
 -- use here at NoRedInk
@@ -31,6 +32,7 @@ module Redis
     set,
     setex,
     setnx,
+    Examples.HasExamples (..),
 
     -- * Running Redis queries
     Internal.query,
@@ -49,6 +51,7 @@ import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
+import qualified Examples
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
@@ -139,8 +142,12 @@ data Api key a = Api
 -- myJsonApi :: Redis.Api Key Val
 -- myJsonApi = Redis.jsonApi (\Key {fieldA, fieldB}-> Text.join "-" [fieldA, fieldB, "v1"])
 -- @
-jsonApi :: (Aeson.ToJSON a, Aeson.FromJSON a) => (key -> Text) -> Api key a
-jsonApi = makeApi Codec.jsonCodec
+jsonApi ::
+  forall a key.
+  (Examples.HasExamples a, Aeson.ToJSON a, Aeson.FromJSON a) =>
+  (key -> Text) ->
+  Api key a
+jsonApi toKey = makeApi Codec.jsonCodec toKey
 
 -- | Creates a Redis API mapping a 'key' to Text
 textApi :: (key -> Text) -> Api key Text
