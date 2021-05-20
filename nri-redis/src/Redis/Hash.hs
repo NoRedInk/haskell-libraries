@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 -- | A simple Redis library providing high level access to Redis features we
 -- use here at NoRedInk
@@ -32,6 +33,12 @@ module Redis.Hash
     hset,
     hsetnx,
 
+    -- * Every `Redis.Api key value` needs to implement an instance for `HasExamples value`.
+
+    -- | This instance is used to generate golden-tests for the api's value.
+    -- | You can use `Redis.Test.fromExamples yourRedisApi` in your test suite.
+    Examples.HasExamples (..),
+
     -- * Running Redis queries
     Internal.query,
     Internal.transaction,
@@ -50,6 +57,7 @@ import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
+import qualified Examples
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
@@ -125,7 +133,8 @@ data Api key field a = Api
   }
 
 jsonApi ::
-  (Aeson.ToJSON a, Aeson.FromJSON a, Ord field) =>
+  forall a field key.
+  (Examples.HasExamples a, Aeson.ToJSON a, Aeson.FromJSON a, Ord field) =>
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
