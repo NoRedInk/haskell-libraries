@@ -8,6 +8,13 @@ import Test (Test)
 import qualified Test.Encoding
 import qualified Text
 
+-- | Turns a Redis.Api into a test.
+-- The test does the following:
+--
+-- 1. get examples from the `HasExamples` constraint
+-- 2. encoded the examples into JSON
+-- 3. check the encoded JSON against the generated file
+--   NOTE: it will generate the file if it doesn't exist yet
 encoding :: forall m key a. (Typeable.Typeable a, Examples.HasExamples a) => m key a -> Test
 encoding _ =
   let proxy = Proxy :: Proxy a

@@ -32,6 +32,11 @@ module Redis
     set,
     setex,
     setnx,
+
+    -- * Every `Redis.Api key value` needs to implement an instance for `HasExamples value`.
+
+    -- | This instance is used to generate golden-tests for the api's value.
+    -- | You can use `Redis.Test.fromExamples yourRedisApi` in your test suite.
     Examples.HasExamples (..),
 
     -- * Running Redis queries
@@ -135,13 +140,17 @@ data Api key a = Api
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
--- @
--- data Key = Key { fieldA: Text, fieldB: Text }
--- data Val = Val { ... }
 --
--- myJsonApi :: Redis.Api Key Val
--- myJsonApi = Redis.jsonApi (\Key {fieldA, fieldB}-> Text.join "-" [fieldA, fieldB, "v1"])
--- @
+-- > data Key = Key { fieldA: Text, fieldB: Text }
+-- > data Val = Val { ... }
+-- >
+-- > -- | This instance can be used to generate a golden test for this type.
+-- > -- | See Redis.Test
+-- > instance Redis.HasExamples Val where
+-- >   example = Examples.example "Val" Val { ... }
+-- >
+-- > myJsonApi :: Redis.Api Key Val
+-- > myJsonApi = Redis.jsonApi (\Key {fieldA, fieldB}-> Text.join "-" [fieldA, fieldB, "v1"])
 jsonApi ::
   forall a key.
   (Examples.HasExamples a, Aeson.ToJSON a, Aeson.FromJSON a) =>
