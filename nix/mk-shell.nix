@@ -54,6 +54,7 @@ in pkgs.mkShell {
         vty
       ]))
     pkgs.cabal-install
+    pkgs.cachix
     pkgs.gnumake
     pkgs.haskellPackages.ghcid
     pkgs.haskellPackages.hpack
