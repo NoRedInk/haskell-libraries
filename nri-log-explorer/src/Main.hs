@@ -1100,7 +1100,18 @@ run failureFilter historyLength = do
                     size <- System.IO.hFileSize handle
                     System.IO.hSeek handle System.IO.AbsoluteSeek (max 0 (size - 2_000_000))
                 stream <-
-                  map Just (ByteString.hGetSome handle 32752)
+                  ByteString.hGetSome handle 32752
+                    |> andThen
+                      ( \chunk -> do
+                          -- We need to sleep for a little while when we don't
+                          -- receive any data. log-explorer will eat all
+                          -- available cpu otherwise. Because it will just read
+                          -- all the time.
+                          if chunk == ""
+                            then Control.Concurrent.threadDelay 100_000 {- 100 ms -}
+                            else Prelude.pure ()
+                          Prelude.pure (Just chunk)
+                      )
                     |> Streams.makeInputStream
                     |> andThen Streams.ByteString.lines
                     |> andThen (Streams.mapMaybe Aeson.decodeStrict')
