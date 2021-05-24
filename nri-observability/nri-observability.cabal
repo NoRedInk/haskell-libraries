@@ -7,9 +7,9 @@ cabal-version: 1.18
 name:           nri-observability
 version:        0.1.0.2
 synopsis:       Report log spans collected by nri-prelude.
-description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/observability>.
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme>.
 category:       Web
-homepage:       https://github.com/NoRedInk/haskell-libraries#readme
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com

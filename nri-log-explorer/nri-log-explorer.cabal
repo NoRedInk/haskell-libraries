@@ -7,9 +7,9 @@ cabal-version: 1.18
 name:           nri-log-explorer
 version:        0.1.1.0
 synopsis:       Explore logs produced by nri-prelude tests.
-description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explorer>.
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explorer#readme>.
 category:       Web
-homepage:       https://github.com/NoRedInk/haskell-libraries#readme
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explorer#readme
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com
