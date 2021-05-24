@@ -1,6 +1,7 @@
 name: nri-observability
 synopsis: Report log spans collected by nri-prelude.
-description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/observability>.
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme>.
+homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme
 author: NoRedInk
 version: 0.1.0.2
 maintainer: haskell-open-source@noredink.com
