@@ -26,7 +26,7 @@ version=$(grep version: < package.yaml | awk '{print $2}')
 bundle="$name-$version.tar.gz"
 
 # check changelog contains an entry for this version
-grep "^# $version$" < CHANGELOG.md > /dev/null || fail "CHANGELOG.md is missing an entry for the current version."
+grep "^# $version$" < CHANGELOG.md > /dev/null || fail "CHANGELOG.md is missing an entry for the current version. The line must look exactly like: # $version"
 
 # check copyright year is current year
 grep "^copyright: $(date +'%Y')" < package.yaml > /dev/null \
