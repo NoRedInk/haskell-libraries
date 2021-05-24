@@ -1,6 +1,7 @@
 name: nri-redis
 synopsis: An intuitive hedis wrapper library.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis>.
+homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme
 author: NoRedInk
 version: 0.1.0.0
 maintainer: haskell-open-source@noredink.com

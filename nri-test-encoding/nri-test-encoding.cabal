@@ -7,9 +7,9 @@ cabal-version: 1.18
 name:           nri-test-encoding
 version:        0.1.0.0
 synopsis:       A library to simplify writing golden tests for encoding types.
-description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding>.
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding#readme>.
 category:       Testing
-homepage:       https://github.com/NoRedInk/haskell-libraries#readme
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding#readme
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com

@@ -9,7 +9,7 @@ version:        0.1.0.0
 synopsis:       An intuitive hedis wrapper library.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis>.
 category:       Web
-homepage:       https://github.com/NoRedInk/haskell-libraries#readme
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com
