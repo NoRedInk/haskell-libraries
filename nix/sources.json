@@ -24,15 +24,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "release-20.09",
+        "branch": "release-21.05",
         "description": "Nix Packages collection",
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "cee3ca37c68dad981396365bf4b1d0c807ac4eb4",
-        "sha256": "1m6f60gnhgsbmavw0mq1r00v2lb4mhrxbx5dxqp3qhadfaxm8xn2",
+        "rev": "0894deca29135de401bfe59f010a04e5c6a81d1a",
+        "sha256": "1z6mpp4k6r6yqyk4nh65fg5ckdvcr5ag6yhv6jv7wcrdy3vnznz7",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/cee3ca37c68dad981396365bf4b1d0c807ac4eb4.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/0894deca29135de401bfe59f010a04e5c6a81d1a.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs-20-09": {
@@ -47,16 +47,16 @@
         "url": "https://github.com/NixOS/nixpkgs/archive/cee3ca37c68dad981396365bf4b1d0c807ac4eb4.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
-    "nixpkgs-unstable": {
-        "branch": "nixpkgs-unstable",
+    "nixpkgs-21-05": {
+        "branch": "release-21.05",
         "description": "Nix Packages collection",
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "4ef6da455e926b87d1923c324306e9dc1da8e371",
-        "sha256": "14g4y3wnkfvf1sh7l3c2ifs6m3h4lwr20nd4q5avdvd83plqd5qh",
+        "rev": "0894deca29135de401bfe59f010a04e5c6a81d1a",
+        "sha256": "1z6mpp4k6r6yqyk4nh65fg5ckdvcr5ag6yhv6jv7wcrdy3vnznz7",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/4ef6da455e926b87d1923c324306e9dc1da8e371.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/0894deca29135de401bfe59f010a04e5c6a81d1a.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "pretty-diff": {
