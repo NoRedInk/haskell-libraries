@@ -18,12 +18,13 @@ import qualified Test.Reporter.Internal
 import qualified Text
 import Text.Colour (chunk)
 import qualified Text.Colour
+import qualified Text.Colour.Capabilities.FromEnv
 import qualified Tuple
 import qualified Prelude
 
 report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
 report handle results = do
-  terminalCapabilities <- Text.Colour.getTerminalCapabilitiesFromHandle handle
+  terminalCapabilities <- Text.Colour.Capabilities.FromEnv.getTerminalCapabilitiesFromHandle handle
   reportChunks <- renderReport results
   Text.Colour.hPutChunksWith terminalCapabilities handle reportChunks
   System.IO.hFlush handle
