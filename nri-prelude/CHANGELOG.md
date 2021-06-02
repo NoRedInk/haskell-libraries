@@ -1,5 +1,9 @@
 # Unreleased next version
 
+# 0.6.0.1
+
+- Update to `safe-coloured-text` version 0.1.0.0.
+
 # 0.6.0.0
 
 ### Bugfix

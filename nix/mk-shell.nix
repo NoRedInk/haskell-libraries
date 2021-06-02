@@ -1,10 +1,21 @@
 { pkgs, haskellPackages }:
 
-let sources = import ./sources.nix { };
+let
+  sources = import ./sources.nix { };
+  customHaskellPackages = haskellPackages.extend (self: super: {
+    hedis = pkgs.haskell.lib.dontCheck
+      (super.callCabal2nix "hedis" sources.hedis { });
+    pretty-diff = super.callCabal2nix "pretty-diff" sources.pretty-diff { };
+    safe-coloured-text = super.callCabal2nix "safe-coloured-text"
+      "${sources.safe-coloured-text}/safe-coloured-text" { };
+    safe-coloured-text-terminfo =
+      super.callCabal2nix "safe-coloured-text-terminfo"
+      "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { };
+  });
 
 in pkgs.mkShell {
   buildInputs = [
-    (haskellPackages.ghcWithPackages (haskellPackges:
+    (customHaskellPackages.ghcWithPackages (haskellPackges:
       with haskellPackges; [
         aeson
         aeson-pretty
@@ -22,7 +33,7 @@ in pkgs.mkShell {
         fuzzy
         ghc
         hedgehog
-        (pkgs.haskell.lib.dontCheck (callCabal2nix "hedis" sources.hedis { }))
+        hedis
         hostname
         http-client
         http-client-tls
@@ -32,13 +43,13 @@ in pkgs.mkShell {
         modern-uri
         network-uri
         pcre-light
-        (callCabal2nix "pretty-diff" sources.pretty-diff { })
+        pretty-diff
         pretty-show
         process
         random
         resourcet
-        (callCabal2nix "safe-coloured-text"
-          "${sources.safe-coloured-text}/safe-coloured-text" { })
+        safe-coloured-text
+        safe-coloured-text-terminfo
         safe-exceptions
         servant
         servant-auth-server
