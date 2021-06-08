@@ -96,3 +96,6 @@ instance HasExamples Int where
 
 instance HasExamples () where
   examples _ = example "unit" ()
+
+instance HasExamples Text where
+  examples _ = example "text" ("" :: Text)
