@@ -12,7 +12,9 @@
 -- have comitted to the repo.
 module Test.Encoding.Routes (tests, IsApi (..)) where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Proxy (Proxy (Proxy))
+import qualified Data.Semigroup
 import qualified Data.Typeable as Typeable
 import qualified Debug
 import qualified Examples
@@ -21,7 +23,18 @@ import GHC.TypeLits (KnownSymbol, symbolVal)
 import qualified List
 import NriPrelude
 import qualified Servant
-import Servant.API (Capture', QueryFlag, Raw, ReqBody, Verb, (:<|>), (:>))
+import Servant.API
+  ( Capture',
+    Header,
+    QueryFlag,
+    Raw,
+    ReqBody,
+    ReqBody',
+    Summary,
+    Verb,
+    (:<|>),
+    (:>),
+  )
 import Servant.API.Generic (ToServantApi)
 import qualified Servant.Auth.Server
 import Test (Test, describe, test)
@@ -55,6 +68,7 @@ tests _ =
 data Route = Route
   { path :: [Text],
     method :: Text,
+    headers :: [(Text, SomeType)],
     requestBody :: Maybe SomeType,
     responseBody :: SomeType
   }
@@ -66,13 +80,21 @@ routesWithExamples :: List Route -> List (Route, Examples.Examples)
 routesWithExamples routes =
   routes
     |> List.map
-      ( \route@Route {requestBody, responseBody} ->
+      ( \route@Route {requestBody, responseBody, headers} ->
           ( route,
             case (requestBody, responseBody) of
-              (Nothing, SomeType t) -> Examples.examples t
-              (Just (SomeType s), SomeType t) -> Examples.examples s ++ Examples.examples t
+              (Nothing, SomeType t) ->
+                List.map headersToExamples headers
+                  |> (NonEmpty.:|) (Examples.examples t)
+                  |> Data.Semigroup.sconcat
+              (Just (SomeType s), SomeType t) ->
+                List.map headersToExamples headers
+                  |> (NonEmpty.:|) (Examples.examples s ++ Examples.examples t)
+                  |> Data.Semigroup.sconcat
           )
       )
+  where
+    headersToExamples (_, SomeType t) = Examples.examples t
 
 routeName :: Route -> Text
 routeName route =
@@ -87,32 +109,42 @@ routesToText routes =
   routes
     |> List.concatMap
       ( \route ->
-          case requestBody route of
-            Nothing ->
-              [ Text.join
-                  " "
-                  [ routeName route,
-                    "response",
-                    printType (responseBody route)
-                  ]
-              ]
-            Just body ->
-              [ Text.join
-                  " "
-                  [ routeName route,
-                    "response",
-                    printType (responseBody route)
-                  ],
-                Text.join
-                  " "
-                  [ routeName route,
-                    "request",
-                    printType body
-                  ]
-              ]
+          [ case headers route of
+              [] -> Nothing
+              headers' ->
+                Just
+                  <| Text.join
+                    " "
+                    ( routeName route :
+                      "headers" :
+                      List.map printHeaders headers'
+                    ),
+            Just
+              <| Text.join
+                " "
+                [ routeName route,
+                  "response",
+                  printType (responseBody route)
+                ],
+            case requestBody route of
+              Nothing -> Nothing
+              Just body ->
+                Just
+                  <| Text.join
+                    " "
+                    [ routeName route,
+                      "request",
+                      printType body
+                    ]
+          ]
       )
+    |> List.filterMap identity
     |> List.sort
     |> Text.join "\n"
+
+printHeaders :: (Text, SomeType) -> Text
+printHeaders (key, val) =
+  "(" ++ key ++ ", " ++ printType val ++ ")"
 
 printType :: SomeType -> Text
 printType (SomeType t) =
@@ -173,6 +205,7 @@ instance
   crawl _ =
     [ Route
         { path = [],
+          headers = [],
           requestBody = Nothing,
           method =
             Typeable.typeRep (Proxy :: Proxy method)
@@ -188,6 +221,40 @@ instance IsApi Raw where
   crawl _ = []
 
 instance (IsApi a) => IsApi (QueryFlag flag :> a) where
+  crawl _ = crawl (Proxy :: Proxy a)
+
+instance (Typeable.Typeable body, Examples.HasExamples body, IsApi a) => IsApi (ReqBody' x encodings body :> a) where
+  crawl _ =
+    crawl (Proxy :: Proxy a)
+      |> List.map
+        ( \route ->
+            route
+              { requestBody = Just (SomeType (Proxy :: Proxy body))
+              }
+        )
+
+instance
+  ( KnownSymbol key,
+    Typeable.Typeable val,
+    Examples.HasExamples val,
+    IsApi a
+  ) =>
+  IsApi (Header key val :> a)
+  where
+  crawl _ =
+    crawl (Proxy :: Proxy a)
+      |> List.map
+        ( \route ->
+            route
+              { headers =
+                  ( Text.fromList (symbolVal (Proxy :: Proxy key)),
+                    SomeType (Proxy :: Proxy val)
+                  ) :
+                  headers route
+              }
+        )
+
+instance (IsApi a) => IsApi (Summary x :> a) where
   crawl _ = crawl (Proxy :: Proxy a)
 
 instance Examples.HasExamples Servant.NoContent where
