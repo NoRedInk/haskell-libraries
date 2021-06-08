@@ -28,7 +28,6 @@ import Servant.API
     Header,
     QueryFlag,
     Raw,
-    ReqBody,
     ReqBody',
     Summary,
     Verb,
@@ -185,16 +184,6 @@ instance (KnownSymbol s, IsApi a) => IsApi (Capture' mods s paramType :> a) wher
         ( \route ->
             route
               { path = (":" ++ Text.fromList (symbolVal (Proxy :: Proxy s))) : path route
-              }
-        )
-
-instance (Typeable.Typeable body, Examples.HasExamples body, IsApi a) => IsApi (ReqBody encodings body :> a) where
-  crawl _ =
-    crawl (Proxy :: Proxy a)
-      |> List.map
-        ( \route ->
-            route
-              { requestBody = Just (SomeType (Proxy :: Proxy body))
               }
         )
 
