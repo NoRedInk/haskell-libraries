@@ -1,0 +1,113 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           nri-http
+version:        0.1.0.2
+synopsis:       Make Elm style HTTP requests
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-http#readme>.
+category:       Web
+homepage:       https://github.com/NoRedInk/haskell-libraries#readme
+bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
+author:         NoRedInk
+maintainer:     haskell-open-source@noredink.com
+copyright:      2021 NoRedInk Corp.
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    LICENSE
+
+source-repository head
+  type: git
+  location: https://github.com/NoRedInk/haskell-libraries
+  subdir: nri-http
+
+library
+  exposed-modules:
+      Http
+      Http.Mock
+  other-modules:
+      Internal.Http
+      Paths_nri_http
+  hs-source-dirs:
+      src
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , conduit
+    , http-client
+    , http-client-tls
+    , http-types
+    , mime-types
+    , network-uri
+    , nri-observability
+    , nri-prelude
+    , safe-exceptions
+    , text
+    , wai
+    , warp
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Http
+      Http.Mock
+      Internal.Http
+      Paths_nri_http
+  hs-source-dirs:
+      src
+      test
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , conduit
+    , http-client
+    , http-client-tls
+    , http-types
+    , mime-types
+    , network-uri
+    , nri-observability
+    , nri-prelude
+    , safe-exceptions
+    , text
+    , wai
+    , warp
+  default-language: Haskell2010

@@ -5,3 +5,4 @@ packages:
   nri-observability/nri-observability.cabal
   nri-redis/nri-redis.cabal
   nri-test-encoding/nri-test-encoding.cabal
+  nri-http/nri-http.cabal
