@@ -1,0 +1,38 @@
+<<: !include ../package-yaml-support/base-package.yaml
+name: http
+synopsis: Make Elm style HTTP requests
+extra-source-files:
+- README.md
+- "test/golden-results/*.json"
+library:
+  dependencies: &dependencies
+  - aeson
+  - base
+  - bytestring
+  - nri-prelude
+  - nri-observability
+  - conduit
+  - http-client
+  - http-client-tls
+  - http-types
+  - mime-types
+  - network-uri
+  - safe-exceptions
+  - text
+  - wai
+  - warp
+  exposed-modules:
+  - Http
+  - Http.Mock
+  source-dirs: src
+tests:
+  spec:
+    dependencies: *dependencies
+    main: Main.hs
+    source-dirs:
+    - src
+    - test
+    # We intentionally do not add the default ghc-options for tests. These would
+    # cause tests to run in parallel, which introduces flakiness in this test
+    # suite. The suite creates a number of web servers that are supposed to get
+    # unique ports, but if we start them in parallel this will not always work.
