@@ -8,6 +8,7 @@ import qualified Data.List
 import qualified Debug
 import qualified Expect
 import qualified Http
+import qualified Http.Mock
 import qualified Log.HttpRequest as HttpRequest
 import qualified Network.HTTP.Types.Status as Status
 import qualified Network.Wai as Wai
@@ -109,7 +110,19 @@ tests =
                   |> spanForTask
               Debug.toString span
                 |> Expect.equalToContentsOf "test/golden-results/expected-http-span"
-          )
+          ),
+      test "Http.Mock.stub" <| \_ -> do
+        urlsAccessed <-
+          Http.Mock.stub
+            (\req -> Task.succeed (Http.url req, "Response!"))
+            ( \http ->
+                Expect.succeeds <| do
+                  _ <- Http.get http "example.com/one" Http.expectText
+                  _ <- Http.get http "example.com/two" Http.expectText
+                  Task.succeed ()
+            )
+        urlsAccessed
+          |> Expect.equal ["example.com/one", "example.com/two"]
     ]
 
 -- # Wai applications to test against

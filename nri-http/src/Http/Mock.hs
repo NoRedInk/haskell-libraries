@@ -1,75 +1,69 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- | An alternative 'Handler' type for use in tests, allowing us to observe
--- the HTTP requests made in a test body.
+-- | Stub out Http requests in tests.
 module Http.Mock
-  ( singleJsonTestHandler,
-    singleWhateverTestHandler,
-    testHandler,
+  ( stub,
   )
 where
 
-import qualified Data.Aeson as Aeson
-import Data.IORef
+import qualified Data.Aeson
+import qualified Data.IORef
+import qualified Data.Text.Encoding
 import qualified Debug
+import qualified Expect
+import qualified GHC.Stack as Stack
 import Internal.Http
 import qualified Platform
 import qualified Task
-import Prelude (Either (Left, Right), IO, pure)
+import qualified Prelude
 
--- | An alternative 'Handler' type that will not make HTTP requests. Instead it
--- will pass the request record to the function provided, allowing you to
--- determine what the response of the request should be.
-testHandler :: (forall expect. Request expect -> Task Error expect) -> IO Handler
-testHandler mockServer =
-  pure
-    <| Internal.Http.Handler
-      mockServer
-      (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
-      (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
-
-singleJsonMockServer :: Aeson.ToJSON mock => Platform.DoAnythingHandler -> IORef (Maybe (Request ())) -> mock -> Request expect -> Task Error expect
-singleJsonMockServer doAnything ioRef responseValue capturedRequestRequest =
-  case Internal.Http.expect capturedRequestRequest of
-    Internal.Http.ExpectWhatever ->
-      Task.fail (Internal.Http.NetworkError "You said you expected a JSON request, but 'ExpectWhatever' was sent")
-    Internal.Http.ExpectText ->
-      Task.fail (Internal.Http.NetworkError "You said you expected a JSON request, but 'ExpectText' was sent")
-    Internal.Http.ExpectJson ->
-      case responseValue |> Aeson.encode |> Aeson.eitherDecode of
-        Left _ ->
-          Task.fail (Internal.Http.NetworkError "We couldn't transform the mock JSON you provided into a valid response.")
-        Right response -> do
-          Platform.doAnything
-            doAnything
-            (map Ok (writeIORef ioRef (Just capturedRequestRequest {expect = Internal.Http.ExpectWhatever})))
-          Task.succeed
-            response
-
-singleJsonTestHandler :: Aeson.ToJSON result => result -> IO (Handler, IORef (Maybe (Request ())))
-singleJsonTestHandler responseValue = do
-  doAnything <- Platform.doAnythingHandler
-  ioRef <- newIORef Nothing
-  h <- testHandler (singleJsonMockServer doAnything ioRef responseValue)
-  pure (h, ioRef)
-
-singleWhateverMockServer :: Platform.DoAnythingHandler -> IORef (Maybe (Request ())) -> Request expect -> Task Error expect
-singleWhateverMockServer doAnything ioRef capturedRequestRequest =
-  case Internal.Http.expect capturedRequestRequest of
-    Internal.Http.ExpectWhatever -> do
-      Platform.doAnything
-        doAnything
-        (map Ok (writeIORef ioRef (Just capturedRequestRequest)))
-      Task.succeed ()
-    Internal.Http.ExpectText ->
-      Task.fail (Internal.Http.NetworkError "You said you didn't care about the response, but 'ExpectText' was sent")
-    Internal.Http.ExpectJson ->
-      Task.fail (Internal.Http.NetworkError "You said you didn't care about the response, but 'ExpectJson' was sent")
-
-singleWhateverTestHandler :: IO (Handler, IORef (Maybe (Request ())))
-singleWhateverTestHandler = do
-  doAnything <- Platform.doAnythingHandler
-  ioRef <- newIORef Nothing
-  h <- testHandler (singleWhateverMockServer doAnything ioRef)
-  pure (h, ioRef)
+-- | Stub out http requests in a bit of code. You can use this if you don't
+-- want your tests to make real http requests, and to listen in on the http
+-- requests it is attempting to make.
+--
+-- 'stub' takes a function that it calls instead of making a real http request.
+-- That function should return the response string and a optionally some
+-- information about the http request. You'll get back the information collected
+-- for each outgoing http request so you can run assertions against it.
+--
+-- > test "Stubbed HTTP requests" <| \_ -> do
+-- >   urlsAccessed <-
+-- >     Http.Mock.stub
+-- >       (\req -> Task.succeed (Http.url req, "Response!"))
+-- >       ( \http ->
+-- >           Expect.succeeds <| do
+-- >             _ <- Http.get http "example.com/one" Http.expectText
+-- >             _ <- Http.get http "example.com/two" Http.expectText
+-- >             Task.succeed ()
+-- >       )
+-- >   urlsAccessed
+-- >     |> Expect.equal ["example.com/one", "example.com/two"]
+stub ::
+  Stack.HasCallStack =>
+  (forall expect. Request expect -> Task Error (a, Text)) ->
+  (Handler -> Expect.Expectation) ->
+  Expect.Expectation' (List a)
+stub respond stubbedTestBody = do
+  logRef <- Expect.fromIO (Data.IORef.newIORef [])
+  doAnything <- Expect.fromIO Platform.doAnythingHandler
+  let mockHandler =
+        Internal.Http.Handler
+          ( \req -> do
+              (log, res) <- respond req
+              Data.IORef.modifyIORef' logRef (\prev -> log : prev)
+                |> map Ok
+                |> Platform.doAnything doAnything
+              case Internal.Http.expect req of
+                Internal.Http.ExpectWhatever -> Task.succeed ()
+                Internal.Http.ExpectText -> Task.succeed res
+                Internal.Http.ExpectJson ->
+                  case Data.Aeson.eitherDecodeStrict (Data.Text.Encoding.encodeUtf8 res) of
+                    Prelude.Left err -> Task.fail (Internal.Http.BadBody (Text.fromList err))
+                    Prelude.Right decoded -> Task.succeed decoded
+          )
+          (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
+          (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
+  Expect.around (\f -> f mockHandler) (Stack.withFrozenCallStack stubbedTestBody)
+  Expect.fromIO (Data.IORef.readIORef logRef)
+    |> map List.reverse
