@@ -24,7 +24,7 @@ data Request a = Request
   { -- | The request method, like @"GET"@ or @"PUT"@.
     method :: Text,
     -- | A list of request headers.
-    headers :: [Header.Header],
+    headers :: [Header],
     -- | The url, like @"https://fishes.com/salmon"@.
     url :: Text,
     -- | The request body.
@@ -34,6 +34,10 @@ data Request a = Request
     -- | The type of response you expect back from the request.
     expect :: Expect a
   }
+
+-- | An HTTP header for configuration requests.
+newtype Header = Header {unHeader :: Header.Header}
+  deriving (Eq, Show)
 
 -- | Represents the body of a Request.
 data Body = Body

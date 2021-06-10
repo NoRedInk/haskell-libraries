@@ -14,6 +14,10 @@ module Http
     Internal.Http.Request (..),
     Internal.Http.Error (..),
 
+    -- * Header,
+    Internal.Http.Header,
+    header,
+
     -- * Body
     Internal.Http.Body,
     emptyBody,
@@ -39,10 +43,11 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
+import Data.String (fromString)
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
-import Internal.Http (Handler)
+import Internal.Http (Body, Expect, Handler)
 import qualified Internal.Http
 import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe
@@ -123,8 +128,11 @@ post handler' url body expect =
 
 -- REQUEST
 
--- |  Represents the body of a Request.
-type Body = Internal.Http.Body
+-- | Create a 'Header'.
+header :: Text -> Text -> Internal.Http.Header
+header key val =
+  Internal.Http.Header
+    (fromString (Text.toList key), fromString (Text.toList val))
 
 -- | Create an empty body for your Request. This is useful for GET requests and
 -- POST requests where you are not sending any data.
@@ -186,8 +194,10 @@ _request doAnythingHandler manager settings = do
                   HTTP.requestHeaders = case Internal.Http.bodyContentType (Internal.Http.body settings) of
                     Nothing ->
                       Internal.Http.headers settings
+                        |> List.map Internal.Http.unHeader
                     Just mimeType ->
-                      ("content-type", mimeType) : Internal.Http.headers settings,
+                      ("content-type", mimeType) :
+                      List.map Internal.Http.unHeader (Internal.Http.headers settings),
                   HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http.body settings),
                   HTTP.responseTimeout =
                     Internal.Http.timeout settings
@@ -219,10 +229,6 @@ _request doAnythingHandler manager settings = do
             Err (Internal.Http.NetworkError (Text.fromList (show err)))
       Left (HTTP.InvalidUrlException _ message) ->
         Err (Internal.Http.BadUrl (Text.fromList message))
-
--- |
--- Logic for interpreting a response body.
-type Expect a = Internal.Http.Expect a
 
 decode :: Expect a -> Data.ByteString.Lazy.ByteString -> Result Text a
 decode Internal.Http.ExpectJson bytes =
