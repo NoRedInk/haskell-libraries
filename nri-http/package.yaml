@@ -2,7 +2,7 @@ name: nri-http
 synopsis: Make Elm style HTTP requests
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-http#readme>.
 author: NoRedInk
-version: 0.1.0.2
+version: 0.1.0.0
 maintainer: haskell-open-source@noredink.com
 copyright: 2021 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-http
