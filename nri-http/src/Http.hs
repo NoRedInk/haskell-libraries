@@ -8,10 +8,10 @@ module Http
     handler,
 
     -- * Requests
-    Internal.Http.Request (..),
     get,
     post,
     request,
+    Internal.Http.Request (..),
     Internal.Http.Error (..),
 
     -- * Body
