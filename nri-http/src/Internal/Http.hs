@@ -21,15 +21,21 @@ data Handler = Handler
 
 -- | A custom request.
 data Request a = Request
-  { method :: Text,
+  { -- | The request method, like @"GET"@ or @"PUT"@.
+    method :: Text,
+    -- | A list of request headers.
     headers :: [Header.Header],
+    -- | The url, like @"https://fishes.com/salmon"@.
     url :: Text,
+    -- | The request body.
     body :: Body,
+    -- | The amount of microseconds you're willing to wait before giving up.
     timeout :: Maybe Int,
+    -- | The type of response you expect back from the request.
     expect :: Expect a
   }
 
--- |  Represents the body of a Request.
+-- | Represents the body of a Request.
 data Body = Body
   { bodyContents :: Data.ByteString.Lazy.ByteString,
     bodyContentType :: Maybe Mime.MimeType

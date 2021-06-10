@@ -189,7 +189,12 @@ _request doAnythingHandler manager settings = do
                     Just mimeType ->
                       ("content-type", mimeType) : Internal.Http.headers settings,
                   HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http.body settings),
-                  HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (Internal.Http.timeout settings)
+                  HTTP.responseTimeout =
+                    Internal.Http.timeout settings
+                      |> Maybe.withDefault (30 * 1000)
+                      |> (*) 1000
+                      |> fromIntegral
+                      |> HTTP.responseTimeoutMicro
                 }
         HTTP.httpLbs finalRequest requestManager
     pure <| case response of
