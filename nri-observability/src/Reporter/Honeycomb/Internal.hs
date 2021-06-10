@@ -1,35 +1,6 @@
 {-# LANGUAGE GADTs #-}
 
--- | Honeycomb
---
--- This reporter logs execution to https://honeycomb.io.
---
--- It does some custom stuff compared to other reporters:
---
--- * Sample requests based on
---   * Response type
---   * Endpoint (log fewer healthchecks)
--- * Calculates statistics over child spans per type
--- * Enriches child spans with data to help track problems
---   * Server (Pod, in k8s' case) hostname
---   * Http endpoint
-module Observability.Honeycomb
-  ( report,
-    handler,
-    Handler,
-    Settings (..),
-    decoder,
-    -- for tests
-    toBatchEvents,
-    SharedTraceData (..),
-    BatchEvent (..),
-    Span,
-    emptySpan,
-    addField,
-    Revision (..),
-    sampleRateForDuration,
-  )
-where
+module Reporter.Honeycomb.Internal where
 
 import qualified Conduit
 import qualified Control.Exception.Safe as Exception
@@ -56,8 +27,8 @@ import qualified Log.RedisCommands as RedisCommands
 import qualified Log.SqlQuery as SqlQuery
 import qualified Maybe
 import qualified Network.HostName
-import qualified Observability.Timer as Timer
 import qualified Platform
+import qualified Platform.Timer as Timer
 import qualified System.Random as Random
 import qualified Task
 import qualified Text
