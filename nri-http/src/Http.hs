@@ -19,8 +19,8 @@ module Http
     expectText,
     expectWhatever,
     Internal.Http.Error (..),
-    Internal.Http.Settings (..),
-    Internal.Http.Body (..),
+    Internal.Http.Settings,
+    Internal.Http.Body,
   )
 where
 
