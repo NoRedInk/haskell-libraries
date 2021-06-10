@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Internal.Http where
+module Http.Internal where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson

@@ -13,7 +13,7 @@ import qualified Data.Text.Encoding
 import qualified Debug
 import qualified Expect
 import qualified GHC.Stack as Stack
-import Internal.Http
+import qualified Http.Internal as Internal
 import qualified Platform
 import qualified Task
 import qualified Prelude
@@ -41,25 +41,25 @@ import qualified Prelude
 -- >     |> Expect.equal ["example.com/one", "example.com/two"]
 stub ::
   Stack.HasCallStack =>
-  (forall expect. Request expect -> Task Error (a, Text)) ->
-  (Handler -> Expect.Expectation) ->
+  (forall expect. Internal.Request expect -> Task Internal.Error (a, Text)) ->
+  (Internal.Handler -> Expect.Expectation) ->
   Expect.Expectation' (List a)
 stub respond stubbedTestBody = do
   logRef <- Expect.fromIO (Data.IORef.newIORef [])
   doAnything <- Expect.fromIO Platform.doAnythingHandler
   let mockHandler =
-        Internal.Http.Handler
+        Internal.Handler
           ( \req -> do
               (log, res) <- respond req
               Data.IORef.modifyIORef' logRef (\prev -> log : prev)
                 |> map Ok
                 |> Platform.doAnything doAnything
-              case Internal.Http.expect req of
-                Internal.Http.ExpectWhatever -> Task.succeed ()
-                Internal.Http.ExpectText -> Task.succeed res
-                Internal.Http.ExpectJson ->
+              case Internal.expect req of
+                Internal.ExpectWhatever -> Task.succeed ()
+                Internal.ExpectText -> Task.succeed res
+                Internal.ExpectJson ->
                   case Data.Aeson.eitherDecodeStrict (Data.Text.Encoding.encodeUtf8 res) of
-                    Prelude.Left err -> Task.fail (Internal.Http.BadBody (Text.fromList err))
+                    Prelude.Left err -> Task.fail (Internal.BadBody (Text.fromList err))
                     Prelude.Right decoded -> Task.succeed decoded
           )
           (\_ -> Debug.todo "We don't mock third party HTTP calls yet")

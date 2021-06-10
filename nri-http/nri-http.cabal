@@ -32,7 +32,7 @@ library
       Http
       Http.Mock
   other-modules:
-      Internal.Http
+      Http.Internal
       Paths_nri_http
   hs-source-dirs:
       src
@@ -74,8 +74,8 @@ test-suite spec
   main-is: Main.hs
   other-modules:
       Http
+      Http.Internal
       Http.Mock
-      Internal.Http
       Paths_nri_http
   hs-source-dirs:
       src

@@ -11,15 +11,15 @@ module Http
     get,
     post,
     request,
-    Internal.Http.Request (..),
-    Internal.Http.Error (..),
+    Internal.Request (..),
+    Internal.Error (..),
 
     -- * Header,
-    Internal.Http.Header,
+    Internal.Header,
     header,
 
     -- * Body
-    Internal.Http.Body,
+    Internal.Body,
     emptyBody,
     stringBody,
     jsonBody,
@@ -47,8 +47,8 @@ import Data.String (fromString)
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
-import Internal.Http (Body, Expect, Handler)
-import qualified Internal.Http
+import Http.Internal (Body, Expect, Handler)
+import qualified Http.Internal as Internal
 import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
@@ -66,7 +66,7 @@ handler = do
   doAnything <- liftIO Platform.doAnythingHandler
   manager <- TLS.newTlsManager
   pure
-    <| Internal.Http.Handler
+    <| Internal.Handler
       (_request doAnything manager)
       (_withThirdParty manager)
       (_withThirdPartyIO manager)
@@ -78,7 +78,7 @@ handler = do
 -- external library, is that 'withThirdParty' will ensure HTTP requests made
 -- by the external library will get logged.
 withThirdParty :: Handler -> (HTTP.Manager -> Task e a) -> Task e a
-withThirdParty Internal.Http.Handler {Internal.Http.handlerWithThirdParty = wtp} library =
+withThirdParty Internal.Handler {Internal.handlerWithThirdParty = wtp} library =
   wtp library
 
 _withThirdParty :: HTTP.Manager -> (HTTP.Manager -> Task e a) -> Task e a
@@ -88,7 +88,7 @@ _withThirdParty manager library = do
 
 -- | Like `withThirdParty`, but runs in `IO`.
 withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> IO a
-withThirdPartyIO log Internal.Http.Handler {Internal.Http.handlerWithThirdPartyIO = wtp} library =
+withThirdPartyIO log Internal.Handler {Internal.handlerWithThirdPartyIO = wtp} library =
   wtp log library
 
 _withThirdPartyIO :: HTTP.Manager -> Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
@@ -103,13 +103,13 @@ get :: Handler -> Text -> Expect a -> Task Error a
 get handler' url expect =
   request
     handler'
-    Internal.Http.Request
-      { Internal.Http.method = "GET",
-        Internal.Http.headers = [],
-        Internal.Http.url = url,
-        Internal.Http.body = emptyBody,
-        Internal.Http.timeout = Nothing,
-        Internal.Http.expect = expect
+    Internal.Request
+      { Internal.method = "GET",
+        Internal.headers = [],
+        Internal.url = url,
+        Internal.body = emptyBody,
+        Internal.timeout = Nothing,
+        Internal.expect = expect
       }
 
 -- | Create a @POST@ request.
@@ -117,30 +117,30 @@ post :: Handler -> Text -> Body -> Expect a -> Task Error a
 post handler' url body expect =
   request
     handler'
-    Internal.Http.Request
-      { Internal.Http.method = "POST",
-        Internal.Http.headers = [],
-        Internal.Http.url = url,
-        Internal.Http.body = body,
-        Internal.Http.timeout = Nothing,
-        Internal.Http.expect = expect
+    Internal.Request
+      { Internal.method = "POST",
+        Internal.headers = [],
+        Internal.url = url,
+        Internal.body = body,
+        Internal.timeout = Nothing,
+        Internal.expect = expect
       }
 
 -- REQUEST
 
 -- | Create a 'Header'.
-header :: Text -> Text -> Internal.Http.Header
+header :: Text -> Text -> Internal.Header
 header key val =
-  Internal.Http.Header
+  Internal.Header
     (fromString (Text.toList key), fromString (Text.toList val))
 
 -- | Create an empty body for your Request. This is useful for GET requests and
 -- POST requests where you are not sending any data.
 emptyBody :: Body
 emptyBody =
-  Internal.Http.Body
-    { Internal.Http.bodyContents = "",
-      Internal.Http.bodyContentType = Nothing
+  Internal.Body
+    { Internal.bodyContents = "",
+      Internal.bodyContentType = Nothing
     }
 
 -- | Put some string in the body of your Request.
@@ -149,18 +149,18 @@ emptyBody =
 -- this!
 stringBody :: Text -> Text -> Body
 stringBody mimeType text =
-  Internal.Http.Body
-    { Internal.Http.bodyContents = Data.Text.Encoding.encodeUtf8 text |> Data.ByteString.Lazy.fromStrict,
-      Internal.Http.bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
+  Internal.Body
+    { Internal.bodyContents = Data.Text.Encoding.encodeUtf8 text |> Data.ByteString.Lazy.fromStrict,
+      Internal.bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
     }
 
 -- | Put some JSON value in the body of your Request. This will automatically
 -- add the Content-Type: application/json header.
 jsonBody :: Aeson.ToJSON body => body -> Body
 jsonBody json =
-  Internal.Http.Body
-    { Internal.Http.bodyContents = Aeson.encode json,
-      Internal.Http.bodyContentType = Just "application/json"
+  Internal.Body
+    { Internal.bodyContents = Aeson.encode json,
+      Internal.bodyContentType = Just "application/json"
     }
 
 -- | Put some Bytes in the body of your Request. This allows you to use
@@ -171,36 +171,36 @@ jsonBody json =
 -- want to use MIME types like image/png or image/jpeg instead.
 bytesBody :: Text -> ByteString -> Body
 bytesBody mimeType bytes =
-  Internal.Http.Body
-    { Internal.Http.bodyContents = Data.ByteString.Lazy.fromStrict bytes,
-      Internal.Http.bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
+  Internal.Body
+    { Internal.bodyContents = Data.ByteString.Lazy.fromStrict bytes,
+      Internal.bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
     }
 
 -- | Create a custom request.
-request :: Handler -> Internal.Http.Request expect -> Task Error expect
-request Internal.Http.Handler {Internal.Http.handlerRequest} settings = handlerRequest settings
+request :: Handler -> Internal.Request expect -> Task Error expect
+request Internal.Handler {Internal.handlerRequest} settings = handlerRequest settings
 
-_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Http.Request expect -> Task Error expect
+_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request expect -> Task Error expect
 _request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
     response <-
       Exception.try <| do
         basicRequest <-
-          HTTP.parseUrlThrow <| Text.toList (Internal.Http.url settings)
+          HTTP.parseUrlThrow <| Text.toList (Internal.url settings)
         let finalRequest =
               basicRequest
-                { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.Http.method settings),
-                  HTTP.requestHeaders = case Internal.Http.bodyContentType (Internal.Http.body settings) of
+                { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.method settings),
+                  HTTP.requestHeaders = case Internal.bodyContentType (Internal.body settings) of
                     Nothing ->
-                      Internal.Http.headers settings
-                        |> List.map Internal.Http.unHeader
+                      Internal.headers settings
+                        |> List.map Internal.unHeader
                     Just mimeType ->
                       ("content-type", mimeType) :
-                      List.map Internal.Http.unHeader (Internal.Http.headers settings),
-                  HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http.body settings),
+                      List.map Internal.unHeader (Internal.headers settings),
+                  HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.bodyContents (Internal.body settings),
                   HTTP.responseTimeout =
-                    Internal.Http.timeout settings
+                    Internal.timeout settings
                       |> Maybe.withDefault (30 * 1000)
                       |> (*) 1000
                       |> fromIntegral
@@ -209,52 +209,52 @@ _request doAnythingHandler manager settings = do
         HTTP.httpLbs finalRequest requestManager
     pure <| case response of
       Right okResponse ->
-        case decode (Internal.Http.expect settings) (HTTP.responseBody okResponse) of
+        case decode (Internal.expect settings) (HTTP.responseBody okResponse) of
           Ok decodedBody ->
             Ok decodedBody
           Err message ->
-            Err (Internal.Http.BadBody message)
+            Err (Internal.BadBody message)
       Left (HTTP.HttpExceptionRequest _ content) ->
         case content of
           HTTP.StatusCodeException res _ ->
             let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
-             in Err (Internal.Http.BadStatus (statusCode res))
+             in Err (Internal.BadStatus (statusCode res))
           HTTP.ResponseTimeout ->
-            Err Internal.Http.Timeout
+            Err Internal.Timeout
           HTTP.ConnectionTimeout ->
-            Err (Internal.Http.NetworkError "ConnectionTimeout")
+            Err (Internal.NetworkError "ConnectionTimeout")
           HTTP.ConnectionFailure err ->
-            Err (Internal.Http.NetworkError (Text.fromList (Exception.displayException err)))
+            Err (Internal.NetworkError (Text.fromList (Exception.displayException err)))
           err ->
-            Err (Internal.Http.NetworkError (Text.fromList (show err)))
+            Err (Internal.NetworkError (Text.fromList (show err)))
       Left (HTTP.InvalidUrlException _ message) ->
-        Err (Internal.Http.BadUrl (Text.fromList message))
+        Err (Internal.BadUrl (Text.fromList message))
 
 decode :: Expect a -> Data.ByteString.Lazy.ByteString -> Result Text a
-decode Internal.Http.ExpectJson bytes =
+decode Internal.ExpectJson bytes =
   case Aeson.eitherDecode bytes of
     Left err -> Err (Text.fromList err)
     Right x -> Ok x
-decode Internal.Http.ExpectText bytes = (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8) bytes
-decode Internal.Http.ExpectWhatever _ = Ok ()
+decode Internal.ExpectText bytes = (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8) bytes
+decode Internal.ExpectWhatever _ = Ok ()
 
 -- |
 -- Expect the response body to be JSON.
 expectJson :: Aeson.FromJSON a => Expect a
-expectJson = Internal.Http.ExpectJson
+expectJson = Internal.ExpectJson
 
 -- |
 -- Expect the response body to be a `Text`.
 expectText :: Expect Text
-expectText = Internal.Http.ExpectText
+expectText = Internal.ExpectText
 
 -- |
 -- Expect the response body to be whatever. It does not matter. Ignore it!
 expectWhatever :: Expect ()
-expectWhatever = Internal.Http.ExpectWhatever
+expectWhatever = Internal.ExpectWhatever
 
 -- |
-type Error = Internal.Http.Error
+type Error = Internal.Error
 
 -- Our Task type carries around some context values which should influence in
 -- minor ways the logic of sending a request. In this function we modify a
