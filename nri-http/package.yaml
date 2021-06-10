@@ -53,10 +53,12 @@ tests:
     source-dirs:
     - src
     - test
-    # We intentionally do not add the default ghc-options for tests. These would
+    # We intentionally do not add threaded ghc-options for tests. These would
     # cause tests to run in parallel, which introduces flakiness in this test
     # suite. The suite creates a number of web servers that are supposed to get
     # unique ports, but if we start them in parallel this will not always work.
+    ghc-options:
+      - -fno-warn-type-defaults
 default-extensions:
   - DataKinds
   - DeriveGeneric
@@ -71,6 +73,8 @@ default-extensions:
   - ScopedTypeVariables
   - Strict
   - TypeOperators
+  - ExtendedDefaultRules
+  - NumericUnderscores
 ghc-options:
   - -Wall
   - -Wcompat

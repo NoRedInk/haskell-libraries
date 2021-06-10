@@ -50,6 +50,8 @@ library
       ScopedTypeVariables
       Strict
       TypeOperators
+      ExtendedDefaultRules
+      NumericUnderscores
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
       aeson >=1.4.6.0 && <1.6
@@ -92,7 +94,9 @@ test-suite spec
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
+      ExtendedDefaultRules
+      NumericUnderscores
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -fno-warn-type-defaults
   build-depends:
       aeson >=1.4.6.0 && <1.6
     , base >=4.12.0.0 && <4.16
