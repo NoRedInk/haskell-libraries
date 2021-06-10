@@ -1,0 +1,49 @@
+TracingSpan
+  { name = "test-root"
+  , started = MonotonicTime { inMicroseconds = 0 }
+  , finished = MonotonicTime { inMicroseconds = 0 }
+  , frame =
+      Just
+        ( "rootTracingSpanIO"
+        , SrcLoc
+            { srcLocPackage = "main"
+            , srcLocModule = "Main"
+            , srcLocFile = "test/Main.hs"
+            , srcLocStartLine = 191
+            , srcLocStartCol = 7
+            , srcLocEndLine = 195
+            , srcLocEndCol = 40
+            }
+        )
+  , details = Nothing
+  , summary = Just "mock-uri"
+  , succeeded = Succeeded
+  , allocated = 0
+  , children =
+      [ TracingSpan
+          { name = "Outoing HTTP Request"
+          , started = MonotonicTime { inMicroseconds = 0 }
+          , finished = MonotonicTime { inMicroseconds = 0 }
+          , frame =
+              Just
+                ( "tracingSpanIO"
+                , SrcLoc
+                    { srcLocPackage = "main"
+                    , srcLocModule = "Http"
+                    , srcLocFile = "src/Http.hs"
+                    , srcLocStartLine = 339
+                    , srcLocStartCol = 11
+                    , srcLocEndLine = 351
+                    , srcLocEndCol = 14
+                    }
+                )
+          , details =
+              Just
+                "{\"method\":\"GET\",\"host\":\"mock-uri\",\"path\":\"/\",\"query string\":\"\",\"headers\":{}}"
+          , summary = Just "mock-uri"
+          , succeeded = Succeeded
+          , allocated = 0
+          , children = []
+          }
+      ]
+  }
