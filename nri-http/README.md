@@ -1,5 +1,5 @@
 # Http
 
-_Reviewed last on 2019-11-25_
+Making HTTP requests using an API similar to Elm's [elm/http][].
 
-Module for working with HTTP like in Elm.
+[elm/http]: https://package.elm-lang.org/packages/elm/http/latest/
