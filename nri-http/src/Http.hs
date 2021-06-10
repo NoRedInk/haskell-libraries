@@ -1,26 +1,35 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
+-- | Making HTTP requests using an API inspired by Elm's elm/http.
 module Http
-  ( Handler,
+  ( -- * Handlers
+    Handler,
     handler,
-    handlerWithCustomManager,
-    withThirdParty,
-    withThirdPartyIO,
+
+    -- * Requests
+    Internal.Http.Settings (..),
     get,
     post,
     request,
+    Internal.Http.Error (..),
+
+    -- * Body
+    Internal.Http.Body,
     emptyBody,
     stringBody,
     jsonBody,
     bytesBody,
+
+    -- * Expect
     Expect,
     expectJson,
     expectText,
     expectWhatever,
-    Internal.Http.Error (..),
-    Internal.Http.Settings,
-    Internal.Http.Body,
+
+    -- * Use with external libraries
+    withThirdParty,
+    withThirdPartyIO,
   )
 where
 
@@ -33,6 +42,7 @@ import qualified Data.ByteString.Lazy
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
+import Internal.Http (Handler)
 import qualified Internal.Http
 import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe
@@ -45,10 +55,7 @@ import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
 
--- |
-type Handler = Internal.Http.Handler
-
--- |
+-- | Create a 'Handler' for making HTTP requests.
 handler :: Conduit.Acquire Handler
 handler = do
   doAnything <- liftIO Platform.doAnythingHandler
@@ -59,12 +66,12 @@ handler = do
       (_withThirdParty manager)
       (_withThirdPartyIO manager)
 
-handlerWithCustomManager :: HTTP.Manager -> Conduit.Acquire Handler
-handlerWithCustomManager m = do
-  doAnything <- liftIO Platform.doAnythingHandler
-  pure <| Internal.Http.Handler (_request doAnything m) (_withThirdParty m) (_withThirdPartyIO m)
-
--- | This is for external libraries only!
+-- | Third party libraries that make HTTP requests often take a 'HTTP.Manager'.
+-- This helper allows us to call such a library using a 'Handler'.
+--
+-- The benefit over using this over using a separate 'HTTP.Manager' for the
+-- external library, is that 'withThirdParty' will ensure HTTP requests made
+-- by the external library will get logged.
 withThirdParty :: Handler -> (HTTP.Manager -> Task e a) -> Task e a
 withThirdParty Internal.Http.Handler {Internal.Http.handlerWithThirdParty = wtp} library =
   wtp library
@@ -74,9 +81,7 @@ _withThirdParty manager library = do
   requestManager <- prepareManagerForRequest manager
   library requestManager
 
--- | Like `withThirdParty`, but runs in `IO`. We'd rather this function didn't
--- exist, and as we move more of our code to run in `Task` rather than `IO`
--- there will should come a point we will be able to delete it.
+-- | Like `withThirdParty`, but runs in `IO`.
 withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> IO a
 withThirdPartyIO log Internal.Http.Handler {Internal.Http.handlerWithThirdPartyIO = wtp} library =
   wtp log library
@@ -88,7 +93,7 @@ _withThirdPartyIO manager log library = do
 
 -- QUICKS
 
--- |
+-- | Create a @GET@ request.
 get :: Handler -> Text -> Expect a -> Task Error a
 get handler' url expect =
   request
@@ -102,7 +107,7 @@ get handler' url expect =
         Internal.Http._expect = expect
       }
 
--- |
+-- | Create a @POST@ request.
 post :: Handler -> Text -> Body -> Expect a -> Task Error a
 post handler' url body expect =
   request
@@ -117,9 +122,6 @@ post handler' url body expect =
       }
 
 -- REQUEST
-
--- |
-type Settings a = Internal.Http.Settings a
 
 -- |  Represents the body of a Request.
 type Body = Internal.Http.Body
@@ -166,12 +168,11 @@ bytesBody mimeType bytes =
       Internal.Http.bodyContentType = Just (Data.Text.Encoding.encodeUtf8 mimeType)
     }
 
--- |
-request :: Handler -> Settings expect -> Task Error expect
+-- | Create a custom request.
+request :: Handler -> Internal.Http.Settings expect -> Task Error expect
 request Internal.Http.Handler {Internal.Http.handlerRequest} settings = handlerRequest settings
 
--- |
-_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Settings expect -> Task Error expect
+_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Http.Settings expect -> Task Error expect
 _request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
@@ -210,7 +211,7 @@ _request doAnythingHandler manager settings = do
           HTTP.ConnectionFailure err ->
             Err (Internal.Http.NetworkError (Text.fromList (Exception.displayException err)))
           err ->
-            Err (Internal.Http.BadResponse (Text.fromList (show err)))
+            Err (Internal.Http.NetworkError (Text.fromList (show err)))
       Left (HTTP.InvalidUrlException _ message) ->
         Err (Internal.Http.BadUrl (Text.fromList message))
 

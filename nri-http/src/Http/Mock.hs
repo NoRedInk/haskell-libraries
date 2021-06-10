@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
+-- | An alternative 'Handler' type for use in tests, allowing us to observe
+-- the HTTP requests made in a test body.
 module Http.Mock
   ( singleJsonTestHandler,
     singleWhateverTestHandler,
@@ -16,6 +18,9 @@ import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, pure)
 
+-- | An alternative 'Handler' type that will not make HTTP requests. Instead it
+-- will pass the request record to the function provided, allowing you to
+-- determine what the response of the request should be.
 testHandler :: (forall expect. Settings expect -> Task Error expect) -> IO Handler
 testHandler mockServer =
   pure
