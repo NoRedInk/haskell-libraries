@@ -14,19 +14,19 @@ import Prelude (IO)
 
 -- | A handler for making HTTP requests.
 data Handler = Handler
-  { handlerRequest :: forall expect. Settings expect -> Task Error expect,
+  { handlerRequest :: forall expect. Request expect -> Task Error expect,
     handlerWithThirdParty :: forall a e. (HTTP.Manager -> Task e a) -> Task e a,
     handlerWithThirdPartyIO :: forall a. Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
   }
 
 -- | A custom request.
-data Settings a = Settings
-  { _method :: Text,
-    _headers :: [Header.Header],
-    _url :: Text,
-    _body :: Body,
-    _timeout :: Maybe Int,
-    _expect :: Expect a
+data Request a = Request
+  { method :: Text,
+    headers :: [Header.Header],
+    url :: Text,
+    body :: Body,
+    timeout :: Maybe Int,
+    expect :: Expect a
   }
 
 -- |  Represents the body of a Request.

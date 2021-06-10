@@ -8,7 +8,7 @@ module Http
     handler,
 
     -- * Requests
-    Internal.Http.Settings (..),
+    Internal.Http.Request (..),
     get,
     post,
     request,
@@ -98,13 +98,13 @@ get :: Handler -> Text -> Expect a -> Task Error a
 get handler' url expect =
   request
     handler'
-    Internal.Http.Settings
-      { Internal.Http._method = "GET",
-        Internal.Http._headers = [],
-        Internal.Http._url = url,
-        Internal.Http._body = emptyBody,
-        Internal.Http._timeout = Nothing,
-        Internal.Http._expect = expect
+    Internal.Http.Request
+      { Internal.Http.method = "GET",
+        Internal.Http.headers = [],
+        Internal.Http.url = url,
+        Internal.Http.body = emptyBody,
+        Internal.Http.timeout = Nothing,
+        Internal.Http.expect = expect
       }
 
 -- | Create a @POST@ request.
@@ -112,13 +112,13 @@ post :: Handler -> Text -> Body -> Expect a -> Task Error a
 post handler' url body expect =
   request
     handler'
-    Internal.Http.Settings
-      { Internal.Http._method = "POST",
-        Internal.Http._headers = [],
-        Internal.Http._url = url,
-        Internal.Http._body = body,
-        Internal.Http._timeout = Nothing,
-        Internal.Http._expect = expect
+    Internal.Http.Request
+      { Internal.Http.method = "POST",
+        Internal.Http.headers = [],
+        Internal.Http.url = url,
+        Internal.Http.body = body,
+        Internal.Http.timeout = Nothing,
+        Internal.Http.expect = expect
       }
 
 -- REQUEST
@@ -169,32 +169,32 @@ bytesBody mimeType bytes =
     }
 
 -- | Create a custom request.
-request :: Handler -> Internal.Http.Settings expect -> Task Error expect
+request :: Handler -> Internal.Http.Request expect -> Task Error expect
 request Internal.Http.Handler {Internal.Http.handlerRequest} settings = handlerRequest settings
 
-_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Http.Settings expect -> Task Error expect
+_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Http.Request expect -> Task Error expect
 _request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
     response <-
       Exception.try <| do
         basicRequest <-
-          HTTP.parseUrlThrow <| Text.toList (Internal.Http._url settings)
+          HTTP.parseUrlThrow <| Text.toList (Internal.Http.url settings)
         let finalRequest =
               basicRequest
-                { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.Http._method settings),
-                  HTTP.requestHeaders = case Internal.Http.bodyContentType (Internal.Http._body settings) of
+                { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.Http.method settings),
+                  HTTP.requestHeaders = case Internal.Http.bodyContentType (Internal.Http.body settings) of
                     Nothing ->
-                      Internal.Http._headers settings
+                      Internal.Http.headers settings
                     Just mimeType ->
-                      ("content-type", mimeType) : Internal.Http._headers settings,
-                  HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http._body settings),
-                  HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (Internal.Http._timeout settings)
+                      ("content-type", mimeType) : Internal.Http.headers settings,
+                  HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.Http.bodyContents (Internal.Http.body settings),
+                  HTTP.responseTimeout = HTTP.responseTimeoutMicro <| fromIntegral <| Maybe.withDefault (30 * 1000 * 1000) (Internal.Http.timeout settings)
                 }
         HTTP.httpLbs finalRequest requestManager
     pure <| case response of
       Right okResponse ->
-        case decode (Internal.Http._expect settings) (HTTP.responseBody okResponse) of
+        case decode (Internal.Http.expect settings) (HTTP.responseBody okResponse) of
           Ok decodedBody ->
             Ok decodedBody
           Err message ->

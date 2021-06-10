@@ -21,7 +21,7 @@ import Prelude (Either (Left, Right), IO, pure)
 -- | An alternative 'Handler' type that will not make HTTP requests. Instead it
 -- will pass the request record to the function provided, allowing you to
 -- determine what the response of the request should be.
-testHandler :: (forall expect. Settings expect -> Task Error expect) -> IO Handler
+testHandler :: (forall expect. Request expect -> Task Error expect) -> IO Handler
 testHandler mockServer =
   pure
     <| Internal.Http.Handler
@@ -29,9 +29,9 @@ testHandler mockServer =
       (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
       (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
 
-singleJsonMockServer :: Aeson.ToJSON mock => Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> mock -> Settings expect -> Task Error expect
-singleJsonMockServer doAnything ioRef responseValue capturedRequestSettings =
-  case Internal.Http._expect capturedRequestSettings of
+singleJsonMockServer :: Aeson.ToJSON mock => Platform.DoAnythingHandler -> IORef (Maybe (Request ())) -> mock -> Request expect -> Task Error expect
+singleJsonMockServer doAnything ioRef responseValue capturedRequestRequest =
+  case Internal.Http.expect capturedRequestRequest of
     Internal.Http.ExpectWhatever ->
       Task.fail (Internal.Http.NetworkError "You said you expected a JSON request, but 'ExpectWhatever' was sent")
     Internal.Http.ExpectText ->
@@ -43,31 +43,31 @@ singleJsonMockServer doAnything ioRef responseValue capturedRequestSettings =
         Right response -> do
           Platform.doAnything
             doAnything
-            (map Ok (writeIORef ioRef (Just capturedRequestSettings {_expect = Internal.Http.ExpectWhatever})))
+            (map Ok (writeIORef ioRef (Just capturedRequestRequest {expect = Internal.Http.ExpectWhatever})))
           Task.succeed
             response
 
-singleJsonTestHandler :: Aeson.ToJSON result => result -> IO (Handler, IORef (Maybe (Settings ())))
+singleJsonTestHandler :: Aeson.ToJSON result => result -> IO (Handler, IORef (Maybe (Request ())))
 singleJsonTestHandler responseValue = do
   doAnything <- Platform.doAnythingHandler
   ioRef <- newIORef Nothing
   h <- testHandler (singleJsonMockServer doAnything ioRef responseValue)
   pure (h, ioRef)
 
-singleWhateverMockServer :: Platform.DoAnythingHandler -> IORef (Maybe (Settings ())) -> Settings expect -> Task Error expect
-singleWhateverMockServer doAnything ioRef capturedRequestSettings =
-  case Internal.Http._expect capturedRequestSettings of
+singleWhateverMockServer :: Platform.DoAnythingHandler -> IORef (Maybe (Request ())) -> Request expect -> Task Error expect
+singleWhateverMockServer doAnything ioRef capturedRequestRequest =
+  case Internal.Http.expect capturedRequestRequest of
     Internal.Http.ExpectWhatever -> do
       Platform.doAnything
         doAnything
-        (map Ok (writeIORef ioRef (Just capturedRequestSettings)))
+        (map Ok (writeIORef ioRef (Just capturedRequestRequest)))
       Task.succeed ()
     Internal.Http.ExpectText ->
       Task.fail (Internal.Http.NetworkError "You said you didn't care about the response, but 'ExpectText' was sent")
     Internal.Http.ExpectJson ->
       Task.fail (Internal.Http.NetworkError "You said you didn't care about the response, but 'ExpectJson' was sent")
 
-singleWhateverTestHandler :: IO (Handler, IORef (Maybe (Settings ())))
+singleWhateverTestHandler :: IO (Handler, IORef (Maybe (Request ())))
 singleWhateverTestHandler = do
   doAnything <- Platform.doAnythingHandler
   ioRef <- newIORef Nothing
