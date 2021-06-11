@@ -1,0 +1,71 @@
+[
+    {
+        "time": "1970-01-01T00:00:00Z",
+        "data": {
+            "hostname": "some-service-oaiefiowh-aoidawi",
+            "http.status": 500,
+            "stats.total_time_ms.some-span": 0,
+            "apdex": 1,
+            "http.path": "/hats/5",
+            "http.http_version": "1",
+            "trace.parent_id": null,
+            "trace.span_id": "request-id-123-0",
+            "trace.trace_id": "request-id-123",
+            "stats.average_time_ms.some-span": 0,
+            "duration_ms": 0,
+            "name": "root span",
+            "source_location": null,
+            "allocated_bytes": 0,
+            "stats.count.some-span": 2,
+            "http.headers": {
+                "Accept": "application/json"
+            },
+            "http.endpoint": "GET /hats/:hat_id",
+            "service_name": "some service",
+            "endpoint": "GET /hats/:hat_id",
+            "revision": "gitref",
+            "failed": false,
+            "http.query_string": "?top=flat",
+            "http.method": "GET"
+        },
+        "samplerate": 1
+    },
+    {
+        "time": "1970-01-01T00:00:00Z",
+        "data": {
+            "hostname": "some-service-oaiefiowh-aoidawi",
+            "apdex": 1,
+            "trace.parent_id": "request-id-123-0",
+            "trace.span_id": "request-id-123-1",
+            "trace.trace_id": "request-id-123",
+            "duration_ms": 0,
+            "name": "some-span",
+            "source_location": null,
+            "allocated_bytes": 0,
+            "service_name": "some service",
+            "endpoint": "GET /hats/:hat_id",
+            "revision": "gitref",
+            "failed": false
+        },
+        "samplerate": 1
+    },
+    {
+        "time": "1970-01-01T00:00:00Z",
+        "data": {
+            "hostname": "some-service-oaiefiowh-aoidawi",
+            "apdex": 1,
+            "trace.parent_id": "request-id-123-1",
+            "trace.span_id": "request-id-123-2",
+            "trace.trace_id": "request-id-123",
+            "duration_ms": 0,
+            "name": "some-span",
+            "source_location": null,
+            "allocated_bytes": 0,
+            "service_name": "some service",
+            "endpoint": "GET /hats/:hat_id",
+            "revision": "gitref",
+            "failed": false
+        },
+        "samplerate": 1
+    }
+]

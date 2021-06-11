@@ -43,6 +43,7 @@ library
       Reporter.Bugsnag.Internal
       Reporter.Dev.Internal
       Reporter.File.Internal
+      Reporter.Honeycomb.Internal
       Paths_nri_observability
   hs-source-dirs:
       src
@@ -92,6 +93,7 @@ test-suite tests
       Spec.Reporter.Bugsnag
       Spec.Reporter.Dev
       Spec.Reporter.File
+      Spec.Reporter.Honeycomb
       Log.HttpRequest
       Log.Kafka
       Log.RedisCommands
@@ -105,6 +107,7 @@ test-suite tests
       Reporter.File
       Reporter.File.Internal
       Reporter.Honeycomb
+      Reporter.Honeycomb.Internal
       Paths_nri_observability
   hs-source-dirs:
       tests

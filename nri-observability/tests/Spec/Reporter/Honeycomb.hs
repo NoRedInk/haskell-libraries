@@ -17,9 +17,9 @@ import qualified Log.RedisCommands as RedisCommands
 import qualified Log.SqlQuery as SqlQuery
 import qualified Platform
 import qualified Platform.Timer as Timer
-import qualified Reporter.Honeycomb as Honeycomb
+import qualified Reporter.Honeycomb.Internal as Honeycomb
+import qualified Data.Time.Clock.POSIX as Clock.POSIX
 import Test (Test, describe, test)
-import qualified Time
 
 tests :: Test
 tests =
@@ -77,8 +77,8 @@ tests =
                   Kafka.partitionId = 12,
                   Kafka.key = Just "key",
                   Kafka.contents = Kafka.Encodable (),
-                  Kafka.createTime = Just (Time.fromPosix 0),
-                  Kafka.logAppendTime = Just (Time.fromPosix 0),
+                  Kafka.createTime = Just (Clock.POSIX.posixSecondsToUTCTime 0),
+                  Kafka.logAppendTime = Just (Clock.POSIX.posixSecondsToUTCTime  0),
                   Kafka.timeSinceLastRebalance = 0,
                   Kafka.processAttempt = 0,
                   Kafka.assignedPartitions = 1,

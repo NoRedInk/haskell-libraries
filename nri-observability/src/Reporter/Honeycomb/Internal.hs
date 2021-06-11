@@ -18,7 +18,6 @@ import qualified Data.Word
 import qualified Dict
 import qualified Environment
 import qualified GHC.Stack as Stack
-import qualified Http
 import qualified List
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
@@ -26,11 +25,12 @@ import qualified Log.Kafka as Kafka
 import qualified Log.RedisCommands as RedisCommands
 import qualified Log.SqlQuery as SqlQuery
 import qualified Maybe
+import qualified Network.HTTP.Client as HTTP
+import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
 import qualified Platform
 import qualified Platform.Timer as Timer
 import qualified System.Random as Random
-import qualified Task
 import qualified Text
 import qualified Text as NriText
 import qualified Prelude
@@ -48,27 +48,21 @@ report handler' _requestId span = do
 sendToHoneycomb :: Handler -> SharedTraceData -> Platform.TracingSpan -> Prelude.IO ()
 sendToHoneycomb handler' sharedTraceData span = do
   let events = toBatchEvents sharedTraceData span
-  let body = Http.jsonBody events
-  silentHandler' <- Platform.silentHandler
-  let url = batchApiEndpoint (datasetName handler')
-  let requestSettings =
-        Http.Settings
-          { Http._method = "POST",
-            Http._headers =
+  baseRequest <- HTTP.parseRequest (Text.toList (batchApiEndpoint (datasetName handler')))
+  let req =
+        baseRequest
+          { HTTP.method = "POST",
+            HTTP.requestHeaders =
               [ ( "X-Honeycomb-Team",
                   settings handler'
                     |> honeycombApiKey
                     |> Log.unSecret
                 )
               ],
-            Http._url = url,
-            Http._body = body,
-            Http._timeout = Nothing,
-            Http._expect = Http.expectText
+            HTTP.requestBody = HTTP.RequestBodyLBS (Aeson.encode events)
           }
-  Http.request (http handler') requestSettings
-    |> Task.attempt silentHandler'
-    |> map (\_ -> ())
+  _ <- HTTP.httpNoBody req (http handler')
+  Prelude.pure ()
 
 getRootSpanRequestPath :: Platform.TracingSpan -> Maybe Text
 getRootSpanRequestPath rootSpan =
@@ -463,7 +457,7 @@ newtype SpanId = SpanId Text
 data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
     -- to spans into real timestamps.
-    http :: Http.Handler,
+    http :: HTTP.Manager,
     datasetName :: Text,
     settings :: Settings,
     makeSharedTraceData :: Platform.TracingSpan -> Prelude.IO SendOrSample
@@ -475,7 +469,7 @@ data SendOrSample
 
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
-  http <- Http.handler
+  http <- liftIO HTTP.TLS.getGlobalManager
   revision <- liftIO getRevision
   hostname' <- liftIO Network.HostName.getHostName
   let serviceName =
