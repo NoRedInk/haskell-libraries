@@ -114,7 +114,7 @@ tests =
       test "Http.Mock.stub" <| \_ -> do
         urlsAccessed <-
           Http.Mock.stub
-            (\req -> Task.succeed (Http.url req, "Response!"))
+            [Http.Mock.mkStub (\req -> Task.succeed (Http.url req, "Response!" :: Text))]
             ( \http ->
                 Expect.succeeds <| do
                   _ <- Http.get http "example.com/one" Http.expectText
