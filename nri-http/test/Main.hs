@@ -114,7 +114,7 @@ tests =
       test "Http.Mock.stub" <| \_ -> do
         urlsAccessed <-
           Http.Mock.stub
-            (\req -> Task.succeed (Http.url req, "Response!"))
+            [Http.Mock.mkStub (\req -> Task.succeed (Http.url req, "Response!" :: Text))]
             ( \http ->
                 Expect.succeeds <| do
                   _ <- Http.get http "example.com/one" Http.expectText
@@ -194,12 +194,10 @@ spanForTask task = do
         "test-root"
         (\log -> Task.attempt log task)
   Expect.ok res
-  maybeSpan <- Expect.fromIO (MVar.tryTakeMVar spanVar)
-  Expect.succeeds
-    ( case maybeSpan of
-        Nothing -> Task.fail "Recording span failed"
-        Just span -> Task.succeed (constantValuesForVariableFields span)
-    )
+  span <- Expect.fromIO (MVar.takeMVar spanVar)
+  constantValuesForVariableFields span
+    |> Task.succeed
+    |> Expect.succeeds
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.

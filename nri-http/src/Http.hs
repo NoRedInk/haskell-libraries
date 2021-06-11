@@ -43,6 +43,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
+import qualified Data.Dynamic as Dynamic
 import Data.String (fromString)
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
@@ -99,7 +100,7 @@ _withThirdPartyIO manager log library = do
 -- QUICKS
 
 -- | Create a @GET@ request.
-get :: Handler -> Text -> Expect a -> Task Error a
+get :: Dynamic.Typeable a => Handler -> Text -> Expect a -> Task Error a
 get handler' url expect =
   request
     handler'
@@ -113,7 +114,7 @@ get handler' url expect =
       }
 
 -- | Create a @POST@ request.
-post :: Handler -> Text -> Body -> Expect a -> Task Error a
+post :: Dynamic.Typeable a => Handler -> Text -> Body -> Expect a -> Task Error a
 post handler' url body expect =
   request
     handler'
@@ -177,7 +178,11 @@ bytesBody mimeType bytes =
     }
 
 -- | Create a custom request.
-request :: Handler -> Internal.Request expect -> Task Error expect
+request ::
+  Dynamic.Typeable expect =>
+  Handler ->
+  Internal.Request expect ->
+  Task Error expect
 request Internal.Handler {Internal.handlerRequest} settings = handlerRequest settings
 
 _request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request expect -> Task Error expect

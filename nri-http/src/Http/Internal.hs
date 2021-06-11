@@ -6,6 +6,7 @@ module Http.Internal where
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
+import qualified Data.Dynamic as Dynamic
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.Mime as Mime
@@ -14,7 +15,7 @@ import Prelude (IO)
 
 -- | A handler for making HTTP requests.
 data Handler = Handler
-  { handlerRequest :: forall expect. Request expect -> Task Error expect,
+  { handlerRequest :: forall expect. Dynamic.Typeable expect => Request expect -> Task Error expect,
     handlerWithThirdParty :: forall a e. (HTTP.Manager -> Task e a) -> Task e a,
     handlerWithThirdPartyIO :: forall a. Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
   }
