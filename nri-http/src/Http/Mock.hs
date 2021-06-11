@@ -6,11 +6,22 @@ module Http.Mock
   ( stub,
     Stub,
     mkStub,
+
+    -- * Read request data
+    getHeader,
+    getTextBody,
+    getJsonBody,
+    getBytesBody,
   )
 where
 
+import qualified Data.Aeson as Aeson
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy
 import qualified Data.Dynamic as Dynamic
 import qualified Data.IORef
+import Data.String (fromString)
+import qualified Data.Text.Encoding
 import qualified Debug
 import qualified Expect
 import qualified GHC.Stack as Stack
@@ -89,6 +100,51 @@ stub responders stubbedTestBody = do
   Expect.around (\f -> f mockHandler) (Stack.withFrozenCallStack stubbedTestBody)
   Expect.fromIO (Data.IORef.readIORef logRef)
     |> map List.reverse
+
+-- | Read the body of the request as text. Useful to check what data got
+-- submitted inside a 'stub' function.
+--
+-- This will return 'Nothing' if the body cannot be parsed as UTF8 text.
+getTextBody :: Internal.Request expect -> Maybe Text
+getTextBody req =
+  Data.Text.Encoding.decodeUtf8' (getBytesBody req)
+    |> eitherToMaybe
+
+-- | Read the body of the request as json. Useful to check what data got
+-- submitted inside a 'stub' function.
+--
+-- This will return an error if parsing the JSON body fails.
+getJsonBody :: Aeson.FromJSON a => Internal.Request expect -> Result Text a
+getJsonBody req =
+  case Aeson.eitherDecodeStrict (getBytesBody req) of
+    Prelude.Left err -> Err (Text.fromList err)
+    Prelude.Right decoded -> Ok decoded
+
+-- | Read the body of the request as bytes. Useful to check what data got
+-- submitted inside a 'stub' function.
+getBytesBody :: Internal.Request expect -> ByteString
+getBytesBody req =
+  Internal.body req
+    |> Internal.bodyContents
+    |> Data.ByteString.Lazy.toStrict
+
+-- | Read a header of the request. Useful to check what data got submitted
+-- inside a 'stub' function.
+--
+-- This will return 'Nothing' if no header with that name was set on the
+-- request.
+getHeader :: Text -> Internal.Request expect -> Maybe Text
+getHeader name req =
+  Internal.headers req
+    |> List.map Internal.unHeader
+    |> Prelude.lookup (fromString (Text.toList name))
+    |> Maybe.andThen (eitherToMaybe << Data.Text.Encoding.decodeUtf8')
+
+eitherToMaybe :: Prelude.Either a b -> Maybe b
+eitherToMaybe either =
+  case either of
+    Prelude.Left _ -> Nothing
+    Prelude.Right x -> Just x
 
 tryRespond ::
   ( Dynamic.Typeable expect,
