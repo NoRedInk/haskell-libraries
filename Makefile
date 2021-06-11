@@ -1,6 +1,6 @@
 all: cabal
 
-cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal nri-redis/nri-redis.cabal nri-test-encoding/nri-test-encoding.cabal
+cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal nri-redis/nri-redis.cabal nri-test-encoding/nri-test-encoding.cabal nri-http/nri-http.cabal
 
 nri-observability/nri-observability.cabal: nri-observability/package.yaml
 	hpack nri-observability
@@ -16,6 +16,9 @@ nri-log-explorer/nri-log-explorer.cabal: nri-log-explorer/package.yaml
 
 nri-redis/nri-redis.cabal: nri-redis/package.yaml
 	hpack nri-redis
+
+nri-http/nri-http.cabal: nri-http/package.yaml
+	hpack nri-http
 
 ghcid-nri-prelude-test: nri-prelude-test/nri-prelude-test.cabal
 
@@ -45,3 +48,6 @@ ghcid-nri-redis-test: nri-redis/nri-redis.cabal
 
 ghcid-nri-test-encoding:
 	cd nri-test-encoding && ghcid
+
+ghcid-nri-http:
+	cd nri-http && ghcid
