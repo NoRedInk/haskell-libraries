@@ -38,6 +38,7 @@ import qualified Prelude
 batchApiEndpoint :: Text -> Text
 batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetName
 
+-- | Report a tracing span to Honeycomb.
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
 report handler' _requestId span = do
   sendOrSample <- makeSharedTraceData handler' span
@@ -60,7 +61,7 @@ sendToHoneycomb handler' sharedTraceData span = do
             HTTP.requestHeaders =
               [ ( "X-Honeycomb-Team",
                   settings handler'
-                    |> honeycombApiKey
+                    |> apiKey
                     |> Log.unSecret
                 )
               ],
@@ -459,10 +460,10 @@ addField key val (Span span) = Span (Dict.insert key (JsonEncodable val) span)
 newtype SpanId = SpanId Text
   deriving (Aeson.ToJSON, Eq, Show)
 
+-- | Contextual information this reporter needs to do its work. You can create
+-- one using 'handler'.
 data Handler = Handler
-  { -- | A bit of state that can be used to turn the clock values attached
-    -- to spans into real timestamps.
-    http :: HTTP.Manager,
+  { http :: HTTP.Manager,
     settings :: Settings,
     makeSharedTraceData :: Platform.TracingSpan -> Prelude.IO SendOrSample
   }
@@ -471,6 +472,8 @@ data SendOrSample
   = SendToHoneycomb SharedTraceData
   | SampledOut
 
+-- | Create a 'Handler' for a specified set of 'Settings'. Do this once when
+-- your application starts and reuse the 'Handler' you get.
 handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
 handler timer settings = do
   http <- liftIO HTTP.TLS.getGlobalManager
@@ -540,19 +543,44 @@ getRevision = do
     Prelude.Right version -> Prelude.pure (Revision version)
 
 data Settings = Settings
-  { datasetName :: Text,
+  { -- | The Honeycomb API key to use.
+    apiKey :: Log.Secret ByteString.ByteString,
+    -- | The name of the honeycomb dataset to report to. If the dataset does not
+    -- exist yet, Honeycomb will create it when you first send a request for it.
+    --
+    -- [@environment variable@] HONEYCOMB_API_KEY
+    -- [@default value@] *****
+    datasetName :: Text,
+    -- | The name of the service we're reporting for.
+    --
+    -- [@environment variable@] HONEYCOMB_SERVICE_NAME
+    -- [@default value@] service
     serviceName :: Text,
-    honeycombApiKey :: Log.Secret ByteString.ByteString,
+    -- | The fraction of successfull requests that will be reported. If your
+    -- service receives a lot of requests you might want reduce this to safe
+    -- cost.
+    --
+    -- [@environment variable@] HONEYCOMB_FRACTION_OF_SUCCESS_REQUESTS_LOGGED
+    -- [@default value@] 1
     fractionOfSuccessRequestsLogged :: Float,
+    -- | The apdex time for this service in ms. Requests handled faster than
+    -- this time will be sampled according to the
+    -- @HONEYCOMB_FRACTION_OF_SUCCESS_REQUESTS_LOGGED@ variable. Slower request
+    -- will have a larger chance to be reported.
+    --
+    -- [@environment variable@] HONEYCOMB_APDEX_TIME_IN_MILLISECONDS
+    -- [@default value@] 100
     apdexTimeMs :: Int
   }
 
+-- | Read 'Settings' from environment variables. Default variables will be used
+-- in case no environment variable is set for an option.
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
+    |> andMap honeycombApiKeyDecoder
     |> andMap datasetNameDecoder
     |> andMap honeycombAppNameDecoder
-    |> andMap honeycombApiKeyDecoder
     |> andMap fractionOfSuccessRequestsLoggedDecoder
     |> andMap apdexTimeMsDecoder
 

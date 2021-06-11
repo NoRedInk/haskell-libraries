@@ -28,7 +28,7 @@ import qualified Platform.ReporterHelpers as Helpers
 import qualified Platform.Timer as Timer
 import qualified Prelude
 
--- This function takes the root span of a completed request and reports it to
+-- | This function takes the root span of a completed request and reports it to
 -- Bugsnag, if there has been a failure. A request that completed succesfully
 -- is not reported.
 --
@@ -474,8 +474,8 @@ data Settings = Settings
   { -- | The Bugsnag API key to use. This determines which Bugsnag project your
     -- errors will end up in.
     --
-    -- [@environment variable@] LOG_FILE
-    -- [@default value@] app.log
+    -- [@environment variable@] BUGSNAG_API_KEY
+    -- [@default value@] *****
     apiKey :: Log.Secret Bugsnag.ApiKey,
     -- | The name of this application. This will be attached to all bugsnag
     -- reports.
