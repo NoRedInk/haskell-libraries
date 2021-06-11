@@ -48,7 +48,12 @@ report handler' _requestId span = do
 sendToHoneycomb :: Handler -> SharedTraceData -> Platform.TracingSpan -> Prelude.IO ()
 sendToHoneycomb handler' sharedTraceData span = do
   let events = toBatchEvents sharedTraceData span
-  baseRequest <- HTTP.parseRequest (Text.toList (batchApiEndpoint (datasetName handler')))
+  baseRequest <-
+     settings handler'
+     |> datasetName
+     |> batchApiEndpoint
+     |> Text.toList
+     |> HTTP.parseRequest
   let req =
         baseRequest
           { HTTP.method = "POST",
@@ -458,7 +463,6 @@ data Handler = Handler
   { -- | A bit of state that can be used to turn the clock values attached
     -- to spans into real timestamps.
     http :: HTTP.Manager,
-    datasetName :: Text,
     settings :: Settings,
     makeSharedTraceData :: Platform.TracingSpan -> Prelude.IO SendOrSample
   }
@@ -472,19 +476,14 @@ handler timer settings = do
   http <- liftIO HTTP.TLS.getGlobalManager
   revision <- liftIO getRevision
   hostname' <- liftIO Network.HostName.getHostName
-  let serviceName =
-        case optionalServiceName settings of
-          "" -> appName settings
-          name -> name
   let baseSpan =
         emptySpan
-          |> addField "service_name" serviceName
+          |> addField "service_name" (serviceName settings)
           |> addField "hostname" (Text.fromList hostname')
           |> addField "revision" revision
   Prelude.pure
     Handler
       { http = http,
-        datasetName = appName settings ++ "-" ++ appEnvironment settings,
         settings = settings,
         makeSharedTraceData = \span -> do
           -- This is an initial implementation of sampling, based on
@@ -541,9 +540,8 @@ getRevision = do
     Prelude.Right version -> Prelude.pure (Revision version)
 
 data Settings = Settings
-  { appName :: Text,
-    optionalServiceName :: Text,
-    appEnvironment :: Text,
+  { datasetName :: Text,
+    serviceName :: Text,
     honeycombApiKey :: Log.Secret ByteString.ByteString,
     fractionOfSuccessRequestsLogged :: Float,
     apdexTimeMs :: Int
@@ -552,9 +550,8 @@ data Settings = Settings
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
-    |> andMap appNameDecoder
+    |> andMap datasetNameDecoder
     |> andMap honeycombAppNameDecoder
-    |> andMap appEnvironmentDecoder
     |> andMap honeycombApiKeyDecoder
     |> andMap fractionOfSuccessRequestsLoggedDecoder
     |> andMap apdexTimeMsDecoder
@@ -569,23 +566,13 @@ honeycombApiKeyDecoder =
       }
     (Environment.text |> map Encoding.encodeUtf8 |> Environment.secret)
 
-appEnvironmentDecoder :: Environment.Decoder Text
-appEnvironmentDecoder =
+datasetNameDecoder :: Environment.Decoder Text
+datasetNameDecoder =
   Environment.variable
     Environment.Variable
-      { Environment.name = "ENVIRONMENT",
-        Environment.description = "Environment to display in logs.",
-        Environment.defaultValue = "development"
-      }
-    Environment.text
-
-appNameDecoder :: Environment.Decoder Text
-appNameDecoder =
-  Environment.variable
-    Environment.Variable
-      { Environment.name = "LOG_ROOT_NAMESPACE",
-        Environment.description = "Root of the log namespace. This should be the name of the application.",
-        Environment.defaultValue = "your-application-name-here"
+      { Environment.name = "HONEYCOMB_DATASET",
+        Environment.description = "Name of the dataset honeycomb should log to.",
+        Environment.defaultValue = "dataset"
       }
     Environment.text
 
@@ -594,8 +581,8 @@ honeycombAppNameDecoder =
   Environment.variable
     Environment.Variable
       { Environment.name = "HONEYCOMB_SERVICE_NAME",
-        Environment.description = "Variable that sets the honeycomb service name without using an. If not set the LOG_ROOT_NAMESPACE value is used instead.",
-        Environment.defaultValue = ""
+        Environment.description = "Variable that sets the honeycomb service name.",
+        Environment.defaultValue = "service"
       }
     Environment.text
 
@@ -614,7 +601,7 @@ apdexTimeMsDecoder =
   Environment.variable
     Environment.Variable
       { Environment.name = "HONEYCOMB_APDEX_TIME_IN_MILLISECONDS",
-        Environment.description = "The T value in the apdex, the time in milliseconds in which a health request should complete.",
+        Environment.description = "The T value in the apdex, the time in milliseconds in which a healthy request should complete.",
         Environment.defaultValue = "100"
       }
     Environment.int
