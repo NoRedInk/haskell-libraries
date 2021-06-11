@@ -2,9 +2,7 @@
 
 module Reporter.Honeycomb.Internal where
 
-import qualified Conduit
 import qualified Control.Exception.Safe as Exception
-import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import qualified Data.HashMap.Strict as HashMap
@@ -474,11 +472,11 @@ data SendOrSample
 
 -- | Create a 'Handler' for a specified set of 'Settings'. Do this once when
 -- your application starts and reuse the 'Handler' you get.
-handler :: Timer.Timer -> Settings -> Conduit.Acquire Handler
+handler :: Timer.Timer -> Settings -> Prelude.IO Handler
 handler timer settings = do
-  http <- liftIO HTTP.TLS.getGlobalManager
-  revision <- liftIO getRevision
-  hostname' <- liftIO Network.HostName.getHostName
+  http <- HTTP.TLS.getGlobalManager
+  revision <- getRevision
+  hostname' <- Network.HostName.getHostName
   let baseSpan =
         emptySpan
           |> addField "service_name" (serviceName settings)
