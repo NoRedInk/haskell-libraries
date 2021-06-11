@@ -50,11 +50,11 @@ sendToHoneycomb :: Handler -> SharedTraceData -> Platform.TracingSpan -> Prelude
 sendToHoneycomb handler' sharedTraceData span = do
   let events = toBatchEvents sharedTraceData span
   baseRequest <-
-     settings handler'
-     |> datasetName
-     |> batchApiEndpoint
-     |> Text.toList
-     |> HTTP.parseRequest
+    settings handler'
+      |> datasetName
+      |> batchApiEndpoint
+      |> Text.toList
+      |> HTTP.parseRequest
   let req =
         baseRequest
           { HTTP.method = "POST",
@@ -542,6 +542,8 @@ getRevision = do
     Prelude.Left _err -> Prelude.pure (Revision "no revision file found")
     Prelude.Right version -> Prelude.pure (Revision version)
 
+-- | Configuration settings for ths reporter. A value of this type can be read
+-- from the environment using the 'decoder' function.
 data Settings = Settings
   { -- | The Honeycomb API key to use.
     apiKey :: Log.Secret ByteString.ByteString,

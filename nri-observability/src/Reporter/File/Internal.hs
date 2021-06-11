@@ -15,9 +15,9 @@ import qualified System.IO
 import qualified System.Random as Random
 import qualified Prelude
 
--- Log tracing information for a request to a file. Tracing information contains
--- nested spans but will appear flattend in the log. Each tracing span will
--- appear on its own line in the log, ordered by its start date.
+-- | Log tracing information for a request to a file. Tracing information
+-- contains nested spans but will appear flattend in the log. Each tracing span
+-- will appear on its own line in the log, ordered by its start date.
 --
 -- Example usage:
 --
@@ -78,6 +78,8 @@ logItem LogContext {timer, namespace, environment, requestId, hostname} span =
       |> Aeson.pairs
       |> Data.Aeson.Encoding.encodingToLazyByteString
 
+-- | Contextual information this reporter needs to do its work. You can create
+-- one using 'handler'.
 data Handler = Handler
   { fileHandle :: System.IO.Handle,
     logContext :: LogContext,
@@ -138,6 +140,8 @@ logLoop writeQueue fileHandle = do
     ByteString.hPut fileHandle "\n"
   logLoop writeQueue fileHandle
 
+-- | Clean up your handler after you're done with it. Call this before your
+-- application shuts down.
 cleanup :: Handler -> Prelude.IO ()
 cleanup Handler {loggingThread, fileHandle} = do
   Async.cancel loggingThread
