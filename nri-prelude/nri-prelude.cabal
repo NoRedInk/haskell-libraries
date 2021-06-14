@@ -1,11 +1,11 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 
 name:           nri-prelude
-version:        0.6.0.1
+version:        0.6.0.2
 synopsis:       A Prelude inspired by the Elm programming language
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
 category:       Web
@@ -68,7 +68,20 @@ library
       Paths_nri_prelude
   hs-source-dirs:
       src
-  default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
   build-depends:
       aeson >=1.4.6.0 && <1.6
@@ -91,7 +104,7 @@ library
     , safe-exceptions >=0.1.7.0 && <1.3
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <1.3
-    , time >=1.8.0.2 && <1.12
+    , time >=1.8.0.2 && <1.13
     , vector >=0.12.1.2 && <0.13
   default-language: Haskell2010
 
@@ -145,7 +158,21 @@ test-suite tests
   hs-source-dirs:
       tests
       src
-  default-extensions: DataKinds DeriveGeneric FlexibleContexts FlexibleInstances GeneralizedNewtypeDeriving MultiParamTypeClasses NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures ScopedTypeVariables Strict TypeOperators ExtendedDefaultRules
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
+      ExtendedDefaultRules
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
       aeson >=1.4.6.0 && <1.6
@@ -168,6 +195,6 @@ test-suite tests
     , safe-exceptions >=0.1.7.0 && <1.3
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <1.3
-    , time >=1.8.0.2 && <1.12
+    , time >=1.8.0.2 && <1.13
     , vector >=0.12.1.2 && <0.13
   default-language: Haskell2010
