@@ -35,12 +35,15 @@ library
       Reporter.Bugsnag
       Reporter.Dev
       Reporter.File
+      Reporter.Honeycomb
   other-modules:
+      Log.Kafka
       Platform.ReporterHelpers
       Platform.Timer
       Reporter.Bugsnag.Internal
       Reporter.Dev.Internal
       Reporter.File.Internal
+      Reporter.Honeycomb.Internal
       Paths_nri_observability
   hs-source-dirs:
       src
@@ -78,6 +81,7 @@ library
     , text >=1.2.3.1 && <1.3
     , time >=1.8.0.2 && <1.13
     , unordered-containers >=0.2.0.0 && <0.3
+    , uuid >=1.3.0 && <1.4
   default-language: Haskell2010
 
 test-suite tests
@@ -88,7 +92,9 @@ test-suite tests
       Spec.Reporter.Bugsnag
       Spec.Reporter.Dev
       Spec.Reporter.File
+      Spec.Reporter.Honeycomb
       Log.HttpRequest
+      Log.Kafka
       Log.RedisCommands
       Log.SqlQuery
       Platform.ReporterHelpers
@@ -99,6 +105,8 @@ test-suite tests
       Reporter.Dev.Internal
       Reporter.File
       Reporter.File.Internal
+      Reporter.Honeycomb
+      Reporter.Honeycomb.Internal
       Paths_nri_observability
   hs-source-dirs:
       tests
@@ -138,4 +146,5 @@ test-suite tests
     , text >=1.2.3.1 && <1.3
     , time >=1.8.0.2 && <1.13
     , unordered-containers >=0.2.0.0 && <0.3
+    , uuid >=1.3.0 && <1.4
   default-language: Haskell2010

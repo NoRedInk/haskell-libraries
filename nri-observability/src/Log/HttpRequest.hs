@@ -66,11 +66,15 @@ infoEncodingOptions =
       Aeson.omitNothingFields = True
     }
 
+-- | A wrapper around the 'Details' type to indicate that we're reporting an
+-- incoming http, like a request sent from a frontend to an http server.
 newtype Incoming = Incoming Details
   deriving (Aeson.ToJSON)
 
 instance Platform.TracingSpanDetails Incoming
 
+-- | A wrapper around the 'Details' type to indicate that this is an outgoing
+-- http request, for example a request we're making to an external weather API.
 newtype Outgoing = Outgoing Details
   deriving (Aeson.ToJSON)
 

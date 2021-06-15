@@ -33,6 +33,7 @@ library:
     - stm >= 2.4 && < 2.6
     - text >= 1.2.3.1 && < 1.3
     - time >= 1.8.0.2 && < 1.13
+    - uuid >=1.3.0 && < 1.4
   exposed-modules:
     - Log.HttpRequest
     - Log.RedisCommands
@@ -40,6 +41,7 @@ library:
     - Reporter.Bugsnag
     - Reporter.Dev
     - Reporter.File
+    - Reporter.Honeycomb
   source-dirs: src
 default-extensions:
   - DataKinds

@@ -1,0 +1,21 @@
+[
+    {
+        "time": "1970-01-01T00:00:00Z",
+        "data": {
+            "hostname": "some-service-oaiefiowh-aoidawi",
+            "apdex": 1,
+            "trace.parent_id": null,
+            "trace.span_id": "request-id-123-0",
+            "trace.trace_id": "request-id-123",
+            "duration_ms": 0,
+            "name": "root span",
+            "source_location": null,
+            "allocated_bytes": 0,
+            "service_name": "some service",
+            "endpoint": "GET /hats/:hat_id",
+            "revision": "gitref",
+            "failed": true
+        },
+        "samplerate": 1
+    }
+]

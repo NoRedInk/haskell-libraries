@@ -63,8 +63,10 @@ options =
 
 instance Platform.TracingSpanDetails Details
 
+-- | MySQL
 mysql :: Text
 mysql = "MySQL"
 
+-- | Postgresql
 postgresql :: Text
 postgresql = "PostgreSQL"

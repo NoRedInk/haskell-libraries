@@ -1,5 +1,4 @@
 -- | Reporting for development
---
 -- This reporter logs basic information about requests in a human-readable
 -- format, for use in a development console.
 --

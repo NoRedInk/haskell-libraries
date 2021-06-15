@@ -14,7 +14,7 @@ import qualified Platform
 import qualified Platform.Timer as Timer
 import qualified Prelude
 
--- Print basic information about requests to stdout and make more detailed
+-- | Print basic information about requests to stdout and make more detailed
 -- information available to the log-explorer tool.
 --
 -- Example usage:
@@ -64,6 +64,8 @@ failed span =
       "❌\n"
         ++ Builder.fromString (Exception.displayException err)
 
+-- | Contextual information this reporter needs to do its work. You can create
+-- one using 'handler'.
 data Handler = Handler
   { timer :: Timer.Timer,
     -- If we let each request log to stdout directly the result will be lots
