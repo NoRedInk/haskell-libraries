@@ -472,8 +472,9 @@ data SendOrSample
 
 -- | Create a 'Handler' for a specified set of 'Settings'. Do this once when
 -- your application starts and reuse the 'Handler' you get.
-handler :: Timer.Timer -> Settings -> Prelude.IO Handler
-handler timer settings = do
+handler :: Settings -> Prelude.IO Handler
+handler settings = do
+  timer <- Timer.mkTimer
   http <- HTTP.TLS.getGlobalManager
   revision <- getRevision
   hostname' <- Network.HostName.getHostName
