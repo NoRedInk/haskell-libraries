@@ -194,6 +194,7 @@ data Handler = Handler
 query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
+    |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack doQuery handler)
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
@@ -205,6 +206,7 @@ query handler query' =
 transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
+    |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack doTransaction handler)
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
