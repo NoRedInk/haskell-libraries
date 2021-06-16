@@ -1,4 +1,13 @@
-module Redis.Settings (Settings (..), ClusterMode (..), DefaultExpiry (..), QueryTimeout (..), decoder, decoderWithEnvVarPrefix) where
+module Redis.Settings
+  ( Settings (..),
+    ClusterMode (..),
+    DefaultExpiry (..),
+    QueryTimeout (..),
+    MaxKeySize (..),
+    decoder,
+    decoderWithEnvVarPrefix,
+  )
+where
 
 import Database.Redis hiding (Ok)
 import qualified Environment
@@ -30,8 +39,11 @@ data Settings = Settings
     --
     -- Default env var name is REDIS_QUERY_TIMEOUT_MILLISECONDS
     -- default is 1000
-    queryTimeout :: QueryTimeout
+    queryTimeout :: QueryTimeout,
+    maxKeySize :: MaxKeySize
   }
+
+data MaxKeySize = NoMaxKeySize | MaxKeySize Int
 
 data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
 
@@ -46,12 +58,13 @@ decoder =
 -- >>> decoderWithEnvVarPrefix "WORKER_"
 decoderWithEnvVarPrefix :: Text -> Environment.Decoder Settings
 decoderWithEnvVarPrefix prefix =
-  map4
+  map5
     Settings
     (decoderConnectInfo prefix)
     (decoderClusterMode prefix)
     (decoderDefaultExpiry prefix)
     (decoderQueryTimeout prefix)
+    (decoderMaxKeySize prefix)
 
 decoderClusterMode :: Text -> Environment.Decoder ClusterMode
 decoderClusterMode prefix =
@@ -117,5 +130,22 @@ decoderQueryTimeout prefix =
             if milliseconds <= 0
               then Ok NoQueryTimeout
               else Ok (TimeoutQueryAfterMilliseconds milliseconds)
+        )
+    )
+
+decoderMaxKeySize :: Text -> Environment.Decoder MaxKeySize
+decoderMaxKeySize prefix =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = prefix ++ "REDIS_MAX_KEY_SIZE",
+        Environment.description = "0 means no max key size, every other value is a max key size.",
+        Environment.defaultValue = "0"
+      }
+    ( Environment.custom
+        Environment.int
+        ( \maxKeySize ->
+            if maxKeySize <= 0
+              then Ok NoMaxKeySize
+              else Ok (MaxKeySize maxKeySize)
         )
     )
