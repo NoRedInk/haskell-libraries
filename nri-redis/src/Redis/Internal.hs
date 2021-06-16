@@ -240,6 +240,12 @@ mapKeys fn query' =
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
 
+ensureMaxKeySize :: Handler -> Query a -> Task Error a
+ensureMaxKeySize handler query' = Debug.todo "TODO"
+
+checkMaxKeySize :: Int -> Text -> Task Error a
+checkMaxKeySize maxSize key = Debug.todo "TODO"
+
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
   case query' of
