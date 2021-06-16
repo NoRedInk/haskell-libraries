@@ -30,6 +30,7 @@ import qualified List
 import qualified Log.RedisCommands as RedisCommands
 import NriPrelude hiding (map, map2, map3)
 import qualified Platform
+import qualified Redis.Settings as Settings
 import qualified Set
 import qualified Text
 import qualified Tuple
@@ -62,7 +63,7 @@ errorForHumans topError =
     DecodingFieldError err -> "Could not decode field of hash: " ++ err
     TransactionAborted -> "Transaction aborted."
     TimeoutError -> "Redis query took too long."
-    KeyExceedsMaxSize key maxSize -> "Redis key (" ++ key ++ ") exceeded max size (" ++ Text.fromInt maxSize ++ ")."
+    KeyExceedsMaxSize key maxKeySize -> "Redis key (" ++ key ++ ") exceeded max size (" ++ Text.fromInt maxKeySize ++ ")."
 
 -- | Render the commands a query is going to run for monitoring and debugging
 -- purposes. Values we write are replaced with "*****" because they might
@@ -182,7 +183,8 @@ sequence =
 data Handler = Handler
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
-    namespace :: Text
+    namespace :: Text,
+    maxKeySize :: Settings.MaxKeySize
   }
 
 -- | Run a 'Query'.
@@ -242,14 +244,18 @@ mapKeys fn query' =
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
 
-ensureMaxKeySize :: Handler -> Query a -> Task Error a
-ensureMaxKeySize handler query' = Debug.todo "TODO"
+ensureMaxKeySize :: Handler -> Query a -> Task Error (Query a)
+ensureMaxKeySize handler query' =
+  case maxKeySize handler of
+    Settings.NoMaxKeySize -> Task.succeed query'
+    Settings.MaxKeySize maxKeySize ->
+      mapKeys (checkMaxKeySize maxKeySize) query'
 
 checkMaxKeySize :: Int -> Text -> Task Error Text
-checkMaxKeySize maxSize key =
-  if Text.length key <= maxSize
+checkMaxKeySize maxKeySize key =
+  if Text.length key <= maxKeySize
     then Task.succeed key
-    else Task.fail (KeyExceedsMaxSize key maxSize)
+    else Task.fail (KeyExceedsMaxSize key maxKeySize)
 
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =

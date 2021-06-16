@@ -103,7 +103,8 @@ acquireHandler namespace settings = do
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Text.fromList err)))
                     )
                   |> Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything,
-          Internal.namespace = namespace
+          Internal.namespace = namespace,
+          Internal.maxKeySize = Settings.maxKeySize settings
         },
       connection
     )
