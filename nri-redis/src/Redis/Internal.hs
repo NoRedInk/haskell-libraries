@@ -217,7 +217,7 @@ mapKeys fn query' =
     Setnx key value -> Task.map (\newKey -> Setnx newKey value) (fn key)
     Getset key value -> Task.map (\newKey -> Getset newKey value) (fn key)
     Mget keys -> Task.map Mget (Prelude.traverse (\k -> fn k) keys)
-    Mset assocs -> Task.map Mset (Prelude.traverse (\(k, v) -> Task.map (\newKey -> (newKey ,v)) (fn k)) assocs)
+    Mset assocs -> Task.map Mset (Prelude.traverse (\(k, v) -> Task.map (\newKey -> (newKey, v)) (fn k)) assocs)
     Del keys -> Task.map Del (Prelude.traverse (fn) keys)
     Hgetall key -> Task.map Hgetall (fn key)
     Hkeys key -> Task.map Hkeys (fn key)
