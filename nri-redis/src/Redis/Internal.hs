@@ -44,6 +44,7 @@ data Error
   | LibraryError Text
   | TransactionAborted
   | TimeoutError
+  | KeyExceedsMaxSize Text Int
 
 instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
@@ -61,6 +62,7 @@ errorForHumans topError =
     DecodingFieldError err -> "Could not decode field of hash: " ++ err
     TransactionAborted -> "Transaction aborted."
     TimeoutError -> "Redis query took too long."
+    KeyExceedsMaxSize key maxSize -> "Redis key (" ++ key ++ ") exceeded max size (" ++ Text.fromInt maxSize ++ ")."
 
 -- | Render the commands a query is going to run for monitoring and debugging
 -- purposes. Values we write are replaced with "*****" because they might
@@ -243,8 +245,11 @@ mapKeys fn query' =
 ensureMaxKeySize :: Handler -> Query a -> Task Error a
 ensureMaxKeySize handler query' = Debug.todo "TODO"
 
-checkMaxKeySize :: Int -> Text -> Task Error a
-checkMaxKeySize maxSize key = Debug.todo "TODO"
+checkMaxKeySize :: Int -> Text -> Task Error Text
+checkMaxKeySize maxSize key =
+  if Text.length key <= maxSize
+    then Task.succeed key
+    else Task.fail (KeyExceedsMaxSize key maxSize)
 
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
