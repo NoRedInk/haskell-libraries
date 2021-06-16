@@ -204,38 +204,41 @@ transaction handler query' =
     |> Stack.withFrozenCallStack doTransaction handler
 
 namespaceQuery :: Text -> Query a -> Query a
-namespaceQuery prefix query' =
+namespaceQuery prefix query' = mapKeys (prefix ++) query'
+
+mapKeys :: (Text -> Text) -> Query a -> Query a
+mapKeys fn query' =
   case query' of
-    Exists key -> Exists (prefix ++ key)
+    Exists key -> Exists (fn key)
     Ping -> Ping
-    Get key -> Get (prefix ++ key)
-    Set key value -> Set (prefix ++ key) value
-    Setex key seconds value -> Setex (prefix ++ key) seconds value
-    Setnx key value -> Setnx (prefix ++ key) value
-    Getset key value -> Getset (prefix ++ key) value
-    Mget keys -> Mget (NonEmpty.map (\k -> prefix ++ k) keys)
-    Mset assocs -> Mset (NonEmpty.map (\(k, v) -> (prefix ++ k, v)) assocs)
-    Del keys -> Del (NonEmpty.map (prefix ++) keys)
-    Hgetall key -> Hgetall (prefix ++ key)
-    Hkeys key -> Hkeys (prefix ++ key)
-    Hmget key fields -> Hmget (prefix ++ key) fields
-    Hget key field -> Hget (prefix ++ key) field
-    Hset key field val -> Hset (prefix ++ key) field val
-    Hsetnx key field val -> Hsetnx (prefix ++ key) field val
-    Hmset key vals -> Hmset (prefix ++ key) vals
-    Hdel key fields -> Hdel (prefix ++ key) fields
-    Incr key -> Incr (prefix ++ key)
-    Incrby key amount -> Incrby (prefix ++ key) amount
-    Expire key secs -> Expire (prefix ++ key) secs
-    Lrange key lower upper -> Lrange (prefix ++ key) lower upper
-    Rpush key vals -> Rpush (prefix ++ key) vals
-    Sadd key vals -> Sadd (prefix ++ key) vals
-    Scard key -> Scard (prefix ++ key)
-    Srem key vals -> Srem (prefix ++ key) vals
-    Smembers key -> Smembers (prefix ++ key)
+    Get key -> Get (fn key)
+    Set key value -> Set (fn key) value
+    Setex key seconds value -> Setex (fn key) seconds value
+    Setnx key value -> Setnx (fn key) value
+    Getset key value -> Getset (fn key) value
+    Mget keys -> Mget (NonEmpty.map (\k -> fn k) keys)
+    Mset assocs -> Mset (NonEmpty.map (\(k, v) -> (fn k, v)) assocs)
+    Del keys -> Del (NonEmpty.map (fn) keys)
+    Hgetall key -> Hgetall (fn key)
+    Hkeys key -> Hkeys (fn key)
+    Hmget key fields -> Hmget (fn key) fields
+    Hget key field -> Hget (fn key) field
+    Hset key field val -> Hset (fn key) field val
+    Hsetnx key field val -> Hsetnx (fn key) field val
+    Hmset key vals -> Hmset (fn key) vals
+    Hdel key fields -> Hdel (fn key) fields
+    Incr key -> Incr (fn key)
+    Incrby key amount -> Incrby (fn key) amount
+    Expire key secs -> Expire (fn key) secs
+    Lrange key lower upper -> Lrange (fn key) lower upper
+    Rpush key vals -> Rpush (fn key) vals
+    Sadd key vals -> Sadd (fn key) vals
+    Scard key -> Scard (fn key)
+    Srem key vals -> Srem (fn key) vals
+    Smembers key -> Smembers (fn key)
     Pure x -> Pure x
-    Apply f x -> Apply (namespaceQuery prefix f) (namespaceQuery prefix x)
-    WithResult f q -> WithResult f (namespaceQuery prefix q)
+    Apply f x -> Apply (mapKeys fn f) (mapKeys fn x)
+    WithResult f q -> WithResult f (mapKeys fn q)
 
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
