@@ -190,7 +190,7 @@ data Handler = Handler
 query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
-    |> Stack.withFrozenCallStack doQuery handler
+    |> Task.andThen (Stack.withFrozenCallStack doQuery handler)
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
@@ -201,44 +201,44 @@ query handler query' =
 transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
-    |> Stack.withFrozenCallStack doTransaction handler
+    |> Task.andThen (Stack.withFrozenCallStack doTransaction handler)
 
-namespaceQuery :: Text -> Query a -> Query a
-namespaceQuery prefix query' = mapKeys (prefix ++) query'
+namespaceQuery :: Text -> Query a -> Task err (Query a)
+namespaceQuery prefix query' = mapKeys (\key -> Task.succeed (prefix ++ key)) query'
 
-mapKeys :: (Text -> Text) -> Query a -> Query a
+mapKeys :: (Text -> Task err Text) -> Query a -> Task err (Query a)
 mapKeys fn query' =
   case query' of
-    Exists key -> Exists (fn key)
-    Ping -> Ping
-    Get key -> Get (fn key)
-    Set key value -> Set (fn key) value
-    Setex key seconds value -> Setex (fn key) seconds value
-    Setnx key value -> Setnx (fn key) value
-    Getset key value -> Getset (fn key) value
-    Mget keys -> Mget (NonEmpty.map (\k -> fn k) keys)
-    Mset assocs -> Mset (NonEmpty.map (\(k, v) -> (fn k, v)) assocs)
-    Del keys -> Del (NonEmpty.map (fn) keys)
-    Hgetall key -> Hgetall (fn key)
-    Hkeys key -> Hkeys (fn key)
-    Hmget key fields -> Hmget (fn key) fields
-    Hget key field -> Hget (fn key) field
-    Hset key field val -> Hset (fn key) field val
-    Hsetnx key field val -> Hsetnx (fn key) field val
-    Hmset key vals -> Hmset (fn key) vals
-    Hdel key fields -> Hdel (fn key) fields
-    Incr key -> Incr (fn key)
-    Incrby key amount -> Incrby (fn key) amount
-    Expire key secs -> Expire (fn key) secs
-    Lrange key lower upper -> Lrange (fn key) lower upper
-    Rpush key vals -> Rpush (fn key) vals
-    Sadd key vals -> Sadd (fn key) vals
-    Scard key -> Scard (fn key)
-    Srem key vals -> Srem (fn key) vals
-    Smembers key -> Smembers (fn key)
-    Pure x -> Pure x
-    Apply f x -> Apply (mapKeys fn f) (mapKeys fn x)
-    WithResult f q -> WithResult f (mapKeys fn q)
+    Exists key -> Task.map Exists (fn key)
+    Ping -> Task.succeed Ping
+    Get key -> Task.map Get (fn key)
+    Set key value -> Task.map (\newKey -> Set newKey value) (fn key)
+    Setex key seconds value -> Task.map (\newKey -> Setex newKey seconds value) (fn key)
+    Setnx key value -> Task.map (\newKey -> Setnx newKey value) (fn key)
+    Getset key value -> Task.map (\newKey -> Getset newKey value) (fn key)
+    Mget keys -> Task.map Mget (Prelude.traverse (\k -> fn k) keys)
+    Mset assocs -> Task.map Mset (Prelude.traverse (\(k, v) -> Task.map (\newKey -> (newKey ,v)) (fn k)) assocs)
+    Del keys -> Task.map Del (Prelude.traverse (fn) keys)
+    Hgetall key -> Task.map Hgetall (fn key)
+    Hkeys key -> Task.map Hkeys (fn key)
+    Hmget key fields -> Task.map (\newKeys -> Hmget newKeys fields) (fn key)
+    Hget key field -> Task.map (\newKeys -> Hget newKeys field) (fn key)
+    Hset key field val -> Task.map (\newKeys -> Hset newKeys field val) (fn key)
+    Hsetnx key field val -> Task.map (\newKeys -> Hsetnx newKeys field val) (fn key)
+    Hmset key vals -> Task.map (\newKeys -> Hmset newKeys vals) (fn key)
+    Hdel key fields -> Task.map (\newKeys -> Hdel newKeys fields) (fn key)
+    Incr key -> Task.map Incr (fn key)
+    Incrby key amount -> Task.map (\newKeys -> Incrby newKeys amount) (fn key)
+    Expire key secs -> Task.map (\newKeys -> Expire newKeys secs) (fn key)
+    Lrange key lower upper -> Task.map (\newKeys -> Lrange newKeys lower upper) (fn key)
+    Rpush key vals -> Task.map (\newKeys -> Rpush newKeys vals) (fn key)
+    Sadd key vals -> Task.map (\newKeys -> Sadd newKeys vals) (fn key)
+    Scard key -> Task.map Scard (fn key)
+    Srem key vals -> Task.map (\newKeys -> Srem newKeys vals) (fn key)
+    Smembers key -> Task.map Smembers (fn key)
+    Pure x -> Task.succeed (Pure x)
+    Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
+    WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
 
 keysTouchedByQuery :: Query a -> Set.Set Text
 keysTouchedByQuery query' =
