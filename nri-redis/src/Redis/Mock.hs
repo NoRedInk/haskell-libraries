@@ -19,6 +19,7 @@ import qualified Expect
 import qualified List
 import qualified Platform
 import qualified Redis.Internal as Internal
+import qualified Redis.Settings as Settings
 import qualified Text
 import qualified Tuple
 import Prelude (IO, pure)
@@ -40,7 +41,8 @@ handlerIO = do
   Internal.Handler
     { Internal.doQuery = doQuery' modelRef doAnything,
       Internal.doTransaction = doQuery' modelRef doAnything,
-      Internal.namespace = "tests"
+      Internal.namespace = "tests",
+      Internal.maxKeySize = Settings.NoMaxKeySize
     }
     |> Prelude.pure
   where
