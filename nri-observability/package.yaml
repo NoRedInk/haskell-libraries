@@ -38,6 +38,7 @@ library:
     - Log.HttpRequest
     - Log.RedisCommands
     - Log.SqlQuery
+    - Log.Kafka
     - Reporter.Bugsnag
     - Reporter.Dev
     - Reporter.File
