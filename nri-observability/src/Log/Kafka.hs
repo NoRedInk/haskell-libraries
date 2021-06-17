@@ -1,7 +1,23 @@
 {-# LANGUAGE GADTs #-}
 
 -- | A module for creating great logs in code using Kafka.
-module Log.Kafka (Details (..), Encodable (..)) where
+module Log.Kafka
+  ( emptyDetails,
+    Details,
+    topic,
+    partitionId,
+    key,
+    contents,
+    createTime,
+    logAppendTime,
+    processAttempt,
+    assignedPartitions,
+    pausedPartitions,
+    timeSinceLastRebalance,
+    requestId,
+    Encodable (..),
+  )
+where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Time.Clock as Clock
@@ -49,6 +65,22 @@ data Details = Details
     requestId :: Maybe Text
   }
   deriving (Generic)
+
+emptyDetails :: Details
+emptyDetails =
+  Details
+    { topic = "",
+      partitionId = -1,
+      key = Nothing,
+      contents = Encodable (),
+      createTime = Nothing,
+      logAppendTime = Nothing,
+      processAttempt = -1,
+      assignedPartitions = -1,
+      pausedPartitions = -1,
+      timeSinceLastRebalance = -1,
+      requestId = Nothing
+    }
 
 instance Aeson.ToJSON Details where
   toJSON = Aeson.genericToJSON options
