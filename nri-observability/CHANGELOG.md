@@ -1,3 +1,8 @@
+# 0.1.1.0
+
+- Add honeycomb.io reporter.
+- Add kafka consumer log details.
+
 # 0.1.0.3
 
 - Relax version bounds to encompass `time-0.12`.
