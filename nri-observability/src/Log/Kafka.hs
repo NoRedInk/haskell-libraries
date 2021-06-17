@@ -24,6 +24,12 @@ import qualified Data.Time.Clock as Clock
 import qualified Platform
 
 -- | A type describing a kafka message being processed by a consumer.
+--
+-- > emptyDetails
+-- >   { topic = Just "kafka-topic"
+-- >   , partitionId = Just 1
+-- >   , contents = Just (Encodable "This message is a JSON string!")
+-- >   }
 data Details = Details
   { -- | The topic name of the message.
     topic :: Maybe Text,
@@ -35,9 +41,6 @@ data Details = Details
     -- partition.
     key :: Maybe Text,
     -- | The contents of the message.
-    --
-    -- This library is currently assuming all message payloads use JSON. That's
-    -- not a limitation of Kafka itself though.
     contents :: Maybe Encodable,
     -- | The time at which this message was created by a producer.
     -- Whether this property is available for a message depends on the
@@ -66,6 +69,7 @@ data Details = Details
   }
   deriving (Generic)
 
+-- | An empty details value to be modified by you.
 emptyDetails :: Details
 emptyDetails =
   Details
