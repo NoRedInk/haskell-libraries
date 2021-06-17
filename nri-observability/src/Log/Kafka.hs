@@ -15,7 +15,8 @@ module Log.Kafka
     pausedPartitions,
     timeSinceLastRebalance,
     requestId,
-    Encodable (..),
+    mkContents,
+    Contents,
   )
 where
 
@@ -28,7 +29,7 @@ import qualified Platform
 -- > emptyDetails
 -- >   { topic = Just "kafka-topic"
 -- >   , partitionId = Just 1
--- >   , contents = Just (Encodable "This message is a JSON string!")
+-- >   , contents = Just (mkContents "This message is a JSON string!")
 -- >   }
 data Details = Details
   { -- | The topic name of the message.
@@ -41,7 +42,7 @@ data Details = Details
     -- partition.
     key :: Maybe Text,
     -- | The contents of the message.
-    contents :: Maybe Encodable,
+    contents :: Maybe Contents,
     -- | The time at which this message was created by a producer.
     -- Whether this property is available for a message depends on the
     -- `log.message.timestamp.type` configuration option.
@@ -99,10 +100,22 @@ options =
 
 instance Platform.TracingSpanDetails Details
 
--- | Defering encoding to json to later.
-data Encodable where
-  Encodable :: (Aeson.ToJSON a) => a -> Encodable
+-- | The contents of a Kafka message. Use 'mkContents' to create one of these.
+data Contents where
+  Contents :: (Aeson.ToJSON a) => a -> Contents
 
-instance Aeson.ToJSON Encodable where
-  toJSON (Encodable x) = Aeson.toJSON x
-  toEncoding (Encodable x) = Aeson.toEncoding x
+instance Aeson.ToJSON Contents where
+  toJSON (Contents x) = Aeson.toJSON x
+  toEncoding (Contents x) = Aeson.toEncoding x
+
+-- | Create a 'Contents' value.
+--
+-- The type wrapped needs to have an Aeson.ToJSON instance, so we can present it
+-- nicely in observability tools.
+--
+-- > data MyMessagePayload { counter :: Int } deriving (Generic)
+-- > instance Aeson.ToJSON MyMessagePayload
+-- >
+-- > contents = mkContents MyMessagePayload { counter = 5 }
+mkContents :: Aeson.ToJSON a => a -> Contents
+mkContents = Contents
