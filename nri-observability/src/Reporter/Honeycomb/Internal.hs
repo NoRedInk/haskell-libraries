@@ -314,7 +314,7 @@ addDetails tracingSpan honeycombSpan =
                   renderDetailsGeneric "sql" details honeycombSpan
               ),
             Platform.Renderer
-              ( \(_ :: Kafka.Consumer) ->
+              ( \(_ :: Kafka.Details) ->
                   renderDetailsGeneric "kafka" details honeycombSpan
               )
           ]

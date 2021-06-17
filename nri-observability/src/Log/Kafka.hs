@@ -1,14 +1,14 @@
 {-# LANGUAGE GADTs #-}
 
 -- | A module for creating great logs in code using Kafka.
-module Log.Kafka (Consumer (..), Encodable (..)) where
+module Log.Kafka (Details (..), Encodable (..)) where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Time.Clock as Clock
 import qualified Platform
 
 -- | A type describing a kafka message being processed by a consumer.
-data Consumer = Consumer
+data Details = Details
   { -- | The topic name of the message.
     topic :: Text,
     -- | The partition id of the message.
@@ -50,7 +50,7 @@ data Consumer = Consumer
   }
   deriving (Generic)
 
-instance Aeson.ToJSON Consumer where
+instance Aeson.ToJSON Details where
   toJSON = Aeson.genericToJSON options
   toEncoding = Aeson.genericToEncoding options
 
@@ -61,7 +61,7 @@ options =
       Aeson.omitNothingFields = True
     }
 
-instance Platform.TracingSpanDetails Consumer
+instance Platform.TracingSpanDetails Details
 
 -- | Defering encoding to json to later.
 data Encodable where
