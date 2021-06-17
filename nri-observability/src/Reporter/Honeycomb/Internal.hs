@@ -85,7 +85,7 @@ getSpanEndpoint span =
     |> Maybe.andThen
       ( Platform.renderTracingSpanDetails
           [ Platform.Renderer (\(HttpRequest.Incoming details) -> HttpRequest.endpoint details),
-            Platform.Renderer (Just << Kafka.topic)
+            Platform.Renderer Kafka.topic
           ]
       )
     |> Maybe.andThen identity

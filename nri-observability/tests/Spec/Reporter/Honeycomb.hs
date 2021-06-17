@@ -6,6 +6,7 @@ import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text.Encoding
+import qualified Data.Time.Clock.POSIX as Clock.POSIX
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Dict
 import qualified Expect
@@ -18,7 +19,6 @@ import qualified Log.SqlQuery as SqlQuery
 import qualified Platform
 import qualified Platform.Timer as Timer
 import qualified Reporter.Honeycomb.Internal as Honeycomb
-import qualified Data.Time.Clock.POSIX as Clock.POSIX
 import Test (Test, describe, test)
 
 tests :: Test
@@ -72,17 +72,17 @@ tests =
           { Platform.name = "Processing Kafka Message",
             Platform.succeeded = Platform.Failed,
             Platform.details =
-              Kafka.Consumer
-                { Kafka.topic = "topic",
-                  Kafka.partitionId = 12,
+              Kafka.emptyDetails
+                { Kafka.topic = Just "topic",
+                  Kafka.partitionId = Just 12,
                   Kafka.key = Just "key",
-                  Kafka.contents = Kafka.Encodable (),
+                  Kafka.contents = Just (Kafka.Encodable ()),
                   Kafka.createTime = Just (Clock.POSIX.posixSecondsToUTCTime 0),
-                  Kafka.logAppendTime = Just (Clock.POSIX.posixSecondsToUTCTime  0),
-                  Kafka.timeSinceLastRebalance = 0,
-                  Kafka.processAttempt = 0,
-                  Kafka.assignedPartitions = 1,
-                  Kafka.pausedPartitions = 2,
+                  Kafka.logAppendTime = Just (Clock.POSIX.posixSecondsToUTCTime 0),
+                  Kafka.timeSinceLastRebalance = Just 0,
+                  Kafka.processAttempt = Just 0,
+                  Kafka.assignedPartitions = Just 1,
+                  Kafka.pausedPartitions = Just 2,
                   Kafka.requestId = Just "requestId"
                 }
                 |> Platform.toTracingSpanDetails

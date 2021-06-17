@@ -26,9 +26,9 @@ import qualified Platform
 -- | A type describing a kafka message being processed by a consumer.
 data Details = Details
   { -- | The topic name of the message.
-    topic :: Text,
+    topic :: Maybe Text,
     -- | The partition id of the message.
-    partitionId :: Int,
+    partitionId :: Maybe Int,
     -- | The key of the message (if it has one). If a key is provided by a
     -- message producer it is used to determine the partition id, in such a way
     -- that messages with the same key are guaranteed to end up in the same
@@ -38,7 +38,7 @@ data Details = Details
     --
     -- This library is currently assuming all message payloads use JSON. That's
     -- not a limitation of Kafka itself though.
-    contents :: Encodable,
+    contents :: Maybe Encodable,
     -- | The time at which this message was created by a producer.
     -- Whether this property is available for a message depends on the
     -- `log.message.timestamp.type` configuration option.
@@ -51,15 +51,15 @@ data Details = Details
     logAppendTime :: Maybe Clock.UTCTime,
     -- | Zero-based counter indicating the how-manyth time it is we're attemping
     -- to process this message.
-    processAttempt :: Int,
+    processAttempt :: Maybe Int,
     -- | The amount of partitions for this topic the consumer is responsible
     -- for.
-    assignedPartitions :: Int,
+    assignedPartitions :: Maybe Int,
     -- | The amount of partitions this consumer currently has paused, because
     -- it's behing processing this partition.
-    pausedPartitions :: Int,
+    pausedPartitions :: Maybe Int,
     -- | Time since last rebalance in s
-    timeSinceLastRebalance :: Float,
+    timeSinceLastRebalance :: Maybe Float,
     -- | The request id of the http request that resulted in the enqueueing of
     -- the message that is now being processed by a worker.
     requestId :: Maybe Text
@@ -69,16 +69,16 @@ data Details = Details
 emptyDetails :: Details
 emptyDetails =
   Details
-    { topic = "",
-      partitionId = -1,
+    { topic = Nothing,
+      partitionId = Nothing,
       key = Nothing,
-      contents = Encodable (),
+      contents = Nothing,
       createTime = Nothing,
       logAppendTime = Nothing,
-      processAttempt = -1,
-      assignedPartitions = -1,
-      pausedPartitions = -1,
-      timeSinceLastRebalance = -1,
+      processAttempt = Nothing,
+      assignedPartitions = Nothing,
+      pausedPartitions = Nothing,
+      timeSinceLastRebalance = Nothing,
       requestId = Nothing
     }
 
