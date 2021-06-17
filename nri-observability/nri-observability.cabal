@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-observability
-version:        0.1.0.3
+version:        0.1.1.0
 synopsis:       Report log spans collected by nri-prelude.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme>.
 category:       Web
@@ -32,12 +32,12 @@ library
       Log.HttpRequest
       Log.RedisCommands
       Log.SqlQuery
+      Log.Kafka
       Reporter.Bugsnag
       Reporter.Dev
       Reporter.File
       Reporter.Honeycomb
   other-modules:
-      Log.Kafka
       Platform.ReporterHelpers
       Platform.Timer
       Reporter.Bugsnag.Internal
