@@ -3,7 +3,6 @@
 let
   sources = import ./sources.nix { };
   customHaskellPackages = haskellPackages.extend (self: super: {
-    pretty-diff = super.callCabal2nix "pretty-diff" sources.pretty-diff { };
     safe-coloured-text = super.callCabal2nix "safe-coloured-text"
       "${sources.safe-coloured-text}/safe-coloured-text" { };
     safe-coloured-text-terminfo =
