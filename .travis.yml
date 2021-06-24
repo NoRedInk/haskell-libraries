@@ -9,7 +9,5 @@ install:
   - sudo systemctl restart nix-daemon
   - nix-env -iA nixpkgs.cachix
   - cachix use $CACHIX_CACHE
-  - nix path-info --all > /tmp/store-path-pre-build
 script:
   - cachix watch-exec $CACHIX_CACHE -- nix-shell shell-ghc-8-10.nix --run "./run-tests.sh"
-  - cachix watch-exec $CACHIX_CACHE -- nix-shell shell-ghc-8-8.nix --run "./run-tests.sh"
