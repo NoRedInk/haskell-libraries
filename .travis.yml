@@ -1,6 +1,8 @@
 language: nix
 nix: 2.3.7
 sudo: false
+services:
+  - postgres
 env:
   global:
     - CACHIX_CACHE=nri-open-source
