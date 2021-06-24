@@ -1,54 +1,74 @@
-<<: !include ../package-yaml-support/base-package.yaml
-name: database
-synopsis: NRI helper for database queries
-extra-source-files:
+name: nri-postgresql
+synopsis: Make queries against Postgresql.
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme>.
+homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme
+author: NoRedInk
+version: 0.1.0.0
+maintainer: haskell-open-source@noredink.com
+copyright: 2021 NoRedInk Corp.
+github: NoRedInk/haskell-libraries/postgresql
+license-file: LICENSE
+category: Web
+extra-doc-files:
 - README.md
+- LICENSE
+- CHANGELOG.md
+extra-source-files:
 - "test/golden-results/*.json"
-dependencies: &dependencies
-- aeson
-- attoparsec
-- base
-- bytestring
-- exceptions
-- filepath
-- hashable
-- haskell-src-meta
-- health
-- io-streams
-- lens
-- lens-regex-pcre
-- mysql-haskell
-- network
-- nri-env-parser
-- nri-observability
-- nri-prelude
-- pcre-light
-- postgresql-simple
-- postgresql-typed
-- resource-pool
-- resourcet
-- safe-exceptions
-- template-haskell
-- text
-- time
+dependencies:
+- aeson >= 1.4.6.0 && < 1.6
+- attoparsec >= 0.13.0.0 && < 0.15
+- base >= 4.12.0.0 && < 4.16
+- bytestring >= 0.10.8.2 && < 0.12
+- filepath >= 1.4.2.1 && < 1.5
+- network >= 3.1.0.0 && < 3.2
+- nri-env-parser >= 0.1.0.0 && < 0.2
+- nri-observability >= 0.1.0.0 && < 0.2
+- nri-prelude >= 0.1.0.0 && < 0.7
+- postgresql-typed >= 0.6 && < 0.7
+- resource-pool >= 0.2.0.0 && < 0.3
+- conduit >= 1.3.0 && < 1.4
+- safe-exceptions >= 0.1.7.0 && < 1.3
+- template-haskell >= 2.16.0.0 && < 2.17
+- text >= 1.2.3.1 && < 1.3
+- time >= 1.8.0.2 && < 1.13
+default-extensions:
+  - DataKinds
+  - DeriveGeneric
+  - FlexibleContexts
+  - FlexibleInstances
+  - GeneralizedNewtypeDeriving
+  - MultiParamTypeClasses
+  - NamedFieldPuns
+  - NoImplicitPrelude
+  - OverloadedStrings
+  - PartialTypeSignatures
+  - ScopedTypeVariables
+  - Strict
+  - TypeOperators
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wpartial-fields
+  - -Wredundant-constraints
+  - -Wincomplete-uni-patterns
+  - -fplugin=NriPrelude.Plugin
 library:
   exposed-modules:
-  - MySQL
-  - MySQL.Settings
-  - MySQL.Test
   - Postgres
   - Postgres.Test
-  # Exposed for tests only
-  - MySQL.Query
-  - Internal.QueryParser
-  - Postgres.Settings
-  - Internal.Time
   source-dirs: src
 tests:
   spec:
-    dependencies: *dependencies
     main: Main.hs
     source-dirs:
     - src
     - test
-    ghc-options: *test-ghc-options
+    ghc-options:
+      - -threaded
+      - -rtsopts "-with-rtsopts=-N -T"
+      - -fno-warn-type-defaults
+    default-extensions:
+      - ExtendedDefaultRules

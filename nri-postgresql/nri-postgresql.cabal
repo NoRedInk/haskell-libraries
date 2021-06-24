@@ -1,0 +1,151 @@
+cabal-version: 1.18
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           nri-postgresql
+version:        0.1.0.0
+synopsis:       Make queries against Postgresql.
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme>.
+category:       Web
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme
+bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
+author:         NoRedInk
+maintainer:     haskell-open-source@noredink.com
+copyright:      2021 NoRedInk Corp.
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-doc-files:
+    README.md
+    LICENSE
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/NoRedInk/haskell-libraries
+  subdir: postgresql
+
+library
+  exposed-modules:
+      Postgres
+      Postgres.Test
+  other-modules:
+      Internal.CaselessRegex
+      Internal.Error
+      Internal.Instances
+      Internal.QueryParser
+      Internal.Time
+      MySQL
+      MySQL.FromRow
+      MySQL.Internal
+      MySQL.MySQLColumn
+      MySQL.MySQLParameter
+      MySQL.Query
+      MySQL.Settings
+      MySQL.Test
+      Postgres.Query
+      Postgres.Settings
+      Paths_nri_postgresql
+  hs-source-dirs:
+      src
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
+  build-depends:
+      aeson >=1.4.6.0 && <1.6
+    , attoparsec >=0.13.0.0 && <0.15
+    , base >=4.12.0.0 && <4.16
+    , bytestring >=0.10.8.2 && <0.12
+    , conduit >=1.3.0 && <1.4
+    , filepath >=1.4.2.1 && <1.5
+    , network >=3.1.0.0 && <3.2
+    , nri-env-parser >=0.1.0.0 && <0.2
+    , nri-observability >=0.1.0.0 && <0.2
+    , nri-prelude >=0.1.0.0 && <0.7
+    , postgresql-typed ==0.6.*
+    , resource-pool >=0.2.0.0 && <0.3
+    , safe-exceptions >=0.1.7.0 && <1.3
+    , template-haskell >=2.16.0.0 && <2.17
+    , text >=1.2.3.1 && <1.3
+    , time >=1.8.0.2 && <1.13
+  default-language: Haskell2010
+
+test-suite spec
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Internal.CaselessRegex
+      Internal.Error
+      Internal.Instances
+      Internal.QueryParser
+      Internal.Time
+      MySQL
+      MySQL.FromRow
+      MySQL.Internal
+      MySQL.MySQLColumn
+      MySQL.MySQLParameter
+      MySQL.Query
+      MySQL.Settings
+      MySQL.Test
+      Postgres
+      Postgres.Query
+      Postgres.Settings
+      Postgres.Test
+      MySQLQuerySpec
+      MySQLSpec
+      ObservabilitySpec
+      PostgresSettingsSpec
+      QueryParserSpec
+      TimeSpec
+      Paths_nri_postgresql
+  hs-source-dirs:
+      src
+      test
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
+      ExtendedDefaultRules
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
+  build-depends:
+      aeson >=1.4.6.0 && <1.6
+    , attoparsec >=0.13.0.0 && <0.15
+    , base >=4.12.0.0 && <4.16
+    , bytestring >=0.10.8.2 && <0.12
+    , conduit >=1.3.0 && <1.4
+    , filepath >=1.4.2.1 && <1.5
+    , network >=3.1.0.0 && <3.2
+    , nri-env-parser >=0.1.0.0 && <0.2
+    , nri-observability >=0.1.0.0 && <0.2
+    , nri-prelude >=0.1.0.0 && <0.7
+    , postgresql-typed ==0.6.*
+    , resource-pool >=0.2.0.0 && <0.3
+    , safe-exceptions >=0.1.7.0 && <1.3
+    , template-haskell >=2.16.0.0 && <2.17
+    , text >=1.2.3.1 && <1.3
+    , time >=1.8.0.2 && <1.13
+  default-language: Haskell2010

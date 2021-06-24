@@ -1,5 +1,3 @@
-# Database
+# nri-postgresql
 
-_Reviewed last on 2019-10-17_
-
-Helpers for querying postgres. Wrapper around `postgresql-typed`.
+A library for querying postgresql. Wrapper around `postgresql-typed`.
