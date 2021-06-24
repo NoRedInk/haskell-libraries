@@ -1,12 +1,21 @@
 language: nix
 nix: 2.3.7
-sudo: false
+os: linux
+dist: xenial
 services:
-  - postgres
+  - postgresql
+addons:
+  postgresql: "9.6"
 env:
   global:
+    - PGPORT=8088
     - CACHIX_CACHE=nri-open-source
 install:
+  # - curl -L https://github.com/tmate-io/tmate/releases/download/2.4.0/tmate-2.4.0-static-linux-amd64.tar.xz | tar xJv
+  # - tmate-2.4.0-static-linux-amd64/tmate -F
+  - sudo sed -i -e 's/^port =.*/port = 8088/' /etc/postgresql/9.6/main/postgresql.conf
+  - sudo service postgresql restart 9.6
+  - echo -e "CREATE DATABASE noredink_dev;\nCREATE USER noredink_dev;\nGRANT ALL PRIVILEGES ON DATABASE noredink_dev TO noredink_dev;" | sudo -u postgres psql
   - echo "trusted-users = $USER" | sudo tee -a /etc/nix/nix.conf
   - sudo systemctl restart nix-daemon
   - nix-env -iA nixpkgs.cachix
