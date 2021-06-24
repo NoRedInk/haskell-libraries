@@ -13,7 +13,6 @@ module Postgres
   ( -- Connection
     Connection,
     connection,
-    readiness, -- Creating a connection handler.
     -- Settings
     Settings.Settings,
     Settings.decoder,
@@ -58,7 +57,6 @@ import Database.PostgreSQL.Typed.Protocol
   )
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
-import qualified Health
 import qualified Internal.Time as Time
 import qualified List
 import qualified Log
@@ -191,18 +189,6 @@ inTestTransactionIo postgres io = do
   case result of
     Ok a -> pure a
     Err _ -> error "This should never happen."
-
--- |
--- Check that we are ready to be take traffic.
-readiness :: Connection -> Health.Check
-readiness conn =
-  Health.mkCheck "postgres" <| do
-    log <- Platform.silentHandler
-    runQuery conn [Query.sql|!SELECT 1|]
-      |> map (\(_ :: [Int]) -> ())
-      |> Task.mapError (Exception.displayException >> Text.fromList)
-      |> Task.attempt log
-      |> map Health.fromResult
 
 doQuery ::
   HasCallStack =>

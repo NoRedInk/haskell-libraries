@@ -43,6 +43,7 @@ in pkgs.mkShell {
         modern-uri
         network-uri
         pcre-light
+        postgresql-typed
         pretty-diff
         pretty-show
         process

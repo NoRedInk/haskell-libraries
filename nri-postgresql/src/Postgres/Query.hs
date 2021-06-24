@@ -26,7 +26,6 @@ import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
 import Internal.Error (Error (..), TimeoutOrigin (..))
-import Internal.Instances ()
 import qualified Internal.QueryParser as Parser
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
@@ -36,7 +35,6 @@ import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import qualified Log
 import qualified Log.SqlQuery as SqlQuery
-import MySQL.Query (inToAny)
 import qualified Postgres.Settings
 import qualified Text
 import Prelude (IO)
@@ -81,14 +79,11 @@ qqSQL query = do
   let op = Text.toList (Parser.sqlOperation meta)
   let rel = Text.toList (Parser.queriedRelation meta)
   [e|
-    let q = $(quoteExp pgSQL (Text.toList (inToAny (Text.fromList query))))
+    let q = $(quoteExp pgSQL query)
      in Query
           { runQuery = \c -> pgQuery c q,
             sqlString = Data.Text.Encoding.decodeUtf8 (getQueryString PGTypes.unknownPGTypeEnv q),
-            quasiQuotedString =
-              query
-                |> Text.fromList
-                |> inToAny,
+            quasiQuotedString = Text.fromList query,
             sqlOperation = op,
             queriedRelation = rel
           }
