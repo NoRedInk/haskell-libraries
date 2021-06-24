@@ -5,8 +5,6 @@ where
 
 import qualified Data.Acquire as Acquire
 import qualified Environment
-import qualified MySQLQuerySpec
-import qualified MySQLSpec
 import qualified ObservabilitySpec
 import qualified Postgres
 import qualified PostgresSettingsSpec
@@ -30,7 +28,5 @@ tests postgres =
     [ PostgresSettingsSpec.tests,
       QueryParserSpec.tests,
       TimeSpec.tests,
-      MySQLQuerySpec.tests,
-      ObservabilitySpec.tests postgres,
-      MySQLSpec.tests
+      ObservabilitySpec.tests postgres
     ]

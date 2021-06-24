@@ -9,9 +9,9 @@ TracingSpan
             { srcLocPackage = "main"
             , srcLocModule = "ObservabilitySpec"
             , srcLocFile = "test/ObservabilitySpec.hs"
-            , srcLocStartLine = 68
+            , srcLocStartLine = 53
             , srcLocStartCol = 7
-            , srcLocEndLine = 72
+            , srcLocEndLine = 57
             , srcLocEndCol = 40
             }
         )
@@ -31,16 +31,16 @@ TracingSpan
                     { srcLocPackage = "main"
                     , srcLocModule = "ObservabilitySpec"
                     , srcLocFile = "test/ObservabilitySpec.hs"
-                    , srcLocStartLine = 37
+                    , srcLocStartLine = 35
                     , srcLocStartCol = 11
-                    , srcLocEndLine = 44
+                    , srcLocEndLine = 42
                     , srcLocEndCol = 14
                     }
                 )
           , details =
               Just
-                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"!SELECT 1\",\"database type\":\"PostgreSQL\",\"host\":\"/mock/db/path.sock\",\"database\":\"mock-db-name\",\"rows returned\":1}"
-          , summary = Just "UNKNOWN !SELECT 1"
+                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1::bigint\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"!SELECT 1::bigint\",\"database type\":\"PostgreSQL\",\"host\":\"/mock/db/path.sock\",\"database\":\"mock-db-name\",\"rows returned\":1}"
+          , summary = Just "UNKNOWN !SELECT 1::bigint"
           , succeeded = Succeeded
           , allocated = 0
           , children =
@@ -55,9 +55,9 @@ TracingSpan
                             { srcLocPackage = "main"
                             , srcLocModule = "Postgres"
                             , srcLocFile = "src/Postgres.hs"
-                            , srcLocStartLine = 363
+                            , srcLocStartLine = 349
                             , srcLocStartCol = 9
-                            , srcLocEndLine = 363
+                            , srcLocEndLine = 349
                             , srcLocEndCol = 69
                             }
                         )

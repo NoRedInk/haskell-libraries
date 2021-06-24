@@ -10,8 +10,6 @@ import qualified Debug
 import qualified Expect
 import qualified Log.SqlQuery as SqlQuery
 import qualified Maybe
-import qualified MySQL
-import qualified MySQL.Test
 import qualified Platform
 import qualified Postgres
 import qualified Task
@@ -36,7 +34,7 @@ tests postgres =
         span <-
           Postgres.doQuery
             postgres
-            [Postgres.sql|!SELECT 1|]
+            [Postgres.sql|!SELECT 1::bigint|]
             ( \res ->
                 case res of
                   Err err -> Task.fail err
@@ -44,20 +42,7 @@ tests postgres =
             )
             |> spanForTask
         Debug.toString span
-          |> Expect.equalToContentsOf "test/golden-results/observability-spec-postgres-reporting",
-      MySQL.Test.test "MySQL queries report the span data we expect" <| \mysql -> do
-        span <-
-          MySQL.doQuery
-            mysql
-            [MySQL.sql|!SELECT 1|]
-            ( \res ->
-                case res of
-                  Err err -> Task.fail err
-                  Ok (_ :: [Int]) -> Task.succeed ()
-            )
-            |> spanForTask
-        Debug.toString span
-          |> Expect.equalToContentsOf "test/golden-results/observability-spec-mysql-reporting"
+          |> Expect.equalToContentsOf "test/golden-results/observability-spec-postgres-reporting"
     ]
 
 spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan

@@ -61,7 +61,7 @@ library:
   - Postgres.Test
   source-dirs: src
 tests:
-  spec:
+  tests:
     main: Main.hs
     source-dirs:
     - src
