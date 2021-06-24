@@ -1,0 +1,54 @@
+<<: !include ../package-yaml-support/base-package.yaml
+name: database
+synopsis: NRI helper for database queries
+extra-source-files:
+- README.md
+- "test/golden-results/*.json"
+dependencies: &dependencies
+- aeson
+- attoparsec
+- base
+- bytestring
+- exceptions
+- filepath
+- hashable
+- haskell-src-meta
+- health
+- io-streams
+- lens
+- lens-regex-pcre
+- mysql-haskell
+- network
+- nri-env-parser
+- nri-observability
+- nri-prelude
+- pcre-light
+- postgresql-simple
+- postgresql-typed
+- resource-pool
+- resourcet
+- safe-exceptions
+- template-haskell
+- text
+- time
+library:
+  exposed-modules:
+  - MySQL
+  - MySQL.Settings
+  - MySQL.Test
+  - Postgres
+  - Postgres.Test
+  # Exposed for tests only
+  - MySQL.Query
+  - Internal.QueryParser
+  - Postgres.Settings
+  - Internal.Time
+  source-dirs: src
+tests:
+  spec:
+    dependencies: *dependencies
+    main: Main.hs
+    source-dirs:
+    - src
+    - test
+    ghc-options: *test-ghc-options

@@ -1,0 +1,73 @@
+TracingSpan
+  { name = "test-root"
+  , started = MonotonicTime { inMicroseconds = 0 }
+  , finished = MonotonicTime { inMicroseconds = 0 }
+  , frame =
+      Just
+        ( "rootTracingSpanIO"
+        , SrcLoc
+            { srcLocPackage = "main"
+            , srcLocModule = "ObservabilitySpec"
+            , srcLocFile = "test/ObservabilitySpec.hs"
+            , srcLocStartLine = 68
+            , srcLocStartCol = 7
+            , srcLocEndLine = 72
+            , srcLocEndCol = 40
+            }
+        )
+  , details = Nothing
+  , summary = Nothing
+  , succeeded = Succeeded
+  , allocated = 0
+  , children =
+      [ TracingSpan
+          { name = "Postgresql Query"
+          , started = MonotonicTime { inMicroseconds = 0 }
+          , finished = MonotonicTime { inMicroseconds = 0 }
+          , frame =
+              Just
+                ( "doQuery"
+                , SrcLoc
+                    { srcLocPackage = "main"
+                    , srcLocModule = "ObservabilitySpec"
+                    , srcLocFile = "test/ObservabilitySpec.hs"
+                    , srcLocStartLine = 37
+                    , srcLocStartCol = 11
+                    , srcLocEndLine = 44
+                    , srcLocEndCol = 14
+                    }
+                )
+          , details =
+              Just
+                "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"!SELECT 1\",\"database type\":\"PostgreSQL\",\"host\":\"/mock/db/path.sock\",\"database\":\"mock-db-name\",\"rows returned\":1}"
+          , summary = Just "UNKNOWN !SELECT 1"
+          , succeeded = Succeeded
+          , allocated = 0
+          , children =
+              [ TracingSpan
+                  { name = "acquiring Postgres connection from pool"
+                  , started = MonotonicTime { inMicroseconds = 0 }
+                  , finished = MonotonicTime { inMicroseconds = 0 }
+                  , frame =
+                      Just
+                        ( "withContext"
+                        , SrcLoc
+                            { srcLocPackage = "main"
+                            , srcLocModule = "Postgres"
+                            , srcLocFile = "src/Postgres.hs"
+                            , srcLocStartLine = 363
+                            , srcLocStartCol = 9
+                            , srcLocEndLine = 363
+                            , srcLocEndCol = 69
+                            }
+                        )
+                  , details = Just "{}"
+                  , summary = Just "acquiring Postgres connection from pool"
+                  , succeeded = Succeeded
+                  , allocated = 0
+                  , children = []
+                  }
+              ]
+          }
+      ]
+  }
