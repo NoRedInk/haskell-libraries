@@ -66,8 +66,8 @@ defaultSettings =
   Settings
     { pgConnection =
         ConnectionSettings
-          { pgDatabase = PgDatabase "postgresql",
-            pgUser = PgUser "postgresql",
+          { pgDatabase = PgDatabase "postgres",
+            pgUser = PgUser "postgres",
             pgHost = PgHost "localhost",
             pgPassword = PgPassword (Log.mkSecret ""),
             pgPort = PgPort 5432

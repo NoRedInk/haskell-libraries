@@ -71,6 +71,7 @@ in pkgs.mkShell {
     pkgs.ormolu
     pkgs.pcre
     pkgs.redis
+    pkgs.postgresql
     pkgs.zlib
   ];
 }
