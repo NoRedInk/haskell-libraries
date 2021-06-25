@@ -8,6 +8,7 @@ import qualified Expect
 import qualified GHC.Stack as Stack
 import qualified Platform
 import qualified Postgres
+import qualified Postgres.Connection as Connection
 import qualified Postgres.Settings as Settings
 import qualified System.IO.Unsafe
 import qualified Test
@@ -57,7 +58,7 @@ getTestConnection =
                 if Settings.pgConnection Settings.defaultSettings == Settings.pgConnection testSettings
                   then Environment.decode Settings.decoder
                   else Prelude.pure testSettings
-              Postgres.connectionIO settings
+              Connection.connectionIO settings
         Prelude.pure (Just conn, conn)
     )
     |> map Ok

@@ -6,8 +6,8 @@
 -- | Functions for running Postgres queries.
 module Postgres
   ( -- Connection
-    Connection,
-    connection,
+    Connection.Connection,
+    Connection.connection,
     -- Settings
     Settings.Settings,
     Settings.decoder,
@@ -22,24 +22,12 @@ module Postgres
     -- Reexposing useful postgresql-typed types
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
-    -- tests only!
-    connectionIO,
   )
 where
 
 import qualified Control.Exception.Safe as Exception
-import qualified Data.Acquire
 import qualified Data.Pool
-import qualified Data.Text.Encoding
-import Database.PostgreSQL.Typed
-  ( PGConnection,
-    PGDatabase (PGDatabase),
-    pgConnect,
-    pgDBAddr,
-    pgDBName,
-    pgDBUser,
-    pgDisconnect,
-  )
+import Database.PostgreSQL.Typed (PGConnection)
 import qualified Database.PostgreSQL.Typed.Array as PGArray
 import Database.PostgreSQL.Typed.Protocol
   ( PGError,
@@ -55,65 +43,14 @@ import qualified Internal.Time as Time
 import qualified List
 import qualified Log
 import qualified Log.SqlQuery as SqlQuery
-import Network.Socket (SockAddr (..))
 import qualified Platform
+import Postgres.Connection (Connection)
+import qualified Postgres.Connection as Connection
 import qualified Postgres.Query as Query
 import qualified Postgres.Settings as Settings
-import qualified System.Exit
 import qualified Task
 import qualified Tuple
-import Prelude (Either (Left, Right), IO, fromIntegral, mconcat, pure, putStrLn, show, (<>))
-
-data Connection = Connection
-  { doAnything :: Platform.DoAnythingHandler,
-    singleOrPool :: SingleOrPool PGConnection,
-    connDetails :: SqlQuery.Details,
-    timeout :: Time.Interval
-  }
-
--- | A database connection type.
---   Defining our own type makes it easier to change it in the future, without
---   having to fix compilation errors all over the codebase.
-data SingleOrPool c
-  = -- | By default a connection pool is passed around. It will:
-    --   - Create new connections in the pool up to a certain limit.
-    --   - Remove connections from the pool after a query in a connection errored.
-    Pool (Data.Pool.Pool c)
-  | -- | A single connection is only used in the context of a transaction, where
-    --   we need to insure several SQL statements happen on the same connection.
-    Single c
-
-connection :: Settings.Settings -> Data.Acquire.Acquire Connection
-connection settings =
-  Data.Acquire.mkAcquire (connectionIO settings) release
-  where
-    release Connection {singleOrPool} =
-      case singleOrPool of
-        Pool pool -> Data.Pool.destroyAllResources pool
-        Single single -> pgDisconnect single
-
-connectionIO :: Settings.Settings -> IO Connection
-connectionIO settings = do
-  let database = Settings.toPGDatabase settings
-  let stripes = Settings.unPgPoolStripes (Settings.pgPoolStripes (Settings.pgPool settings)) |> fromIntegral
-  let maxIdleTime = Settings.unPgPoolMaxIdleTime (Settings.pgPoolMaxIdleTime (Settings.pgPool settings))
-  let size = Settings.unPgPoolSize (Settings.pgPoolSize (Settings.pgPool settings)) |> fromIntegral
-  doAnything <- Platform.doAnythingHandler
-  pool <-
-    map Pool
-      <| Data.Pool.createPool
-        (pgConnect database `Exception.catch` handleError (toConnectionString database))
-        pgDisconnect
-        stripes
-        maxIdleTime
-        size
-  pure
-    ( Connection
-        doAnything
-        pool
-        (connectionDetails database)
-        (Settings.pgQueryTimeout settings)
-    )
+import qualified Prelude
 
 -- |
 -- Perform a database transaction.
@@ -123,7 +60,7 @@ transaction conn func =
       start c =
         doIO conn <| do
           pgBegin c
-          pure c
+          Prelude.pure c
       --
       end :: Platform.Succeeded -> PGConnection -> Task x ()
       end succeeded c =
@@ -136,7 +73,7 @@ transaction conn func =
       setSingle :: PGConnection -> Connection
       setSingle c =
         -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single c}
+        conn {Connection.singleOrPool = Connection.Single c}
    in withConnection conn <| \c ->
         Platform.bracketWithError (start c) end (setSingle >> func)
 
@@ -148,7 +85,7 @@ inTestTransaction conn func =
       start c = do
         rollbackAllSafe conn c
         doIO conn <| pgBegin c
-        pure c
+        Prelude.pure c
       --
       end :: Platform.Succeeded -> PGConnection -> Task x ()
       end _ c =
@@ -157,7 +94,7 @@ inTestTransaction conn func =
       setSingle :: PGConnection -> Connection
       setSingle c =
         -- All queries in a transactions must run on the same thread.
-        conn {singleOrPool = Single c}
+        conn {Connection.singleOrPool = Connection.Single c}
    in --
       withConnection conn <| \c ->
         Platform.bracketWithError (start c) end (setSingle >> func)
@@ -207,7 +144,7 @@ doQuery conn query handleResponse =
     |> Task.onError (Task.succeed << Err)
     |> andThen handleResponse
   where
-    queryInfo = Query.details query (connDetails conn)
+    queryInfo = Query.details query (Connection.connDetails conn)
 
 fromPGError :: Connection -> PGError -> Query.Error
 fromPGError c pgError =
@@ -222,7 +159,7 @@ fromPGError c pgError =
         |> Text.fromList
         |> Query.UniqueViolation
     "57014" ->
-      Query.Timeout Query.ServerTimeout (timeout c)
+      Query.Timeout Query.ServerTimeout (Connection.timeout c)
     _ ->
       Exception.displayException pgError
         |> Text.fromList
@@ -233,65 +170,6 @@ fromPGError c pgError =
         -- error message would result in each error being grouped by
         -- itself.
         |> (\err -> Query.Other "Postgres query failed with unexpected error" [Log.context "error" err])
-
-toConnectionString :: PGDatabase -> Text
-toConnectionString PGDatabase {pgDBUser, pgDBAddr, pgDBName} =
-  mconcat
-    [ Data.Text.Encoding.decodeUtf8 pgDBUser,
-      ":*****@",
-      case pgDBAddr of
-        Right sockAddr ->
-          Text.fromList (show sockAddr)
-        Left (hostName, serviceName) ->
-          Text.fromList hostName
-            <> ":"
-            <> Text.fromList serviceName,
-      "/",
-      Data.Text.Encoding.decodeUtf8 pgDBName
-    ] ::
-    Text
-
-connectionDetails :: PGDatabase -> SqlQuery.Details
-connectionDetails db =
-  case pgDBAddr db of
-    Left (hostName, serviceName) ->
-      SqlQuery.emptyDetails
-        { SqlQuery.databaseType = Just SqlQuery.postgresql,
-          SqlQuery.host = Just (Text.fromList hostName),
-          SqlQuery.port = Text.toInt (Text.fromList serviceName),
-          SqlQuery.database = Just databaseName
-        }
-    Right (SockAddrInet portNum hostAddr) ->
-      SqlQuery.emptyDetails
-        { SqlQuery.databaseType = Just SqlQuery.postgresql,
-          SqlQuery.host = Just (Text.fromList (show hostAddr)),
-          SqlQuery.port = Just (Prelude.fromIntegral portNum),
-          SqlQuery.database = Just databaseName
-        }
-    Right (SockAddrInet6 portNum _flowInfo hostAddr _scopeId) ->
-      SqlQuery.emptyDetails
-        { SqlQuery.databaseType = Just SqlQuery.postgresql,
-          SqlQuery.host = Just (Text.fromList (show hostAddr)),
-          SqlQuery.port = Just (Prelude.fromIntegral portNum),
-          SqlQuery.database = Just databaseName
-        }
-    Right (SockAddrUnix sockPath) ->
-      SqlQuery.emptyDetails
-        { SqlQuery.databaseType = Just SqlQuery.postgresql,
-          SqlQuery.host = Just (Text.fromList sockPath),
-          SqlQuery.port = Nothing,
-          SqlQuery.database = Just databaseName
-        }
-  where
-    databaseName = pgDBName db |> Data.Text.Encoding.decodeUtf8
-
-handleError :: Text -> Exception.IOException -> IO a
-handleError connectionString err = do
-  putStrLn "I couldn't connect to Postgres"
-  putStrLn ""
-  putStrLn "Is the database running? You can start it by running `aide setup-postgres`."
-  putStrLn ("I tried to connect to: " ++ Text.toList connectionString)
-  System.Exit.die (Exception.displayException err)
 
 --
 -- CONNECTION HELPERS
@@ -304,19 +182,19 @@ runQuery conn query =
       |> Exception.try
       |> map
         ( \res -> case res of
-            Right x -> Ok x
-            Left err -> Err (fromPGError conn err)
+            Prelude.Right x -> Ok x
+            Prelude.Left err -> Err (fromPGError conn err)
         )
-      |> Platform.doAnything (doAnything conn)
+      |> Platform.doAnything (Connection.doAnything conn)
       |> withTimeout conn
 
 withTimeout :: Connection -> Task Query.Error a -> Task Query.Error a
 withTimeout conn task =
-  if Time.microseconds (timeout conn) > 0
+  if Time.microseconds (Connection.timeout conn) > 0
     then
       Task.timeout
-        (Time.milliseconds (timeout conn))
-        (Query.Timeout Query.ClientTimeout (timeout conn))
+        (Time.milliseconds (Connection.timeout conn))
+        (Query.Timeout Query.ClientTimeout (Connection.timeout conn))
         task
     else task
 
@@ -343,16 +221,16 @@ withConnection conn func =
             Platform.FailedWith _ ->
               Data.Pool.destroyResource pool localPool c
    in --
-      case singleOrPool conn of
-        (Single c) ->
+      case Connection.singleOrPool conn of
+        (Connection.Single c) ->
           func c
         --
-        (Pool pool) ->
+        (Connection.Pool pool) ->
           Platform.bracketWithError (acquire pool) (release pool) (Tuple.first >> func)
 
-doIO :: Connection -> IO a -> Task x a
+doIO :: Connection -> Prelude.IO a -> Task x a
 doIO conn io =
-  Platform.doAnything (doAnything conn) (io |> map Ok)
+  Platform.doAnything (Connection.doAnything conn) (io |> map Ok)
 
 -- useful typeclass instances
 instance PGTypes.PGType "jsonb" => PGTypes.PGType "jsonb[]" where
