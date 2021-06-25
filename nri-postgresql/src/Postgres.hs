@@ -3,12 +3,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- |
--- Description : Helpers for running queries.
---
--- This module expose some helpers for running postgresql-typed queries. They
--- return the correct amount of results in a Servant handler, or throw a
--- Rollbarred error.
+-- | Functions for running Postgres queries.
 module Postgres
   ( -- Connection
     Connection,
@@ -24,7 +19,6 @@ module Postgres
     -- Handling transactions
     transaction,
     inTestTransaction,
-    inTestTransactionIo,
     -- Reexposing useful postgresql-typed types
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
@@ -68,7 +62,7 @@ import qualified Postgres.Settings as Settings
 import qualified System.Exit
 import qualified Task
 import qualified Tuple
-import Prelude (Either (Left, Right), IO, error, fromIntegral, mconcat, pure, putStrLn, show, (<>))
+import Prelude (Either (Left, Right), IO, fromIntegral, mconcat, pure, putStrLn, show, (<>))
 
 data Connection = Connection
   { doAnything :: Platform.DoAnythingHandler,
@@ -177,18 +171,6 @@ rollbackAllSafe conn c =
     -- at least one to kill.
     pgBegin c
     pgRollbackAll c
-
--- | DON'T USE. Prefer to arrange your tests around Task, not IO.
---   Same as `inTestTransaction` but for IO. Should be removed when no
---   tests depend on it anymore.
-inTestTransactionIo :: Postgres.Connection -> (Postgres.Connection -> IO a) -> IO a
-inTestTransactionIo postgres io = do
-  doAnything <- Platform.doAnythingHandler
-  logHandler <- Platform.silentHandler
-  result <- Task.attempt logHandler <| Postgres.inTestTransaction postgres <| \c -> Platform.doAnything doAnything (io c |> map Ok)
-  case result of
-    Ok a -> pure a
-    Err _ -> error "This should never happen."
 
 doQuery ::
   HasCallStack =>
