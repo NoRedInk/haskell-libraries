@@ -9,7 +9,7 @@ export PGDATA
 export PGUSER=$USER
 pg_ctl stop || true
 rm -rf "$PGDATA"
-initdb
+initdb --no-locale --encoding=UTF8
 pg_ctl start -o '-k .'
 
 ## start redis
