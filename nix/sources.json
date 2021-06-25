@@ -1,16 +1,4 @@
 {
-    "hedis": {
-        "branch": "v0.14.0",
-        "description": "A Redis client library for Haskell.",
-        "homepage": "http://hackage.haskell.org/package/hedis",
-        "owner": "informatikr",
-        "repo": "hedis",
-        "rev": "bbe302050a2efae31ca3150f07e4fb82941a7d31",
-        "sha256": "1nkg4dbq5i1ir034prqgrm1y6qz9mn59hrcyma55dmw9c2gf1nnk",
-        "type": "tarball",
-        "url": "https://github.com/informatikr/hedis/archive/bbe302050a2efae31ca3150f07e4fb82941a7d31.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
     "niv": {
         "branch": "master",
         "description": "Easy dependency management for Nix projects",
@@ -33,42 +21,6 @@
         "sha256": "1z6mpp4k6r6yqyk4nh65fg5ckdvcr5ag6yhv6jv7wcrdy3vnznz7",
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/0894deca29135de401bfe59f010a04e5c6a81d1a.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "nixpkgs-20-09": {
-        "branch": "release-20.09",
-        "description": "Nix Packages collection",
-        "homepage": "",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "cee3ca37c68dad981396365bf4b1d0c807ac4eb4",
-        "sha256": "1m6f60gnhgsbmavw0mq1r00v2lb4mhrxbx5dxqp3qhadfaxm8xn2",
-        "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/cee3ca37c68dad981396365bf4b1d0c807ac4eb4.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "nixpkgs-21-05": {
-        "branch": "release-21.05",
-        "description": "Nix Packages collection",
-        "homepage": "",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0894deca29135de401bfe59f010a04e5c6a81d1a",
-        "sha256": "1z6mpp4k6r6yqyk4nh65fg5ckdvcr5ag6yhv6jv7wcrdy3vnznz7",
-        "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/0894deca29135de401bfe59f010a04e5c6a81d1a.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "pretty-diff": {
-        "branch": "master",
-        "description": "Pretty printing a diff of two values",
-        "homepage": null,
-        "owner": "stoeffel",
-        "repo": "pretty-diff",
-        "rev": "790c3b2029174a50966e57983e6e12743b2cd818",
-        "sha256": "0m1h3w42a968x2bb2vgd3cxg09l4ql4bhgj19zv68h0i0la288ln",
-        "type": "tarball",
-        "url": "https://github.com/stoeffel/pretty-diff/archive/790c3b2029174a50966e57983e6e12743b2cd818.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "safe-coloured-text": {

@@ -3,9 +3,6 @@
 let
   sources = import ./sources.nix { };
   customHaskellPackages = haskellPackages.extend (self: super: {
-    hedis = pkgs.haskell.lib.dontCheck
-      (super.callCabal2nix "hedis" sources.hedis { });
-    pretty-diff = super.callCabal2nix "pretty-diff" sources.pretty-diff { };
     safe-coloured-text = super.callCabal2nix "safe-coloured-text"
       "${sources.safe-coloured-text}/safe-coloured-text" { };
     safe-coloured-text-terminfo =
@@ -43,6 +40,7 @@ in pkgs.mkShell {
         modern-uri
         network-uri
         pcre-light
+        postgresql-typed
         pretty-diff
         pretty-show
         process
@@ -73,6 +71,7 @@ in pkgs.mkShell {
     pkgs.ormolu
     pkgs.pcre
     pkgs.redis
+    pkgs.postgresql
     pkgs.zlib
   ];
 }
