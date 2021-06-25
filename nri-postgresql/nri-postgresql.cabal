@@ -32,11 +32,12 @@ library
       Postgres
       Postgres.Test
   other-modules:
-      Internal.Error
-      Internal.QueryParser
-      Internal.Time
+      Postgres.Connection
+      Postgres.Error
       Postgres.Query
+      Postgres.QueryParser
       Postgres.Settings
+      Postgres.Time
       Paths_nri_postgresql
   hs-source-dirs:
       src
@@ -78,13 +79,14 @@ test-suite tests
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      Internal.Error
-      Internal.QueryParser
-      Internal.Time
       Postgres
+      Postgres.Connection
+      Postgres.Error
       Postgres.Query
+      Postgres.QueryParser
       Postgres.Settings
       Postgres.Test
+      Postgres.Time
       ObservabilitySpec
       PostgresSettingsSpec
       QueryParserSpec

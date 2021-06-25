@@ -1,11 +1,11 @@
-module Internal.Error
+module Postgres.Error
   ( Error (..),
     TimeoutOrigin (..),
   )
 where
 
 import qualified Control.Exception.Safe as Exception
-import qualified Internal.Time as Time
+import qualified Postgres.Time as Time
 import qualified Log
 import qualified Text
 import Prelude (Show (show))

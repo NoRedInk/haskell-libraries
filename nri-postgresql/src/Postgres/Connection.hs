@@ -13,7 +13,7 @@ import Database.PostgreSQL.Typed
     pgDBUser,
     pgDisconnect,
   )
-import qualified Internal.Time as Time
+import qualified Postgres.Time as Time
 import qualified Log.SqlQuery as SqlQuery
 import qualified Network.Socket as Socket
 import qualified Postgres.Settings as Settings

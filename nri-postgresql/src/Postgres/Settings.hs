@@ -47,7 +47,7 @@ import Database.PostgreSQL.Typed
     pgDBUser,
   )
 import qualified Environment
-import qualified Internal.Time as Time
+import qualified Postgres.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
 import System.FilePath ((</>))

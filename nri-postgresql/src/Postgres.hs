@@ -39,7 +39,7 @@ import Database.PostgreSQL.Typed.Protocol
   )
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
-import qualified Internal.Time as Time
+import qualified Postgres.Time as Time
 import qualified List
 import qualified Log
 import qualified Log.SqlQuery as SqlQuery

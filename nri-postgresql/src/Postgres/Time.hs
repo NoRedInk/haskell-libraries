@@ -1,4 +1,4 @@
-module Internal.Time
+module Postgres.Time
   ( Interval,
     fromMicroseconds,
     fromMilliseconds,

@@ -1,7 +1,7 @@
 module QueryParserSpec (tests) where
 
 import qualified Expect
-import qualified Internal.QueryParser as Parser
+import qualified Postgres.QueryParser as Parser
 import Test (Test, describe, test)
 import qualified Text
 
@@ -11,7 +11,7 @@ import qualified Text
 tests :: Test
 tests =
   describe
-    "Internal.QueryParser"
+    "Postgres.QueryParser"
     [ describe
         "parse SQL"
         [ test "simple select" <| \_ ->

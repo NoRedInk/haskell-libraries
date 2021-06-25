@@ -25,8 +25,8 @@ import Database.PostgreSQL.Typed.Array ()
 import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
-import Internal.Error (Error (..), TimeoutOrigin (..))
-import qualified Internal.QueryParser as Parser
+import Postgres.Error (Error (..), TimeoutOrigin (..))
+import qualified Postgres.QueryParser as Parser
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),

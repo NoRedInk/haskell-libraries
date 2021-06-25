@@ -1,13 +1,13 @@
 module TimeSpec (tests) where
 
 import qualified Expect
-import qualified Internal.Time as Time
+import qualified Postgres.Time as Time
 import Test (Test, describe, test)
 
 tests :: Test
 tests =
   describe
-    "Internal.Time"
+    "Postgres.Time"
     [ test "fromSeconds" <| \_ ->
         Time.fromSeconds 2.5
           |> Time.microseconds
