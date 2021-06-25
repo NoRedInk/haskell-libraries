@@ -39,7 +39,6 @@ import Database.PostgreSQL.Typed.Protocol
   )
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
-import qualified Postgres.Time as Time
 import qualified List
 import qualified Log
 import qualified Log.SqlQuery as SqlQuery
@@ -48,6 +47,7 @@ import Postgres.Connection (Connection)
 import qualified Postgres.Connection as Connection
 import qualified Postgres.Query as Query
 import qualified Postgres.Settings as Settings
+import qualified Postgres.Time as Time
 import qualified Task
 import qualified Tuple
 import qualified Prelude
@@ -109,6 +109,17 @@ rollbackAllSafe conn c =
     pgBegin c
     pgRollbackAll c
 
+-- | Run a query against MySql. This will return a list of rows, where the @row@
+-- type is a tuple containing the queried columns.
+--
+-- > doQuery
+-- >   connection
+-- >   [sql| SELECT name, breed FROM doggos |]
+-- >   (\result ->
+-- >     case result of
+-- >       Ok rows -> Task.succeed rows
+-- >       Err err -> Task.fail err
+-- >   )
 doQuery ::
   HasCallStack =>
   Connection ->

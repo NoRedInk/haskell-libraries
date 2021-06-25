@@ -5,11 +5,12 @@ module Postgres.Error
 where
 
 import qualified Control.Exception.Safe as Exception
-import qualified Postgres.Time as Time
 import qualified Log
+import qualified Postgres.Time as Time
 import qualified Text
 import Prelude (Show (show))
 
+-- | A postgres query might fail with one of these errors.
 data Error
   = Timeout TimeoutOrigin Time.Interval
   | UniqueViolation Text

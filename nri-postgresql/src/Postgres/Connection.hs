@@ -13,13 +13,14 @@ import Database.PostgreSQL.Typed
     pgDBUser,
     pgDisconnect,
   )
-import qualified Postgres.Time as Time
 import qualified Log.SqlQuery as SqlQuery
 import qualified Network.Socket as Socket
 import qualified Postgres.Settings as Settings
+import qualified Postgres.Time as Time
 import qualified System.Exit
 import qualified Prelude
 
+-- | A connection to Postgres. You need this for making Postgres queries.
 data Connection = Connection
   { doAnything :: Platform.DoAnythingHandler,
     singleOrPool :: SingleOrPool PGConnection,
@@ -66,6 +67,7 @@ connectionIO settings = do
         (Settings.pgQueryTimeout settings)
     )
 
+-- | Create a 'Connection'.
 connection :: Settings.Settings -> Data.Acquire.Acquire Connection
 connection settings =
   Data.Acquire.mkAcquire (connectionIO settings) release

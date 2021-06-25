@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-cse #-}
 
+-- | Write tests that require a Postgres connection.
 module Postgres.Test (test) where
 
 import qualified Control.Concurrent.MVar as MVar

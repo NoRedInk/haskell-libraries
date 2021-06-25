@@ -47,12 +47,13 @@ import Database.PostgreSQL.Typed
     pgDBUser,
   )
 import qualified Environment
-import qualified Postgres.Time as Time
 import qualified Log
 import Network.Socket (SockAddr (SockAddrUnix))
+import qualified Postgres.Time as Time
 import System.FilePath ((</>))
 import Prelude (Either (Left, Right), pure, realToFrac, round, show)
 
+-- | Postgres connection details. You can use 'decoder' to create one of these.
 data Settings = Settings
   { pgConnection :: ConnectionSettings,
     pgPool :: PoolSettings,
@@ -65,11 +66,11 @@ defaultSettings =
   Settings
     { pgConnection =
         ConnectionSettings
-          { pgDatabase = PgDatabase "noredink_dev",
-            pgUser = PgUser "noredink_dev",
+          { pgDatabase = PgDatabase "postgresql",
+            pgUser = PgUser "postgresql",
             pgHost = PgHost "localhost",
             pgPassword = PgPassword (Log.mkSecret ""),
-            pgPort = PgPort 8088
+            pgPort = PgPort 5432
           },
       pgPool =
         PoolSettings
@@ -100,6 +101,34 @@ data PoolSettings = PoolSettings
   }
   deriving (Eq, Show)
 
+-- | Create a 'Settings' value by reading settings from environment values.
+--
+-- [@environment variable@] PGHOST
+-- [@default value@] localhost
+--
+-- [@environment variable@] PGPORT
+-- [@default value@] 5432
+--
+-- [@environment variable@] PGDATABASE
+-- [@default value@] postgresql
+--
+-- [@environment variable@] PGUSER
+-- [@default value@] postgresql
+--
+-- [@environment variable@] PGPASSWORD
+-- [@default value@]
+--
+-- [@environment variable@] PG_POOL_SIZE
+-- [@default value@] 500
+--
+-- [@environment variable@] PG_POOL_STRIPES
+-- [@default value@] 1
+--
+-- [@environment variable@] PG_POOL_MAX_IDLE_TIME
+-- [@default value@] 3600
+--
+-- [@environment variable@] PG_QUERY_TIMEOUT_SECONDS
+-- [@default value@] 5
 decoder :: Environment.Decoder Settings
 decoder = decoderWithPrefix ""
 

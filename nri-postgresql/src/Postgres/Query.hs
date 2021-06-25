@@ -25,8 +25,6 @@ import Database.PostgreSQL.Typed.Array ()
 import Database.PostgreSQL.Typed.Query (getQueryString, pgQuery)
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import qualified Environment
-import Postgres.Error (Error (..), TimeoutOrigin (..))
-import qualified Postgres.QueryParser as Parser
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Quote
   ( QuasiQuoter (QuasiQuoter, quoteDec, quoteExp, quotePat, quoteType),
@@ -35,26 +33,14 @@ import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import qualified Log
 import qualified Log.SqlQuery as SqlQuery
+import Postgres.Error (Error (..), TimeoutOrigin (..))
+import qualified Postgres.QueryParser as Parser
 import qualified Postgres.Settings
 import qualified Text
 import Prelude (IO)
 import qualified Prelude
 
--- |
--- A wrapper around a `postgresql-typed` query. This type has a number of
--- different purposes.
---
--- 1. By not using the native `postgresql-typed` Query type we ensure all our
---    queries are made through the `database` package, which in turn ensures
---    they're all logged and traced.
--- 2. The `postgresql-typed` query type is parametrized over `q`. It's not
---    immediately clear what this `q` means. Our query type is parametrized over
---    `row`, the type of the rows this query returns. That's conceptually much
---    easier to gok.
--- 3. We attach a bunch of meta data that can be derived from the wrapped
---    `postgresql-typed` query type. Although this information could be
---    calculated on the fly for each query, attaching it to our own `Query`
---    type ensures we only need to calculate the metadata once, at compile time.
+-- | A Postgres query. Create one of these using the `sql` quasiquoter.
 data Query row = Query
   { -- | Run a query against Postgres
     runQuery :: PGConnection -> IO [row],
@@ -89,6 +75,12 @@ qqSQL query = do
           }
     |]
 
+-- | Quasi-quoter that allows you to write plain SQL in your code. The query is
+-- checked at compile-time using the 'postgresql-typed' library.
+--
+-- Requires the QuasiQuotes language extension to be enabled.
+--
+-- > [sql| SELECT name, breed FROM doggos |]
 sql :: QuasiQuoter
 sql =
   QuasiQuoter
