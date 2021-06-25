@@ -11,7 +11,6 @@ module Postgres.Query
   ( sql,
     Query (..),
     Error (..),
-    TimeoutOrigin (..),
     format,
     details,
   )
@@ -33,7 +32,7 @@ import Language.Haskell.TH.Syntax (runIO)
 import qualified List
 import qualified Log
 import qualified Log.SqlQuery as SqlQuery
-import Postgres.Error (Error (..), TimeoutOrigin (..))
+import Postgres.Error (Error (..))
 import qualified Postgres.QueryParser as Parser
 import qualified Postgres.Settings
 import qualified Text
