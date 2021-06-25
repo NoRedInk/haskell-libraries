@@ -170,7 +170,7 @@ fromPGError c pgError =
         |> Text.fromList
         |> Query.UniqueViolation
     "57014" ->
-      Query.Timeout (Connection.timeout c)
+      Query.Timeout (Time.milliseconds (Connection.timeout c))
     _ ->
       Exception.displayException pgError
         |> Text.fromList
@@ -205,7 +205,7 @@ withTimeout conn task =
     then
       Task.timeout
         (Time.milliseconds (Connection.timeout conn))
-        (Query.Timeout (Connection.timeout conn))
+        (Query.Timeout (Time.milliseconds (Connection.timeout conn)))
         task
     else task
 
