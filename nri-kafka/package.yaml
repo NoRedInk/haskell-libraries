@@ -1,9 +1,19 @@
-<<: !include ../package-yaml-support/base-package.yaml
 name: kafka
-synopsis: NRI helper for working with Kafka
+synopsis: Functions for working with Kafka
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka>.
+homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme
+author: NoRedInk
+version: 0.1.0.0
+maintainer: haskell-open-source@noredink.com
+copyright: 2021 NoRedInk Corp.
+github: NoRedInk/haskell-libraries/nri-kafka
+license-file: LICENSE
+category: Web
 extra-source-files:
 - README.md
-dependencies: &dependencies
+- LICENSE
+- CHANGELOG.md
+dependencies:
 - aeson
 - async
 - base
@@ -30,10 +40,38 @@ library:
   - Kafka.Worker.Settings
   source-dirs: src
 tests:
-  spec:
-    dependencies: *dependencies
+  tests:
     main: Main.hs
     source-dirs:
     - src
     - test
-    ghc-options: *test-ghc-options
+    ghc-options:
+      - -threaded
+      - -rtsopts "-with-rtsopts=-N -T"
+      - -fno-warn-type-defaults
+default-extensions:
+  - DataKinds
+  - DeriveGeneric
+  - ExtendedDefaultRules
+  - FlexibleContexts
+  - FlexibleInstances
+  - GeneralizedNewtypeDeriving
+  - MultiParamTypeClasses
+  - NamedFieldPuns
+  - NoImplicitPrelude
+  - NumericUnderscores
+  - OverloadedStrings
+  - PartialTypeSignatures
+  - ScopedTypeVariables
+  - Strict
+  - TypeOperators
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wpartial-fields
+  - -Wredundant-constraints
+  - -Wincomplete-uni-patterns
+  - -fno-warn-type-defaults
+  - -fplugin=NriPrelude.Plugin

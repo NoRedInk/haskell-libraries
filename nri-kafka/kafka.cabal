@@ -1,0 +1,140 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           kafka
+version:        0.1.0.0
+synopsis:       Functions for working with Kafka
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka>.
+category:       Web
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme
+bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
+author:         NoRedInk
+maintainer:     haskell-open-source@noredink.com
+copyright:      2021 NoRedInk Corp.
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    LICENSE
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/NoRedInk/haskell-libraries
+  subdir: nri-kafka
+
+library
+  exposed-modules:
+      Kafka
+      Kafka.Settings
+      Kafka.Test
+      Kafka.Worker
+      Kafka.Worker.Settings
+  other-modules:
+      Kafka.Internal
+      Kafka.Settings.Internal
+      Kafka.Worker.Analytics
+      Kafka.Worker.Fetcher
+      Kafka.Worker.Partition
+      Kafka.Worker.Stopping
+      Paths_kafka
+  hs-source-dirs:
+      src
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      ExtendedDefaultRules
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      NumericUnderscores
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin
+  build-depends:
+      aeson
+    , async
+    , base
+    , bytestring
+    , conduit
+    , containers
+    , hw-kafka-client
+    , nri-env-parser
+    , nri-extras
+    , nri-observability
+    , nri-prelude
+    , safe-exceptions
+    , stm
+    , text
+    , unix
+    , uuid
+    , webserver
+  default-language: Haskell2010
+
+test-suite tests
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Kafka
+      Kafka.Internal
+      Kafka.Settings
+      Kafka.Settings.Internal
+      Kafka.Test
+      Kafka.Worker
+      Kafka.Worker.Analytics
+      Kafka.Worker.Fetcher
+      Kafka.Worker.Partition
+      Kafka.Worker.Settings
+      Kafka.Worker.Stopping
+      Spec.Kafka.Worker.Integration
+      Spec.Kafka.Worker.Partition
+      Paths_kafka
+  hs-source-dirs:
+      src
+      test
+  default-extensions:
+      DataKinds
+      DeriveGeneric
+      ExtendedDefaultRules
+      FlexibleContexts
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      MultiParamTypeClasses
+      NamedFieldPuns
+      NoImplicitPrelude
+      NumericUnderscores
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+      TypeOperators
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
+  build-depends:
+      aeson
+    , async
+    , base
+    , bytestring
+    , conduit
+    , containers
+    , hw-kafka-client
+    , nri-env-parser
+    , nri-extras
+    , nri-observability
+    , nri-prelude
+    , safe-exceptions
+    , stm
+    , text
+    , unix
+    , uuid
+    , webserver
+  default-language: Haskell2010
