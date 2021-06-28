@@ -13,24 +13,24 @@ extra-doc-files:
   - README.md
   - LICENSE
   - CHANGELOG.md
+dependencies:
+  - aeson >= 1.4.6.0 && < 1.6
+  - async >=2.2.2 && <2.3
+  - base >= 4.12.0.0 && < 4.16
+  - bytestring >= 0.10.8.2 && < 0.12
+  - conduit >= 1.3.0 && < 1.4
+  # hedis 14 introduces redis-cluster support
+  - hedis >= 0.14.0 && < 0.15
+  - nri-env-parser >= 0.1.0.0 && < 0.2
+  - nri-observability >= 0.1.0 && < 0.2
+  - nri-prelude >= 0.1.0.0 && < 0.7
+  - nri-test-encoding >= 0.1.0 && < 0.2
+  - resourcet >= 1.2.0 && < 1.3
+  - safe-exceptions >= 0.1.7.0 && < 1.3
+  - text >= 1.2.3.1 && < 1.3
+  - unordered-containers >=0.2.0.0 && <0.3
+  - uuid >=1.3.0 && < 1.4
 library:
-  dependencies: &dependencies
-    - aeson >= 1.4.6.0 && < 1.6
-    - async >=2.2.2 && <2.3
-    - base >= 4.12.0.0 && < 4.16
-    - bytestring >= 0.10.8.2 && < 0.12
-    - conduit >= 1.3.0 && < 1.4
-    # hedis 14 introduces redis-cluster support
-    - hedis >= 0.14.0 && < 0.15
-    - nri-env-parser >= 0.1.0.0 && < 0.2
-    - nri-observability >= 0.1.0 && < 0.2
-    - nri-prelude >= 0.1.0.0 && < 0.7
-    - nri-test-encoding >= 0.1.0 && < 0.2
-    - resourcet >= 1.2.0 && < 1.3
-    - safe-exceptions >= 0.1.7.0 && < 1.3
-    - text >= 1.2.3.1 && < 1.3
-    - unordered-containers >=0.2.0.0 && <0.3
-    - uuid >=1.3.0 && < 1.4
   exposed-modules:
     - NonEmptyDict
     - Redis
@@ -70,8 +70,11 @@ ghc-options:
   - -fplugin=NriPrelude.Plugin
 tests:
   tests:
-    dependencies: *dependencies
     main: Main.hs
     source-dirs:
       - test
       - src
+    ghc-options:
+      - -threaded
+      - -rtsopts "-with-rtsopts=-N -T"
+      - -fno-warn-type-defaults
