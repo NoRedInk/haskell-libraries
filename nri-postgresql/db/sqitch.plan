@@ -1,4 +1,0 @@
-%syntax-version=1.0.0
-%project=database-tests
-
-empty 2020-07-16T10:04:19Z Jasper Woudenberg <jasper@noredink.com> # add empty migration to tests dont fail
