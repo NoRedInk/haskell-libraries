@@ -1,0 +1,39 @@
+<<: !include ../package-yaml-support/base-package.yaml
+name: kafka
+synopsis: NRI helper for working with Kafka
+extra-source-files:
+- README.md
+dependencies: &dependencies
+- aeson
+- async
+- base
+- bytestring
+- conduit
+- containers
+- hw-kafka-client
+- nri-env-parser
+- nri-extras
+- nri-observability
+- nri-prelude
+- safe-exceptions
+- stm
+- text
+- unix
+- uuid
+- webserver
+library:
+  exposed-modules:
+  - Kafka
+  - Kafka.Settings
+  - Kafka.Test
+  - Kafka.Worker
+  - Kafka.Worker.Settings
+  source-dirs: src
+tests:
+  spec:
+    dependencies: *dependencies
+    main: Main.hs
+    source-dirs:
+    - src
+    - test
+    ghc-options: *test-ghc-options

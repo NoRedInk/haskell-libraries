@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:kafka"
+
+    - path: "src"
+      component: "kafka:test:spec"
+
+    - path: "test"
+      component: "kafka:test:spec"
