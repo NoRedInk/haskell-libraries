@@ -1,6 +1,6 @@
 all: cabal
 
-cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal nri-redis/nri-redis.cabal nri-test-encoding/nri-test-encoding.cabal nri-http/nri-http.cabal
+cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal nri-redis/nri-redis.cabal nri-test-encoding/nri-test-encoding.cabal nri-http/nri-http.cabal nri-postgresql/nri-postgresql.cabal
 
 nri-env-parser/nri-env-parser.cabal: nri-env-parser/package.yaml
 	hpack nri-env-parser
@@ -34,6 +34,12 @@ ghcid-nri-prelude-test: nri-prelude-test/nri-prelude-test.cabal
 
 ghcid-nri-prelude: nri-prelude/nri-prelude.cabal
 	cd nri-prelude && ghcid
+
+nri-postgresql/nri-postgresql.cabal: nri-postgresql/package.yaml
+	hpack nri-postgresql
+
+ghcid-nri-postgresql: nri-postgresql/nri-postgresql.cabal
+	cd nri-postgresql && ghcid
 
 nri-redis/nri-redis.cabal: nri-redis/package.yaml
 	hpack nri-redis
