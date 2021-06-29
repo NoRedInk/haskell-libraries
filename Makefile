@@ -20,12 +20,10 @@ nri-redis/nri-redis.cabal: nri-redis/package.yaml
 nri-http/nri-http.cabal: nri-http/package.yaml
 	hpack nri-http
 
-ghcid-nri-prelude-test: nri-prelude-test/nri-prelude-test.cabal
-
 nri-test-encoding/nri-test-encoding.cabal: nri-test-encoding/package.yaml
 	hpack nri-test-encoding
 
-ghcid-nri-prelude-test:
+ghcid-nri-prelude-test: nri-prelude-test/nri-prelude-test.cabal
 	cd nri-prelude && ghcid --command "cabal repl nri-prelude:test:tests" --test Main.main
 
 ghcid-nri-prelude: nri-prelude/nri-prelude.cabal
@@ -46,8 +44,8 @@ ghcid-nri-redis: nri-redis/nri-redis.cabal
 ghcid-nri-redis-test: nri-redis/nri-redis.cabal
 	cd nri-redis && ghcid --command "cabal repl nri-redis:test:tests" --test Main.main
 
-ghcid-nri-test-encoding:
+ghcid-nri-test-encoding: nri-test-encoding/nri-test-encoding.cabal
 	cd nri-test-encoding && ghcid
 
-ghcid-nri-http:
+ghcid-nri-http: nri-http/nri-http.cabal
 	cd nri-http && ghcid
