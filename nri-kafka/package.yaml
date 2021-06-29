@@ -1,4 +1,4 @@
-name: kafka
+name: nri-kafka
 synopsis: Functions for working with Kafka
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme

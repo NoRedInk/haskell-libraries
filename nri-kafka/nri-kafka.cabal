@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           kafka
+name:           nri-kafka
 version:        0.1.0.0
 synopsis:       Functions for working with Kafka
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka>.
@@ -41,7 +41,7 @@ library
       Kafka.Worker.Fetcher
       Kafka.Worker.Partition
       Kafka.Worker.Stopping
-      Paths_kafka
+      Paths_nri_kafka
   hs-source-dirs:
       src
   default-extensions:
@@ -96,7 +96,7 @@ test-suite tests
       Kafka.Worker.Stopping
       Spec.Kafka.Worker.Integration
       Spec.Kafka.Worker.Partition
-      Paths_kafka
+      Paths_nri_kafka
   hs-source-dirs:
       src
       test
