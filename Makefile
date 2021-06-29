@@ -1,6 +1,6 @@
 all: cabal
 
-cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal nri-redis/nri-redis.cabal nri-test-encoding/nri-test-encoding.cabal nri-http/nri-http.cabal nri-postgresql/nri-postgresql.cabal
+cabal: nri-prelude/nri-prelude.cabal nri-env-parser/nri-env-parser.cabal nri-log-explorer/nri-log-explorer.cabal nri-observability/nri-observability.cabal nri-redis/nri-redis.cabal nri-test-encoding/nri-test-encoding.cabal nri-http/nri-http.cabal nri-postgresql/nri-postgresql.cabal nri-kafka/nri-kafka.cabal
 
 nri-env-parser/nri-env-parser.cabal: nri-env-parser/package.yaml
 	hpack nri-env-parser
@@ -13,6 +13,15 @@ nri-http/nri-http.cabal: nri-http/package.yaml
 
 ghcid-nri-http: nri-http/nri-http.cabal
 	cd nri-http && ghcid
+
+nri-kafka/nri-kafka.cabal: nri-kafka/package.yaml
+	hpack nri-kafka
+
+ghcid-nri-kafka: nri-kafka/nri-kafka.cabal
+	cd nri-kafka && ghcid
+
+ghcid-nri-kafka-test: nri-kafka/nri-kafka.cabal
+	cd nri-kafka && ghcid --command "cabal repl nri-kafka:test:tests" --test Main.main
 
 nri-log-explorer/nri-log-explorer.cabal: nri-log-explorer/package.yaml
 	hpack nri-log-explorer
