@@ -34,6 +34,7 @@ in pkgs.mkShell {
         hostname
         http-client
         http-client-tls
+        hw-kafka-client
         io-streams
         junit-xml
         microlens
