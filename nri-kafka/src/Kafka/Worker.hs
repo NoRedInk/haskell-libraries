@@ -26,7 +26,6 @@ module Kafka.Worker
   )
 where
 
-import qualified CLI
 import qualified Conduit
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
@@ -47,6 +46,7 @@ import qualified Kafka.Worker.Settings as Settings
 import qualified Kafka.Worker.Stopping as Stopping
 import qualified Observability
 import qualified Set
+import qualified System.Environment
 import qualified System.Exit
 import qualified System.Posix.Process
 import qualified System.Posix.Signals as Signals
@@ -355,8 +355,25 @@ cleanUp observabilityHandler rebalanceInfo stopping maybeException consumer = do
             ]
             |> Task.perform log
 
-  CLI.writeCrashLogOnError maybeException
+  writeCrashLogOnError maybeException
   Prelude.putStrLn "Bye!"
+
+-- | Handle crash logging
+writeCrashLogOnError :: Maybe Exception.SomeException -> Prelude.IO ()
+writeCrashLogOnError maybeException = do
+  -- Not using the nri-env-parser lib for this configuration option because it would
+  -- require us to run code to make it available. If that code failed it
+  -- wouldn't end up in the crash log! Using only `base` functionality allows us
+  -- to put the crashlog reporting in the very root of the application.
+  crashLogPath <- System.Environment.lookupEnv "CRASHLOG_PATH"
+  let crashLog =
+        case maybeException of
+          Nothing -> "System exited in response to signal"
+          Just exception -> Exception.displayException exception
+  case crashLogPath of
+    Nothing -> Prelude.pure ()
+    Just "" -> Prelude.pure ()
+    Just path -> Prelude.writeFile path crashLog
 
 -- Adds a partition to our partitions dict. These partitions will be idle until
 -- lib-rdkafka actually starts sending us new messages

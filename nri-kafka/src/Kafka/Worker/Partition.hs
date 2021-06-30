@@ -26,6 +26,8 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import qualified Data.Sequence as Seq
 import qualified Data.Text.Encoding
+import qualified Data.Time.Clock as Clock
+import qualified Data.Time.Clock.POSIX as Clock.POSIX
 import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified GHC.Clock
@@ -37,7 +39,6 @@ import qualified Kafka.Worker.Stopping as Stopping
 import qualified Log.Kafka
 import qualified Observability
 import qualified Platform
-import qualified Time
 import qualified Prelude
 
 data WorkerError e
@@ -293,8 +294,8 @@ getTracingDetails ::
 getTracingDetails analytics (ProcessAttemptsCount processAttempt) record = do
   let (createTime, logAppendTime) =
         case Consumer.crTimestamp record of
-          Consumer.CreateTime millis -> (Just (Time.toUTCTime <| millisToSecs millis), Nothing)
-          Consumer.LogAppendTime millis -> (Nothing, Just (Time.toUTCTime <| millisToSecs millis))
+          Consumer.CreateTime millis -> (Just (millisToSecs millis), Nothing)
+          Consumer.LogAppendTime millis -> (Nothing, Just (millisToSecs millis))
           Consumer.NoTimestamp -> (Nothing, Nothing)
   let eitherMsg =
         Consumer.crValue record
@@ -349,8 +350,8 @@ getTracingDetails analytics (ProcessAttemptsCount processAttempt) record = do
         }
     )
 
-millisToSecs :: Consumer.Millis -> Time.Time
-millisToSecs (Consumer.Millis millis) = Time.fromPosix (millis // 1000)
+millisToSecs :: Consumer.Millis -> Clock.UTCTime
+millisToSecs (Consumer.Millis millis) = fromPosix (millis // 1000)
 
 decodeMessage :: (Aeson.FromJSON msg) => ConsumerRecord -> Task (WorkerError e) msg
 decodeMessage record = do
@@ -486,3 +487,11 @@ length (Partition partition) = do
 
 revoke :: Partition -> STM.STM ()
 revoke (Partition partition) = TVar.writeTVar partition Stopping
+
+-- | Create a time from a posix timestamp, a number of seconds since the Linux
+-- epoch. This provides us a way to create constant timetamps for tests.
+fromPosix :: Int -> Clock.UTCTime
+fromPosix secondsSinceEpoch =
+  secondsSinceEpoch
+    |> Prelude.fromIntegral
+    |> Clock.POSIX.posixSecondsToUTCTime
