@@ -23,7 +23,7 @@ ghcid-nri-log-explorer: nri-log-explorer/nri-log-explorer.cabal
 nri-observability/nri-observability.cabal: nri-observability/package.yaml
 	hpack nri-observability
 
-ghcid-nri-observability: nri-observability/nri-observability
+ghcid-nri-observability: nri-observability/nri-observability.cabal
 	cd nri-observability && ghcid
 
 nri-prelude/nri-prelude.cabal: nri-prelude/package.yaml
