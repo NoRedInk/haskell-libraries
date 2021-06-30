@@ -14,15 +14,15 @@ module Kafka.Worker
     Description (..),
     Partition.MessageCallback (Partition.MessageCallback),
     OffsetSource (..),
-    -- For tests
-    processWithoutShutdownEnsurance,
-    PartitionKey,
-    Partition.ProcessResult (..),
     Consumer.ConsumerGroupId (..),
+    PartitionKey,
     Consumer.TopicName (..),
     Consumer.ConsumerRecord (..),
+    Partition.ProcessResult (..),
     Consumer.PartitionId (..),
     Consumer.unOffset,
+    -- For tests
+    processWithoutShutdownEnsurance,
   )
 where
 
@@ -52,6 +52,7 @@ import qualified System.Posix.Process
 import qualified System.Posix.Signals as Signals
 import qualified Prelude
 
+-- | Alias for a TopicName and PartitionId, something every message will have
 type PartitionKey = (Consumer.TopicName, Consumer.PartitionId)
 
 type AllPartitions = TVar.TVar (Dict.Dict PartitionKey Partition.Partition)
@@ -69,6 +70,7 @@ data State = State
     rebalanceInfo :: RebalanceInfo
   }
 
+-- | All the required parameters to start the Kafka worker
 data Description = Description
   { settings :: Settings.Settings,
     groupId :: Consumer.ConsumerGroupId,

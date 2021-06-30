@@ -1,3 +1,4 @@
+-- | Tests, exposed so we can run them against GHCID
 module Kafka.Test
   ( stub,
     spawnWorker,

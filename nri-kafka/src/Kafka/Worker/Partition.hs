@@ -61,6 +61,11 @@ newtype ProcessAttemptsCount = ProcessAttemptsCount Int
 
 newtype Partition = Partition (TVar.TVar Backlog)
 
+-- | ProcessResult is the expected response of the MessageCallback.
+-- Return Success if processing succeeded and the offset was correct.
+-- Return ExpectedOffset with the expected offset if the offset of the message
+-- processed was wrong (this only makes sense when Kafka isn't managing the offset)
+-- The MessageCallback will throw if proccessing throws.
 data ProcessResult
   = Success
   | ExpectedOffset Int
@@ -85,6 +90,7 @@ newtype OnStartup = OnStartup (Partition -> Prelude.IO ())
 -- this is a function that runs with the partition when it's done to cleanup
 newtype OnCleanup = OnCleanup (Prelude.IO ())
 
+-- | MessageCallback is used by your worker to process messages peeled off the queue.
 data MessageCallback where
   MessageCallback ::
     (Show e, Aeson.ToJSON msg, Aeson.FromJSON msg) =>
