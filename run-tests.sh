@@ -16,5 +16,8 @@ pg_ctl start -o '-k .'
 mkdir -p ./_build/redis/data
 redis-server --daemonize yes --dir ./_build/redis/data
 
+## start kafka
+kafka-server-start.sh --override num.partitions=10
+
 cabal build all
 cabal test all

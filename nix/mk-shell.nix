@@ -63,6 +63,7 @@ in pkgs.mkShell {
         vector
         vty
       ]))
+    pkgs.apacheKafka
     pkgs.cabal-install
     pkgs.cachix
     pkgs.gnumake
