@@ -17,8 +17,10 @@ mkdir -p ./_build/redis/data
 redis-server --daemonize yes --dir ./_build/redis/data
 
 ## start kafka
+kafka-server-stop.sh || true # but first stop it
 server_properties_path=$(dirname "$(which kafka-server-start.sh)")/../config/server.properties
 kafka-server-start.sh -daemon "$server_properties_path" --override num.partitions=10
+
 # wait for zookeeper
 echo "waiting for zookeeper to start"
 until nc -vz localhost 2181
