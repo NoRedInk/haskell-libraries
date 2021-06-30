@@ -198,7 +198,7 @@ test description body =
                       Ok
                       ( testHandler
                           settings
-                            { Settings.batchNumMessages = Settings.BatchNumMessages 1
+                            { Settings.batchNumMessages = Settings.exampleBatchNumMessages
                             }
                       )
                   Err err -> Debug.todo ("Failed to to decode worker settings" ++ err)
