@@ -132,7 +132,7 @@ data Api key a = Api
     --
     -- https://redis.io/commands/setex
     setex :: key -> Int -> a -> Internal.Query (),
-    -- Set key to hold string value if key does not exist. In that case, it
+    -- | Set key to hold string value if key does not exist. In that case, it
     -- is equal to SET. When key already holds a value, no operation is
     -- performed. SETNX is short for "SET if Not eXists".
     --
