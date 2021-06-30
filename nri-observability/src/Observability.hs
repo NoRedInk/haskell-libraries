@@ -35,11 +35,12 @@ import Prelude (pure, traverse)
 import qualified Prelude
 
 -- | A handler for reporting to logging/monitoring/observability platforms.
---
--- The `report` function takes a span containing all the tracing information we
--- collected for a single request and then reports it to all platforms we
--- enabled when creating this handler.
-newtype Handler = Handler {report :: Text -> Platform.TracingSpan -> Prelude.IO ()}
+newtype Handler = Handler
+  { -- | `report` takes a span containing all the tracing information we
+    --  collected for a single request and then reports it to all platforms we
+    --  enabled when creating this handler.
+    report :: Text -> Platform.TracingSpan -> Prelude.IO ()
+  }
   deriving (Prelude.Semigroup, Prelude.Monoid)
 
 -- | Function for creating an observability handler. The settings we pass in
@@ -195,6 +196,8 @@ data Settings = Settings
 stdout :: Settings -> File.Settings
 stdout settings = (file settings) {File.logFile = "/dev/stdout"}
 
+-- | Read 'Settings' from environment variables. Default variables will be used
+-- in case no environment variable is set for an option.
 decoder :: Environment.Decoder Settings
 decoder =
   pure Settings
