@@ -5,7 +5,7 @@ dist: xenial
 env:
   global:
     - PGPORT=8088
-    - CACHIX_CACHE=nri-open-source
+    - CACHIX_CACHE=nri
 install:
   - echo "trusted-users = $USER" | sudo tee -a /etc/nix/nix.conf
   - sudo systemctl restart nix-daemon
