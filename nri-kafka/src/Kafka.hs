@@ -6,6 +6,7 @@ module Kafka
     Error (..),
     Topic (..),
     Key (..),
+    Msg,
     handler,
     msg,
     sendAsync,
@@ -49,6 +50,10 @@ instance Aeson.ToJSON DeliveryReportDetails
 
 instance Platform.TracingSpanDetails DeliveryReportDetails
 
+-- Creates a Kafka-writable message from a topic, key, and JSON-encodable
+-- payload
+--
+-- We ask for JSON decodability to ensure the Kafka worker can later read the message
 msg :: (Aeson.FromJSON a, Aeson.ToJSON a) => Topic -> Key -> a -> Msg
 msg topic key contents = Msg topic key (Encodable contents)
 
@@ -73,6 +78,9 @@ record Msg {topic, key, payload} = do
             |> Just
       }
 
+-- | Function for creating a Kafka handler.
+--
+-- See 'Kafka.Settings' for potential customizations.
 handler :: Settings.Settings -> Conduit.Acquire Handler
 handler settings = do
   producer <- Conduit.mkAcquire (mkProducer settings) Producer.closeProducer

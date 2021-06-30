@@ -7,13 +7,22 @@ import qualified Data.Aeson as Aeson
 import qualified Kafka.Producer as Producer
 import qualified Prelude
 
+-- | A handler for writing to Kafka
 data Handler = Handler
-  { sendAsync :: OnDelivery -> Msg -> Task Error (),
+  { -- | sends messages asynchronously with to Kafka
+    --
+    -- This is the recommended approach for high throughput. The C++ library
+    -- behind hte scenes, librdkafka, will batch messages together.
+    sendAsync :: OnDelivery -> Msg -> Task Error (),
+    -- | sends messages synchronously with to Kafka
+    --
+    -- This can have a large negative impact on throughput. Use sparingly!
     sendSync :: Msg -> Task Error ()
   }
 
 type OnDelivery = Task Never ()
 
+-- | A message that can be written to Kafka
 data Msg = Msg
   { topic :: Topic,
     key :: Key,
@@ -38,13 +47,17 @@ instance Aeson.FromJSON Encodable where
 instance Show Encodable where
   show (Encodable x) = Prelude.show (Aeson.toJSON x)
 
+-- | Errors.
+-- If you experience an 'Uncaught' exception, please wrap it here type here!
 data Error
   = SendingFailed (Producer.ProducerRecord, Producer.KafkaError)
   | Uncaught Exception.SomeException
   deriving (Show)
 
+-- | A kafka topic
 newtype Topic = Topic {unTopic :: Text} deriving (Aeson.ToJSON, Show)
 
+-- | A kafka key
 newtype Key = Key {unKey :: Text} deriving (Show, Aeson.ToJSON, Eq, Ord)
 
 data MsgWithMetaData = MsgWithMetaData
