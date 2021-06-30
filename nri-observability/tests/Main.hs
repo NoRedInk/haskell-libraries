@@ -1,5 +1,6 @@
 module Main (main) where
 
+import qualified Spec.Observability
 import qualified Spec.Platform.Timer
 import qualified Spec.Reporter.Bugsnag
 import qualified Spec.Reporter.Dev
@@ -19,5 +20,6 @@ tests =
       Spec.Reporter.Bugsnag.tests,
       Spec.Reporter.Dev.tests,
       Spec.Reporter.File.tests,
-      Spec.Reporter.Honeycomb.tests
+      Spec.Reporter.Honeycomb.tests,
+      Spec.Observability.tests
     ]

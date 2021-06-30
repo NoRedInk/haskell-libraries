@@ -1,3 +1,8 @@
+# 0.1.1.1
+
+- Add `Observability` glue module (still needs better documentation!)
+  - Adds direct dependency on conduit
+
 # 0.1.1.0
 
 - Add honeycomb.io reporter.
