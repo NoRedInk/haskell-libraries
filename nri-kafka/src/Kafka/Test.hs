@@ -222,6 +222,9 @@ test description body =
       )
       body
 
+-- | Can be used to test your Kafka writer.
+-- yields a mock Kafka handler, and returns an expectation wrapping a list of
+-- messages that would have been written if the handler was real
 stub ::
   Stack.HasCallStack =>
   (Internal.Handler -> Expect.Expectation) ->

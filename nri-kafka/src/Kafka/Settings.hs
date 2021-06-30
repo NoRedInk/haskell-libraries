@@ -1,3 +1,4 @@
+-- | Kafka.Settings
 module Kafka.Settings
   ( Settings (..),
     decoder,

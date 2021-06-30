@@ -30,16 +30,16 @@ source-repository head
 library
   exposed-modules:
       Kafka
-      Kafka.Settings
-      Kafka.Test
       Kafka.Worker
-      Kafka.Worker.Settings
+      Kafka.Test
   other-modules:
       Kafka.Internal
+      Kafka.Settings
       Kafka.Settings.Internal
       Kafka.Worker.Analytics
       Kafka.Worker.Fetcher
       Kafka.Worker.Partition
+      Kafka.Worker.Settings
       Kafka.Worker.Stopping
       Paths_nri_kafka
   hs-source-dirs:
@@ -70,7 +70,7 @@ library
     , containers >=0.6.0.1 && <0.7
     , hw-kafka-client >=4.0.3 && <5.0
     , nri-env-parser >=0.1.0.0 && <0.2
-    , nri-observability >=0.1.0 && <0.2
+    , nri-observability >=0.1.1.1 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6
@@ -127,7 +127,7 @@ test-suite tests
     , containers >=0.6.0.1 && <0.7
     , hw-kafka-client >=4.0.3 && <5.0
     , nri-env-parser >=0.1.0.0 && <0.2
-    , nri-observability >=0.1.0 && <0.2
+    , nri-observability >=0.1.1.1 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6

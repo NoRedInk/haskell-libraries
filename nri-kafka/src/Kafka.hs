@@ -1,12 +1,18 @@
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
+-- | Kafka is a module for _writing_ to Kafka
+--
+-- See Kafka.Worker for the basic building blocks of a CLI app that will poll &
+-- process kafka messages
 module Kafka
   ( Handler,
     Error (..),
     Topic (..),
     Key (..),
     Msg,
+    Settings.Settings,
+    Settings.decoder,
     handler,
     msg,
     sendAsync,
@@ -50,7 +56,7 @@ instance Aeson.ToJSON DeliveryReportDetails
 
 instance Platform.TracingSpanDetails DeliveryReportDetails
 
--- Creates a Kafka-writable message from a topic, key, and JSON-encodable
+-- | Creates a Kafka-writable message from a topic, key, and JSON-encodable
 -- payload
 --
 -- We ask for JSON decodability to ensure the Kafka worker can later read the message

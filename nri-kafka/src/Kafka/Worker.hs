@@ -8,7 +8,11 @@
 --    turning on and off worker threads.
 -- 3. A single-thread `pauseAndAnalyticsLoop` that tells the kafka library to pause & resume
 --    sending us messages from specific partitions (based on a number of factors)
--- 4. Multiple worker-threads (`Partition.processMsgLoop`), one per (topic,partition)
+-- 4. Multiple worker-threads (`Partition.processMsgLoop`), one per
+--    (topic,partition)
+
+-- | Kafka.Worker is a module for processing a Kafka log.
+-- It can be used to build a CLI that will consume and process a user-defined message type
 module Kafka.Worker
   ( process,
     Description (..),
@@ -21,6 +25,8 @@ module Kafka.Worker
     Partition.ProcessResult (..),
     Consumer.PartitionId (..),
     Consumer.unOffset,
+    Settings.Settings,
+    Settings.decoder,
     -- For tests
     processWithoutShutdownEnsurance,
   )
