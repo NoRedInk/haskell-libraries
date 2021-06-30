@@ -35,6 +35,13 @@ import NriPrelude.Plugin.GhcVersionDependent
 import qualified Set
 import Prelude
 
+-- | adds an unqualified import of the NriPrelude module, and qualified imports of
+-- other base modules such as List and Maybe.
+--
+-- To use it make sure your project has @nri-prelude@ listed as a dependency,
+-- then add the follwing ghc option to your cabal or package yaml file:
+--
+-- > -fplugin=NriPrelude.Plugin
 plugin :: GhcPlugins.Plugin
 plugin =
   GhcPlugins.defaultPlugin
