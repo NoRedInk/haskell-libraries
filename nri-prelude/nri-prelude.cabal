@@ -7,7 +7,7 @@ cabal-version: 1.18
 name:           nri-prelude
 version:        0.6.0.2
 synopsis:       A Prelude inspired by the Elm programming language
-description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme>.
 category:       Web
 homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues

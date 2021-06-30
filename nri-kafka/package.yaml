@@ -1,6 +1,6 @@
 name: nri-kafka
 synopsis: Functions for working with Kafka
-description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka>.
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme
 author: NoRedInk
 version: 0.1.0.0

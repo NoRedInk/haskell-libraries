@@ -7,7 +7,7 @@ cabal-version: 1.12
 name:           nri-kafka
 version:        0.1.0.0
 synopsis:       Functions for working with Kafka
-description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka>.
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme>.
 category:       Web
 homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
