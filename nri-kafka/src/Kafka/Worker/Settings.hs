@@ -14,34 +14,53 @@ import qualified Kafka.Settings.Internal as Internal
 import qualified Observability
 import qualified Prelude
 
+-- | Settings required to process kafka messages
 data Settings = Settings
-  { brokerAddresses :: [Consumer.BrokerAddress],
+  { -- | broker addresses. See hw-kafka's documentation for more info
+    brokerAddresses :: [Consumer.BrokerAddress],
+    -- | Worker will poll Kafka for new messages. This is the timeout
     pollingTimeout :: Consumer.Timeout,
-    -- used for throttling
+    -- | Used for throttling. Turn this down to give Kafka a speed limit.
     maxMsgsPerSecondPerPartition :: MaxMsgsPerSecondPerPartition,
     logLevel :: Internal.KafkaLogLevel,
     observability :: Observability.Settings,
-    -- Provides backpressure from message-workers to the queue-reader worker.
+    -- | Provides backpressure from message-workers to the queue-reader worker.
     -- Ensures that the thread responsible for pulling messages off of kafka
     -- doesn't race ahead / steal resources from the threads executing messages.
     maxMsgsPerPartitionBufferedLocally :: MaxMsgsPerPartitionBufferedLocally,
     pollBatchSize :: Consumer.BatchSize,
+    -- | Time between polling
     maxPollIntervalMs :: MaxPollIntervalMs,
-    -- This option provides us the possibility to skip messages on failure. We
-    -- won't be able to do this once we're properly life with quiz-engine:
-    -- failures will need to be handled. But it's useful for testing things
-    -- now.
+    -- | This option provides us the possibility to skip messages on failure.
+    -- Useful for testing Kafka worker. DoNotSkip is a reasonable default!
     onProcessMessageSkip :: SkipOrNot
   }
 
+-- | This option provides us the possibility to skip messages on failure.
+-- Useful for testing Kafka worker. DoNotSkip is a reasonable default!
 data SkipOrNot = Skip | DoNotSkip
 
+-- | Used for throttling. Turn this down to give Kafka a speed limit.
 data MaxMsgsPerSecondPerPartition = ThrottleAt Int | DontThrottle
 
+-- | Provides backpressure from message-workers to the queue-reader worker.
+-- Ensures that the thread responsible for pulling messages off of kafka
+-- doesn't race ahead / steal resources from the threads executing messages.
 newtype MaxMsgsPerPartitionBufferedLocally = MaxMsgsPerPartitionBufferedLocally {unMaxMsgsPerPartitionBufferedLocally :: Int}
 
+-- | Time between polling
 newtype MaxPollIntervalMs = MaxPollIntervalMs {unMaxPollIntervalMs :: Int}
 
+-- | decodes Settings from environmental variables
+-- Also consumes Observability env variables (see nri-observability)
+-- KAFKA_BROKER_ADDRESSES=localhost:9092 # comma delimeted list
+-- KAFKA_LOG_LEVEL=Debug
+-- KAFKA_POLLING_TIMEOUT=1000
+-- KAFKA_MAX_MESSAGES_PER_SECOND_PER_PARTITION=0 (disabled)
+-- KAFKA_MAX_POLL_INTERVAL_MS=300000
+-- KAFKA_MAX_MSGS_PER_PARTITION_BUFFERED_LOCALLY=100
+-- POLL_BATCH_SIZE=100
+-- SKIP_ON_PROCESS_MESSAGE_FAILURE=0
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
@@ -119,7 +138,7 @@ decoderOnProcessMessageFailure =
     Environment.Variable
       { Environment.name = "SKIP_ON_PROCESS_MESSAGE_FAILURE",
         Environment.description = "Whether to skip message that are failing processing. 1 means on, 0 means off.",
-        Environment.defaultValue = "1"
+        Environment.defaultValue = "0"
       }
     ( Environment.custom
         Environment.int
