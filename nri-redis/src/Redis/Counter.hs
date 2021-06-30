@@ -46,6 +46,8 @@ import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Prelude
 
+-- | a API type can be used to help enforce a consistent key usage.
+-- Without an API type, it can be easy to naiively change key serialization.
 data Api key = Api
   { -- | Removes the specified keys. A key is ignored if it does not exist.
     --
@@ -97,6 +99,10 @@ data Api key = Api
     set :: key -> Int -> Internal.Query ()
   }
 
+-- | Creates a Redis API to help enforce consistent key serialization
+--
+-- > myJsonApi :: Redis.Counter.Api Key
+-- > myJsonApi = Redis.counter.makeApi (\Key {fieldA, fieldB}-> Text.join "-" [fieldA, fieldB, "v1"])
 makeApi ::
   (key -> Text) ->
   Api key

@@ -57,6 +57,14 @@ import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
 import qualified Prelude
 
+-- | a API type can be used to enforce a mapping of keys to values.
+-- without an API type, it can be easy to naiively serialize the wrong type
+-- into a redis key.
+--
+-- Out of the box, we have helpers to support
+-- - 'jsonApi' for json-encodable and decodable values
+-- - 'textApi' for 'Text' values
+-- - 'byteStringApi' for 'ByteString' values
 data Api key a = Api
   { -- | Removes the specified keys. A key is ignored if it does not exist.
     --
@@ -93,6 +101,18 @@ data Api key a = Api
     rpush :: key -> NonEmpty a -> Internal.Query Int
   }
 
+-- | Creates a json API mapping a 'key' to a json-encodable-decodable type
+--
+-- > data Key = Key { fieldA: Text, fieldB: Text }
+-- > data Val = Val { ... }
+-- >
+-- > -- | This instance can be used to generate a golden test for this type.
+-- > -- | See Redis.Test
+-- > instance Redis.HasExamples Val where
+-- >   example = Examples.example "Val" Val { ... }
+-- >
+-- > myJsonApi :: Redis.Api Key Val
+-- > myJsonApi = Redis.jsonApi (\Key {fieldA,
 jsonApi ::
   forall a key.
   (Examples.HasExamples a, Aeson.ToJSON a, Aeson.FromJSON a) =>
@@ -100,9 +120,11 @@ jsonApi ::
   Api key a
 jsonApi = makeApi Codec.jsonCodec
 
+-- | Creates a Redis API mapping a 'key' to Text
 textApi :: (key -> Text) -> Api key Text
 textApi = makeApi Codec.textCodec
 
+-- | Creates a Redis API mapping a 'key' to a ByteString
 byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
 byteStringApi = makeApi Codec.byteStringCodec
 

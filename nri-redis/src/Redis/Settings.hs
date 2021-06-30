@@ -49,12 +49,12 @@ data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
 
 data QueryTimeout = NoQueryTimeout | TimeoutQueryAfterMilliseconds Int
 
--- decodes Settings from environmental variables
+-- | decodes Settings from environmental variables
 decoder :: Environment.Decoder Settings
 decoder =
   decoderWithEnvVarPrefix ""
 
--- decodes Settings from environmental variables prefixed with a Text
+-- | decodes Settings from environmental variables prefixed with a Text
 -- >>> decoderWithEnvVarPrefix "WORKER_"
 decoderWithEnvVarPrefix :: Text -> Environment.Decoder Settings
 decoderWithEnvVarPrefix prefix =
