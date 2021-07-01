@@ -108,10 +108,10 @@ subscription topic callback =
 subscriptionManageOwnOffsets ::
   (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
   Text ->
-  Task Text (Dict.Dict Int Int) ->
+  ([OffsetParams] -> Task Text (Dict.Dict Int Int)) ->
   (OffsetParams -> Int -> msg -> Task Text Partition.SeekCmd) ->
   TopicSubscription
-subscriptionManageOwnOffsets topic initialOffsets callback =
+subscriptionManageOwnOffsets topic fetchOffsets callback =
   TopicSubscription
     { topic = Kafka.Topic topic,
       onMessage =
@@ -131,8 +131,8 @@ subscriptionManageOwnOffsets topic initialOffsets callback =
           ),
       offsetSource =
         Elsewhere
-          ( \_ -> do
-              offsets <- initialOffsets
+          ( \partitionKeys -> do
+              offsets <- fetchOffsets (List.map toOffsetParams partitionKeys)
               Dict.toList offsets
                 |> List.map
                   ( Tuple.mapFirst
@@ -395,6 +395,10 @@ rebalanceCallback skipOrNot observability callback offsetSource state consumer r
       Prelude.pure ()
     Consumer.RebalanceRevoke _revokedPartitions -> do
       Prelude.pure ()
+
+toOffsetParams :: PartitionKey -> OffsetParams
+toOffsetParams (Consumer.TopicName topicName, Consumer.PartitionId partitionId) =
+  OffsetParams topicName (Prelude.fromIntegral partitionId)
 
 -- | Disconnects our Consumer / yields back partitions on quit / node shutdown
 cleanUp :: Observability.Handler -> RebalanceInfo -> Stopping.Stopping -> Maybe Exception.SomeException -> Consumer.KafkaConsumer -> Prelude.IO ()
