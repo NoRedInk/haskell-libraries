@@ -63,19 +63,15 @@ spawnWorker handler' topic callback =
     async <-
       Kafka.Worker.Internal.processWithoutShutdownEnsurance
         settings
-        Worker.TopicSubscription
-          { Worker.topic = topic,
-            Worker.onMessage =
-              Worker.MessageCallback
-                ( \_consumerRecord msg -> do
-                    callback msg
-                      |> STM.atomically
-                      |> map Ok
-                      |> Platform.doAnything (doAnything handler')
-                    Task.succeed Worker.NoSeek
-                ),
-            Worker.offsetSource = Worker.InKafka
-          }
+        ( Worker.subscription
+            (Kafka.unTopic topic)
+            ( \msg -> do
+                callback (Worker.payload msg)
+                  |> STM.atomically
+                  |> map Ok
+                  |> Platform.doAnything (doAnything handler')
+            )
+        )
         |> Async.race_ (returnWhenTerminating handler')
         |> Async.async
     Async.link async

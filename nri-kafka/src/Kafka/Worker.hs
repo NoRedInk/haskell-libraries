@@ -15,18 +15,26 @@
 -- It can be used to build a CLI that will consume and process a user-defined message type
 module Kafka.Worker
   ( Internal.process,
-    Internal.TopicSubscription (..),
-    Partition.MessageCallback (Partition.MessageCallback),
+
+    -- * Settings
+    Settings.Settings,
+    Settings.decoder,
+
+    -- * Subscriptions
+    Internal.TopicSubscription,
+    Internal.subscription,
+    Internal.subscriptionManageOwnOffsets,
+    Internal.Envelope (topicName, partitionId, messageOffset, payload),
+    Partition.SeekCmd (..),
+
+    -- * Wrapper types
     Internal.OffsetSource (..),
     Consumer.ConsumerGroupId (..),
     Internal.PartitionKey,
     Consumer.TopicName (..),
     Consumer.ConsumerRecord (..),
-    Partition.SeekCmd (..),
     Consumer.PartitionId (..),
     Consumer.unOffset,
-    Settings.Settings,
-    Settings.decoder,
   )
 where
 

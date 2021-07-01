@@ -8,6 +8,7 @@ import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TVar as TVar
 import qualified Control.Exception.Safe as Exception
+import qualified Data.Aeson as Aeson
 import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified Dict
@@ -54,6 +55,119 @@ data TopicSubscription = TopicSubscription
     offsetSource :: OffsetSource
   }
 
+-- | A message received from Kafka, along with some metadata.
+data Envelope msg = Envelope
+  { -- | The name of the topic this message is from.
+    topicName :: Text,
+    -- | The topic partition this message is from.
+    partitionId :: Int,
+    -- | The offset of the message in the partition.
+    messageOffset :: Int,
+    -- | The message payload.
+    payload :: msg
+  }
+
+-- | Create a subscription for a topic.
+--
+-- > main :: IO ()
+-- > main = do
+-- >   settings <- Environment.decode decoder
+-- >   let subscription =
+-- >         subscription
+-- >           "the-topic"
+-- >           (\msg -> Debug.todo "Process your message here!")
+-- >   process settings subscription
+subscription ::
+  (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
+  Text ->
+  (Envelope msg -> Task Text ()) ->
+  TopicSubscription
+subscription topic callback =
+  TopicSubscription
+    { topic = Kafka.Topic topic,
+      onMessage =
+        Partition.MessageCallback
+          ( \record msg -> do
+              let envelope =
+                    Envelope
+                      { topicName =
+                          Consumer.crTopic record
+                            |> Consumer.unTopicName,
+                        partitionId =
+                          Consumer.crPartition record
+                            |> Consumer.unPartitionId
+                            |> Prelude.fromIntegral,
+                        messageOffset =
+                          Consumer.crOffset record
+                            |> Consumer.unOffset,
+                        payload = msg
+                      }
+              callback envelope
+              Task.succeed Partition.NoSeek
+          ),
+      offsetSource = InKafka
+    }
+
+-- | Create a subscription for a topic and manage offsets for that topic
+-- yourself.
+--
+-- You'll need to tell Kafka where it can read starting offsets. When passed
+-- a message you can also tell Kafka to seek to a different offset.
+--
+-- > main :: IO ()
+-- > main = do
+-- >   settings <- Environment.decode decoder
+-- >   let subscription =
+-- >         subscriptionManageOwnOffsets
+-- >           "the-topic"
+-- >           (sql "SELECT partition_id, offset FROM offsets")
+-- >           (\msg -> Debug.todo "Process your message here!")
+-- >   process settings subscription
+subscriptionManageOwnOffsets ::
+  (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
+  Text ->
+  Task Text (Dict.Dict Int Int) ->
+  (Envelope msg -> Task Text Partition.SeekCmd) ->
+  TopicSubscription
+subscriptionManageOwnOffsets topic initialOffsets callback =
+  TopicSubscription
+    { topic = Kafka.Topic topic,
+      onMessage =
+        Partition.MessageCallback
+          ( \record msg -> do
+              let envelope =
+                    Envelope
+                      { topicName =
+                          Consumer.crTopic record
+                            |> Consumer.unTopicName,
+                        partitionId =
+                          Consumer.crPartition record
+                            |> Consumer.unPartitionId
+                            |> Prelude.fromIntegral,
+                        messageOffset =
+                          Consumer.crOffset record
+                            |> Consumer.unOffset,
+                        payload = msg
+                      }
+              callback envelope
+          ),
+      offsetSource =
+        Elsewhere
+          ( \_ -> do
+              offsets <- initialOffsets
+              Dict.toList offsets
+                |> List.map
+                  ( Tuple.mapFirst
+                      ( \partition ->
+                          ( Consumer.TopicName topic,
+                            Consumer.PartitionId (Prelude.fromIntegral partition)
+                          )
+                      )
+                  )
+                |> Task.succeed
+          )
+    }
+
 -- | This determines how a worker that was just assigned a partition should
 -- decide at which message offset to continue processing.
 data OffsetSource where
@@ -64,8 +178,7 @@ data OffsetSource where
   -- outside Kafka can be used to implement exactly-once-delivery schemes.
   -- Using this requires the message itself to commit the offset.
   Elsewhere ::
-    Exception.Exception e =>
-    ([PartitionKey] -> Task e [(PartitionKey, Int)]) ->
+    ([PartitionKey] -> Task Text [(PartitionKey, Int)]) ->
     OffsetSource
 
 -- | Starts the kafka worker handling messages.
@@ -203,7 +316,7 @@ rebalanceCallback skipOrNot observability callback offsetSource state consumer r
             log <- Platform.silentHandler
             fetchResult <- Task.attempt log (fetch newPartitions)
             case fetchResult of
-              Err err -> Exception.throwIO err
+              Err err -> Exception.throwString (Text.toList err)
               Ok fetched -> do
                 let storedOffsets =
                       List.map (Tuple.mapSecond Partition.Elsewhere) fetched
