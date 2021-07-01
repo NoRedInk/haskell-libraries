@@ -48,7 +48,7 @@ data State = State
   }
 
 -- | The topics this worker should subscribe too. At the moment this library
--- only supports subscribing too a single topic.
+-- only supports subscribing to a single topic.
 data TopicSubscription = TopicSubscription
   { topic :: Kafka.Topic,
     onMessage :: Partition.MessageCallback,
@@ -182,9 +182,9 @@ data OffsetSource where
     OffsetSource
 
 -- | Starts the kafka worker handling messages.
-process :: Settings.Settings -> TopicSubscription -> Prelude.IO ()
-process settings topicSubscriptions = do
-  processWithoutShutdownEnsurance settings topicSubscriptions
+process :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Prelude.IO ()
+process settings groupId topicSubscriptions = do
+  processWithoutShutdownEnsurance settings groupId topicSubscriptions
   -- Start an ensurance policy to make sure we exit in 5 seconds. We've seen
   -- cases where our graceful shutdown seems to hang, resulting in a worker
   -- that's not doing anything. We should try to fix those failures, but for the
@@ -203,10 +203,9 @@ process settings topicSubscriptions = do
 -- | Like `process`, but doesn't exit the current process by itself. This risks
 -- leaving zombie processes when used in production but is safer in tests, where
 -- the worker shares the OS process with other test code and the test runner.
-processWithoutShutdownEnsurance :: Settings.Settings -> TopicSubscription -> Prelude.IO ()
-processWithoutShutdownEnsurance settings topicSubscriptions = do
+processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Prelude.IO ()
+processWithoutShutdownEnsurance settings groupId topicSubscriptions = do
   let TopicSubscription {onMessage, topic, offsetSource} = topicSubscriptions
-  let groupId = Settings.groupId settings
   state <- initState
   onQuitSignal (Stopping.stopTakingRequests (stopping state))
   Conduit.withAcquire (Observability.handler (Settings.observability settings)) <| \observabilityHandler -> do

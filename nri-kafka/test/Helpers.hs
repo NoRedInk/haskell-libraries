@@ -20,6 +20,7 @@ import qualified Environment
 import qualified Expect
 import qualified GHC.Stack as Stack
 import qualified Kafka
+import qualified Kafka.Consumer as Consumer
 import qualified Kafka.Internal as Internal
 import qualified Kafka.Producer as Producer
 import qualified Kafka.Settings as Settings
@@ -63,6 +64,7 @@ spawnWorker handler' topic callback =
     async <-
       Kafka.Worker.Internal.processWithoutShutdownEnsurance
         settings
+        (Consumer.ConsumerGroupId "group")
         ( Worker.subscription
             (Kafka.unTopic topic)
             ( \msg -> do
