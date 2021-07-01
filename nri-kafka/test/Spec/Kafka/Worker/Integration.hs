@@ -3,7 +3,7 @@ module Spec.Kafka.Worker.Integration (tests) where
 import qualified Control.Concurrent.STM as STM
 import qualified Dict
 import qualified Expect
-import qualified Kafka.Test as Kafka
+import qualified Helpers
 import qualified Set
 import qualified Test
 import qualified Prelude
@@ -14,20 +14,20 @@ tests =
     "Worker"
     [ Test.describe
         "Integration"
-        [ Kafka.test "We receive what we send" <| \(topic, handler) -> do
-            Kafka.sendSync handler topic 1 1
+        [ Helpers.test "We receive what we send" <| \(topic, handler) -> do
+            Helpers.sendSync handler topic 1 1
             msgsTVar <- atomically (STM.newTVar Set.empty)
-            _ <- Kafka.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (Set.insert msg))
-            Kafka.sendSync handler topic 2 2
+            _ <- Helpers.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (Set.insert msg))
+            Helpers.sendSync handler topic 2 2
             msgs' <- waitFor msgsTVar (\items -> Set.size items == 2)
             msgs' |> Expect.equal (Set.fromList [1, 2]),
-          Kafka.test "two workers process all messages once" <| \(topic, handler) -> do
+          Helpers.test "two workers process all messages once" <| \(topic, handler) -> do
             msgsTVar <- atomically (STM.newTVar [])
-            _ <- Kafka.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
-            _ <- Kafka.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
-            Kafka.sendSync handler topic 1 (1, 1)
-            Kafka.sendSync handler topic 1 (1, 2)
-            Kafka.sendSync handler topic 2 (2, 3)
+            _ <- Helpers.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
+            _ <- Helpers.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
+            Helpers.sendSync handler topic 1 (1, 1)
+            Helpers.sendSync handler topic 1 (1, 2)
+            Helpers.sendSync handler topic 2 (2, 3)
             msgs' <- waitFor msgsTVar (\items -> List.length items == 3)
             msgs' |> groupDictAndMap identity
               |> Expect.equal
@@ -36,16 +36,16 @@ tests =
                       (2, [3])
                     ]
                 ),
-          Kafka.test "second worker takes over after first worker gets stopped" <| \(topic, handler) -> do
+          Helpers.test "second worker takes over after first worker gets stopped" <| \(topic, handler) -> do
             msgsTVar <- atomically (STM.newTVar [])
-            worker1 <- Kafka.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
-            _ <- Kafka.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
-            Kafka.sendSync handler topic 1 (1, 1)
-            Kafka.sendSync handler topic 2 (2, 1)
+            worker1 <- Helpers.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
+            _ <- Helpers.spawnWorker handler topic (\msg -> STM.modifyTVar' msgsTVar (\msgs -> msg : msgs))
+            Helpers.sendSync handler topic 1 (1, 1)
+            Helpers.sendSync handler topic 2 (2, 1)
             _ <- waitFor msgsTVar (\items -> List.length items == 2)
-            Kafka.stopWorker worker1
-            Kafka.sendSync handler topic 1 (1, 2)
-            Kafka.sendSync handler topic 2 (2, 2)
+            Helpers.stopWorker worker1
+            Helpers.sendSync handler topic 1 (1, 2)
+            Helpers.sendSync handler topic 2 (2, 2)
             msgsAfterStoppingWorker <- waitFor msgsTVar (\items -> List.length items == 4)
             msgsAfterStoppingWorker
               |> groupDictAndMap identity
