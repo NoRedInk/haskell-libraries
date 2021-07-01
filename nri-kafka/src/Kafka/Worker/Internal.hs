@@ -182,9 +182,9 @@ data OffsetSource where
     OffsetSource
 
 -- | Starts the kafka worker handling messages.
-process :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Prelude.IO ()
-process settings groupId topicSubscriptions = do
-  processWithoutShutdownEnsurance settings groupId topicSubscriptions
+process :: Settings.Settings -> Text -> TopicSubscription -> Prelude.IO ()
+process settings groupIdText topicSubscriptions = do
+  processWithoutShutdownEnsurance settings (Consumer.ConsumerGroupId groupIdText) topicSubscriptions
   -- Start an ensurance policy to make sure we exit in 5 seconds. We've seen
   -- cases where our graceful shutdown seems to hang, resulting in a worker
   -- that's not doing anything. We should try to fix those failures, but for the

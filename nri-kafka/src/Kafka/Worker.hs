@@ -19,7 +19,6 @@ module Kafka.Worker
     -- * Settings
     Settings.Settings,
     Settings.decoder,
-    Consumer.ConsumerGroupId (..),
 
     -- * Subscriptions
     Internal.TopicSubscription,
@@ -30,7 +29,6 @@ module Kafka.Worker
   )
 where
 
-import qualified Kafka.Consumer as Consumer
 import qualified Kafka.Worker.Internal as Internal
 import qualified Kafka.Worker.Partition as Partition
 import qualified Kafka.Worker.Settings as Settings

@@ -24,7 +24,7 @@ main =
   Kafka.Worker.process
     Kafka.Worker.Description
       settings
-      (Kafka.Worker.ConsumerGroupID "this worker's group id")
+      "this worker's group id"
       (Kafka.Worker.subscription "my.topic" processMessage,)
 
 data MyKafkaMessageType =
