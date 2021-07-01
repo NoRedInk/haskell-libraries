@@ -68,7 +68,7 @@ spawnWorker handler' topic callback =
         ( Worker.subscription
             (Kafka.unTopic topic)
             ( \msg -> do
-                callback (Worker.payload msg)
+                callback msg
                   |> STM.atomically
                   |> map Ok
                   |> Platform.doAnything (doAnything handler')

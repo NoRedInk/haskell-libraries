@@ -80,29 +80,15 @@ data Envelope msg = Envelope
 subscription ::
   (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
   Text ->
-  (Envelope msg -> Task Text ()) ->
+  (msg -> Task Text ()) ->
   TopicSubscription
 subscription topic callback =
   TopicSubscription
     { topic = Kafka.Topic topic,
       onMessage =
         Partition.MessageCallback
-          ( \record msg -> do
-              let envelope =
-                    Envelope
-                      { topicName =
-                          Consumer.crTopic record
-                            |> Consumer.unTopicName,
-                        partitionId =
-                          Consumer.crPartition record
-                            |> Consumer.unPartitionId
-                            |> Prelude.fromIntegral,
-                        messageOffset =
-                          Consumer.crOffset record
-                            |> Consumer.unOffset,
-                        payload = msg
-                      }
-              callback envelope
+          ( \_ msg -> do
+              callback msg
               Task.succeed Partition.NoSeek
           ),
       offsetSource = InKafka
