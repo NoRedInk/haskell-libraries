@@ -22,7 +22,7 @@ module Kafka.Worker
     Internal.PartitionKey,
     Consumer.TopicName (..),
     Consumer.ConsumerRecord (..),
-    Partition.ProcessResult (..),
+    Partition.SeekCmd (..),
     Consumer.PartitionId (..),
     Consumer.unOffset,
     Settings.Settings,

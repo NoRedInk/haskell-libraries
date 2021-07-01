@@ -11,7 +11,7 @@ import qualified Kafka.Worker.Partition as Partition
 import qualified Kafka.Worker.Settings as Settings
 import qualified Prelude
 
-type EnqueueRecord = (ConsumerRecord -> Prelude.IO Partition.ProcessResult)
+type EnqueueRecord = (ConsumerRecord -> Prelude.IO Partition.SeekCmd)
 
 -- | pollingLoop
 -- our long-running event loop that
@@ -95,7 +95,7 @@ getPartitionKey record =
 
 toSeekPartition ::
   ( (Consumer.TopicName, Consumer.PartitionId),
-    List Partition.ProcessResult
+    List Partition.SeekCmd
   ) ->
   Maybe Consumer.TopicPartition
 toSeekPartition ((topicName, partitionId), appendResults) =
@@ -108,8 +108,8 @@ toSeekPartition ((topicName, partitionId), appendResults) =
   -- do. If it had an unexpected offset then we should seek.
   case last appendResults of
     Nothing -> Nothing
-    Just Partition.Success -> Nothing
-    Just (Partition.ExpectedOffset offset) ->
+    Just Partition.NoSeek -> Nothing
+    Just (Partition.SeekToOffset offset) ->
       Just
         Consumer.TopicPartition
           { Consumer.tpTopicName = topicName,

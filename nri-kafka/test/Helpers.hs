@@ -72,7 +72,7 @@ spawnWorker handler' topic callback =
                       |> STM.atomically
                       |> map Ok
                       |> Platform.doAnything (doAnything handler')
-                    Task.succeed Worker.Success
+                    Task.succeed Worker.NoSeek
                 ),
             Worker.offsetSource = Worker.InKafka
           }

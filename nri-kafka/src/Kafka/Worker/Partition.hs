@@ -8,7 +8,7 @@ module Kafka.Worker.Partition
     ConsumerRecord,
     Partition,
     MessageCallback (..),
-    ProcessResult (..),
+    SeekCmd (..),
     CommitOffsets (..),
     -- just exported for tests
     microSecondsDelayForAttempt,
@@ -61,14 +61,14 @@ newtype ProcessAttemptsCount = ProcessAttemptsCount Int
 
 newtype Partition = Partition (TVar.TVar Backlog)
 
--- | ProcessResult is the expected response of the MessageCallback.
--- Return Success if processing succeeded and the offset was correct.
--- Return ExpectedOffset with the expected offset if the offset of the message
+-- | SeekCmd is the expected response of the MessageCallback.
+-- Return NoSeek if processing succeeded and the offset was correct.
+-- Return SeekToOffset with the expected offset if the offset of the message
 -- processed was wrong (this only makes sense when Kafka isn't managing the offset)
 -- The MessageCallback will throw if proccessing throws.
-data ProcessResult
-  = Success
-  | ExpectedOffset Int
+data SeekCmd
+  = NoSeek
+  | SeekToOffset Int
 
 -- for each partition, we keep a local backlog of messages we've read from Kafka
 -- that are not yet processed
@@ -94,7 +94,7 @@ newtype OnCleanup = OnCleanup (Prelude.IO ())
 data MessageCallback where
   MessageCallback ::
     (Show e, Aeson.ToJSON msg, Aeson.FromJSON msg) =>
-    (Consumer.ConsumerRecord () () -> msg -> Task e ProcessResult) ->
+    (Consumer.ConsumerRecord () () -> msg -> Task e SeekCmd) ->
     MessageCallback
 
 data CommitOffsets
@@ -203,11 +203,11 @@ processMsgLoop skipOrNot commitOffsets observabilityHandler state consumer callb
       doAnything <- Platform.doAnythingHandler
       let commit processResult =
             case processResult of
-              ExpectedOffset offset ->
+              SeekToOffset offset ->
                 awaitingSeekTo (partition state) offset
                   |> map Ok
                   |> Platform.doAnything doAnything
-              Success -> do
+              NoSeek -> do
                 -- Still around? That means things must have gone well. Let's mark
                 -- this message as succesfully processed.
                 case commitOffsets of
@@ -246,7 +246,7 @@ processMsgLoop skipOrNot commitOffsets observabilityHandler state consumer callb
                 |> Task.onError
                   ( \err -> do
                       case skipOrNot of
-                        Settings.Skip -> Task.succeed Success
+                        Settings.Skip -> Task.succeed NoSeek
                         Settings.DoNotSkip -> Task.fail err
                   )
                 |> Task.andThen commit
@@ -458,7 +458,7 @@ dequeueRecord (Partition partition) record =
           else -- why would this ever be the case??? should we log here?
             Prelude.pure ()
 
-append :: ConsumerRecord -> Partition -> STM.STM ProcessResult
+append :: ConsumerRecord -> Partition -> STM.STM SeekCmd
 append item (Partition partition) =
   TVar.stateTVar
     partition
@@ -467,16 +467,16 @@ append item (Partition partition) =
           AwaitingSeekTo offset ->
             if offset == Consumer.unOffset (Consumer.crOffset item)
               then
-                ( Success,
+                ( NoSeek,
                   Assigned (Seq.singleton (ProcessAttemptsCount 0, item))
                 )
               else
-                ( ExpectedOffset offset,
+                ( SeekToOffset offset,
                   AwaitingSeekTo offset
                 )
-          Stopping -> (Success, Stopping)
+          Stopping -> (NoSeek, Stopping)
           Assigned queue ->
-            ( Success,
+            ( NoSeek,
               Assigned (queue Seq.:|> (ProcessAttemptsCount 0, item))
             )
     )

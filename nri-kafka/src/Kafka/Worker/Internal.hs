@@ -159,10 +159,10 @@ createConsumer
               ( Dict.fromList
                   [("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs))]
               )
-    let subscription =
+    let subscription' =
           Consumer.topics [Consumer.TopicName (Kafka.unTopic topic)]
             ++ Consumer.offsetReset Consumer.Earliest
-    eitherConsumer <- Consumer.newConsumer properties subscription
+    eitherConsumer <- Consumer.newConsumer properties subscription'
     case eitherConsumer of
       Prelude.Left err ->
         -- We create the worker as part of starting the application. Throwing
@@ -426,7 +426,7 @@ instance Exception.Exception RuntimeExceptions
 enqueueRecord ::
   AllPartitions ->
   Partition.ConsumerRecord ->
-  Prelude.IO Partition.ProcessResult
+  Prelude.IO Partition.SeekCmd
 enqueueRecord partitions record =
   STM.atomically <| do
     let key = (Consumer.crTopic record, Consumer.crPartition record)
