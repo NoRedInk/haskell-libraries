@@ -144,6 +144,9 @@ data Query a where
 instance Prelude.Functor Query where
   fmap = map
 
+instance Prelude.Show (Query a) where
+  show = Text.toList << Text.join "<|" << cmds
+
 -- | Used to map the type of a query to another type
 -- useful in combination with 'transaction'
 map :: (a -> b) -> Query a -> Query b
