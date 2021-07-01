@@ -108,7 +108,7 @@ subscription topic callback =
 subscriptionManageOwnOffsets ::
   (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
   Text ->
-  ([OffsetParams] -> Task Text (Dict.Dict Int Int)) ->
+  ([OffsetParams] -> Task Text (Dict.Dict OffsetParams Int)) ->
   (OffsetParams -> Int -> msg -> Task Text Partition.SeekCmd) ->
   TopicSubscription
 subscriptionManageOwnOffsets topic fetchOffsets callback =
@@ -134,17 +134,18 @@ subscriptionManageOwnOffsets topic fetchOffsets callback =
           ( \partitionKeys -> do
               offsets <- fetchOffsets (List.map toOffsetParams partitionKeys)
               Dict.toList offsets
-                |> List.map
-                  ( Tuple.mapFirst
-                      ( \partition ->
-                          ( Consumer.TopicName topic,
-                            Consumer.PartitionId (Prelude.fromIntegral partition)
-                          )
-                      )
-                  )
+                |> List.map (Tuple.mapFirst toPartitionKey)
                 |> Task.succeed
           )
     }
+  where
+    toOffsetParams :: PartitionKey -> OffsetParams
+    toOffsetParams (Consumer.TopicName topicName, Consumer.PartitionId partitionId) =
+      OffsetParams topicName (Prelude.fromIntegral partitionId)
+
+    toPartitionKey :: OffsetParams -> PartitionKey
+    toPartitionKey (OffsetParams topicName partitionId) =
+      (Consumer.TopicName topicName, Consumer.PartitionId (Prelude.fromIntegral partitionId))
 
 -- | This determines how a worker that was just assigned a partition should
 -- decide at which message offset to continue processing.
@@ -395,10 +396,6 @@ rebalanceCallback skipOrNot observability callback offsetSource state consumer r
       Prelude.pure ()
     Consumer.RebalanceRevoke _revokedPartitions -> do
       Prelude.pure ()
-
-toOffsetParams :: PartitionKey -> OffsetParams
-toOffsetParams (Consumer.TopicName topicName, Consumer.PartitionId partitionId) =
-  OffsetParams topicName (Prelude.fromIntegral partitionId)
 
 -- | Disconnects our Consumer / yields back partitions on quit / node shutdown
 cleanUp :: Observability.Handler -> RebalanceInfo -> Stopping.Stopping -> Maybe Exception.SomeException -> Consumer.KafkaConsumer -> Prelude.IO ()
