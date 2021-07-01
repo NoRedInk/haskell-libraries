@@ -23,12 +23,9 @@ main =
   settings <- Environment.decode Kafka.Worker.decoder
   Kafka.Worker.process
     Kafka.Worker.Description
-      { Kafka.Worker.settings = settings,
-        Kafka.Worker.groupId = Kafka.Worker.ConsumerGroupID "this worker's group id",
-        Kafka.Worker.topic = Kafka.Topic "my.topic"
-        Kafka.Worker.onMessage = Kafka.Worker.MessageCallback processMessage,
-        Kafka.Worker.offsetSource = Kafka.Worker.InKafka
-      }
+      settings
+      (Kafka.Worker.ConsumerGroupID "this worker's group id")
+      (Kafka.Worker.subscription "my.topic" processMessage,)
 
 data MyKafkaMessageType =
   ReticulateSplines Int
@@ -41,15 +38,14 @@ instance Aeson.FromJSON Envelope
 
 -- the meat and potatoes: handles all MyKafkaMessageTypes
 processMessage ::
-  Kafka.Worker.ConsumerRecord () () ->
-  MyKafkaMessageType ->
-  Task WebServer.ErrorResponse Kafka.Worker.ProcessResult
+  Kafka.Worker.Envelope MyKafkaMessageType ->
+  Task Text ()
 processMessage record myMessage =
   -- process your message in here
   -- because of our usage of `Task` you probably want to pass in any handlers
   case myMessage of
     AddHiddenAgenda agenda ->
-	Debug.todo "Add the agenda"
+    	Debug.todo "Add the agenda"
     _ ->
-	Debug.todo "and also handle the other cases"
+    	Debug.todo "and also handle the other cases"
 ```
