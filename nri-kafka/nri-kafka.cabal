@@ -38,6 +38,7 @@ library
       Kafka.Settings.Internal
       Kafka.Worker.Analytics
       Kafka.Worker.Fetcher
+      Kafka.Worker.Internal
       Kafka.Worker.Partition
       Kafka.Worker.Settings
       Kafka.Worker.Stopping
@@ -92,9 +93,11 @@ test-suite tests
       Kafka.Worker
       Kafka.Worker.Analytics
       Kafka.Worker.Fetcher
+      Kafka.Worker.Internal
       Kafka.Worker.Partition
       Kafka.Worker.Settings
       Kafka.Worker.Stopping
+      Helpers
       Spec.Kafka.Worker.Integration
       Spec.Kafka.Worker.Partition
       Paths_nri_kafka

@@ -25,6 +25,7 @@ import qualified Kafka.Internal as Internal
 import qualified Kafka.Producer as Producer
 import qualified Kafka.Settings as Settings
 import qualified Kafka.Worker as Worker
+import qualified Kafka.Worker.Internal
 import qualified Kafka.Worker.Settings as Worker.Settings
 import qualified Platform
 import qualified Test
@@ -61,7 +62,7 @@ spawnWorker handler' topic callback =
         Ok settings' -> Prelude.pure settings'
         Err err -> Prelude.fail (Text.toList err)
     async <-
-      Worker.processWithoutShutdownEnsurance
+      Kafka.Worker.Internal.processWithoutShutdownEnsurance
         Worker.Description
           { Worker.settings = settings,
             Worker.groupId = Consumer.ConsumerGroupId "group",
