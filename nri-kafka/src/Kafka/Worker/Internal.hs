@@ -55,16 +55,12 @@ data TopicSubscription = TopicSubscription
     offsetSource :: OffsetSource
   }
 
--- | A message received from Kafka, along with some metadata.
-data Envelope msg = Envelope
+-- | Params needed to write / read offsets to another data store
+data OffsetParams = OffsetParams
   { -- | The name of the topic this message is from.
     topicName :: Text,
     -- | The topic partition this message is from.
-    partitionId :: Int,
-    -- | The offset of the message in the partition.
-    messageOffset :: Int,
-    -- | The message payload.
-    payload :: msg
+    partitionId :: Int
   }
 
 -- | Create a subscription for a topic.
@@ -113,7 +109,7 @@ subscriptionManageOwnOffsets ::
   (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
   Text ->
   Task Text (Dict.Dict Int Int) ->
-  (Envelope msg -> Task Text Partition.SeekCmd) ->
+  (OffsetParams -> Int -> msg -> Task Text Partition.SeekCmd) ->
   TopicSubscription
 subscriptionManageOwnOffsets topic initialOffsets callback =
   TopicSubscription
@@ -121,21 +117,17 @@ subscriptionManageOwnOffsets topic initialOffsets callback =
       onMessage =
         Partition.MessageCallback
           ( \record msg -> do
-              let envelope =
-                    Envelope
+              let offsetParams =
+                    OffsetParams
                       { topicName =
                           Consumer.crTopic record
                             |> Consumer.unTopicName,
                         partitionId =
                           Consumer.crPartition record
                             |> Consumer.unPartitionId
-                            |> Prelude.fromIntegral,
-                        messageOffset =
-                          Consumer.crOffset record
-                            |> Consumer.unOffset,
-                        payload = msg
+                            |> Prelude.fromIntegral
                       }
-              callback envelope
+              callback offsetParams (Consumer.unOffset (Consumer.crOffset record)) msg
           ),
       offsetSource =
         Elsewhere

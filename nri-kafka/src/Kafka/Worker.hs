@@ -24,7 +24,7 @@ module Kafka.Worker
     Internal.TopicSubscription,
     Internal.subscription,
     Internal.subscriptionManageOwnOffsets,
-    Internal.Envelope (topicName, partitionId, messageOffset, payload),
+    Internal.OffsetParams (topicName, partitionId),
     Partition.SeekCmd (..),
   )
 where
