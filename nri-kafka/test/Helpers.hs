@@ -20,7 +20,6 @@ import qualified Environment
 import qualified Expect
 import qualified GHC.Stack as Stack
 import qualified Kafka
-import qualified Kafka.Consumer as Consumer
 import qualified Kafka.Internal as Internal
 import qualified Kafka.Producer as Producer
 import qualified Kafka.Settings as Settings
@@ -63,10 +62,9 @@ spawnWorker handler' topic callback =
         Err err -> Prelude.fail (Text.toList err)
     async <-
       Kafka.Worker.Internal.processWithoutShutdownEnsurance
-        Worker.Description
-          { Worker.settings = settings,
-            Worker.groupId = Consumer.ConsumerGroupId "group",
-            Worker.topic = topic,
+        settings
+        Worker.TopicSubscription
+          { Worker.topic = topic,
             Worker.onMessage =
               Worker.MessageCallback
                 ( \_consumerRecord msg -> do

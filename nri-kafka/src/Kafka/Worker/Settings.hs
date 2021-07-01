@@ -33,7 +33,11 @@ data Settings = Settings
     maxPollIntervalMs :: MaxPollIntervalMs,
     -- | This option provides us the possibility to skip messages on failure.
     -- Useful for testing Kafka worker. DoNotSkip is a reasonable default!
-    onProcessMessageSkip :: SkipOrNot
+    onProcessMessageSkip :: SkipOrNot,
+    -- | The consumer group this worker is part of. Workers sharing the same
+    -- consumer group id will collaborate, each processing messages for part
+    -- of the partitions of a topic.
+    groupId :: Consumer.ConsumerGroupId
   }
 
 -- | This option provides us the possibility to skip messages on failure.
@@ -61,6 +65,7 @@ newtype MaxPollIntervalMs = MaxPollIntervalMs {unMaxPollIntervalMs :: Int}
 -- KAFKA_MAX_MSGS_PER_PARTITION_BUFFERED_LOCALLY=100
 -- POLL_BATCH_SIZE=100
 -- SKIP_ON_PROCESS_MESSAGE_FAILURE=0
+-- GROUP_ID=0
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
@@ -73,6 +78,7 @@ decoder =
     |> andMap decoderPollBatchSize
     |> andMap decoderMaxPollIntervalMs
     |> andMap decoderOnProcessMessageFailure
+    |> andMap decoderGroupId
 
 decoderPollingTimeout :: Environment.Decoder Consumer.Timeout
 decoderPollingTimeout =
@@ -148,3 +154,13 @@ decoderOnProcessMessageFailure =
               else Ok DoNotSkip
         )
     )
+
+decoderGroupId :: Environment.Decoder Consumer.ConsumerGroupId
+decoderGroupId =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "KAFKA_GROUP_ID",
+        Environment.description = "Identifies the consumer group this worker is part off",
+        Environment.defaultValue = "procrastinators"
+      }
+    (map Consumer.ConsumerGroupId Environment.text)

@@ -15,7 +15,7 @@
 -- It can be used to build a CLI that will consume and process a user-defined message type
 module Kafka.Worker
   ( Internal.process,
-    Internal.Description (..),
+    Internal.TopicSubscription (..),
     Partition.MessageCallback (Partition.MessageCallback),
     Internal.OffsetSource (..),
     Consumer.ConsumerGroupId (..),

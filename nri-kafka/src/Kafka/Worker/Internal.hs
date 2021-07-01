@@ -46,11 +46,10 @@ data State = State
     rebalanceInfo :: RebalanceInfo
   }
 
--- | All the required parameters to start the Kafka worker
-data Description = Description
-  { settings :: Settings.Settings,
-    groupId :: Consumer.ConsumerGroupId,
-    topic :: Kafka.Topic,
+-- | The topics this worker should subscribe too. At the moment this library
+-- only supports subscribing too a single topic.
+data TopicSubscription = TopicSubscription
+  { topic :: Kafka.Topic,
     onMessage :: Partition.MessageCallback,
     offsetSource :: OffsetSource
   }
@@ -70,10 +69,9 @@ data OffsetSource where
     OffsetSource
 
 -- | Starts the kafka worker handling messages.
--- The GroupId is an identifier for a group of work. It should be unique per topic-callback pair.
-process :: Description -> Prelude.IO ()
-process workerProcess = do
-  processWithoutShutdownEnsurance workerProcess
+process :: Settings.Settings -> TopicSubscription -> Prelude.IO ()
+process settings topicSubscriptions = do
+  processWithoutShutdownEnsurance settings topicSubscriptions
   -- Start an ensurance policy to make sure we exit in 5 seconds. We've seen
   -- cases where our graceful shutdown seems to hang, resulting in a worker
   -- that's not doing anything. We should try to fix those failures, but for the
@@ -92,9 +90,10 @@ process workerProcess = do
 -- | Like `process`, but doesn't exit the current process by itself. This risks
 -- leaving zombie processes when used in production but is safer in tests, where
 -- the worker shares the OS process with other test code and the test runner.
-processWithoutShutdownEnsurance :: Description -> Prelude.IO ()
-processWithoutShutdownEnsurance workerProcess = do
-  let Description {settings, groupId, onMessage, topic, offsetSource} = workerProcess
+processWithoutShutdownEnsurance :: Settings.Settings -> TopicSubscription -> Prelude.IO ()
+processWithoutShutdownEnsurance settings topicSubscriptions = do
+  let TopicSubscription {onMessage, topic, offsetSource} = topicSubscriptions
+  let groupId = Settings.groupId settings
   state <- initState
   onQuitSignal (Stopping.stopTakingRequests (stopping state))
   Conduit.withAcquire (Observability.handler (Settings.observability settings)) <| \observabilityHandler -> do
