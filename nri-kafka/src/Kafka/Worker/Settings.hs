@@ -63,9 +63,9 @@ newtype MaxPollIntervalMs = MaxPollIntervalMs {unMaxPollIntervalMs :: Int}
 -- KAFKA_MAX_MESSAGES_PER_SECOND_PER_PARTITION=0 (disabled)
 -- KAFKA_MAX_POLL_INTERVAL_MS=300000
 -- KAFKA_MAX_MSGS_PER_PARTITION_BUFFERED_LOCALLY=100
--- POLL_BATCH_SIZE=100
--- SKIP_ON_PROCESS_MESSAGE_FAILURE=0
--- GROUP_ID=0
+-- KAFKA_POLL_BATCH_SIZE=100
+-- KAFKA_SKIP_ON_PROCESS_MESSAGE_FAILURE=0
+-- KAFKA_GROUP_ID=0
 decoder :: Environment.Decoder Settings
 decoder =
   Prelude.pure Settings
@@ -132,7 +132,7 @@ decoderPollBatchSize :: Environment.Decoder Consumer.BatchSize
 decoderPollBatchSize =
   Environment.variable
     Environment.Variable
-      { Environment.name = "POLL_BATCH_SIZE",
+      { Environment.name = "KAFKA_POLL_BATCH_SIZE",
         Environment.description = "The amount of messages we request in a single poll request to Kafka",
         Environment.defaultValue = "100"
       }
@@ -142,7 +142,7 @@ decoderOnProcessMessageFailure :: Environment.Decoder SkipOrNot
 decoderOnProcessMessageFailure =
   Environment.variable
     Environment.Variable
-      { Environment.name = "SKIP_ON_PROCESS_MESSAGE_FAILURE",
+      { Environment.name = "KAFKA_SKIP_ON_PROCESS_MESSAGE_FAILURE",
         Environment.description = "Whether to skip message that are failing processing. 1 means on, 0 means off.",
         Environment.defaultValue = "0"
       }
