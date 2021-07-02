@@ -13,14 +13,12 @@ data Handler = Handler
     --
     -- This is the recommended approach for high throughput. The C++ library
     -- behind hte scenes, librdkafka, will batch messages together.
-    sendAsync :: OnDelivery -> Msg -> Task Error (),
+    sendAsync :: Task Never () -> Msg -> Task Error (),
     -- | sends messages synchronously with to Kafka
     --
     -- This can have a large negative impact on throughput. Use sparingly!
     sendSync :: Msg -> Task Error ()
   }
-
-type OnDelivery = Task Never ()
 
 -- | A message that can be written to Kafka
 data Msg = Msg
