@@ -34,6 +34,7 @@ in pkgs.mkShell {
         hostname
         http-client
         http-client-tls
+        hw-kafka-client
         io-streams
         junit-xml
         microlens
@@ -62,6 +63,7 @@ in pkgs.mkShell {
         vector
         vty
       ]))
+    pkgs.apacheKafka # for nri-kafka
     pkgs.cabal-install
     pkgs.cachix
     pkgs.gnumake
@@ -70,8 +72,9 @@ in pkgs.mkShell {
     pkgs.niv
     pkgs.ormolu
     pkgs.pcre
-    pkgs.redis
-    pkgs.postgresql
+    pkgs.redis # for nri-redis
+    pkgs.postgresql # for nri-postgres
     pkgs.zlib
+    pkgs.zookeeper # for nri-kafka
   ];
 }

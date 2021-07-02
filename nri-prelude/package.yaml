@@ -1,6 +1,6 @@
 name: nri-prelude
 synopsis: A Prelude inspired by the Elm programming language
-description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude>.
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme
 author: NoRedInk
 version: 0.6.0.2

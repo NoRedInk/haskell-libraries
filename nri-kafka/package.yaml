@@ -1,15 +1,15 @@
-name: nri-redis
-synopsis: An intuitive hedis wrapper library.
-description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
-homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme
+name: nri-kafka
+synopsis: Functions for working with Kafka
+description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme>.
+homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme
 author: NoRedInk
 version: 0.1.0.0
 maintainer: haskell-open-source@noredink.com
 copyright: 2021 NoRedInk Corp.
-github: NoRedInk/haskell-libraries/nri-redis
+github: NoRedInk/haskell-libraries/nri-kafka
 license-file: LICENSE
 category: Web
-extra-doc-files:
+extra-source-files:
   - README.md
   - LICENSE
   - CHANGELOG.md
@@ -19,29 +19,33 @@ dependencies:
   - base >= 4.12.0.0 && < 4.16
   - bytestring >= 0.10.8.2 && < 0.12
   - conduit >= 1.3.0 && < 1.4
-  # hedis 14 introduces redis-cluster support
-  - hedis >= 0.14.0 && < 0.15
+  - containers >= 0.6.0.1 && < 0.7
+  - hw-kafka-client >=4.0.3 && < 5.0
   - nri-env-parser >= 0.1.0.0 && < 0.2
-  - nri-observability >= 0.1.0 && < 0.2
+  - nri-observability >= 0.1.1.1 && < 0.2
   - nri-prelude >= 0.1.0.0 && < 0.7
-  - nri-test-encoding >= 0.1.0 && < 0.2
-  - resourcet >= 1.2.0 && < 1.3
   - safe-exceptions >= 0.1.7.0 && < 1.3
+  - stm >= 2.4 && < 2.6
   - text >= 1.2.3.1 && < 1.3
-  - unordered-containers >=0.2.0.0 && <0.3
+  - time >= 1.8.0.2 && < 1.13
+  - unix >= 2.7.2.2 && < 2.8.0.0
   - uuid >=1.3.0 && < 1.4
 library:
   exposed-modules:
-    - NonEmptyDict
-    - Redis
-    - Redis.Counter
-    - Redis.Hash
-    - Redis.List
-    - Redis.Mock
-    - Redis.Set
-    - Redis.Test
-  source-dirs:
-    - src
+    - Kafka
+    - Kafka.Worker
+    - Kafka.Test
+  source-dirs: src
+tests:
+  tests:
+    main: Main.hs
+    source-dirs:
+      - src
+      - test
+    ghc-options:
+      - -threaded
+      - -rtsopts "-with-rtsopts=-N -T"
+      - -fno-warn-type-defaults
 default-extensions:
   - DataKinds
   - DeriveGeneric
@@ -68,13 +72,3 @@ ghc-options:
   - -Wincomplete-uni-patterns
   - -fno-warn-type-defaults
   - -fplugin=NriPrelude.Plugin
-tests:
-  tests:
-    main: Main.hs
-    source-dirs:
-      - test
-      - src
-    ghc-options:
-      - -threaded
-      - -rtsopts "-with-rtsopts=-N -T"
-      - -fno-warn-type-defaults

@@ -1,15 +1,15 @@
-cabal-version: 1.18
+cabal-version: 1.12
 
 -- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 
-name:           nri-redis
+name:           nri-kafka
 version:        0.1.0.0
-synopsis:       An intuitive hedis wrapper library.
-description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
+synopsis:       Functions for working with Kafka
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme>.
 category:       Web
-homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com
@@ -17,7 +17,7 @@ copyright:      2021 NoRedInk Corp.
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-extra-doc-files:
+extra-source-files:
     README.md
     LICENSE
     CHANGELOG.md
@@ -25,24 +25,24 @@ extra-doc-files:
 source-repository head
   type: git
   location: https://github.com/NoRedInk/haskell-libraries
-  subdir: nri-redis
+  subdir: nri-kafka
 
 library
   exposed-modules:
-      NonEmptyDict
-      Redis
-      Redis.Counter
-      Redis.Hash
-      Redis.List
-      Redis.Mock
-      Redis.Set
-      Redis.Test
+      Kafka
+      Kafka.Worker
+      Kafka.Test
   other-modules:
-      Redis.Codec
-      Redis.Internal
-      Redis.Real
-      Redis.Settings
-      Paths_nri_redis
+      Kafka.Internal
+      Kafka.Settings
+      Kafka.Settings.Internal
+      Kafka.Worker.Analytics
+      Kafka.Worker.Fetcher
+      Kafka.Worker.Internal
+      Kafka.Worker.Partition
+      Kafka.Worker.Settings
+      Kafka.Worker.Stopping
+      Paths_nri_kafka
   hs-source-dirs:
       src
   default-extensions:
@@ -68,15 +68,16 @@ library
     , base >=4.12.0.0 && <4.16
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
-    , hedis >=0.14.0 && <0.15
+    , containers >=0.6.0.1 && <0.7
+    , hw-kafka-client >=4.0.3 && <5.0
     , nri-env-parser >=0.1.0.0 && <0.2
-    , nri-observability >=0.1.0 && <0.2
+    , nri-observability >=0.1.1.1 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
-    , nri-test-encoding >=0.1.0 && <0.2
-    , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
+    , stm >=2.4 && <2.6
     , text >=1.2.3.1 && <1.3
-    , unordered-containers >=0.2.0.0 && <0.3
+    , time >=1.8.0.2 && <1.13
+    , unix >=2.7.2.2 && <2.8.0.0
     , uuid >=1.3.0 && <1.4
   default-language: Haskell2010
 
@@ -84,22 +85,25 @@ test-suite tests
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
-      NonEmptyDict
-      Redis
-      Redis.Codec
-      Redis.Counter
-      Redis.Hash
-      Redis.Internal
-      Redis.List
-      Redis.Mock
-      Redis.Real
-      Redis.Set
-      Redis.Settings
-      Redis.Test
-      Paths_nri_redis
+      Kafka
+      Kafka.Internal
+      Kafka.Settings
+      Kafka.Settings.Internal
+      Kafka.Test
+      Kafka.Worker
+      Kafka.Worker.Analytics
+      Kafka.Worker.Fetcher
+      Kafka.Worker.Internal
+      Kafka.Worker.Partition
+      Kafka.Worker.Settings
+      Kafka.Worker.Stopping
+      Helpers
+      Spec.Kafka.Worker.Integration
+      Spec.Kafka.Worker.Partition
+      Paths_nri_kafka
   hs-source-dirs:
-      test
       src
+      test
   default-extensions:
       DataKinds
       DeriveGeneric
@@ -123,14 +127,15 @@ test-suite tests
     , base >=4.12.0.0 && <4.16
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
-    , hedis >=0.14.0 && <0.15
+    , containers >=0.6.0.1 && <0.7
+    , hw-kafka-client >=4.0.3 && <5.0
     , nri-env-parser >=0.1.0.0 && <0.2
-    , nri-observability >=0.1.0 && <0.2
+    , nri-observability >=0.1.1.1 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
-    , nri-test-encoding >=0.1.0 && <0.2
-    , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
+    , stm >=2.4 && <2.6
     , text >=1.2.3.1 && <1.3
-    , unordered-containers >=0.2.0.0 && <0.3
+    , time >=1.8.0.2 && <1.13
+    , unix >=2.7.2.2 && <2.8.0.0
     , uuid >=1.3.0 && <1.4
   default-language: Haskell2010
