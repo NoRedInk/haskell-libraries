@@ -19,7 +19,6 @@ import qualified Dict
 import qualified Environment
 import qualified Expect
 import qualified GHC.Stack as Stack
-import qualified Kafka
 import qualified Kafka.Consumer as Consumer
 import qualified Kafka.Internal as Internal
 import qualified Kafka.Producer as Producer
@@ -52,7 +51,7 @@ terminate TestHandler {terminator} = MVar.putMVar terminator ()
 spawnWorker ::
   (Aeson.ToJSON msg, Aeson.FromJSON msg) =>
   TestHandler ->
-  Kafka.Topic ->
+  Internal.Topic ->
   (msg -> STM.STM ()) ->
   Expect.Expectation' Worker
 spawnWorker handler' topic callback =
@@ -66,7 +65,7 @@ spawnWorker handler' topic callback =
         settings
         (Consumer.ConsumerGroupId "group")
         ( Worker.subscription
-            (Kafka.unTopic topic)
+            (Internal.unTopic topic)
             ( \msg -> do
                 callback msg
                   |> STM.atomically
@@ -120,7 +119,7 @@ testHandler Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeou
       Prelude.pure TestHandler {producer, doAnything, terminator}
 
 -- | puts a message synchronously onto a topic-partition
-sendSync :: Aeson.ToJSON a => TestHandler -> Kafka.Topic -> Int -> a -> Expect.Expectation
+sendSync :: Aeson.ToJSON a => TestHandler -> Internal.Topic -> Int -> a -> Expect.Expectation
 sendSync handler topicName partitionId msg' =
   Platform.tracingSpan
     "Sync send Kafka messages"
@@ -136,7 +135,7 @@ sendSync handler topicName partitionId msg' =
 sendHelperSync ::
   Producer.KafkaProducer ->
   Platform.DoAnythingHandler ->
-  Kafka.Topic ->
+  Internal.Topic ->
   Int ->
   Aeson.Value ->
   Task Text ()
@@ -155,10 +154,10 @@ sendHelperSync producer doAnything topicName partitionId msg' =
     )
     |> Platform.doAnything doAnything
 
-record :: Kafka.Topic -> Int -> Aeson.Value -> Producer.ProducerRecord
+record :: Internal.Topic -> Int -> Aeson.Value -> Producer.ProducerRecord
 record topicName partitionId val =
   Producer.ProducerRecord
-    { Producer.prTopic = Producer.TopicName (Kafka.unTopic topicName),
+    { Producer.prTopic = Producer.TopicName (Internal.unTopic topicName),
       Producer.prPartition = Producer.SpecifiedPartition (Prelude.fromIntegral partitionId),
       Producer.prKey = Nothing,
       Producer.prValue =
@@ -178,7 +177,7 @@ record topicName partitionId val =
 test ::
   Stack.HasCallStack =>
   Text ->
-  ((Kafka.Topic, TestHandler) -> Expect.Expectation) ->
+  ((Internal.Topic, TestHandler) -> Expect.Expectation) ->
   Test.Test
 test description body =
   Stack.withFrozenCallStack Test.test description <| \_ -> do
@@ -211,7 +210,7 @@ test description body =
                   map Data.UUID.toText Data.UUID.V4.nextRandom
                     |> map Ok
                     |> Platform.doAnything doAnything
-                let topic = Kafka.Topic uuid
+                let topic = Internal.Topic uuid
                 task' (topic, handler')
             )
       )

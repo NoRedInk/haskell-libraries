@@ -13,8 +13,8 @@ import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified Dict
 import qualified GHC.Clock
-import qualified Kafka
 import qualified Kafka.Consumer as Consumer
+import qualified Kafka.Internal as Kafka
 import qualified Kafka.Metadata
 import qualified Kafka.Worker.Analytics as Analytics
 import qualified Kafka.Worker.Fetcher as Fetcher

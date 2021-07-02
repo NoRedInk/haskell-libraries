@@ -7,23 +7,26 @@
 -- process kafka messages
 module Kafka
   ( -- * Setup
-    Handler,
+    Internal.Handler,
     Settings.Settings,
     Settings.decoder,
     handler,
 
     -- * Creating messages
-    Msg,
-    Topic (..),
-    Key (..),
+    Internal.Msg,
     emptyMsg,
     addPayload,
     addKey,
 
     -- * Sending messags
-    sendAsync,
-    sendSync,
-    Error (..),
+    Internal.sendAsync,
+    Internal.sendSync,
+    Internal.Error (..),
+
+    -- * Reading messages
+    topic,
+    payload,
+    key,
   )
 where
 
@@ -38,7 +41,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.Text.Encoding
 import qualified Dict
-import Kafka.Internal as Internal
+import qualified Kafka.Internal as Internal
 import qualified Kafka.Producer as Producer
 import qualified Kafka.Settings as Settings
 import qualified Platform
@@ -46,7 +49,7 @@ import qualified Prelude
 
 data Details = Details
   { detailsBrokers :: List Text,
-    detailsMsg :: Msg
+    detailsMsg :: Internal.Msg
   }
   deriving (Generic, Show)
 
@@ -69,8 +72,13 @@ instance Platform.TracingSpanDetails DeliveryReportDetails
 -- >   emptyMsg "groceries"
 -- >     |> addPayload "broccoli"
 -- >     |> addKey "vegetables"
-emptyMsg :: Text -> Msg
-emptyMsg topic = Msg (Topic topic) Nothing Nothing
+emptyMsg :: Text -> Internal.Msg
+emptyMsg topic' =
+  Internal.Msg
+    { Internal.topic = Internal.Topic topic',
+      Internal.payload = Nothing,
+      Internal.key = Nothing
+    }
 
 -- Add a payload to a message.
 --
@@ -80,8 +88,9 @@ emptyMsg topic = Msg (Topic topic) Nothing Nothing
 -- for it to work.
 --
 -- We ask for JSON decodability to ensure the Kafka worker can later read the message
-addPayload :: (Aeson.FromJSON a, Aeson.ToJSON a) => a -> Msg -> Msg
-addPayload contents msg = msg {payload = (Just (Encodable contents))}
+addPayload :: (Aeson.FromJSON a, Aeson.ToJSON a) => a -> Internal.Msg -> Internal.Msg
+addPayload contents msg =
+  msg {Internal.payload = (Just (Internal.Encodable contents))}
 
 -- Add a key to a message.
 --
@@ -97,17 +106,23 @@ addPayload contents msg = msg {payload = (Just (Encodable contents))}
 -- Example: if each message is related to a single user and you need to ensure
 -- messagse for a user don't overtake each other, you can set the key to be the
 -- user's id.
-addKey :: Text -> Msg -> Msg
-addKey key' msg = msg {key = Just (Key key')}
+addKey :: Text -> Internal.Msg -> Internal.Msg
+addKey key' msg = msg {Internal.key = Just (Internal.Key key')}
 
-record :: Msg -> Task e Producer.ProducerRecord
-record Msg {topic, key, payload} = do
+record :: Internal.Msg -> Task e Producer.ProducerRecord
+record msg = do
   requestId <- Platform.requestId
   Task.succeed
     Producer.ProducerRecord
-      { Producer.prTopic = Producer.TopicName (unTopic topic),
+      { Producer.prTopic =
+          Internal.topic msg
+            |> Internal.unTopic
+            |> Producer.TopicName,
         Producer.prPartition = Producer.UnassignedPartition,
-        Producer.prKey = Maybe.map (Data.Text.Encoding.encodeUtf8 << unKey) key,
+        Producer.prKey =
+          Maybe.map
+            (Data.Text.Encoding.encodeUtf8 << Internal.unKey)
+            (Internal.key msg),
         Producer.prValue =
           Maybe.map
             ( \payload' ->
@@ -121,13 +136,25 @@ record Msg {topic, key, payload} = do
                   |> Aeson.encode
                   |> ByteString.Lazy.toStrict
             )
-            payload
+            (Internal.payload msg)
       }
+
+-- | The topic of a message. This function might sometimes be useful in tests.
+topic :: Internal.Msg -> Text
+topic msg = Internal.unTopic (Internal.topic msg)
+
+-- | The payload of a message. This function might sometimes be useful in tests.
+payload :: Internal.Msg -> Maybe Aeson.Value
+payload msg = Maybe.map Aeson.toJSON (Internal.payload msg)
+
+-- | The key of a message. This function might sometimes be useful in tests.
+key :: Internal.Msg -> Maybe Text
+key msg = Maybe.map Internal.unKey (Internal.key msg)
 
 -- | Function for creating a Kafka handler.
 --
 -- See 'Kafka.Settings' for potential customizations.
-handler :: Settings.Settings -> Conduit.Acquire Handler
+handler :: Settings.Settings -> Conduit.Acquire Internal.Handler
 handler settings = do
   producer <- Conduit.mkAcquire (mkProducer settings) Producer.closeProducer
   _ <- Conduit.mkAcquire (startPollEventLoop producer) (\terminator -> STM.atomically (TMVar.putTMVar terminator Terminate))
@@ -158,17 +185,17 @@ pollEvents producer = do
   pollEvents producer
 
 -- |
-mkHandler :: Settings.Settings -> Producer.KafkaProducer -> Prelude.IO Handler
+mkHandler :: Settings.Settings -> Producer.KafkaProducer -> Prelude.IO Internal.Handler
 mkHandler settings producer = do
   doAnything <- Platform.doAnythingHandler
   Prelude.pure
-    Handler
-      { sendAsync = \onDeliveryCallback msg' ->
+    Internal.Handler
+      { Internal.sendAsync = \onDeliveryCallback msg' ->
           Platform.tracingSpan "Async send Kafka messages" <| do
             let details = Details (List.map Producer.unBrokerAddress (Settings.brokerAddresses settings)) msg'
             Platform.setTracingSpanDetails details
             sendHelperAsync producer doAnything onDeliveryCallback msg',
-        sendSync = \msg' ->
+        Internal.sendSync = \msg' ->
           Platform.tracingSpan "Sync send Kafka messages" <| do
             let details = Details (List.map Producer.unBrokerAddress (Settings.brokerAddresses settings)) msg'
             Platform.setTracingSpanDetails details
@@ -216,11 +243,16 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
     Prelude.Right producer ->
       Prelude.pure producer
 
-sendHelperAsync :: Producer.KafkaProducer -> Platform.DoAnythingHandler -> Task Never () -> Msg -> Task Error ()
+sendHelperAsync ::
+  Producer.KafkaProducer ->
+  Platform.DoAnythingHandler ->
+  Task Never () ->
+  Internal.Msg ->
+  Task Internal.Error ()
 sendHelperAsync producer doAnything onDeliveryCallback msg' = do
   record' <- record msg'
   Exception.handleAny
-    (\exception -> Prelude.pure (Err (Uncaught exception)))
+    (\exception -> Prelude.pure (Err (Internal.Uncaught exception)))
     ( do
         maybeFailedMessages <-
           Producer.produceMessage'
@@ -235,6 +267,7 @@ sendHelperAsync producer doAnything onDeliveryCallback msg' = do
             )
         Prelude.pure <| case maybeFailedMessages of
           Prelude.Right _ -> Ok ()
-          Prelude.Left (Producer.ImmediateError failure) -> Err (SendingFailed (record', failure))
+          Prelude.Left (Producer.ImmediateError failure) ->
+            Err (Internal.SendingFailed (record', failure))
     )
     |> Platform.doAnything doAnything

@@ -4,7 +4,6 @@ module Kafka.Test
   )
 where
 
-import qualified Data.Aeson as Aeson
 import qualified Data.IORef
 import qualified Expect
 import qualified GHC.Stack as Stack
@@ -18,17 +17,12 @@ import qualified Platform
 stub ::
   Stack.HasCallStack =>
   (Internal.Handler -> Expect.Expectation) ->
-  Expect.Expectation' (List (Kafka.Topic, Maybe Kafka.Key, Maybe Aeson.Value))
+  Expect.Expectation' (List Kafka.Msg)
 stub stubbed = do
   logRef <- Expect.fromIO (Data.IORef.newIORef [])
   doAnything <- Expect.fromIO Platform.doAnythingHandler
   let sendStub = \msg' -> do
-        let entry =
-              ( Internal.topic msg',
-                Internal.key msg',
-                Maybe.map Aeson.toJSON (Internal.payload msg')
-              )
-        Data.IORef.modifyIORef' logRef (\prev -> entry : prev)
+        Data.IORef.modifyIORef' logRef (\prev -> msg' : prev)
           |> map Ok
           |> Platform.doAnything doAnything
   let mockHandler =
