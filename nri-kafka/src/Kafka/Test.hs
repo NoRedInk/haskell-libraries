@@ -18,7 +18,7 @@ import qualified Platform
 stub ::
   Stack.HasCallStack =>
   (Internal.Handler -> Expect.Expectation) ->
-  Expect.Expectation' (List (Kafka.Topic, Kafka.Key, Aeson.Value))
+  Expect.Expectation' (List (Kafka.Topic, Maybe Kafka.Key, Maybe Aeson.Value))
 stub stubbed = do
   logRef <- Expect.fromIO (Data.IORef.newIORef [])
   doAnything <- Expect.fromIO Platform.doAnythingHandler
@@ -26,7 +26,7 @@ stub stubbed = do
         let entry =
               ( Internal.topic msg',
                 Internal.key msg',
-                Aeson.toJSON (Internal.payload msg')
+                Maybe.map Aeson.toJSON (Internal.payload msg')
               )
         Data.IORef.modifyIORef' logRef (\prev -> entry : prev)
           |> map Ok

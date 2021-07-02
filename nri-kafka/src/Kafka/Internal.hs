@@ -25,8 +25,8 @@ type OnDelivery = Task Never ()
 -- | A message that can be written to Kafka
 data Msg = Msg
   { topic :: Topic,
-    key :: Key,
-    payload :: Encodable
+    key :: Maybe Key,
+    payload :: Maybe Encodable
   }
   deriving (Generic, Show)
 

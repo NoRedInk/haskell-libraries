@@ -61,7 +61,7 @@ instance Platform.TracingSpanDetails DeliveryReportDetails
 --
 -- We ask for JSON decodability to ensure the Kafka worker can later read the message
 msg :: (Aeson.FromJSON a, Aeson.ToJSON a) => Topic -> Key -> a -> Msg
-msg topic key contents = Msg topic key (Encodable contents)
+msg topic key contents = Msg topic (Just key) (Just (Encodable contents))
 
 record :: Msg -> Task e Producer.ProducerRecord
 record Msg {topic, key, payload} = do
@@ -70,18 +70,21 @@ record Msg {topic, key, payload} = do
     Producer.ProducerRecord
       { Producer.prTopic = Producer.TopicName (unTopic topic),
         Producer.prPartition = Producer.UnassignedPartition,
-        Producer.prKey = Just (Data.Text.Encoding.encodeUtf8 (unKey key)),
+        Producer.prKey = Maybe.map (Data.Text.Encoding.encodeUtf8 << unKey) key,
         Producer.prValue =
-          Internal.MsgWithMetaData
-            { Internal.metaData =
-                Internal.MetaData
-                  { Internal.requestId
-                  },
-              Internal.value = payload
-            }
-            |> Aeson.encode
-            |> ByteString.Lazy.toStrict
-            |> Just
+          Maybe.map
+            ( \payload' ->
+                Internal.MsgWithMetaData
+                  { Internal.metaData =
+                      Internal.MetaData
+                        { Internal.requestId
+                        },
+                    Internal.value = payload'
+                  }
+                  |> Aeson.encode
+                  |> ByteString.Lazy.toStrict
+            )
+            payload
       }
 
 -- | Function for creating a Kafka handler.
