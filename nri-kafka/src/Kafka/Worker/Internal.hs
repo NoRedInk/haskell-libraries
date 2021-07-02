@@ -56,11 +56,11 @@ data TopicSubscription = TopicSubscription
   }
 
 -- | Params needed to write / read offsets to another data store
-data OffsetParams = OffsetParams
-  { -- | The name of the topic this message is from.
-    topicName :: Text,
-    -- | The topic partition this message is from.
-    partitionId :: Int
+data PartitionOffset = PartitionOffset
+  { -- | The partition of a topic.
+    partitionId :: Int,
+    -- | The partition's offset.
+    offset :: Int
   }
 
 -- | Create a subscription for a topic.
@@ -102,14 +102,17 @@ subscription topic callback =
 -- >   let subscription =
 -- >         subscriptionManageOwnOffsets
 -- >           "the-topic"
--- >           (sql "SELECT partition_id, offset FROM offsets")
+-- >           (\partitions ->
+-- >              sql
+-- >                "SELECT partition, offset FROM offsets WHERE partition = %"
+-- >                [partitions] )
 -- >           (\msg -> Debug.todo "Process your message here!")
 -- >   process settings subscription
 subscriptionManageOwnOffsets ::
   (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
   Text ->
-  ([OffsetParams] -> Task Text (Dict.Dict OffsetParams Int)) ->
-  (OffsetParams -> Int -> msg -> Task Text Partition.SeekCmd) ->
+  ([Int] -> Task Text (List PartitionOffset)) ->
+  (PartitionOffset -> msg -> Task Text Partition.SeekCmd) ->
   TopicSubscription
 subscriptionManageOwnOffsets topic fetchOffsets callback =
   TopicSubscription
@@ -118,34 +121,37 @@ subscriptionManageOwnOffsets topic fetchOffsets callback =
         Partition.MessageCallback
           ( \record msg -> do
               let offsetParams =
-                    OffsetParams
-                      { topicName =
-                          Consumer.crTopic record
-                            |> Consumer.unTopicName,
-                        partitionId =
+                    PartitionOffset
+                      { partitionId =
                           Consumer.crPartition record
-                            |> Consumer.unPartitionId
-                            |> Prelude.fromIntegral
+                            |> partitionIdToInt,
+                        offset = Consumer.unOffset (Consumer.crOffset record)
                       }
-              callback offsetParams (Consumer.unOffset (Consumer.crOffset record)) msg
+              callback offsetParams msg
           ),
       offsetSource =
         Elsewhere
           ( \partitionKeys -> do
-              offsets <- fetchOffsets (List.map toOffsetParams partitionKeys)
-              Dict.toList offsets
-                |> List.map (Tuple.mapFirst toPartitionKey)
+              let partitionIds =
+                    partitionKeys
+                      |> List.map (partitionIdToInt << Tuple.second)
+              offsets <- fetchOffsets partitionIds
+              offsets
+                |> List.map toPartitionKey
                 |> Task.succeed
           )
     }
   where
-    toOffsetParams :: PartitionKey -> OffsetParams
-    toOffsetParams (Consumer.TopicName topicName, Consumer.PartitionId partitionId) =
-      OffsetParams topicName (Prelude.fromIntegral partitionId)
+    toPartitionKey :: PartitionOffset -> (PartitionKey, Int)
+    toPartitionKey (PartitionOffset {partitionId, offset}) =
+      ( ( Consumer.TopicName topic,
+          Consumer.PartitionId (Prelude.fromIntegral partitionId)
+        ),
+        offset
+      )
 
-    toPartitionKey :: OffsetParams -> PartitionKey
-    toPartitionKey (OffsetParams topicName partitionId) =
-      (Consumer.TopicName topicName, Consumer.PartitionId (Prelude.fromIntegral partitionId))
+    partitionIdToInt :: Consumer.PartitionId -> Int
+    partitionIdToInt (Consumer.PartitionId int) = Prelude.fromIntegral int
 
 -- | This determines how a worker that was just assigned a partition should
 -- decide at which message offset to continue processing.
