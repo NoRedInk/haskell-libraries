@@ -6,17 +6,24 @@
 -- See Kafka.Worker for the basic building blocks of a CLI app that will poll &
 -- process kafka messages
 module Kafka
-  ( Handler,
-    Error (..),
-    Topic (..),
-    Key (..),
-    Msg,
+  ( -- * Setup
+    Handler,
     Settings.Settings,
     Settings.decoder,
     handler,
-    msg,
+
+    -- * Creating messages
+    Msg,
+    Topic (..),
+    Key (..),
+    emptyMsg,
+    addPayload,
+    addKey,
+
+    -- * Sending messags
     sendAsync,
     sendSync,
+    Error (..),
   )
 where
 
@@ -56,12 +63,42 @@ instance Aeson.ToJSON DeliveryReportDetails
 
 instance Platform.TracingSpanDetails DeliveryReportDetails
 
--- | Creates a Kafka-writable message from a topic, key, and JSON-encodable
--- payload
+-- | Creates a Kafka-writable message for a topic.
+--
+-- > msg =
+-- >   emptyMsg "groceries"
+-- >     |> addPayload "broccoli"
+-- >     |> addKey "vegetables"
+emptyMsg :: Text -> Msg
+emptyMsg topic = Msg (Topic topic) Nothing Nothing
+
+-- Add a payload to a message.
+--
+-- Message payloads aren't mandatory in Kafka, so using this function really is
+-- optional. A counter is an example of an application that doesn't require
+-- message payloads. Just knowing an increment event took place would be enough
+-- for it to work.
 --
 -- We ask for JSON decodability to ensure the Kafka worker can later read the message
-msg :: (Aeson.FromJSON a, Aeson.ToJSON a) => Topic -> Key -> a -> Msg
-msg topic key contents = Msg topic (Just key) (Just (Encodable contents))
+addPayload :: (Aeson.FromJSON a, Aeson.ToJSON a) => a -> Msg -> Msg
+addPayload contents msg = msg {payload = (Just (Encodable contents))}
+
+-- Add a key to a message.
+--
+-- Kafka divides messages in a topic in different partitions. Kafka workers can
+-- collaborate on a topic by each processing messages from a couple of the
+-- topic's partitions. Within a partition messages will never overtake each
+-- other.
+--
+-- By default each message is assigned to a random partition. Setting a key on
+-- the message gives you more control over this process. Messages with the same
+-- key are guaranteed to end up in the same partition.
+--
+-- Example: if each message is related to a single user and you need to ensure
+-- messagse for a user don't overtake each other, you can set the key to be the
+-- user's id.
+addKey :: Text -> Msg -> Msg
+addKey key' msg = msg {key = Just (Key key')}
 
 record :: Msg -> Task e Producer.ProducerRecord
 record Msg {topic, key, payload} = do
