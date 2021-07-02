@@ -21,7 +21,6 @@ module Kafka
     -- * Sending messags
     Internal.sendAsync,
     Internal.sendSync,
-    Internal.Error (..),
 
     -- * Reading messages
     topic,
@@ -196,7 +195,8 @@ mkHandler settings producer = do
           Platform.tracingSpan "Async send Kafka messages" <| do
             let details = Details (List.map Producer.unBrokerAddress (Settings.brokerAddresses settings)) msg'
             Platform.setTracingSpanDetails details
-            sendHelperAsync producer doAnything onDeliveryCallback msg',
+            sendHelperAsync producer doAnything onDeliveryCallback msg'
+              |> Task.mapError Internal.errorToText,
         Internal.sendSync = \msg' ->
           Platform.tracingSpan "Sync send Kafka messages" <| do
             let details = Details (List.map Producer.unBrokerAddress (Settings.brokerAddresses settings)) msg'
@@ -204,6 +204,7 @@ mkHandler settings producer = do
             terminator <- doSTM doAnything TMVar.newEmptyTMVar
             let onDeliveryCallback = doSTM doAnything (TMVar.putTMVar terminator Terminate)
             sendHelperAsync producer doAnything onDeliveryCallback msg'
+              |> Task.mapError Internal.errorToText
             Terminate <- doSTM doAnything (TMVar.readTMVar terminator)
             Task.succeed ()
       }
