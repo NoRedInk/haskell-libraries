@@ -144,8 +144,10 @@ topic :: Internal.Msg -> Text
 topic msg = Internal.unTopic (Internal.topic msg)
 
 -- | The payload of a message. This function might sometimes be useful in tests.
-payload :: Internal.Msg -> Maybe Aeson.Value
-payload msg = Maybe.map Aeson.toJSON (Internal.payload msg)
+payload :: (Aeson.FromJSON a) => Internal.Msg -> Maybe a
+payload msg =
+  Internal.payload msg
+    |> Maybe.andThen (Aeson.decode << Aeson.encode)
 
 -- | The key of a message. This function might sometimes be useful in tests.
 key :: Internal.Msg -> Maybe Text
