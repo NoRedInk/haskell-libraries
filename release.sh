@@ -43,11 +43,10 @@ fi
 git fetch --tags
 git tag -l --points-at HEAD | grep "^$name-$version$" > /dev/null \
   || fail "No git tag for current version exists. Please create tag:
-  
+
 $ git tag $name-$version && git push --tags"
 
 cabal sdist -o - > "$bundle"
+cabal haddock --haddock-for-hackage --haddock-hyperlink-source --haddock-quickjump
 cabal upload --publish "$bundle"
-# Documentation upload doesn't seem to work, not sure why. If you find a fix
-# please uncomment! Until then we rely on documentation generation from hackage.
-# cabal upload -d --publish
+cabal upload -d --publish "../dist-newstyle/$name-$version-docs.tar.gz"
