@@ -13,3 +13,4 @@ install:
   - cachix use $CACHIX_CACHE
 script:
   - cachix watch-exec $CACHIX_CACHE -- nix-shell shell-ghc-8-10.nix --run "./run-tests.sh"
+  - cachix watch-exec $CACHIX_CACHE -- nix-shell shell-ghc-9-0.nix --run "./run-tests.sh"
