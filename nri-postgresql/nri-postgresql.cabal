@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-postgresql
-version:        0.1.0.0
+version:        0.1.0.1
 synopsis:       Make queries against Postgresql.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme>.
 category:       Web
@@ -70,7 +70,7 @@ library
     , resource-pool >=0.2.0.0 && <0.3
     , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
-    , template-haskell >=2.15.0.0 && <2.17
+    , template-haskell >=2.15.0.0 && <2.18
     , text >=1.2.3.1 && <1.3
     , time >=1.8.0.2 && <1.13
   default-language: Haskell2010
@@ -125,7 +125,7 @@ test-suite tests
     , resource-pool >=0.2.0.0 && <0.3
     , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
-    , template-haskell >=2.15.0.0 && <2.17
+    , template-haskell >=2.15.0.0 && <2.18
     , text >=1.2.3.1 && <1.3
     , time >=1.8.0.2 && <1.13
   default-language: Haskell2010
