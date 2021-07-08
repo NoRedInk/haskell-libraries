@@ -762,7 +762,7 @@ tracingSpan name (Task run) =
 tracingSpanIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 tracingSpanIO handler name run =
   Exception.bracketWithError
-    (Stack.withFrozenCallStack startChildTracingSpan handler name)
+    (Stack.withFrozenCallStack (startChildTracingSpan handler name))
     (Prelude.flip finishTracingSpan)
     run
 
