@@ -2,6 +2,9 @@ language: nix
 nix: 2.3.7
 os: linux
 dist: xenial
+vm:
+  # we were getting out of memory errors without this
+  size: large
 env:
   global:
     - PGPORT=8088
