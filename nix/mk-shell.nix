@@ -20,6 +20,15 @@ let
       super.servant-server_0_18_3
     else
       super.servant-server;
+    jose = if useServant_0_18_3 then
+      pkgs.haskell.lib.dontCheck super.jose
+    else
+      super.jose;
+
+    servant-auth-server = if useServant_0_18_3 then
+      pkgs.haskell.lib.dontCheck super.servant-auth-server
+    else
+      super.servant-auth-server;
   });
 in pkgs.mkShell {
   buildInputs = [
