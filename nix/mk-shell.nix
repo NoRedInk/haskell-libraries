@@ -1,15 +1,22 @@
-{ pkgs, haskellPackages, use_servant_0_18_3 ? false }:
+{ pkgs, haskellPackages, useServant_0_18_3 ? false
+, customSafeColouredText ? true }:
 
 let
   sources = import ./sources.nix { };
   customHaskellPackages = haskellPackages.extend (self: super: {
-    safe-coloured-text = super.callCabal2nix "safe-coloured-text"
-      "${sources.safe-coloured-text}/safe-coloured-text" { };
-    safe-coloured-text-terminfo =
+    safe-coloured-text = if customSafeColouredText then
+      super.callCabal2nix "safe-coloured-text"
+      "${sources.safe-coloured-text}/safe-coloured-text" { }
+    else
+      self.safe-coloured-text;
+    safe-coloured-text-terminfo = if customSafeColouredText then
       super.callCabal2nix "safe-coloured-text-terminfo"
-      "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { };
-    servant = if use_servant_0_18_3 then self.servant_0_18_3 else self.servant;
-    servant-server = if use_servant_0_18_3 then
+      "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { }
+    else
+      self.safe-coloured-text-terminfo;
+
+    servant = if useServant_0_18_3 then self.servant_0_18_3 else self.servant;
+    servant-server = if useServant_0_18_3 then
       self.servant-server_0_18_3
     else
       self.servant-server;
