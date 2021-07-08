@@ -198,7 +198,7 @@ query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
-    |> Task.andThen (Stack.withFrozenCallStack doQuery handler)
+    |> Task.andThen (Stack.withFrozenCallStack (doQuery handler))
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
@@ -210,7 +210,7 @@ transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
-    |> Task.andThen (Stack.withFrozenCallStack doTransaction handler)
+    |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler))
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
 namespaceQuery prefix query' = mapKeys (\key -> Task.succeed (prefix ++ key)) query'
