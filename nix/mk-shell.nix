@@ -1,4 +1,4 @@
-{ pkgs, haskellPackages }:
+{ pkgs, haskellPackages, use_servant_0_18_3 ? false }:
 
 let
   sources = import ./sources.nix { };
@@ -8,8 +8,12 @@ let
     safe-coloured-text-terminfo =
       super.callCabal2nix "safe-coloured-text-terminfo"
       "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { };
+    servant = if use_servant_0_18_3 then self.servant_0_18_3 else self.servant;
+    servant-server = if use_servant_0_18_3 then
+      self.servant-server_0_18_3
+    else
+      self.servant-server;
   });
-
 in pkgs.mkShell {
   buildInputs = [
     (customHaskellPackages.ghcWithPackages (haskellPackges:
