@@ -8,18 +8,18 @@ let
       super.callCabal2nix "safe-coloured-text"
       "${sources.safe-coloured-text}/safe-coloured-text" { }
     else
-      self.safe-coloured-text;
+      super.safe-coloured-text;
     safe-coloured-text-terminfo = if customSafeColouredText then
       super.callCabal2nix "safe-coloured-text-terminfo"
       "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { }
     else
-      self.safe-coloured-text-terminfo;
+      super.safe-coloured-text-terminfo;
 
-    servant = if useServant_0_18_3 then self.servant_0_18_3 else self.servant;
+    servant = if useServant_0_18_3 then super.servant_0_18_3 else super.servant;
     servant-server = if useServant_0_18_3 then
-      self.servant-server_0_18_3
+      super.servant-server_0_18_3
     else
-      self.servant-server;
+      super.servant-server;
   });
 in pkgs.mkShell {
   buildInputs = [
