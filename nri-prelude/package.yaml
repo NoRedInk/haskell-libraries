@@ -27,7 +27,7 @@ library:
     - directory >= 1.3.3.0 && < 1.4
     - exceptions >= 0.10.4 && < 0.11
     - filepath >= 1.4.2.1 && < 1.5
-    - ghc >= 8.6.1 && < 8.11
+    - ghc >= 8.6.1 && < 9.1
     - hedgehog >= 1.0.2 && < 1.1
     - junit-xml >= 0.1.0.0 && < 0.2.0.0
     - pretty-diff >= 0.4.0.2 && < 0.5

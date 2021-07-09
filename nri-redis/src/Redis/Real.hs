@@ -44,10 +44,10 @@ timeoutAfterMilliseconds :: Float -> Internal.Handler -> Internal.Handler
 timeoutAfterMilliseconds milliseconds handler' =
   handler'
     { Internal.doQuery =
-        Stack.withFrozenCallStack Internal.doQuery handler'
+        Stack.withFrozenCallStack (Internal.doQuery handler')
           >> Task.timeout milliseconds Internal.TimeoutError,
       Internal.doTransaction =
-        Stack.withFrozenCallStack Internal.doTransaction handler'
+        Stack.withFrozenCallStack (Internal.doTransaction handler')
           >> Task.timeout milliseconds Internal.TimeoutError
     }
 
@@ -63,10 +63,10 @@ defaultExpiryKeysAfterSeconds secs handler' =
    in handler'
         { Internal.doQuery = \query' ->
             wrapWithExpire query'
-              |> Stack.withFrozenCallStack Internal.doQuery handler',
+              |> Stack.withFrozenCallStack (Internal.doQuery handler'),
           Internal.doTransaction = \query' ->
             wrapWithExpire query'
-              |> Stack.withFrozenCallStack Internal.doTransaction handler'
+              |> Stack.withFrozenCallStack (Internal.doTransaction handler')
         }
 
 acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler, Connection)
@@ -102,7 +102,7 @@ acquireHandler namespace settings = do
                           Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Text.fromList err)))
                     )
-                  |> Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything,
+                  |> Stack.withFrozenCallStack (platformRedis (Internal.cmds query) connection anything),
           Internal.namespace = namespace,
           Internal.maxKeySize = Settings.maxKeySize settings
         },

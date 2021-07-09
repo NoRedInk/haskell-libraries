@@ -30,11 +30,11 @@ Documentation comments use the [Haddock][haddock] format to ensure they are rend
 
 ### Testing compilation against GHC 8.10
 
-Our default `shell.nix` sets up an environment around GHC version 8.10. CI also runs tests against GHC 8.8. To test using this version locally:
+Our default `shell.nix` sets up an environment around GHC version 8.10. CI also runs tests against GHC 9.0. To test using this version locally:
 
 ```sh
 cachix use nri-open-source       # set up cache so the next step goes faster
-nix-shell shell-ghc-8-8.nix
+nix-shell shell-ghc-9-0.nix
 ```
 
 This starts a special shell in which you can run any of the commands above.

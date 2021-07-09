@@ -1,18 +1,8 @@
 { pkgs, haskellPackages }:
 
-let
-  sources = import ./sources.nix { };
-  customHaskellPackages = haskellPackages.extend (self: super: {
-    safe-coloured-text = super.callCabal2nix "safe-coloured-text"
-      "${sources.safe-coloured-text}/safe-coloured-text" { };
-    safe-coloured-text-terminfo =
-      super.callCabal2nix "safe-coloured-text-terminfo"
-      "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { };
-  });
-
-in pkgs.mkShell {
+pkgs.mkShell {
   buildInputs = [
-    (customHaskellPackages.ghcWithPackages (haskellPackges:
+    (haskellPackages.ghcWithPackages (haskellPackges:
       with haskellPackges; [
         aeson
         aeson-pretty

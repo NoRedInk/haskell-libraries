@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-record-updates #-}
 
@@ -21,7 +22,11 @@ where
 
 import Data.Function ((&))
 import qualified Data.List
-import qualified GhcPlugins
+#if __GLASGOW_HASKELL__ >= 900
+import qualified GHC.Plugins as GhcPlugins
+#else
+import GhcPlugins
+#endif
 import NriPrelude.Plugin.GhcVersionDependent
   ( hsmodImports,
     hsmodName,
