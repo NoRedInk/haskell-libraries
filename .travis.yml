@@ -9,11 +9,13 @@ env:
   global:
     - PGPORT=8088
     - CACHIX_CACHE=nri
+  jobs:
+    - GHC_VERSION=8-10
+    - GHC_VERSION=9-0
 install:
   - echo "trusted-users = $USER" | sudo tee -a /etc/nix/nix.conf
   - sudo systemctl restart nix-daemon
   - nix-env -iA nixpkgs.cachix
   - cachix use $CACHIX_CACHE
 script:
-  - cachix watch-exec $CACHIX_CACHE -- nix-shell shell-ghc-8-10.nix --run "./run-tests.sh"
-  - cachix watch-exec $CACHIX_CACHE -- nix-shell shell-ghc-9-0.nix --run "./run-tests.sh"
+  - cachix watch-exec $CACHIX_CACHE -- nix-shell shell-ghc-$GHC_VERSION.nix --run "./run-tests.sh"
