@@ -1,38 +1,8 @@
-{ pkgs, haskellPackages, useServant_0_18_3 ? false
-, customSafeColouredText ? true }:
+{ pkgs, haskellPackages }:
 
-let
-  sources = import ./sources.nix { };
-  customHaskellPackages = haskellPackages.extend (self: super: {
-    safe-coloured-text = if customSafeColouredText then
-      super.callCabal2nix "safe-coloured-text"
-      "${sources.safe-coloured-text}/safe-coloured-text" { }
-    else
-      super.safe-coloured-text;
-    safe-coloured-text-terminfo = if customSafeColouredText then
-      super.callCabal2nix "safe-coloured-text-terminfo"
-      "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { }
-    else
-      super.safe-coloured-text-terminfo;
-
-    servant = if useServant_0_18_3 then super.servant_0_18_3 else super.servant;
-    servant-server = if useServant_0_18_3 then
-      super.servant-server_0_18_3
-    else
-      super.servant-server;
-    jose = if useServant_0_18_3 then
-      pkgs.haskell.lib.dontCheck super.jose
-    else
-      super.jose;
-
-    servant-auth-server = if useServant_0_18_3 then
-      pkgs.haskell.lib.dontCheck super.servant-auth-server
-    else
-      super.servant-auth-server;
-  });
-in pkgs.mkShell {
+pkgs.mkShell {
   buildInputs = [
-    (customHaskellPackages.ghcWithPackages (haskellPackges:
+    (haskellPackages.ghcWithPackages (haskellPackges:
       with haskellPackges; [
         aeson
         aeson-pretty
