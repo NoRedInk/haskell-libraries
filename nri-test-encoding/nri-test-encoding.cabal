@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-test-encoding
-version:        0.1.0.0
+version:        0.1.1.0
 synopsis:       A library to simplify writing golden tests for encoding types.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding#readme>.
 category:       Testing
