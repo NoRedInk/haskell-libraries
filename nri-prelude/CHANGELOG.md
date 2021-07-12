@@ -1,5 +1,9 @@
 # Unreleased next version
 
+# 0.6.0.3
+
+- Support GHC 9.0.1.
+
 # 0.6.0.2
 
 - Relax version bounds to encompass `time-0.12`.

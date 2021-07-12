@@ -38,13 +38,6 @@ module Redis.Set
     Internal.map2,
     Internal.map3,
     Internal.sequence,
-
-    -- * Every `Redis.Api key value` needs to implement an instance for `HasExamples value`.
-
-    -- | This instance is used to generate golden-tests for the api's value.
-    -- | You can use `Redis.Test.fromExamples yourRedisApi` in your test suite.
-    Examples.HasExamples (..),
-    Examples.example,
   )
 where
 
@@ -52,7 +45,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Examples
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
@@ -117,16 +109,11 @@ data Api key a = Api
 -- > data Key = Key { fieldA: Text, fieldB: Text }
 -- > data Val = Val { ... }
 -- >
--- > -- | This instance can be used to generate a golden test for this type.
--- > -- | See Redis.Test
--- > instance Redis.HasExamples Val where
--- >   example = Examples.example "Val" Val { ... }
--- >
 -- > myJsonApi :: Redis.Api Key Val
 -- > myJsonApi = Redis.jsonApi (\Key {fieldA,
 jsonApi ::
   forall a key.
-  (Examples.HasExamples a, Aeson.ToJSON a, Aeson.FromJSON a, Ord a) =>
+  (Aeson.ToJSON a, Aeson.FromJSON a, Ord a) =>
   (key -> Text) ->
   Api key a
 jsonApi = makeApi Codec.jsonCodec

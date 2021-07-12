@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-redis
-version:        0.1.0.0
+version:        0.1.0.1
 synopsis:       An intuitive hedis wrapper library.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
 category:       Web
@@ -36,7 +36,6 @@ library
       Redis.List
       Redis.Mock
       Redis.Set
-      Redis.Test
   other-modules:
       Redis.Codec
       Redis.Internal
@@ -72,7 +71,6 @@ library
     , nri-env-parser >=0.1.0.0 && <0.2
     , nri-observability >=0.1.0 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
-    , nri-test-encoding >=0.1.0 && <0.2
     , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
     , text >=1.2.3.1 && <1.3
@@ -95,7 +93,6 @@ test-suite tests
       Redis.Real
       Redis.Set
       Redis.Settings
-      Redis.Test
       Paths_nri_redis
   hs-source-dirs:
       test
@@ -127,7 +124,6 @@ test-suite tests
     , nri-env-parser >=0.1.0.0 && <0.2
     , nri-observability >=0.1.0 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
-    , nri-test-encoding >=0.1.0 && <0.2
     , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
     , text >=1.2.3.1 && <1.3
