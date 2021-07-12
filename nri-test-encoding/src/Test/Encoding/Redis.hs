@@ -1,5 +1,5 @@
 -- | Useful to test encoding of data stored in redis.
-module Redis.Test (encoding) where
+module Test.Encoding.Redis (test) where
 
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Typeable as Typeable
@@ -16,8 +16,8 @@ import qualified Text
 -- 2. encoded the examples into JSON
 -- 3. check the encoded JSON against the generated file
 --   NOTE: it will generate the file if it doesn't exist yet
-encoding :: forall m key a. (Typeable.Typeable a, Examples.HasExamples a) => m key a -> Test
-encoding _ =
+test :: forall m key a. (Typeable.Typeable a, Examples.HasExamples a) => m key a -> Test
+test _ =
   let proxy = Proxy :: Proxy a
       tyCon =
         Typeable.typeRep proxy

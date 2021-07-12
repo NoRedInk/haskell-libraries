@@ -31,8 +31,8 @@ library
   exposed-modules:
       Examples
       Test.Encoding
+      Test.Encoding.Redis
       Test.Encoding.Routes
-      Redis.Test
   other-modules:
       Paths_nri_test_encoding
   hs-source-dirs:
