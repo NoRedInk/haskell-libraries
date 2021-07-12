@@ -32,6 +32,7 @@ library
       Examples
       Test.Encoding
       Test.Encoding.Routes
+      Redis.Test
   other-modules:
       Paths_nri_test_encoding
   hs-source-dirs:
@@ -58,6 +59,7 @@ library
     , bytestring >=0.10.8.2 && <0.12
     , filepath >=1.4.2.1 && <1.5
     , nri-prelude >=0.1.0.0 && <0.7
+    , nri-redis >=0.1.0.0 && <0.2
     , servant >=0.16.2 && <0.19
     , servant-auth-server >=0.4.5.1 && <0.5
     , servant-server >=0.16.2 && <0.19
