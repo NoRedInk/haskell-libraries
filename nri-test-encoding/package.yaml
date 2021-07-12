@@ -29,8 +29,8 @@ library:
   exposed-modules:
     - Examples
     - Test.Encoding
+    - Test.Encoding.Redis
     - Test.Encoding.Routes
-    - Redis.Test
   source-dirs:
     - src
 default-extensions:
