@@ -1051,6 +1051,9 @@ main = do
   case args of
     [] -> run ShowAll MostRecent
     ["--failures"] -> run ShowOnlyFailures MostRecent
+    ["--clear"] -> do
+      System.Directory.removeFile logFile
+      run ShowAll MostRecent
     ["--help"] ->
       [ "Usage:",
         "  log-explorer",
@@ -1059,6 +1062,7 @@ main = do
         "  --version      show application version",
         "  --all          load all old log entries",
         "  --failures     only show failures",
+        "  --clear        clears the log file",
         "",
         "log-explorer is a tool for exploring traces produced by the nri-prelude set of libraries."
       ]
