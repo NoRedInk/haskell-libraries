@@ -99,13 +99,15 @@ deriveSampleRate rootSpan settings =
           -- healthcheck endpoints don't populate `HttpRequest.endpoint`.
           -- Fix that first before trying this.
           Just requestPath -> List.any (requestPath ==) ["/health/readiness", "/metrics", "/health/liveness"]
-      baseRate = fractionOfSuccessRequestsLogged settings
+      baseRate = modifyFractionOfSuccessRequestsLogged settings (fractionOfSuccessRequestsLogged settings) rootSpan
       requestDurationMs =
         Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
           |> (*) 1e-3
-      apdexTMs = Prelude.fromIntegral (apdexTimeMs settings)
+      apdexTMs =
+        modifyApdexTimeMs settings (apdexTimeMs settings) rootSpan
+          |> Prelude.fromIntegral
    in if isNonAppRequestPath
         then --
         -- We have 2678400 seconds in a month
