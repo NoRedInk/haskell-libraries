@@ -99,13 +99,15 @@ deriveSampleRate rootSpan settings =
           -- healthcheck endpoints don't populate `HttpRequest.endpoint`.
           -- Fix that first before trying this.
           Just requestPath -> List.any (requestPath ==) ["/health/readiness", "/metrics", "/health/liveness"]
-      baseRate = fractionOfSuccessRequestsLogged settings
+      baseRate = modifyFractionOfSuccessRequestsLogged settings (fractionOfSuccessRequestsLogged settings) rootSpan
       requestDurationMs =
         Timer.difference (Platform.started rootSpan) (Platform.finished rootSpan)
           |> Platform.inMicroseconds
           |> Prelude.fromIntegral
           |> (*) 1e-3
-      apdexTMs = Prelude.fromIntegral (apdexTimeMs settings)
+      apdexTMs =
+        modifyApdexTimeMs settings (apdexTimeMs settings) rootSpan
+          |> Prelude.fromIntegral
    in if isNonAppRequestPath
         then --
         -- We have 2678400 seconds in a month
@@ -571,7 +573,19 @@ data Settings = Settings
     --
     -- [@environment variable@] HONEYCOMB_APDEX_TIME_IN_MILLISECONDS
     -- [@default value@] 100
-    apdexTimeMs :: Int
+    apdexTimeMs :: Int,
+    -- | Allows overriding the default sample rates for given spans.
+    -- This allows us to change the sample rate for certain endpoints within an
+    -- application, for example if a path is critical but low volume we may choose
+    -- to increase the rate.
+    -- [@default value@] the input float
+    modifyFractionOfSuccessRequestsLogged :: Float -> Platform.TracingSpan -> Float,
+    -- | Allows overriding the default apdex rates for given spans.
+    -- This allows us to change the apdex for certain endpoints within an
+    -- application, for example if a path is significantly lower volume than
+    -- another the apdex may require tuning.
+    -- [@default value@] the input int
+    modifyApdexTimeMs :: Int -> Platform.TracingSpan -> Int
   }
 
 -- | Read 'Settings' from environment variables. Default variables will be used
@@ -584,6 +598,8 @@ decoder =
     |> andMap honeycombAppNameDecoder
     |> andMap fractionOfSuccessRequestsLoggedDecoder
     |> andMap apdexTimeMsDecoder
+    |> andMap (Prelude.pure always)
+    |> andMap (Prelude.pure always)
 
 honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret ByteString.ByteString)
 honeycombApiKeyDecoder =

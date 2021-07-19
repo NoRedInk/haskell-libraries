@@ -3,7 +3,7 @@ module Reporter.Honeycomb
   ( Internal.report,
     Internal.handler,
     Internal.Handler,
-    Internal.Settings(..),
+    Internal.Settings (..),
     Internal.decoder,
   )
 where

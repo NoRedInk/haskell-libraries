@@ -1,3 +1,5 @@
+{-# LANGUAGE NumericUnderscores #-}
+
 module Spec.Reporter.Honeycomb (tests) where
 
 import qualified Control.Exception.Safe as Exception
@@ -20,6 +22,7 @@ import qualified Platform
 import qualified Platform.Timer as Timer
 import qualified Reporter.Honeycomb.Internal as Honeycomb
 import Test (Test, describe, test)
+import qualified Prelude
 
 tests :: Test
 tests =
@@ -315,6 +318,52 @@ tests =
               |> (:) ("apdex T: " ++ Text.fromFloat apdexTMs ++ "ms")
               |> Text.join "\n"
               |> Expect.equalToContentsOf "test/golden-results/observability-spec-honeycomb-sampling"
+        ],
+      describe
+        "deriveSampleRate"
+        [ test "modifies configured sample rate by route" <| \_ -> do
+            let matchingSpan =
+                  emptyTracingSpan
+                    { Platform.name = "matching-span"
+                    }
+            let customRate = 1.0
+            let defaultRate = 0.1
+            let settings =
+                  emptySettings
+                    { Honeycomb.fractionOfSuccessRequestsLogged = defaultRate,
+                      Honeycomb.modifyFractionOfSuccessRequestsLogged =
+                        \rate span ->
+                          case Platform.name span of
+                            "matching-span" -> customRate
+                            _ -> rate
+                    }
+            Honeycomb.deriveSampleRate matchingSpan settings
+              |> Expect.within (Expect.Absolute 0.001) customRate
+
+            Honeycomb.deriveSampleRate emptyTracingSpan settings
+              |> Expect.within (Expect.Absolute 0.001) defaultRate,
+          test "modifies configured apdex by route" <| \_ -> do
+            let matchingSpan =
+                  emptyTracingSpan
+                    { Platform.name = "matching-span",
+                      Platform.started = 0,
+                      Platform.finished = 1000
+                    }
+            let settings =
+                  emptySettings
+                    { Honeycomb.fractionOfSuccessRequestsLogged = 0.1,
+                      Honeycomb.apdexTimeMs = Prelude.maxBound,
+                      Honeycomb.modifyApdexTimeMs =
+                        \defaultApdex span ->
+                          case Platform.name span of
+                            "matching-span" -> 10
+                            _ -> defaultApdex
+                    }
+            Honeycomb.deriveSampleRate matchingSpan settings
+              |> Expect.notWithin (Expect.Absolute 0.001) 0.1
+
+            Honeycomb.deriveSampleRate emptyTracingSpan settings
+              |> Expect.within (Expect.Absolute 0.001) 0.1
         ]
     ]
 
@@ -341,6 +390,18 @@ emptyTracingSpan =
       Platform.succeeded = Platform.Succeeded,
       Platform.allocated = 0,
       Platform.children = []
+    }
+
+emptySettings :: Honeycomb.Settings
+emptySettings =
+  Honeycomb.Settings
+    { Honeycomb.apiKey = Log.mkSecret "api-key",
+      Honeycomb.datasetName = "dataset",
+      Honeycomb.serviceName = "service",
+      Honeycomb.fractionOfSuccessRequestsLogged = 0.0,
+      Honeycomb.apdexTimeMs = 10,
+      Honeycomb.modifyFractionOfSuccessRequestsLogged = always,
+      Honeycomb.modifyApdexTimeMs = always
     }
 
 toBatchEvents :: Platform.TracingSpan -> [Honeycomb.BatchEvent]
