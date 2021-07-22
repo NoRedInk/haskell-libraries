@@ -27,7 +27,7 @@ writeSpanToDevLog span = do
       logFile
       System.IO.AppendMode
       ( \handle -> do
-          System.Posix.Files.setFileMode logFile System.Posix.Files.accessModes
+          System.Posix.Files.setFileMode logFile System.Posix.Files.stdFileMode
           Data.ByteString.Lazy.hPut handle (Aeson.encode (now, span))
           Data.ByteString.Lazy.hPut handle "\n"
       )
