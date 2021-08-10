@@ -192,7 +192,7 @@ processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId
 processWithoutShutdownEnsurance settings groupId topicSubscriptions = do
   let TopicSubscription {onMessage, topic, offsetSource} = topicSubscriptions
   state <- initState
-  onQuitSignal (Stopping.stopTakingRequests (stopping state))
+  onQuitSignal (Stopping.stopTakingRequests (stopping state) "Received stop signal")
   Conduit.withAcquire (Observability.handler (Settings.observability settings)) <| \observabilityHandler -> do
     Exception.bracketWithError
       (createConsumer settings groupId observabilityHandler offsetSource onMessage topic state)
@@ -408,8 +408,10 @@ cleanUp :: Observability.Handler -> RebalanceInfo -> Stopping.Stopping -> Maybe 
 cleanUp observabilityHandler rebalanceInfo stopping maybeException consumer = do
   Prelude.putStrLn "Cleaning up"
   _ <- Consumer.closeConsumer consumer
-  -- ensure workers shut down
-  Stopping.stopTakingRequests stopping
+  -- In case we're already stopping, get the reason we're doing so.
+  maybeStopReason <- Stopping.stopReason stopping
+  -- Ensure we enter stopping mode if we weren't already.
+  Stopping.stopTakingRequests stopping "Shutting down"
   requestId <- map Data.UUID.toText Data.UUID.V4.nextRandom
   -- at some point, k8s should report system crashes. In the mean time, we'll do it.
   Platform.rootTracingSpanIO
@@ -428,9 +430,11 @@ cleanUp observabilityHandler rebalanceInfo stopping maybeException consumer = do
               Log.context "rebalance info" (Debug.toString rebalanceInfo')
             ]
             |> Task.perform log
-
   writeCrashLogOnError maybeException
-  Prelude.putStrLn "Bye!"
+  case (maybeException, maybeStopReason) of
+    (Just exception, _) -> Prelude.putStrLn ("Shut down because of exception: " ++ Exception.displayException exception)
+    (_, Just stopReason) -> Prelude.putStrLn ("Shut down because of: " ++ Text.toList stopReason)
+    (Nothing, Nothing) -> Prelude.putStrLn "Shut down for an unknown reason."
 
 -- | Handle crash logging
 writeCrashLogOnError :: Maybe Exception.SomeException -> Prelude.IO ()
