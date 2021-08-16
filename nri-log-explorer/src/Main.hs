@@ -1232,6 +1232,12 @@ handleEvent pushMsg model event =
         (EditMode, _) -> do
           liftIO (pushMsg (EditorEvent vtyEvent))
           Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar '1') []) -> do
+          Brick.vScrollBy (Brick.viewportScroll SpanDetail) (-1)
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar '2') []) -> do
+          Brick.vScrollBy (Brick.viewportScroll SpanDetail) 1
+          Brick.continue model
         _ ->
           scroll
             (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
