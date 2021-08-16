@@ -9,6 +9,7 @@ where
 
 import qualified Brick
 import qualified Brick.BChan
+import Brick.Types (ViewportType (..))
 import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
 import qualified Brick.Widgets.Edit as Edit
@@ -143,6 +144,7 @@ data Name
   = RootSpanList
   | SpanBreakdownList Prelude.Int
   | FilterField
+  | SpanDetail
   deriving (Eq, Ord, Show)
 
 -- An alternative data type containing part of the same data as above, in a
@@ -907,77 +909,81 @@ viewSpanBreakdownWithMatch matching span =
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
-  Brick.vBox
-    [ viewDetail "name" (Platform.name original),
-      case Platform.summary original of
-        Nothing -> Brick.emptyWidget
-        Just summary -> viewDetail "summary" summary,
-      viewDetail
-        "duration"
-        ( ( Platform.finished original - Platform.started original
-              |> Platform.inMicroseconds
-              |> Prelude.fromIntegral
-              |> (\n -> n `Prelude.div` 1000)
-              |> Text.fromInt
-          )
-            ++ " ms"
-        ),
-      case Platform.frame original of
-        Nothing -> Brick.emptyWidget
-        Just (_, srcLoc) ->
+  Brick.viewport
+    SpanDetail
+    Vertical
+    ( Brick.vBox
+        [ viewDetail "name" (Platform.name original),
+          case Platform.summary original of
+            Nothing -> Brick.emptyWidget
+            Just summary -> viewDetail "summary" summary,
           viewDetail
-            "source"
-            ( Data.Text.pack (Stack.srcLocFile srcLoc)
-                ++ ":"
-                ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
-            ),
-      case Platform.succeeded original of
-        Platform.Succeeded -> viewDetail "result" "succeeded"
-        Platform.Failed -> viewDetail "result" "failed"
-        Platform.FailedWith exception ->
-          viewDetail
-            "failed with"
-            ( Exception.displayException exception
-                |> Data.Text.pack
-            ),
-      case map Aeson.toJSON (Platform.details original) of
-        Nothing -> Brick.emptyWidget
-        Just Aeson.Null -> Brick.emptyWidget
-        Just (Aeson.String str) -> viewDetail "details" str
-        Just (Aeson.Number number) ->
-          Data.Text.pack (Prelude.show number)
-            |> viewDetail "details"
-        Just (Aeson.Bool bool) ->
-          Data.Text.pack (Prelude.show bool)
-            |> viewDetail "details"
-        Just (Aeson.Array array) ->
-          viewDetail
-            "details"
-            ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder array
-                |> Data.Text.Lazy.Builder.toLazyText
-                |> Data.Text.Lazy.toStrict
-            )
-        Just (Aeson.Object object) ->
-          HashMap.toList object
-            |> List.map
-              ( \(name, val) ->
-                  viewDetail
-                    name
-                    ( case Aeson.toJSON val of
-                        Aeson.Null -> "Null"
-                        Aeson.String str -> str
-                        Aeson.Number number ->
-                          Data.Text.pack (Prelude.show number)
-                        Aeson.Bool bool ->
-                          Data.Text.pack (Prelude.show bool)
-                        other ->
-                          Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder other
-                            |> Data.Text.Lazy.Builder.toLazyText
-                            |> Data.Text.Lazy.toStrict
-                    )
+            "duration"
+            ( ( Platform.finished original - Platform.started original
+                  |> Platform.inMicroseconds
+                  |> Prelude.fromIntegral
+                  |> (\n -> n `Prelude.div` 1000)
+                  |> Text.fromInt
               )
-            |> Brick.vBox
-    ]
+                ++ " ms"
+            ),
+          case Platform.frame original of
+            Nothing -> Brick.emptyWidget
+            Just (_, srcLoc) ->
+              viewDetail
+                "source"
+                ( Data.Text.pack (Stack.srcLocFile srcLoc)
+                    ++ ":"
+                    ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
+                ),
+          case Platform.succeeded original of
+            Platform.Succeeded -> viewDetail "result" "succeeded"
+            Platform.Failed -> viewDetail "result" "failed"
+            Platform.FailedWith exception ->
+              viewDetail
+                "failed with"
+                ( Exception.displayException exception
+                    |> Data.Text.pack
+                ),
+          case map Aeson.toJSON (Platform.details original) of
+            Nothing -> Brick.emptyWidget
+            Just Aeson.Null -> Brick.emptyWidget
+            Just (Aeson.String str) -> viewDetail "details" str
+            Just (Aeson.Number number) ->
+              Data.Text.pack (Prelude.show number)
+                |> viewDetail "details"
+            Just (Aeson.Bool bool) ->
+              Data.Text.pack (Prelude.show bool)
+                |> viewDetail "details"
+            Just (Aeson.Array array) ->
+              viewDetail
+                "details"
+                ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder array
+                    |> Data.Text.Lazy.Builder.toLazyText
+                    |> Data.Text.Lazy.toStrict
+                )
+            Just (Aeson.Object object) ->
+              HashMap.toList object
+                |> List.map
+                  ( \(name, val) ->
+                      viewDetail
+                        name
+                        ( case Aeson.toJSON val of
+                            Aeson.Null -> "Null"
+                            Aeson.String str -> str
+                            Aeson.Number number ->
+                              Data.Text.pack (Prelude.show number)
+                            Aeson.Bool bool ->
+                              Data.Text.pack (Prelude.show bool)
+                            other ->
+                              Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder other
+                                |> Data.Text.Lazy.Builder.toLazyText
+                                |> Data.Text.Lazy.toStrict
+                        )
+                  )
+                |> Brick.vBox
+        ]
+    )
 
 viewDetail :: Text -> Text -> Brick.Widget Name
 viewDetail label val =
