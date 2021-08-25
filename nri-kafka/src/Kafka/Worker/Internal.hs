@@ -518,8 +518,7 @@ runThreads settings state consumer = do
     )
 
 data RuntimeExceptions
-  = ReceivedMsgNotInAssignedPartitions (Consumer.TopicName, Consumer.PartitionId)
-  | AskedToInitPartitionThatAlreadyExists (Consumer.TopicName, Consumer.PartitionId)
+  = AskedToInitPartitionThatAlreadyExists (Consumer.TopicName, Consumer.PartitionId)
   deriving (Show)
 
 instance Exception.Exception RuntimeExceptions
@@ -534,7 +533,7 @@ enqueueRecord partitions record =
     partitions' <- TVar.readTVar partitions
     let maybePartition = Dict.get key partitions'
     case maybePartition of
-      Nothing -> STM.throwSTM (ReceivedMsgNotInAssignedPartitions key)
+      Nothing -> Prelude.pure Partition.NoSeek
       Just partition -> Partition.append record partition
 
 -- | Intermittently updates
