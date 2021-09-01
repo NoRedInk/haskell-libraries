@@ -196,7 +196,11 @@ data Handler = Handler
 -- to run them using 'transaction'
 query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
 query handler query' =
-  namespaceQuery (namespace handler ++ ":") query'
+  let prefix =
+        if namespace handler /= ""
+          then namespace handler ++ ":"
+          else ""
+  namespaceQuery prefix query'
     |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack (doQuery handler))
 
@@ -207,8 +211,12 @@ query handler query' =
 -- In redis terms, this is wrappping the 'Query' in `MULTI` and `EXEC
 -- see redis transaction semantics here: https://redis.io/topics/transactions
 transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
-transaction handler query' =
-  namespaceQuery (namespace handler ++ ":") query'
+transaction handler query' = do
+  let prefix =
+        if namespace handler /= ""
+          then namespace handler ++ ":"
+          else ""
+  namespaceQuery prefix query'
     |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler))
 
