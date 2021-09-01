@@ -630,6 +630,7 @@ view model =
             viewContents page,
             viewKey page (clipboardCommand model)
           ]
+          |> Brick.joinBorders
       ]
 
 viewMaybeInfoOnlyFailures :: Page -> Brick.Widget Name
@@ -851,15 +852,18 @@ viewContents page =
             |> Center.hCenter,
           Border.hBorder,
           Brick.hBox
-            [ viewSpanBreakdown spans
+            [ Border.vBorder,
+              viewSpanBreakdown spans
                 |> Brick.hLimitPercent 50,
+              Border.vBorder,
               ( case ListWidget.listSelectedElement spans of
                   Nothing -> Brick.emptyWidget
                   Just (_, (_, currentSpan')) ->
                     viewSpanDetails currentSpan'
               )
                 |> Brick.padRight (Brick.Pad 1)
-                |> Brick.padRight Brick.Max
+                |> Brick.padRight Brick.Max,
+              Border.vBorder
             ]
         ]
 
