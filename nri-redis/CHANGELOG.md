@@ -1,4 +1,6 @@
-# Unreleased next version
+# 0.1.0.2
+
+- Support Hedis version 0.15.
 
 # 0.1.0.1
 
