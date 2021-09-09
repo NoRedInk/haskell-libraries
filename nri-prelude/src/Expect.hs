@@ -601,7 +601,7 @@ fromResult (Err msg) =
 -- > test "Greetings are friendly" <| \_ -> do
 -- >     getGreeting
 -- >         |> andCheck (Expect.equal "Hi!")
-andCheck :: (Stack.HasCallStack, Show err) => (a -> Expectation) -> Task err a -> Internal.Expectation
+andCheck :: (Stack.HasCallStack, Show err) => (a -> Internal.Expectation' b) -> Task err a -> Internal.Expectation' b
 andCheck expectation task = do
   x <- succeeds task
   Stack.withFrozenCallStack expectation x

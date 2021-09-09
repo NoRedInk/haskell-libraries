@@ -239,7 +239,7 @@ Expectation failed at tests/TestSpec.hs:311
   310:                   test "test err" (\_ -> Expect.err (Ok ())),
 ✗ 311:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
   312:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
-  313:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+  313:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ())),
 
 "oops"
 
@@ -251,8 +251,8 @@ Expectation failed at tests/TestSpec.hs:312
   310:                   test "test err" (\_ -> Expect.err (Ok ())),
   311:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
 ✗ 312:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
-  313:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
-  314:                 ]
+  313:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ())),
+  314:                   test "test andCheck no map ()" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2))
 
 "Expected failure but succeeded with \"oops\""
 
@@ -263,9 +263,28 @@ Expectation failed at tests/TestSpec.hs:312
 Expectation failed at tests/TestSpec.hs:313
   311:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
   312:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
-✗ 313:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
-  314:                 ]
-  315:         contents <-
+✗ 313:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ())),
+  314:                   test "test andCheck no map ()" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2))
+  315:                 ]
+
+▼
+1
+╷
+│ Expect.equal
+╵
+2
+▲
+
+↓ tests/TestSpec.hs:314
+↓ suite loc
+✗ test andCheck no map ()
+
+Expectation failed at tests/TestSpec.hs:314
+  312:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
+  313:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ())),
+✗ 314:                   test "test andCheck no map ()" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2))
+  315:                 ]
+  316:         contents <-
 
 ▼
 1
@@ -278,4 +297,4 @@ Expectation failed at tests/TestSpec.hs:313
 [4mTEST RUN FAILED[m
 
 Passed:    0
-Failed:    17
+Failed:    18
