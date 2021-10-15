@@ -1,3 +1,7 @@
+# 0.1.0.3
+
+- Support `aeson-2.0.x` (properly).
+
 # 0.1.0.2
 
 - Support `aeson-2.0.x`.
