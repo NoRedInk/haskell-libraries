@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | This module supports working with aeson objects in a way compatible with
 -- both the 1.x and 2.x versions of the aseon library.
 --
@@ -16,6 +18,24 @@
 -- inline the 2.x versions of functions wherever they are called.
 module Platform.AesonHelpers (foldObject, mergeObjects) where
 
+#if MIN_VERSION_aeson(2,0,0)
+
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
+
+foldObject :: (Text -> Aeson.Value -> acc -> acc) -> acc -> Aeson.Object -> acc
+foldObject fn = KeyMap.foldrWithKey (\key val acc -> fn (Key.toText key) val acc)
+
+mergeObjects ::
+  (Aeson.Value -> Aeson.Value -> Aeson.Value) ->
+  Aeson.Object ->
+  Aeson.Object ->
+  Aeson.Object
+mergeObjects = KeyMap.unionWith
+
+#else
+
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
 
@@ -28,3 +48,5 @@ mergeObjects ::
   Aeson.Object ->
   Aeson.Object
 mergeObjects merge object1 object2 = HashMap.unionWith merge object1 object2
+
+#endif
