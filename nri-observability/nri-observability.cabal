@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-observability
-version:        0.1.1.1
+version:        0.1.1.2
 synopsis:       Report log spans collected by nri-prelude.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme>.
 category:       Web
@@ -39,6 +39,7 @@ library
       Reporter.Honeycomb
       Observability
   other-modules:
+      Platform.AesonHelpers
       Platform.ReporterHelpers
       Platform.Timer
       Reporter.Bugsnag.Internal
@@ -64,7 +65,7 @@ library
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
-      aeson >=1.4.6.0 && <1.6
+      aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , base >=4.12.0.0 && <4.16
@@ -101,6 +102,7 @@ test-suite tests
       Log.RedisCommands
       Log.SqlQuery
       Observability
+      Platform.AesonHelpers
       Platform.ReporterHelpers
       Platform.Timer
       Reporter.Bugsnag
@@ -132,7 +134,7 @@ test-suite tests
       ExtendedDefaultRules
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
-      aeson >=1.4.6.0 && <1.6
+      aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , base >=4.12.0.0 && <4.16
