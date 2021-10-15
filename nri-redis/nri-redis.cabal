@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-redis
-version:        0.1.0.2
+version:        0.1.0.3
 synopsis:       An intuitive hedis wrapper library.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
 category:       Web
@@ -62,7 +62,7 @@ library
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin
   build-depends:
-      aeson >=1.4.6.0 && <1.6
+      aeson >=1.4.6.0 && <2.1
     , async >=2.2.2 && <2.3
     , base >=4.12.0.0 && <4.16
     , bytestring >=0.10.8.2 && <0.12
@@ -115,7 +115,7 @@ test-suite tests
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
-      aeson >=1.4.6.0 && <1.6
+      aeson >=1.4.6.0 && <2.1
     , async >=2.2.2 && <2.3
     , base >=4.12.0.0 && <4.16
     , bytestring >=0.10.8.2 && <0.12

@@ -5,7 +5,6 @@ module Reporter.Honeycomb.Internal where
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding as Encoding
@@ -27,6 +26,7 @@ import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
 import qualified Platform
+import qualified Platform.AesonHelpers as AesonHelpers
 import qualified Platform.Timer as Timer
 import qualified System.Random as Random
 import qualified Text
@@ -334,11 +334,11 @@ addDetails tracingSpan honeycombSpan =
 renderDetailsGeneric :: Text -> Platform.SomeTracingSpanDetails -> Span -> Span
 renderDetailsGeneric keyPrefix details honeycombSpan =
   case Aeson.toJSON details of
-    Aeson.Object hashMap ->
-      HashMap.foldrWithKey
+    Aeson.Object object ->
+      AesonHelpers.foldObject
         (\key value -> addField (useAsKey (keyPrefix ++ "." ++ key)) value)
         honeycombSpan
-        hashMap
+        object
     jsonVal -> addField keyPrefix jsonVal honeycombSpan
 
 -- LogContext is an unbounded list of key value pairs with possibly nested
