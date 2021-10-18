@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-observability
-version:        0.1.1.2
+version:        0.1.1.3
 synopsis:       Report log spans collected by nri-prelude.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme>.
 category:       Web
@@ -82,7 +82,7 @@ library
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6
     , text >=1.2.3.1 && <1.3
-    , time >=1.8.0.2 && <1.13
+    , time >=1.8.0.2 && <2
     , unordered-containers >=0.2.0.0 && <0.3
     , uuid >=1.3.0 && <1.4
   default-language: Haskell2010
@@ -151,7 +151,7 @@ test-suite tests
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6
     , text >=1.2.3.1 && <1.3
-    , time >=1.8.0.2 && <1.13
+    , time >=1.8.0.2 && <2
     , unordered-containers >=0.2.0.0 && <0.3
     , uuid >=1.3.0 && <1.4
   default-language: Haskell2010
