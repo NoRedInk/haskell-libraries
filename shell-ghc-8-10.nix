@@ -25,6 +25,8 @@ in import nix/mk-shell.nix {
       ver = "1.3.4.1";
       sha256 = "13f2hy8jr519avnv9kg5hfx2n5s1l5d7786zfyj6w3ax77nsi8bm";
     } { };
+    aeson-pretty =
+      super.callCabal2nix "aeson-pretty" "${sources.aeson-pretty}" { };
     aeson = super.callHackageDirect {
       pkg = "aeson";
       ver = "2.0.1.0";
