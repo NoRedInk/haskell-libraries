@@ -32,6 +32,12 @@ in import nix/mk-shell.nix {
       ver = "2.0.1.0";
       sha256 = "0nhzbnygj17m4x39mmf8r13xisc0hnkijnrwyqskf8gk276x9dpz";
     } { };
+    unordered-containers = super.callHackageDirect {
+      pkg = "unordered-containers";
+      ver = "0.2.14.0";
+      sha256 = "1n4z4sh11jya0v55rhs2fmq787sj8qw4g1v6m0jj3z0p8jkm1mzw";
+    } { };
+
     safe-coloured-text = super.callCabal2nix "safe-coloured-text"
       "${sources.safe-coloured-text}/safe-coloured-text" { };
     safe-coloured-text-terminfo =
