@@ -1,9 +1,15 @@
 {
     "aeson-pretty": {
-        "branch": "aeson-2",
-        "repo": "git@github.com:hasufell/aeson-pretty",
+        "branch": "master",
+        "description": "JSON pretty-printing library and command-line tool.",
+        "homepage": "http://hackage.haskell.org/package/aeson-pretty",
+        "owner": "hasufell",
+        "repo": "aeson-pretty",
         "rev": "e902ab866bb41d990b66af3644aeb352ff7aaf6f",
-        "type": "git"
+        "sha256": "08pc8043ps0zn0nkxy9mabdzglcn7ywgybi3x8az399l0qgjwzv8",
+        "type": "tarball",
+        "url": "https://github.com/hasufell/aeson-pretty/archive/e902ab866bb41d990b66af3644aeb352ff7aaf6f.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "niv": {
         "branch": "master",
