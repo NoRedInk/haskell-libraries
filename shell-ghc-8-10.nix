@@ -30,6 +30,36 @@ in import nix/mk-shell.nix {
       ver = "1.3.4.1";
       sha256 = "13f2hy8jr519avnv9kg5hfx2n5s1l5d7786zfyj6w3ax77nsi8bm";
     } { };
+    lens-aeson = super.callHackageDirect {
+      pkg = "lens-aeson";
+      ver = "1.1.2";
+      sha256 = "sha256-dn2lde4lfxiFbujdGOjC7MAV5nt54fw1gdOkN2N7SEQ=";
+    } { };
+    postgresql-binary = super.callHackageDirect {
+      pkg = "postgresql-binary";
+      ver = "0.12.4.2";
+      sha256 = "sha256-YHBm+eoeupEQHamEFCtRCx9UquXq4oSceAAD4csIibc=";
+    } { };
+    hpack = super.callHackageDirect {
+      pkg = "hpack";
+      ver = "0.34.5";
+      sha256 = "sha256-mlpEiBOo8nPFN/s7x1yWEdPBM2Dp94SlXXOhtZ2c80M=";
+    } { };
+    rebase = super.callHackageDirect {
+      pkg = "rebase";
+      ver = "1.11.0.1";
+      sha256 = "sha256-QJIJ0FHtoK4GAhHJp4Z/JRs2zb1DAcOH7hGZbPpae8M=";
+    } { };
+    rerebase = super.callHackageDirect {
+      pkg = "rerebase";
+      ver = "1.11.0.1";
+      sha256 = "sha256-3ohUbGgwXIWwTAGSj8CZyRShoecG9TZbs4n/1kvsEsY=";
+    } { };
+    yaml = super.callHackageDirect {
+      pkg = "yaml";
+      ver = "0.11.7.0";
+      sha256 = "sha256-FlxtU5Hl75pfY/ly9XaSzVkUB+WnetRyuTYRWGBDwFY=";
+    } { };
     aeson-pretty =
       super.callCabal2nix "aeson-pretty" "${sources.aeson-pretty}" { };
     aeson = super.callHackageDirect {

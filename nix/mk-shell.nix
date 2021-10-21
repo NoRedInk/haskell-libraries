@@ -40,9 +40,9 @@ pkgs.mkShell {
         safe-coloured-text
         safe-coloured-text-terminfo
         safe-exceptions
-        servant
-        servant-auth-server
-        servant-server
+        # servant
+        # servant-auth-server
+        # servant-server
         stm
         terminal-size
         text
