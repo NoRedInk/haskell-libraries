@@ -5,6 +5,11 @@ let
 in import nix/mk-shell.nix {
   pkgs = pkgs;
   haskellPackages = pkgs.haskell.packages.ghc8104.extend (self: super: {
+    bugsnag-hs = super.callHackageDirect {
+      pkg = "bugsnag-hs";
+      ver = "0.2.0.7";
+      sha256 = "sha256-OVNuDmwXAVvQ3E5JMCM0y6b/4DsecbOT1tuz6htxUuo=";
+    } { };
     scientific = super.callHackageDirect {
       pkg = "scientific";
       ver = "0.3.7.0";
