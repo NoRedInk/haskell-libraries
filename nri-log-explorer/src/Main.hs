@@ -893,7 +893,7 @@ viewContents page =
               viewSpanBreakdown spans
                 |> Brick.hLimitPercent 50
                 |> ( case focus of
-                       FocusOnSpanList ->
+                       FocusOnSpanDetails ->
                          Border.border
                        _ ->
                          identity
@@ -907,7 +907,7 @@ viewContents page =
                 |> Brick.padRight (Brick.Pad 1)
                 |> Brick.padRight Brick.Max
                 |> ( case focus of
-                       FocusOnSpanDetails ->
+                       FocusOnSpanList ->
                          Border.border
                        _ ->
                          identity
