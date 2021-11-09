@@ -82,8 +82,11 @@ data SearchMatch = NoMatch | Matches Text
 data SpanBreakdownPageData = SpanBreakdownPageData
   { currentSpan :: RootSpan,
     search :: Search,
-    spans :: ListWidget.List Name (SearchMatch, Span)
+    spans :: ListWidget.List Name (SearchMatch, Span),
+    focus :: SpanBreakdownPageFocus
   }
+
+data SpanBreakdownPageFocus = FocusOnSpanList | FocusOnSpanDetails
 
 data FailureFilter = ShowAll | ShowOnlyFailures
 
@@ -226,11 +229,14 @@ update model msg =
                   Nothing -> page
                   Just (currentIndex, currentSpan) ->
                     SpanBreakdownPage
-                      SpanBreakdownPageData
-                        { currentSpan,
-                          spans = currentSpan |> logSpan |> toFlatList currentIndex,
-                          search = NoSearch
-                        }
+                      (
+                        SpanBreakdownPageData
+                          { currentSpan,
+                            spans = currentSpan |> logSpan |> toFlatList currentIndex,
+                            search = NoSearch,
+                            focus = FocusOnSpanList
+                          }
+                      )
         )
         |> andThen continueAfterUserInteraction
     Confirm ->
@@ -259,7 +265,8 @@ update model msg =
                           SpanBreakdownPageData
                             { currentSpan,
                               spans = currentSpan |> logSpan |> toFlatList currentIndex,
-                              search = NoSearch
+                              search = NoSearch,
+                              focus = FocusOnSpanList
                             }
         )
         |> andThen continueAfterUserInteraction
