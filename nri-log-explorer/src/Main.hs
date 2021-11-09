@@ -137,6 +137,7 @@ data Msg
   | Previous
   | EditorEvent Vty.Event
   | ShowHideFailures
+  | ToggleSpanBreakdownPageFocus
   | Quit
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
@@ -418,6 +419,26 @@ update model msg =
               NoDataPage filter failureFilter -> NoDataPage filter (toggleFailureFilter failureFilter)
         )
         |> andThen continueAfterUserInteraction
+
+    ToggleSpanBreakdownPageFocus ->
+      withPage
+        model
+        ( \page ->
+            case page of
+              NoDataPage _ _ -> page
+              RootSpanPage _ -> page
+              SpanBreakdownPage spanBreakdownPageData ->
+                SpanBreakdownPage
+                (spanBreakdownPageData
+                  { focus =
+                      case (focus spanBreakdownPageData) of
+                        FocusOnSpanList -> FocusOnSpanDetails
+                        FocusOnSpanDetails -> FocusOnSpanList
+                    }
+                )
+        )
+        |> andThen continueAfterUserInteraction
+
     Quit ->
       case toPage model of
         NoDataPage _ _ -> Brick.halt model
@@ -853,7 +874,7 @@ viewContents page =
           )
           True
         |> Brick.padLeftRight 1
-    SpanBreakdownPage SpanBreakdownPageData {currentSpan, spans} ->
+    SpanBreakdownPage SpanBreakdownPageData {currentSpan, spans, focus} ->
       Brick.vBox
         [ Brick.txt (spanSummary (logSpan currentSpan))
             |> Center.hCenter,
@@ -861,7 +882,14 @@ viewContents page =
           Brick.hBox
             [ Border.vBorder,
               viewSpanBreakdown spans
-                |> Brick.hLimitPercent 50,
+                |> Brick.hLimitPercent 50
+                |> (case focus of
+                      FocusOnSpanList ->
+                        Border.border
+                      _ ->
+                        identity
+                      )
+            ,
               Border.vBorder,
               ( case ListWidget.listSelectedElement spans of
                   Nothing -> Brick.emptyWidget
@@ -869,7 +897,13 @@ viewContents page =
                     viewSpanDetails currentSpan'
               )
                 |> Brick.padRight (Brick.Pad 1)
-                |> Brick.padRight Brick.Max,
+                |> Brick.padRight Brick.Max
+                |> (case focus of
+                      FocusOnSpanDetails ->
+                        Border.border
+                      _ ->
+                        identity
+                      ),
               Border.vBorder
             ]
         ]
