@@ -250,7 +250,15 @@ update model msg =
                   EditSearch searchEditor ->
                     updateSpanBreakdownSearch (currentValue searchEditor) spanBreakdownPageData
                       |> SpanBreakdownPage
-                  _ -> page
+                  _ ->
+                    case focus spanBreakdownPageData of
+                      FocusOnSpanList ->
+                        -- user is allowed to toggle focus with tab/backtab, but
+                        -- pressing enter seems like an intuitive way of
+                        -- drilling down into the details.
+                        SpanBreakdownPage (spanBreakdownPageData {focus = FocusOnSpanDetails})
+                      _ ->
+                        page
               RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
                 case filter of
                   EditFilter filterEditor ->
@@ -426,14 +434,9 @@ update model msg =
               NoDataPage _ _ -> page
               RootSpanPage _ -> page
               SpanBreakdownPage spanBreakdownPageData ->
-                SpanBreakdownPage
-                  ( spanBreakdownPageData
-                      { focus =
-                          case (focus spanBreakdownPageData) of
-                            FocusOnSpanList -> FocusOnSpanDetails
-                            FocusOnSpanDetails -> FocusOnSpanList
-                      }
-                  )
+                spanBreakdownPageData
+                  |> toggleFocus
+                  |> SpanBreakdownPage
         )
         |> andThen continueAfterUserInteraction
     Quit ->
@@ -441,6 +444,15 @@ update model msg =
         NoDataPage _ _ -> Brick.halt model
         RootSpanPage _ -> Brick.halt model
         SpanBreakdownPage _ -> update model Cancel
+
+toggleFocus :: SpanBreakdownPageData -> SpanBreakdownPageData
+toggleFocus spanBreakdownPageData =
+  spanBreakdownPageData
+    { focus =
+        case (focus spanBreakdownPageData) of
+          FocusOnSpanList -> FocusOnSpanDetails
+          FocusOnSpanDetails -> FocusOnSpanList
+    }
 
 selectNextMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
 selectNextMatch spanBreakdownPageData = do
