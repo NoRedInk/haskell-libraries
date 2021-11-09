@@ -230,8 +230,7 @@ update model msg =
                   Nothing -> page
                   Just (currentIndex, currentSpan) ->
                     SpanBreakdownPage
-                      (
-                        SpanBreakdownPageData
+                      ( SpanBreakdownPageData
                           { currentSpan,
                             spans = currentSpan |> logSpan |> toFlatList currentIndex,
                             search = NoSearch,
@@ -419,7 +418,6 @@ update model msg =
               NoDataPage filter failureFilter -> NoDataPage filter (toggleFailureFilter failureFilter)
         )
         |> andThen continueAfterUserInteraction
-
     ToggleSpanBreakdownPageFocus ->
       withPage
         model
@@ -429,16 +427,15 @@ update model msg =
               RootSpanPage _ -> page
               SpanBreakdownPage spanBreakdownPageData ->
                 SpanBreakdownPage
-                (spanBreakdownPageData
-                  { focus =
-                      case (focus spanBreakdownPageData) of
-                        FocusOnSpanList -> FocusOnSpanDetails
-                        FocusOnSpanDetails -> FocusOnSpanList
-                    }
-                )
+                  ( spanBreakdownPageData
+                      { focus =
+                          case (focus spanBreakdownPageData) of
+                            FocusOnSpanList -> FocusOnSpanDetails
+                            FocusOnSpanDetails -> FocusOnSpanList
+                      }
+                  )
         )
         |> andThen continueAfterUserInteraction
-
     Quit ->
       case toPage model of
         NoDataPage _ _ -> Brick.halt model
@@ -883,13 +880,12 @@ viewContents page =
             [ Border.vBorder,
               viewSpanBreakdown spans
                 |> Brick.hLimitPercent 50
-                |> (case focus of
-                      FocusOnSpanList ->
-                        Border.border
-                      _ ->
-                        identity
-                      )
-            ,
+                |> ( case focus of
+                       FocusOnSpanList ->
+                         Border.border
+                       _ ->
+                         identity
+                   ),
               Border.vBorder,
               ( case ListWidget.listSelectedElement spans of
                   Nothing -> Brick.emptyWidget
@@ -898,12 +894,12 @@ viewContents page =
               )
                 |> Brick.padRight (Brick.Pad 1)
                 |> Brick.padRight Brick.Max
-                |> (case focus of
-                      FocusOnSpanDetails ->
-                        Border.border
-                      _ ->
-                        identity
-                      ),
+                |> ( case focus of
+                       FocusOnSpanDetails ->
+                         Border.border
+                       _ ->
+                         identity
+                   ),
               Border.vBorder
             ]
         ]
@@ -1282,6 +1278,12 @@ handleEvent pushMsg model event =
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar '2') []) -> do
           Brick.vScrollBy (Brick.viewportScroll SpanDetail) 1
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar '\t') []) -> do
+          liftIO (pushMsg ToggleSpanBreakdownPageFocus)
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KBackTab) []) -> do
+          liftIO (pushMsg ToggleSpanBreakdownPageFocus)
           Brick.continue model
         _ ->
           scroll
