@@ -1,5 +1,13 @@
 # Unreleased next version
 
+# 0.6.0.5
+
+- Support `time-1.x`.
+
+# 0.6.0.4
+
+- Support `aeson-2.0.x`.
+
 # 0.6.0.3
 
 - Support GHC 9.0.1.

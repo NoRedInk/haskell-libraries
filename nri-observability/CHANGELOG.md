@@ -1,3 +1,11 @@
+# 0.1.1.3
+
+- Support `time-1.x`.
+
+# 0.1.1.2
+
+- Support `aeson-2.0.x`.
+
 # 0.1.1.1
 
 - Add `Observability` glue module (still needs better documentation!)

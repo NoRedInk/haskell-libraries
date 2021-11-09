@@ -3,7 +3,7 @@ synopsis: Report log spans collected by nri-prelude.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observability#readme
 author: NoRedInk
-version: 0.1.1.1
+version: 0.1.1.3
 maintainer: haskell-open-source@noredink.com
 copyright: 2021 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/observability
@@ -14,7 +14,7 @@ extra-doc-files:
   - LICENSE
   - CHANGELOG.md
 dependencies:
-  - aeson >= 1.4.6.0 && < 1.6
+  - aeson >= 1.4.6.0 && < 2.1
   - aeson-pretty >= 0.8.0 && < 0.9
   - async >= 2.2.2 && < 2.3
   - base >= 4.12.0.0 && < 4.16
@@ -32,7 +32,7 @@ dependencies:
   - safe-exceptions >= 0.1.7.0 && < 1.3
   - stm >= 2.4 && < 2.6
   - text >= 1.2.3.1 && < 1.3
-  - time >= 1.8.0.2 && < 1.13
+  - time >= 1.8.0.2 && < 2
   - uuid >=1.3.0 && < 1.4
 library:
   exposed-modules:

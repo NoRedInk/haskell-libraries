@@ -5,6 +5,7 @@ import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified GHC.Stack as Stack
 import qualified List
+import qualified Platform.AesonHelpers as AesonHelpers
 import qualified Text
 import qualified Prelude
 
@@ -30,19 +31,19 @@ import qualified Prelude
 toHashMap :: Aeson.ToJSON a => a -> HashMap.HashMap Text Text
 toHashMap x =
   case Aeson.toJSON x of
-    Aeson.Object dict ->
-      HashMap.foldlWithKey'
-        (\acc key value -> acc ++ jsonAsText key value)
+    Aeson.Object object ->
+      AesonHelpers.foldObject
+        (\key value acc -> jsonAsText key value ++ acc)
         HashMap.empty
-        dict
+        object
     val -> jsonAsText "value" val
 
 jsonAsText :: Text -> Aeson.Value -> HashMap.HashMap Text Text
 jsonAsText key val =
   case val of
     Aeson.Object dict ->
-      HashMap.foldlWithKey'
-        (\acc key2 value -> acc ++ jsonAsText (key ++ "." ++ key2) value)
+      AesonHelpers.foldObject
+        (\key2 value acc -> jsonAsText (key ++ "." ++ key2) value ++ acc)
         HashMap.empty
         dict
     Aeson.Array vals ->

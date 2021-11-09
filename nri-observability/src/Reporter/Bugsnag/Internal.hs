@@ -24,6 +24,7 @@ import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import qualified Network.HostName
 import qualified Platform
+import qualified Platform.AesonHelpers as AesonHelpers
 import qualified Platform.ReporterHelpers as Helpers
 import qualified Platform.Timer as Timer
 import qualified Prelude
@@ -380,7 +381,7 @@ renderLog event details =
     }
 
 mergeJson :: Aeson.Value -> Aeson.Value -> Aeson.Value
-mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (HashMap.unionWith mergeJson x y)
+mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (AesonHelpers.mergeObjects mergeJson x y)
 mergeJson _ last = last
 
 mergeMetaData ::

@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-prelude
-version:        0.6.0.3
+version:        0.6.0.5
 synopsis:       A Prelude inspired by the Elm programming language
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme>.
 category:       Web
@@ -84,7 +84,7 @@ library
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
   build-depends:
-      aeson >=1.4.6.0 && <1.6
+      aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , auto-update >=0.1.6 && <0.2
@@ -104,7 +104,7 @@ library
     , safe-exceptions >=0.1.7.0 && <1.3
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <1.3
-    , time >=1.8.0.2 && <1.13
+    , time >=1.8.0.2 && <2
     , unix >=2.7.2.2 && <2.8.0.0
     , vector >=0.12.1.2 && <0.13
   default-language: Haskell2010
@@ -176,7 +176,7 @@ test-suite tests
       ExtendedDefaultRules
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
-      aeson >=1.4.6.0 && <1.6
+      aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , auto-update >=0.1.6 && <0.2
@@ -196,7 +196,7 @@ test-suite tests
     , safe-exceptions >=0.1.7.0 && <1.3
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <1.3
-    , time >=1.8.0.2 && <1.13
+    , time >=1.8.0.2 && <2
     , unix >=2.7.2.2 && <2.8.0.0
     , vector >=0.12.1.2 && <0.13
   default-language: Haskell2010

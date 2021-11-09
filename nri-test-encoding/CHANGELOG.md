@@ -1,4 +1,6 @@
-# Unreleased next version
+# 0.1.1.1
+
+- Support `aeson-2.0.x`.
 
 # 0.1.1.0
 
