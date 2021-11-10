@@ -829,22 +829,32 @@ viewKey page clipboardCommand =
                   NoFilter -> [exit, updown, select, filter', failureFilterText]
                   HasFilter _ -> [exit, updown, select, adjustFilter, failureFilterText]
                   EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
-          SpanBreakdownPage SpanBreakdownPageData {search} ->
-            ( case search of
-                NoSearch ->
-                  [goBack, updown, unselect, search']
-                    ++ ( case clipboardCommand of
-                           Nothing -> []
-                           Just _ -> [copy]
-                       )
-                HasSearch _ ->
-                  [goBack, updown, unselect, adjustSearch, nextMatch, previousMatch]
-                    ++ ( case clipboardCommand of
-                           Nothing -> []
-                           Just _ -> [copy]
-                       )
-                EditSearch _ -> [stopEditSearch, applySearch, clearSearch]
-            )
+          SpanBreakdownPage SpanBreakdownPageData {search, focus} ->
+            let focusChange =
+                  "tab: toggle focus"
+                scrolling =
+                  -- TODO: not yet implemented!
+                  "↑↓: scroll"
+                maybeCopy =
+                  ( case clipboardCommand of
+                      Nothing -> []
+                      Just _ -> [copy]
+                  )
+             in ( case search of
+                    NoSearch ->
+                      case focus of
+                        FocusOnSpanList ->
+                          [goBack, focusChange, updown, unselect, search'] ++ maybeCopy
+                        FocusOnSpanDetails ->
+                          [goBack, focusChange, scrolling, unselect, search'] ++ maybeCopy
+                    HasSearch _ ->
+                      [goBack, updown, unselect, adjustSearch, nextMatch, previousMatch]
+                        ++ ( case clipboardCommand of
+                               Nothing -> []
+                               Just _ -> [copy]
+                           )
+                    EditSearch _ -> [stopEditSearch, applySearch, clearSearch]
+                )
    in Brick.vBox
         [ Border.hBorder,
           shortcuts
@@ -1286,9 +1296,11 @@ handleEvent pushMsg model event =
           liftIO (pushMsg (EditorEvent vtyEvent))
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar '1') []) -> do
+          -- TODO: bind to up/k
           Brick.vScrollBy (Brick.viewportScroll SpanDetail) (-1)
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar '2') []) -> do
+          -- TODO: bind to down/j
           Brick.vScrollBy (Brick.viewportScroll SpanDetail) 1
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar '\t') []) -> do
