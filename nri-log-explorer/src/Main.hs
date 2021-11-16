@@ -138,7 +138,12 @@ data Msg
   | EditorEvent Vty.Event
   | ShowHideFailures
   | ToggleSpanBreakdownPageFocus
+  | ScrollSpanDetails ScrollingDirection
   | Quit
+
+data ScrollingDirection
+  = ScrollUp
+  | ScrollDown
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -439,6 +444,15 @@ update model msg =
                   |> SpanBreakdownPage
         )
         |> andThen continueAfterUserInteraction
+    ScrollSpanDetails direction -> do
+      -- TODO: only do it if we are focusing on the span details pane
+      Brick.vScrollBy
+        (Brick.viewportScroll SpanDetail)
+        ( case direction of
+            ScrollUp -> -1
+            ScrollDown -> 1
+        )
+      Brick.continue model
     Quit ->
       case toPage model of
         NoDataPage _ _ -> Brick.halt model
@@ -1305,12 +1319,16 @@ handleEvent pushMsg modelBeforeScrolling event =
           liftIO (pushMsg (EditorEvent vtyEvent))
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KUp) []) -> do
-          -- TODO: bind to up/k
-          Brick.vScrollBy (Brick.viewportScroll SpanDetail) (-1)
+          liftIO (pushMsg (ScrollSpanDetails ScrollUp))
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KDown) []) -> do
-          -- TODO: bind to down/j
-          Brick.vScrollBy (Brick.viewportScroll SpanDetail) 1
+          liftIO (pushMsg (ScrollSpanDetails ScrollDown))
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar 'j') []) -> do
+          liftIO (pushMsg (ScrollSpanDetails ScrollDown))
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar 'k') []) -> do
+          liftIO (pushMsg (ScrollSpanDetails ScrollUp))
           Brick.continue model
         (NormalMode, Vty.EvKey (Vty.KChar '\t') []) -> do
           liftIO (pushMsg ToggleSpanBreakdownPageFocus)
