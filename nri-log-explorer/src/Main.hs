@@ -927,30 +927,31 @@ viewContents page =
             |> Center.hCenter,
           Border.hBorder,
           Brick.hBox
-            [ Border.vBorder,
-              viewSpanBreakdown spans
-                |> Brick.hLimitPercent 50
+            [ Border.vBorder
                 |> ( case focus of
-                       FocusOnSpanDetails ->
-                         Border.border
+                       FocusOnSpanList ->
+                         Brick.overrideAttr Border.borderAttr "focused-pane-border"
                        _ ->
                          identity
                    ),
-              Border.vBorder,
+              viewSpanBreakdown spans
+                |> Brick.hLimitPercent 50,
+              Border.vBorder
+                |> Brick.overrideAttr Border.borderAttr "focused-pane-border",
               ( case ListWidget.listSelectedElement spans of
                   Nothing -> Brick.emptyWidget
                   Just (_, (_, currentSpan')) ->
                     viewSpanDetails currentSpan'
               )
                 |> Brick.padRight (Brick.Pad 1)
-                |> Brick.padRight Brick.Max
+                |> Brick.padRight Brick.Max,
+              Border.vBorder
                 |> ( case focus of
-                       FocusOnSpanList ->
-                         Border.border
+                       FocusOnSpanDetails ->
+                         Brick.overrideAttr Border.borderAttr "focused-pane-border"
                        _ ->
                          identity
-                   ),
-              Border.vBorder
+                   )
             ]
         ]
 
@@ -1265,6 +1266,15 @@ attrMap =
               Vty.Color.red
           )
           Vty.Color.black
+      ),
+      ( "focused-pane-border",
+        Vty.withForeColor
+          Vty.defAttr
+          ( Vty.Color.rgbColor
+              (255 :: Prelude.Integer)
+              (204 :: Prelude.Integer)
+              (102 :: Prelude.Integer)
+          )
       )
     ]
 
