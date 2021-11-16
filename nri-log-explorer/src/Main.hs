@@ -445,14 +445,21 @@ update model msg =
         )
         |> andThen continueAfterUserInteraction
     ScrollSpanDetails direction -> do
-      -- TODO: only do it if we are focusing on the span details pane
-      Brick.vScrollBy
-        (Brick.viewportScroll SpanDetail)
-        ( case direction of
-            ScrollUp -> -1
-            ScrollDown -> 1
-        )
-      Brick.continue model
+      case toPage model of
+        NoDataPage _ _ -> Brick.continue model
+        RootSpanPage _ -> Brick.continue model
+        SpanBreakdownPage SpanBreakdownPageData {focus} ->
+          case focus of
+            FocusOnSpanList ->
+              Brick.continue model
+            FocusOnSpanDetails -> do
+              Brick.vScrollBy
+                (Brick.viewportScroll SpanDetail)
+                ( case direction of
+                    ScrollUp -> -1
+                    ScrollDown -> 1
+                )
+              Brick.continue model
     Quit ->
       case toPage model of
         NoDataPage _ _ -> Brick.halt model
