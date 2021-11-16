@@ -612,16 +612,23 @@ scroll ::
   Model ->
   Brick.EventM Name Model
 scroll move model =
-  withPageEvent model
-    <| \case
-      NoDataPage filter failureFilter -> Prelude.pure (NoDataPage filter failureFilter)
-      RootSpanPage rootSpanPageData@RootSpanPageData {rootSpans} ->
-        move (Filterable.toListWidget rootSpans)
-          |> map (Filterable.setListWidget rootSpans)
-          |> map (\rootSpans' -> RootSpanPage rootSpanPageData {rootSpans = rootSpans'})
-      SpanBreakdownPage spanBreakdownPageData ->
-        scrollSpanBreakdownPage move spanBreakdownPageData
-          |> map SpanBreakdownPage
+  withPageEvent
+    model
+    ( \page ->
+        case page of
+          NoDataPage filter failureFilter -> Prelude.pure (NoDataPage filter failureFilter)
+          RootSpanPage rootSpanPageData@RootSpanPageData {rootSpans} ->
+            move (Filterable.toListWidget rootSpans)
+              |> map (Filterable.setListWidget rootSpans)
+              |> map (\rootSpans' -> RootSpanPage rootSpanPageData {rootSpans = rootSpans'})
+          SpanBreakdownPage spanBreakdownPageData ->
+            case focus spanBreakdownPageData of
+              FocusOnSpanList ->
+                scrollSpanBreakdownPage move spanBreakdownPageData
+                  |> map SpanBreakdownPage
+              FocusOnSpanDetails ->
+                Prelude.return page
+    )
 
 scrollSpanBreakdownPage ::
   (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
@@ -1245,9 +1252,11 @@ handleEvent ::
   Model ->
   Brick.BrickEvent Name Msg ->
   Brick.EventM Name (Brick.Next Model)
-handleEvent pushMsg model event =
+handleEvent pushMsg modelBeforeScrolling event =
   case event of
     (Brick.VtyEvent vtyEvent) -> do
+      model <- scroll (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent) modelBeforeScrolling
+
       case (toMode model, vtyEvent) of
         -- Quitting
         (NormalMode, Vty.EvKey (Vty.KChar 'q') []) -> do
@@ -1295,11 +1304,11 @@ handleEvent pushMsg model event =
         (EditMode, _) -> do
           liftIO (pushMsg (EditorEvent vtyEvent))
           Brick.continue model
-        (NormalMode, Vty.EvKey (Vty.KChar '1') []) -> do
+        (NormalMode, Vty.EvKey (Vty.KUp) []) -> do
           -- TODO: bind to up/k
           Brick.vScrollBy (Brick.viewportScroll SpanDetail) (-1)
           Brick.continue model
-        (NormalMode, Vty.EvKey (Vty.KChar '2') []) -> do
+        (NormalMode, Vty.EvKey (Vty.KDown) []) -> do
           -- TODO: bind to down/j
           Brick.vScrollBy (Brick.viewportScroll SpanDetail) 1
           Brick.continue model
@@ -1310,13 +1319,10 @@ handleEvent pushMsg model event =
           liftIO (pushMsg ToggleSpanBreakdownPageFocus)
           Brick.continue model
         _ ->
-          scroll
-            (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
-            model
-            |> andThen Brick.continue
-    Brick.MouseDown {} -> Brick.continue model
-    Brick.MouseUp {} -> Brick.continue model
-    Brick.AppEvent msg -> update model msg
+          Brick.continue model
+    Brick.MouseDown {} -> Brick.continue modelBeforeScrolling
+    Brick.MouseUp {} -> Brick.continue modelBeforeScrolling
+    Brick.AppEvent msg -> update modelBeforeScrolling msg
 
 data Mode = NormalMode | EditMode
 
