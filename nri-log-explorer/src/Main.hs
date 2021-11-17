@@ -35,6 +35,7 @@ import qualified Filterable
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
+import qualified Graphics.Vty.Attributes as Vty.Attributes
 import qualified Graphics.Vty.Attributes.Color as Vty.Color
 import Lens.Micro ((^.))
 import qualified List
@@ -87,6 +88,7 @@ data SpanBreakdownPageData = SpanBreakdownPageData
   }
 
 data SpanBreakdownPageFocus = FocusOnSpanList | FocusOnSpanDetails
+  deriving (Eq)
 
 data FailureFilter = ShowAll | ShowOnlyFailures
 
@@ -934,14 +936,26 @@ viewContents page =
                        _ ->
                          identity
                    ),
-              viewSpanBreakdown spans
-                |> Brick.hLimitPercent 50,
+              viewSpanBreakdown focus spans
+                |> Brick.hLimitPercent 50
+                |> ( case focus of
+                       FocusOnSpanList ->
+                         identity
+                       _ ->
+                         Brick.withAttr "dim-unfocused"
+                   ),
               Border.vBorder
                 |> Brick.overrideAttr Border.borderAttr "focused-pane-border",
               ( case ListWidget.listSelectedElement spans of
                   Nothing -> Brick.emptyWidget
                   Just (_, (_, currentSpan')) ->
                     viewSpanDetails currentSpan'
+                      |> ( case focus of
+                             FocusOnSpanDetails ->
+                               identity
+                             _ ->
+                               Brick.withAttr "dim-unfocused"
+                         )
               )
                 |> Brick.padRight (Brick.Pad 1)
                 |> Brick.padRight Brick.Max,
@@ -955,8 +969,8 @@ viewContents page =
             ]
         ]
 
-viewSpanBreakdown :: ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
-viewSpanBreakdown spans =
+viewSpanBreakdown :: SpanBreakdownPageFocus -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
+viewSpanBreakdown focus spans =
   spans
     |> ListWidget.renderList
       ( \hasFocus (matches, span) ->
@@ -971,10 +985,13 @@ viewSpanBreakdown spans =
                 |> Brick.padRight Brick.Max
             ]
             |> if hasFocus
-              then Brick.withAttr "selected"
+              then
+                if focus == FocusOnSpanList
+                  then Brick.withAttr "selected"
+                  else Brick.withAttr "underlined"
               else identity
       )
-      True
+      (focus == FocusOnSpanList)
     |> Brick.padLeftRight 1
 
 viewSpanBreakdownWithMatch :: Text -> Span -> Brick.Widget n
@@ -1275,7 +1292,9 @@ attrMap =
               (204 :: Prelude.Integer)
               (102 :: Prelude.Integer)
           )
-      )
+      ),
+      ("dim-unfocused", Vty.withStyle Vty.defAttr Vty.Attributes.dim),
+      ("focused", Vty.withStyle Vty.defAttr Vty.Attributes.standout)
     ]
 
 handleEvent ::
