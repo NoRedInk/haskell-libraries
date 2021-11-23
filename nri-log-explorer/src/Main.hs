@@ -84,10 +84,10 @@ data SpanBreakdownPageData = SpanBreakdownPageData
   { currentSpan :: RootSpan,
     search :: Search,
     spans :: ListWidget.List Name (SearchMatch, Span),
-    focus :: SpanBreakdownPageFocus
+    focus :: SpanBreakdownFocusedPane
   }
 
-data SpanBreakdownPageFocus = FocusOnSpanList | FocusOnSpanDetails
+data SpanBreakdownFocusedPane = SpanList | SpanDetails
   deriving (Eq)
 
 data FailureFilter = ShowAll | ShowOnlyFailures
@@ -241,7 +241,7 @@ update model msg =
                           { currentSpan,
                             spans = currentSpan |> logSpan |> toFlatList currentIndex,
                             search = NoSearch,
-                            focus = FocusOnSpanList
+                            focus = SpanList
                           }
                       )
         )
@@ -259,11 +259,11 @@ update model msg =
                       |> SpanBreakdownPage
                   _ ->
                     case focus spanBreakdownPageData of
-                      FocusOnSpanList ->
+                      SpanList ->
                         -- user is allowed to toggle focus with tab/backtab, but
                         -- pressing enter seems like an intuitive way of
                         -- drilling down into the details.
-                        SpanBreakdownPage (spanBreakdownPageData {focus = FocusOnSpanDetails})
+                        SpanBreakdownPage (spanBreakdownPageData {focus = SpanDetails})
                       _ ->
                         page
               RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
@@ -281,7 +281,7 @@ update model msg =
                             { currentSpan,
                               spans = currentSpan |> logSpan |> toFlatList currentIndex,
                               search = NoSearch,
-                              focus = FocusOnSpanList
+                              focus = SpanList
                             }
         )
         |> andThen continueAfterUserInteraction
@@ -452,9 +452,9 @@ update model msg =
         RootSpanPage _ -> Brick.continue model
         SpanBreakdownPage SpanBreakdownPageData {focus} ->
           case focus of
-            FocusOnSpanList ->
+            SpanList ->
               Brick.continue model
-            FocusOnSpanDetails -> do
+            SpanDetails -> do
               Brick.vScrollBy
                 (Brick.viewportScroll SpanDetail)
                 ( case direction of
@@ -473,8 +473,8 @@ toggleFocus spanBreakdownPageData =
   spanBreakdownPageData
     { focus =
         case (focus spanBreakdownPageData) of
-          FocusOnSpanList -> FocusOnSpanDetails
-          FocusOnSpanDetails -> FocusOnSpanList
+          SpanList -> SpanDetails
+          SpanDetails -> SpanList
     }
 
 selectNextMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
@@ -646,10 +646,10 @@ scroll move model =
               |> map (\rootSpans' -> RootSpanPage rootSpanPageData {rootSpans = rootSpans'})
           SpanBreakdownPage spanBreakdownPageData ->
             case focus spanBreakdownPageData of
-              FocusOnSpanList ->
+              SpanList ->
                 scrollSpanBreakdownPage move spanBreakdownPageData
                   |> map SpanBreakdownPage
-              FocusOnSpanDetails ->
+              SpanDetails ->
                 Prelude.return page
     )
 
@@ -873,9 +873,9 @@ viewKey page clipboardCommand =
              in ( case search of
                     NoSearch ->
                       case focus of
-                        FocusOnSpanList ->
+                        SpanList ->
                           [goBack, focusChange, updown, unselect, search'] ++ maybeCopy
-                        FocusOnSpanDetails ->
+                        SpanDetails ->
                           [goBack, focusChange, scrolling, unselect, search'] ++ maybeCopy
                     HasSearch _ ->
                       [goBack, updown, unselect, adjustSearch, nextMatch, previousMatch]
@@ -931,7 +931,7 @@ viewContents page =
           viewSpanBreakdownPageContent focus spans
         ]
 
-viewSpanBreakdownPageContent :: SpanBreakdownPageFocus -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
+viewSpanBreakdownPageContent :: SpanBreakdownFocusedPane -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
 viewSpanBreakdownPageContent focus spans =
   let leftPane = viewSpanBreakdown focus spans
 
@@ -942,14 +942,14 @@ viewSpanBreakdownPageContent focus spans =
 
       (leftBorderStyles, rightBorderStyle) =
         case focus of
-          FocusOnSpanList ->
+          SpanList ->
             (Brick.overrideAttr Border.borderAttr "focused-pane-border", identity)
           _ ->
             (identity, Brick.overrideAttr Border.borderAttr "focused-pane-border")
 
       (leftPaneStyle, rightPaneStyle) =
         case focus of
-          FocusOnSpanList ->
+          SpanList ->
             (identity, Brick.withAttr "dim-unfocused")
           _ ->
             (Brick.withAttr "dim-unfocused", identity)
@@ -970,11 +970,11 @@ viewSpanBreakdownPageContent focus spans =
             |> rightBorderStyle
         ]
 
-viewSpanBreakdown :: SpanBreakdownPageFocus -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
-viewSpanBreakdown focus spans =
+viewSpanBreakdown :: SpanBreakdownFocusedPane -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
+viewSpanBreakdown focusedPane spans =
   spans
     |> ListWidget.renderList
-      ( \hasFocus (matches, span) ->
+      ( \isSpanFocused (matches, span) ->
           Brick.hBox
             [ ( case matches of
                   Matches matching ->
@@ -985,14 +985,14 @@ viewSpanBreakdown focus spans =
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * nesting span)))
                 |> Brick.padRight Brick.Max
             ]
-            |> if hasFocus
+            |> if isSpanFocused
               then
-                if focus == FocusOnSpanList
+                if focusedPane == SpanList
                   then Brick.withAttr "selected"
                   else Brick.withAttr "underlined"
               else identity
       )
-      (focus == FocusOnSpanList)
+      (focusedPane == SpanList)
     |> Brick.padLeftRight 1
 
 viewSpanBreakdownWithMatch :: Text -> Span -> Brick.Widget n
