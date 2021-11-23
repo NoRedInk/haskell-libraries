@@ -863,7 +863,6 @@ viewKey page clipboardCommand =
             let focusChange =
                   "tab: toggle focus"
                 scrolling =
-                  -- TODO: not yet implemented!
                   "↑↓: scroll"
                 maybeCopy =
                   ( case clipboardCommand of
