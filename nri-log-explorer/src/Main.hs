@@ -928,45 +928,46 @@ viewContents page =
         [ Brick.txt (spanSummary (logSpan currentSpan))
             |> Center.hCenter,
           Border.hBorder,
-          Brick.hBox
-            [ Border.vBorder
-                |> ( case focus of
-                       FocusOnSpanList ->
-                         Brick.overrideAttr Border.borderAttr "focused-pane-border"
-                       _ ->
-                         identity
-                   ),
-              viewSpanBreakdown focus spans
-                |> Brick.hLimitPercent 50
-                |> ( case focus of
-                       FocusOnSpanList ->
-                         identity
-                       _ ->
-                         Brick.withAttr "dim-unfocused"
-                   ),
-              Border.vBorder
-                |> Brick.overrideAttr Border.borderAttr "focused-pane-border",
-              ( case ListWidget.listSelectedElement spans of
-                  Nothing -> Brick.emptyWidget
-                  Just (_, (_, currentSpan')) ->
-                    viewSpanDetails currentSpan'
-                      |> ( case focus of
-                             FocusOnSpanDetails ->
-                               identity
-                             _ ->
-                               Brick.withAttr "dim-unfocused"
-                         )
-              )
-                |> Brick.padRight (Brick.Pad 1)
-                |> Brick.padRight Brick.Max,
-              Border.vBorder
-                |> ( case focus of
-                       FocusOnSpanDetails ->
-                         Brick.overrideAttr Border.borderAttr "focused-pane-border"
-                       _ ->
-                         identity
-                   )
-            ]
+          viewSpanBreakdownPageContent focus spans
+        ]
+
+viewSpanBreakdownPageContent :: SpanBreakdownPageFocus -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
+viewSpanBreakdownPageContent focus spans =
+  let leftPane = viewSpanBreakdown focus spans
+
+      rightPane =
+        case ListWidget.listSelectedElement spans of
+          Nothing -> Brick.emptyWidget
+          Just (_, (_, currentSpan')) -> viewSpanDetails currentSpan'
+
+      (leftBorderStyles, rightBorderStyle) =
+        case focus of
+          FocusOnSpanList ->
+            (Brick.overrideAttr Border.borderAttr "focused-pane-border", identity)
+          _ ->
+            (identity, Brick.overrideAttr Border.borderAttr "focused-pane-border")
+
+      (leftPaneStyle, rightPaneStyle) =
+        case focus of
+          FocusOnSpanList ->
+            (identity, Brick.withAttr "dim-unfocused")
+          _ ->
+            (Brick.withAttr "dim-unfocused", identity)
+   in Brick.hBox
+        [ Border.vBorder
+            |> leftBorderStyles,
+          leftPane
+            |> Brick.hLimitPercent 50
+            |> leftPaneStyle,
+          Border.vBorder
+            |> Brick.overrideAttr Border.borderAttr "focused-pane-border",
+          ( rightPane
+              |> rightPaneStyle
+          )
+            |> Brick.padRight (Brick.Pad 1)
+            |> Brick.padRight Brick.Max,
+          Border.vBorder
+            |> rightBorderStyle
         ]
 
 viewSpanBreakdown :: SpanBreakdownPageFocus -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
