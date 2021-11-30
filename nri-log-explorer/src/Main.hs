@@ -927,47 +927,40 @@ viewContents page =
         [ Brick.txt (spanSummary (logSpan currentSpan))
             |> Center.hCenter,
           Border.hBorder,
-          viewSpanBreakdownPageContent focus spans
+          sideBySide
+            focus
+            (viewSpanBreakdown focus spans)
+            ( case ListWidget.listSelectedElement spans of
+                Nothing -> Brick.emptyWidget
+                Just (_, (_, currentSpan')) -> viewSpanDetails currentSpan'
+            )
         ]
 
-viewSpanBreakdownPageContent :: SpanBreakdownFocusedPane -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
-viewSpanBreakdownPageContent focus spans =
-  let leftPane = viewSpanBreakdown focus spans
-
-      rightPane =
-        case ListWidget.listSelectedElement spans of
-          Nothing -> Brick.emptyWidget
-          Just (_, (_, currentSpan')) -> viewSpanDetails currentSpan'
-
-      (leftBorderStyles, rightBorderStyle) =
-        case focus of
-          SpanList ->
-            (Brick.overrideAttr Border.borderAttr "focused-pane-border", identity)
-          _ ->
-            (identity, Brick.overrideAttr Border.borderAttr "focused-pane-border")
-
-      (leftPaneStyle, rightPaneStyle) =
-        case focus of
-          SpanList ->
-            (identity, Brick.withAttr "dim-unfocused")
-          _ ->
-            (Brick.withAttr "dim-unfocused", identity)
-   in Brick.hBox
-        [ Border.vBorder
-            |> leftBorderStyles,
-          leftPane
-            |> Brick.hLimitPercent 50
-            |> leftPaneStyle,
-          Border.vBorder
-            |> Brick.overrideAttr Border.borderAttr "focused-pane-border",
-          ( rightPane
-              |> rightPaneStyle
-          )
-            |> Brick.padRight (Brick.Pad 1)
-            |> Brick.padRight Brick.Max,
-          Border.vBorder
-            |> rightBorderStyle
-        ]
+sideBySide :: SpanBreakdownFocusedPane -> Brick.Widget n -> Brick.Widget n -> Brick.Widget n
+sideBySide focus leftPane rightPane =
+  Brick.hBox
+    [ Border.vBorder
+        |> attrIf (focus == SpanList) (Just Border.borderAttr) "focused-pane-border",
+      leftPane
+        |> attrIf (focus == SpanDetails) Nothing "dim-unfocused"
+        |> Brick.hLimitPercent 50,
+      Border.vBorder
+        |> Brick.overrideAttr Border.borderAttr "focused-pane-border",
+      rightPane
+        |> attrIf (focus == SpanList) Nothing "dim-unfocused"
+        |> Brick.padRight (Brick.Pad 1)
+        |> Brick.padRight Brick.Max,
+      Border.vBorder
+        |> attrIf (focus == SpanDetails) (Just Border.borderAttr) "focused-pane-border"
+    ]
+  where
+    attrIf :: Bool -> Maybe Brick.AttrName -> Brick.AttrName -> Brick.Widget n -> Brick.Widget n
+    attrIf cond old new =
+      if cond
+        then case old of
+          Just old_ -> Brick.overrideAttr old_ new
+          Nothing -> Brick.withAttr new
+        else identity
 
 viewSpanBreakdown :: SpanBreakdownFocusedPane -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
 viewSpanBreakdown focusedPane spans =
