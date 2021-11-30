@@ -9,6 +9,7 @@ where
 
 import qualified Brick
 import qualified Brick.BChan
+import Brick.Types (ViewportType (..))
 import qualified Brick.Widgets.Border as Border
 import qualified Brick.Widgets.Center as Center
 import qualified Brick.Widgets.Edit as Edit
@@ -34,6 +35,7 @@ import qualified Filterable
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import qualified Graphics.Vty as Vty
+import qualified Graphics.Vty.Attributes as Vty.Attributes
 import qualified Graphics.Vty.Attributes.Color as Vty.Color
 import Lens.Micro ((^.))
 import qualified List
@@ -81,8 +83,12 @@ data SearchMatch = NoMatch | Matches Text
 data SpanBreakdownPageData = SpanBreakdownPageData
   { currentSpan :: RootSpan,
     search :: Search,
-    spans :: ListWidget.List Name (SearchMatch, Span)
+    spans :: ListWidget.List Name (SearchMatch, Span),
+    focus :: SpanBreakdownFocusedPane
   }
+
+data SpanBreakdownFocusedPane = SpanList | SpanDetails
+  deriving (Eq)
 
 data FailureFilter = ShowAll | ShowOnlyFailures
 
@@ -133,7 +139,13 @@ data Msg
   | Previous
   | EditorEvent Vty.Event
   | ShowHideFailures
+  | ToggleSpanBreakdownPageFocus
+  | ScrollSpanDetails ScrollingDirection
   | Quit
+
+data ScrollingDirection
+  = ScrollUp
+  | ScrollDown
 
 -- Brick's view elements have a Widget type, which is sort of the equivalent of
 -- the Html type in an Elm application. Unlike Elm those widgets can have their
@@ -143,6 +155,7 @@ data Name
   = RootSpanList
   | SpanBreakdownList Prelude.Int
   | FilterField
+  | SpanDetail
   deriving (Eq, Ord, Show)
 
 -- An alternative data type containing part of the same data as above, in a
@@ -224,11 +237,13 @@ update model msg =
                   Nothing -> page
                   Just (currentIndex, currentSpan) ->
                     SpanBreakdownPage
-                      SpanBreakdownPageData
-                        { currentSpan,
-                          spans = currentSpan |> logSpan |> toFlatList currentIndex,
-                          search = NoSearch
-                        }
+                      ( SpanBreakdownPageData
+                          { currentSpan,
+                            spans = currentSpan |> logSpan |> toFlatList currentIndex,
+                            search = NoSearch,
+                            focus = SpanList
+                          }
+                      )
         )
         |> andThen continueAfterUserInteraction
     Confirm ->
@@ -242,7 +257,15 @@ update model msg =
                   EditSearch searchEditor ->
                     updateSpanBreakdownSearch (currentValue searchEditor) spanBreakdownPageData
                       |> SpanBreakdownPage
-                  _ -> page
+                  _ ->
+                    case focus spanBreakdownPageData of
+                      SpanList ->
+                        -- user is allowed to toggle focus with tab/backtab, but
+                        -- pressing enter seems like an intuitive way of
+                        -- drilling down into the details.
+                        SpanBreakdownPage (spanBreakdownPageData {focus = SpanDetails})
+                      _ ->
+                        page
               RootSpanPage rootSpanPageData@RootSpanPageData {filter, rootSpans} ->
                 case filter of
                   EditFilter filterEditor ->
@@ -257,7 +280,8 @@ update model msg =
                           SpanBreakdownPageData
                             { currentSpan,
                               spans = currentSpan |> logSpan |> toFlatList currentIndex,
-                              search = NoSearch
+                              search = NoSearch,
+                              focus = SpanList
                             }
         )
         |> andThen continueAfterUserInteraction
@@ -409,11 +433,49 @@ update model msg =
               NoDataPage filter failureFilter -> NoDataPage filter (toggleFailureFilter failureFilter)
         )
         |> andThen continueAfterUserInteraction
+    ToggleSpanBreakdownPageFocus ->
+      withPage
+        model
+        ( \page ->
+            case page of
+              NoDataPage _ _ -> page
+              RootSpanPage _ -> page
+              SpanBreakdownPage spanBreakdownPageData ->
+                spanBreakdownPageData
+                  |> toggleFocus
+                  |> SpanBreakdownPage
+        )
+        |> andThen continueAfterUserInteraction
+    ScrollSpanDetails direction -> do
+      case toPage model of
+        NoDataPage _ _ -> Brick.continue model
+        RootSpanPage _ -> Brick.continue model
+        SpanBreakdownPage SpanBreakdownPageData {focus} ->
+          case focus of
+            SpanList ->
+              Brick.continue model
+            SpanDetails -> do
+              Brick.vScrollBy
+                (Brick.viewportScroll SpanDetail)
+                ( case direction of
+                    ScrollUp -> -1
+                    ScrollDown -> 1
+                )
+              Brick.continue model
     Quit ->
       case toPage model of
         NoDataPage _ _ -> Brick.halt model
         RootSpanPage _ -> Brick.halt model
         SpanBreakdownPage _ -> update model Cancel
+
+toggleFocus :: SpanBreakdownPageData -> SpanBreakdownPageData
+toggleFocus spanBreakdownPageData =
+  spanBreakdownPageData
+    { focus =
+        case (focus spanBreakdownPageData) of
+          SpanList -> SpanDetails
+          SpanDetails -> SpanList
+    }
 
 selectNextMatch :: SpanBreakdownPageData -> Maybe (Prelude.Int, SpanBreakdownPageData)
 selectNextMatch spanBreakdownPageData = do
@@ -573,16 +635,23 @@ scroll ::
   Model ->
   Brick.EventM Name Model
 scroll move model =
-  withPageEvent model
-    <| \case
-      NoDataPage filter failureFilter -> Prelude.pure (NoDataPage filter failureFilter)
-      RootSpanPage rootSpanPageData@RootSpanPageData {rootSpans} ->
-        move (Filterable.toListWidget rootSpans)
-          |> map (Filterable.setListWidget rootSpans)
-          |> map (\rootSpans' -> RootSpanPage rootSpanPageData {rootSpans = rootSpans'})
-      SpanBreakdownPage spanBreakdownPageData ->
-        scrollSpanBreakdownPage move spanBreakdownPageData
-          |> map SpanBreakdownPage
+  withPageEvent
+    model
+    ( \page ->
+        case page of
+          NoDataPage filter failureFilter -> Prelude.pure (NoDataPage filter failureFilter)
+          RootSpanPage rootSpanPageData@RootSpanPageData {rootSpans} ->
+            move (Filterable.toListWidget rootSpans)
+              |> map (Filterable.setListWidget rootSpans)
+              |> map (\rootSpans' -> RootSpanPage rootSpanPageData {rootSpans = rootSpans'})
+          SpanBreakdownPage spanBreakdownPageData ->
+            case focus spanBreakdownPageData of
+              SpanList ->
+                scrollSpanBreakdownPage move spanBreakdownPageData
+                  |> map SpanBreakdownPage
+              SpanDetails ->
+                Prelude.return page
+    )
 
 scrollSpanBreakdownPage ::
   (forall a. ListWidget.List Name a -> Brick.EventM Name (ListWidget.List Name a)) ->
@@ -628,6 +697,7 @@ view model =
             viewContents page,
             viewKey page (clipboardCommand model)
           ]
+          |> Brick.joinBorders
       ]
 
 viewMaybeInfoOnlyFailures :: Page -> Brick.Widget Name
@@ -789,22 +859,31 @@ viewKey page clipboardCommand =
                   NoFilter -> [exit, updown, select, filter', failureFilterText]
                   HasFilter _ -> [exit, updown, select, adjustFilter, failureFilterText]
                   EditFilter _ -> [stopEditFilter, applyFilter, clearFilter]
-          SpanBreakdownPage SpanBreakdownPageData {search} ->
-            ( case search of
-                NoSearch ->
-                  [goBack, updown, unselect, search']
-                    ++ ( case clipboardCommand of
-                           Nothing -> []
-                           Just _ -> [copy]
-                       )
-                HasSearch _ ->
-                  [goBack, updown, unselect, adjustSearch, nextMatch, previousMatch]
-                    ++ ( case clipboardCommand of
-                           Nothing -> []
-                           Just _ -> [copy]
-                       )
-                EditSearch _ -> [stopEditSearch, applySearch, clearSearch]
-            )
+          SpanBreakdownPage SpanBreakdownPageData {search, focus} ->
+            let focusChange =
+                  "tab: toggle focus"
+                scrolling =
+                  "↑↓: scroll"
+                maybeCopy =
+                  ( case clipboardCommand of
+                      Nothing -> []
+                      Just _ -> [copy]
+                  )
+             in ( case search of
+                    NoSearch ->
+                      case focus of
+                        SpanList ->
+                          [goBack, focusChange, updown, unselect, search'] ++ maybeCopy
+                        SpanDetails ->
+                          [goBack, focusChange, scrolling, unselect, search'] ++ maybeCopy
+                    HasSearch _ ->
+                      [goBack, updown, unselect, adjustSearch, nextMatch, previousMatch]
+                        ++ ( case clipboardCommand of
+                               Nothing -> []
+                               Just _ -> [copy]
+                           )
+                    EditSearch _ -> [stopEditSearch, applySearch, clearSearch]
+                )
    in Brick.vBox
         [ Border.hBorder,
           shortcuts
@@ -843,29 +922,51 @@ viewContents page =
           )
           True
         |> Brick.padLeftRight 1
-    SpanBreakdownPage SpanBreakdownPageData {currentSpan, spans} ->
+    SpanBreakdownPage SpanBreakdownPageData {currentSpan, spans, focus} ->
       Brick.vBox
         [ Brick.txt (spanSummary (logSpan currentSpan))
             |> Center.hCenter,
           Border.hBorder,
-          Brick.hBox
-            [ viewSpanBreakdown spans
-                |> Brick.hLimitPercent 50,
-              ( case ListWidget.listSelectedElement spans of
-                  Nothing -> Brick.emptyWidget
-                  Just (_, (_, currentSpan')) ->
-                    viewSpanDetails currentSpan'
-              )
-                |> Brick.padRight (Brick.Pad 1)
-                |> Brick.padRight Brick.Max
-            ]
+          sideBySide
+            focus
+            (viewSpanBreakdown focus spans)
+            ( case ListWidget.listSelectedElement spans of
+                Nothing -> Brick.emptyWidget
+                Just (_, (_, currentSpan')) -> viewSpanDetails currentSpan'
+            )
         ]
 
-viewSpanBreakdown :: ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
-viewSpanBreakdown spans =
+sideBySide :: SpanBreakdownFocusedPane -> Brick.Widget n -> Brick.Widget n -> Brick.Widget n
+sideBySide focus leftPane rightPane =
+  Brick.hBox
+    [ Border.vBorder
+        |> attrIf (focus == SpanList) (Just Border.borderAttr) "focused-pane-border",
+      leftPane
+        |> attrIf (focus == SpanDetails) Nothing "dim-unfocused"
+        |> Brick.hLimitPercent 50,
+      Border.vBorder
+        |> Brick.overrideAttr Border.borderAttr "focused-pane-border",
+      rightPane
+        |> attrIf (focus == SpanList) Nothing "dim-unfocused"
+        |> Brick.padRight (Brick.Pad 1)
+        |> Brick.padRight Brick.Max,
+      Border.vBorder
+        |> attrIf (focus == SpanDetails) (Just Border.borderAttr) "focused-pane-border"
+    ]
+  where
+    attrIf :: Bool -> Maybe Brick.AttrName -> Brick.AttrName -> Brick.Widget n -> Brick.Widget n
+    attrIf cond old new =
+      if cond
+        then case old of
+          Just old_ -> Brick.overrideAttr old_ new
+          Nothing -> Brick.withAttr new
+        else identity
+
+viewSpanBreakdown :: SpanBreakdownFocusedPane -> ListWidget.List Name (SearchMatch, Span) -> Brick.Widget Name
+viewSpanBreakdown focusedPane spans =
   spans
     |> ListWidget.renderList
-      ( \hasFocus (matches, span) ->
+      ( \isSpanFocused (matches, span) ->
           Brick.hBox
             [ ( case matches of
                   Matches matching ->
@@ -876,11 +977,14 @@ viewSpanBreakdown spans =
                 |> Brick.padLeft (Brick.Pad (Prelude.fromIntegral (2 * nesting span)))
                 |> Brick.padRight Brick.Max
             ]
-            |> if hasFocus
-              then Brick.withAttr "selected"
+            |> if isSpanFocused
+              then
+                if focusedPane == SpanList
+                  then Brick.withAttr "selected"
+                  else Brick.withAttr "underlined"
               else identity
       )
-      True
+      (focusedPane == SpanList)
     |> Brick.padLeftRight 1
 
 viewSpanBreakdownWithMatch :: Text -> Span -> Brick.Widget n
@@ -907,77 +1011,81 @@ viewSpanBreakdownWithMatch matching span =
 
 viewSpanDetails :: Span -> Brick.Widget Name
 viewSpanDetails Span {original} =
-  Brick.vBox
-    [ viewDetail "name" (Platform.name original),
-      case Platform.summary original of
-        Nothing -> Brick.emptyWidget
-        Just summary -> viewDetail "summary" summary,
-      viewDetail
-        "duration"
-        ( ( Platform.finished original - Platform.started original
-              |> Platform.inMicroseconds
-              |> Prelude.fromIntegral
-              |> (\n -> n `Prelude.div` 1000)
-              |> Text.fromInt
-          )
-            ++ " ms"
-        ),
-      case Platform.frame original of
-        Nothing -> Brick.emptyWidget
-        Just (_, srcLoc) ->
+  Brick.viewport
+    SpanDetail
+    Vertical
+    ( Brick.vBox
+        [ viewDetail "name" (Platform.name original),
+          case Platform.summary original of
+            Nothing -> Brick.emptyWidget
+            Just summary -> viewDetail "summary" summary,
           viewDetail
-            "source"
-            ( Data.Text.pack (Stack.srcLocFile srcLoc)
-                ++ ":"
-                ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
-            ),
-      case Platform.succeeded original of
-        Platform.Succeeded -> viewDetail "result" "succeeded"
-        Platform.Failed -> viewDetail "result" "failed"
-        Platform.FailedWith exception ->
-          viewDetail
-            "failed with"
-            ( Exception.displayException exception
-                |> Data.Text.pack
-            ),
-      case map Aeson.toJSON (Platform.details original) of
-        Nothing -> Brick.emptyWidget
-        Just Aeson.Null -> Brick.emptyWidget
-        Just (Aeson.String str) -> viewDetail "details" str
-        Just (Aeson.Number number) ->
-          Data.Text.pack (Prelude.show number)
-            |> viewDetail "details"
-        Just (Aeson.Bool bool) ->
-          Data.Text.pack (Prelude.show bool)
-            |> viewDetail "details"
-        Just (Aeson.Array array) ->
-          viewDetail
-            "details"
-            ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder array
-                |> Data.Text.Lazy.Builder.toLazyText
-                |> Data.Text.Lazy.toStrict
-            )
-        Just (Aeson.Object object) ->
-          HashMap.toList object
-            |> List.map
-              ( \(name, val) ->
-                  viewDetail
-                    name
-                    ( case Aeson.toJSON val of
-                        Aeson.Null -> "Null"
-                        Aeson.String str -> str
-                        Aeson.Number number ->
-                          Data.Text.pack (Prelude.show number)
-                        Aeson.Bool bool ->
-                          Data.Text.pack (Prelude.show bool)
-                        other ->
-                          Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder other
-                            |> Data.Text.Lazy.Builder.toLazyText
-                            |> Data.Text.Lazy.toStrict
-                    )
+            "duration"
+            ( ( Platform.finished original - Platform.started original
+                  |> Platform.inMicroseconds
+                  |> Prelude.fromIntegral
+                  |> (\n -> n `Prelude.div` 1000)
+                  |> Text.fromInt
               )
-            |> Brick.vBox
-    ]
+                ++ " ms"
+            ),
+          case Platform.frame original of
+            Nothing -> Brick.emptyWidget
+            Just (_, srcLoc) ->
+              viewDetail
+                "source"
+                ( Data.Text.pack (Stack.srcLocFile srcLoc)
+                    ++ ":"
+                    ++ Text.fromInt (Prelude.fromIntegral (Stack.srcLocStartLine srcLoc))
+                ),
+          case Platform.succeeded original of
+            Platform.Succeeded -> viewDetail "result" "succeeded"
+            Platform.Failed -> viewDetail "result" "failed"
+            Platform.FailedWith exception ->
+              viewDetail
+                "failed with"
+                ( Exception.displayException exception
+                    |> Data.Text.pack
+                ),
+          case map Aeson.toJSON (Platform.details original) of
+            Nothing -> Brick.emptyWidget
+            Just Aeson.Null -> Brick.emptyWidget
+            Just (Aeson.String str) -> viewDetail "details" str
+            Just (Aeson.Number number) ->
+              Data.Text.pack (Prelude.show number)
+                |> viewDetail "details"
+            Just (Aeson.Bool bool) ->
+              Data.Text.pack (Prelude.show bool)
+                |> viewDetail "details"
+            Just (Aeson.Array array) ->
+              viewDetail
+                "details"
+                ( Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder array
+                    |> Data.Text.Lazy.Builder.toLazyText
+                    |> Data.Text.Lazy.toStrict
+                )
+            Just (Aeson.Object object) ->
+              HashMap.toList object
+                |> List.map
+                  ( \(name, val) ->
+                      viewDetail
+                        name
+                        ( case Aeson.toJSON val of
+                            Aeson.Null -> "Null"
+                            Aeson.String str -> str
+                            Aeson.Number number ->
+                              Data.Text.pack (Prelude.show number)
+                            Aeson.Bool bool ->
+                              Data.Text.pack (Prelude.show bool)
+                            other ->
+                              Data.Aeson.Encode.Pretty.encodePrettyToTextBuilder other
+                                |> Data.Text.Lazy.Builder.toLazyText
+                                |> Data.Text.Lazy.toStrict
+                        )
+                  )
+                |> Brick.vBox
+        ]
+    )
 
 viewDetail :: Text -> Text -> Brick.Widget Name
 viewDetail label val =
@@ -1168,7 +1276,18 @@ attrMap =
               Vty.Color.red
           )
           Vty.Color.black
-      )
+      ),
+      ( "focused-pane-border",
+        Vty.withForeColor
+          Vty.defAttr
+          ( Vty.Color.rgbColor
+              (255 :: Prelude.Integer)
+              (204 :: Prelude.Integer)
+              (102 :: Prelude.Integer)
+          )
+      ),
+      ("dim-unfocused", Vty.withStyle Vty.defAttr Vty.Attributes.dim),
+      ("focused", Vty.withStyle Vty.defAttr Vty.Attributes.standout)
     ]
 
 handleEvent ::
@@ -1176,9 +1295,11 @@ handleEvent ::
   Model ->
   Brick.BrickEvent Name Msg ->
   Brick.EventM Name (Brick.Next Model)
-handleEvent pushMsg model event =
+handleEvent pushMsg modelBeforeScrolling event =
   case event of
     (Brick.VtyEvent vtyEvent) -> do
+      model <- scroll (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent) modelBeforeScrolling
+
       case (toMode model, vtyEvent) of
         -- Quitting
         (NormalMode, Vty.EvKey (Vty.KChar 'q') []) -> do
@@ -1226,14 +1347,29 @@ handleEvent pushMsg model event =
         (EditMode, _) -> do
           liftIO (pushMsg (EditorEvent vtyEvent))
           Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KUp) []) -> do
+          liftIO (pushMsg (ScrollSpanDetails ScrollUp))
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KDown) []) -> do
+          liftIO (pushMsg (ScrollSpanDetails ScrollDown))
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar 'j') []) -> do
+          liftIO (pushMsg (ScrollSpanDetails ScrollDown))
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar 'k') []) -> do
+          liftIO (pushMsg (ScrollSpanDetails ScrollUp))
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KChar '\t') []) -> do
+          liftIO (pushMsg ToggleSpanBreakdownPageFocus)
+          Brick.continue model
+        (NormalMode, Vty.EvKey (Vty.KBackTab) []) -> do
+          liftIO (pushMsg ToggleSpanBreakdownPageFocus)
+          Brick.continue model
         _ ->
-          scroll
-            (ListWidget.handleListEventVi ListWidget.handleListEvent vtyEvent)
-            model
-            |> andThen Brick.continue
-    Brick.MouseDown {} -> Brick.continue model
-    Brick.MouseUp {} -> Brick.continue model
-    Brick.AppEvent msg -> update model msg
+          Brick.continue model
+    Brick.MouseDown {} -> Brick.continue modelBeforeScrolling
+    Brick.MouseUp {} -> Brick.continue modelBeforeScrolling
+    Brick.AppEvent msg -> update modelBeforeScrolling msg
 
 data Mode = NormalMode | EditMode
 
