@@ -394,7 +394,7 @@ handleUnexpectedErrors :: Expectation -> Expectation
 handleUnexpectedErrors (Expectation task') =
   task'
     |> onException (Task.fail << ThrewException)
-    |> Task.timeout 10_000 TookTooLong
+    |> Task.timeout 100_000 TookTooLong
     |> Task.onError Task.fail
     |> Expectation
 
