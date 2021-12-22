@@ -2,8 +2,8 @@
 
 pkgs.mkShell {
   buildInputs = [
-    (haskellPackages.ghcWithPackages (haskellPackges:
-      with haskellPackges; [
+    (haskellPackages.ghcWithPackages (haskellPackages:
+      with haskellPackages; [
         aeson
         aeson-pretty
         async
