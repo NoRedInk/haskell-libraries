@@ -1,9 +1,15 @@
 { pkgs, haskellPackages }:
 
-pkgs.mkShell {
+# Fix from https://github.com/srid/haskell-template
+let
+  workaround140774 = hpkg:
+    with pkgs.haskell.lib;
+    overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
+
+in pkgs.mkShell {
   buildInputs = [
-    (haskellPackages.ghcWithPackages (haskellPackges:
-      with haskellPackges; [
+    (haskellPackages.ghcWithPackages (haskellPackages:
+      with haskellPackages; [
         aeson
         aeson-pretty
         async
@@ -57,10 +63,10 @@ pkgs.mkShell {
     pkgs.cabal-install
     pkgs.cachix
     pkgs.gnumake
-    pkgs.haskellPackages.ghcid
+    (workaround140774 pkgs.haskellPackages.ghcid)
     pkgs.haskellPackages.hpack
-    pkgs.niv
-    pkgs.ormolu
+    (workaround140774 pkgs.haskellPackages.niv)
+    (workaround140774 pkgs.haskellPackages.ormolu)
     pkgs.pcre
     pkgs.redis # for nri-redis
     pkgs.postgresql # for nri-postgres
