@@ -1,5 +1,9 @@
 # Unreleased next version
 
+# 0.6.0.6
+
+- Permit `text-2.0.x`, `base-4.16.x` and `template-haskell-2.18.x`
+
 # 0.6.0.5
 
 - Support `time-1.x`.
