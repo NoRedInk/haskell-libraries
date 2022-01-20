@@ -26,6 +26,7 @@ module Kafka.Worker
     Internal.subscriptionManageOwnOffsets,
     Internal.PartitionOffset (..),
     Partition.SeekCmd (..),
+    Internal.CommitToKafkaAsWell (..),
   )
 where
 

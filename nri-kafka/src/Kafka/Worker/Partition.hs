@@ -102,6 +102,10 @@ data CommitOffsets
   | -- | Commit offsets elsewhere. Takes the offset of the last committed
     -- message so we can skip old messages.
     Elsewhere Int
+  | -- | Same as `Elsewhere` but commits offsets to Kafka. This is an experiment
+    -- to check if brokers stay healthier when their offsets aren't completely
+    -- out of date.
+    ElsewhereButToKafkaAsWell Int
 
 -- | A thread that processes messages for a particular partition. Cleans itself
 -- up if it ever runs out.
@@ -154,6 +158,7 @@ spawnWorkerThread skipOrNot commitOffsets observabilityHandler analytics stoppin
       <| case commitOffsets of
         ToKafka -> Assigned Seq.empty
         Elsewhere offset -> AwaitingSeekTo offset
+        ElsewhereButToKafkaAsWell offset -> AwaitingSeekTo offset
   onStartup partition
   Exception.finally
     (processMsgLoop skipOrNot commitOffsets observabilityHandler State {analytics, stopping, partition} consumer callback)
@@ -223,6 +228,16 @@ processMsgLoop skipOrNot commitOffsets observabilityHandler state consumer callb
                     -- of a larger database transaction as part of an
                     -- exactly-once-delivery scheme.
                     Prelude.pure ()
+                  ElsewhereButToKafkaAsWell _ ->
+                    -- The user of the Kafka module is responsible for
+                    -- comitting the offsets. To help them do so we pass
+                    -- them the record in the callback function.
+                    --
+                    -- It's important the module user can determine when to
+                    -- commit, for example to allow them to commit as part
+                    -- of a larger database transaction as part of an
+                    -- exactly-once-delivery scheme.
+                    commitRecord doAnything consumer record
 
                 -- finally, let's remove it from the queue
                 dequeueRecord (partition state) record

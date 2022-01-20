@@ -52,8 +52,14 @@ data State = State
 data TopicSubscription = TopicSubscription
   { topic :: Kafka.Topic,
     onMessage :: Partition.MessageCallback,
-    offsetSource :: OffsetSource
+    offsetSource :: OffsetSource,
+    commitToKafkaAsWell :: CommitToKafkaAsWell
   }
+
+-- | Commit the offset to Kafka in addition to an externally managed storage.
+data CommitToKafkaAsWell
+  = CommitToKafkaAsWell
+  | DoNotCommitToKafkaAsWell
 
 -- | Params needed to write / read offsets to another data store
 data PartitionOffset = PartitionOffset
@@ -87,7 +93,8 @@ subscription topic callback =
               callback msg
               Task.succeed Partition.NoSeek
           ),
-      offsetSource = InKafka
+      offsetSource = InKafka,
+      commitToKafkaAsWell = CommitToKafkaAsWell
     }
 
 -- | Create a subscription for a topic and manage offsets for that topic
@@ -102,6 +109,7 @@ subscription topic callback =
 -- >   let subscription =
 -- >         subscriptionManageOwnOffsets
 -- >           "the-topic"
+-- >           CommitToKafkaAsWell
 -- >           (\partitions ->
 -- >              sql
 -- >                "SELECT partition, offset FROM offsets WHERE partition = %"
@@ -111,12 +119,14 @@ subscription topic callback =
 subscriptionManageOwnOffsets ::
   (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
   Text ->
+  CommitToKafkaAsWell ->
   ([Int] -> Task Text (List PartitionOffset)) ->
   (PartitionOffset -> msg -> Task Text Partition.SeekCmd) ->
   TopicSubscription
-subscriptionManageOwnOffsets topic fetchOffsets callback =
+subscriptionManageOwnOffsets topic commitToKafkaAsWell fetchOffsets callback =
   TopicSubscription
     { topic = Kafka.Topic topic,
+      commitToKafkaAsWell,
       onMessage =
         Partition.MessageCallback
           ( \record msg -> do
@@ -190,12 +200,12 @@ process settings groupIdText topicSubscriptions = do
 -- the worker shares the OS process with other test code and the test runner.
 processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Prelude.IO ()
 processWithoutShutdownEnsurance settings groupId topicSubscriptions = do
-  let TopicSubscription {onMessage, topic, offsetSource} = topicSubscriptions
+  let TopicSubscription {onMessage, topic, offsetSource, commitToKafkaAsWell} = topicSubscriptions
   state <- initState
   onQuitSignal (Stopping.stopTakingRequests (stopping state) "Received stop signal")
   Conduit.withAcquire (Observability.handler (Settings.observability settings)) <| \observabilityHandler -> do
     Exception.bracketWithError
-      (createConsumer settings groupId observabilityHandler offsetSource onMessage topic state)
+      (createConsumer settings groupId observabilityHandler offsetSource commitToKafkaAsWell onMessage topic state)
       (cleanUp observabilityHandler (rebalanceInfo state) (stopping state))
       (runThreads settings state)
 
@@ -220,6 +230,7 @@ createConsumer ::
   Consumer.ConsumerGroupId ->
   Observability.Handler ->
   OffsetSource ->
+  CommitToKafkaAsWell ->
   Partition.MessageCallback ->
   Kafka.Topic ->
   State ->
@@ -234,6 +245,7 @@ createConsumer
   groupId
   observability
   offsetSource
+  commitToKafkaAsWell
   callback
   topic
   state = do
@@ -243,6 +255,7 @@ createConsumer
             observability
             callback
             offsetSource
+            commitToKafkaAsWell
             state
     let properties =
           Consumer.brokersList
@@ -283,11 +296,12 @@ rebalanceCallback ::
   Observability.Handler ->
   Partition.MessageCallback ->
   OffsetSource ->
+  CommitToKafkaAsWell ->
   State ->
   Consumer.KafkaConsumer ->
   Consumer.RebalanceEvent ->
   Prelude.IO ()
-rebalanceCallback skipOrNot observability callback offsetSource state consumer rebalanceEvent = do
+rebalanceCallback skipOrNot observability callback offsetSource commitToKafkaAsWell state consumer rebalanceEvent = do
   now <- GHC.Clock.getMonotonicTime
   Analytics.updateTimeOfLastRebalance now (analytics state)
   case rebalanceEvent of
@@ -302,8 +316,13 @@ rebalanceCallback skipOrNot observability callback offsetSource state consumer r
             case fetchResult of
               Err err -> Exception.throwString (Text.toList err)
               Ok fetched -> do
+                let elsewhere = case commitToKafkaAsWell of
+                      CommitToKafkaAsWell ->
+                        Partition.ElsewhereButToKafkaAsWell
+                      DoNotCommitToKafkaAsWell ->
+                        Partition.Elsewhere
                 let storedOffsets =
-                      List.map (Tuple.mapSecond Partition.Elsewhere) fetched
+                      List.map (Tuple.mapSecond elsewhere) fetched
                         |> Dict.fromList
                 let storedKeys =
                       fetched
