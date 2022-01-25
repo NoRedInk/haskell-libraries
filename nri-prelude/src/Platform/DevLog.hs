@@ -13,7 +13,6 @@ import NriPrelude
 import qualified Platform.Internal
 import qualified System.IO
 import qualified System.IO.Unsafe
-import qualified System.Posix.Files
 import qualified Prelude
 
 -- | Write a tracing span to the development log, where it can be found by
@@ -27,7 +26,6 @@ writeSpanToDevLog span = do
       logFile
       System.IO.AppendMode
       ( \handle -> do
-          System.Posix.Files.setFileMode logFile System.Posix.Files.stdFileMode
           Data.ByteString.Lazy.hPut handle (Aeson.encode (now, span))
           Data.ByteString.Lazy.hPut handle "\n"
       )
