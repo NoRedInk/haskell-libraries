@@ -20,7 +20,7 @@ import qualified Prelude
 writeSpanToDevLog :: Platform.Internal.TracingSpan -> Prelude.IO ()
 writeSpanToDevLog span = do
   now <- Time.getCurrentTime
-  let logFile = "/tmp/nri-prelude-logs"
+  let logFile = "/tmp/nri-prelude-logs-test"
   MVar.withMVar writeLock <| \_ ->
     System.IO.withFile
       logFile
