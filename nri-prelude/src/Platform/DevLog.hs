@@ -6,6 +6,7 @@ module Platform.DevLog
 where
 
 import qualified Control.Concurrent.MVar as MVar
+import qualified Control.Monad
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy
 import qualified Data.Time as Time
@@ -13,7 +14,7 @@ import NriPrelude
 import qualified Platform.Internal
 import qualified System.IO
 import qualified System.IO.Unsafe
-import qualified System.Posix.Files
+import qualified System.Posix.Files as Files
 import qualified Prelude
 
 -- | Write a tracing span to the development log, where it can be found by
@@ -27,7 +28,9 @@ writeSpanToDevLog span = do
       logFile
       System.IO.AppendMode
       ( \handle -> do
-          System.Posix.Files.setFileMode logFile System.Posix.Files.stdFileMode
+          fileStatus <- Files.getFileStatus logFile
+          Control.Monad.unless (Files.fileMode fileStatus == Files.stdFileMode) <|
+            Files.setFileMode logFile Files.stdFileMode
           Data.ByteString.Lazy.hPut handle (Aeson.encode (now, span))
           Data.ByteString.Lazy.hPut handle "\n"
       )
