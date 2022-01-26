@@ -29,7 +29,9 @@ writeSpanToDevLog span = do
       System.IO.AppendMode
       ( \handle -> do
           fileStatus <- Files.getFileStatus logFile
-          Control.Monad.unless (Files.fileMode fileStatus == Files.stdFileMode) <|
+          let fileMode = Files.fileMode fileStatus
+          let fileAccessModes = Files.intersectFileModes fileMode Files.accessModes
+          Control.Monad.unless (fileAccessModes == Files.stdFileMode) <|
             Files.setFileMode logFile Files.stdFileMode
           Data.ByteString.Lazy.hPut handle (Aeson.encode (now, span))
           Data.ByteString.Lazy.hPut handle "\n"
