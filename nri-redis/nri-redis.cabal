@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-redis
-version:        0.1.0.3
+version:        0.1.0.4
 synopsis:       An intuitive hedis wrapper library.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
 category:       Web

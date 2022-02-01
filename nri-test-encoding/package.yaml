@@ -3,7 +3,7 @@ synopsis: A library to simplify writing golden tests for encoding types.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding#readme
 author: NoRedInk
-version: 0.1.1.1
+version: 0.1.1.2
 maintainer: haskell-open-source@noredink.com
 copyright: 2021 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-test-encoding

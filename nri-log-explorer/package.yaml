@@ -3,7 +3,7 @@ synopsis: Explore logs produced by nri-prelude tests.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explorer#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explorer#readme
 author: NoRedInk
-version: 0.1.1.0
+version: 0.1.1.2
 maintainer: haskell-open-source@noredink.com
 copyright: 2021 NoRedInk Corp.
 github: NoRedInk/haskell-libraries

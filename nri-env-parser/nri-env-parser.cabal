@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-env-parser
-version:        0.1.0.7
+version:        0.1.0.8
 synopsis:       Read environment variables as settings to build 12-factor apps.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-env-parser#readme>.
 category:       Web
