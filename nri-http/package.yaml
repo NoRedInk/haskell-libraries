@@ -4,7 +4,7 @@ description: Please see the README at <https://github.com/NoRedInk/haskell-libra
 author: NoRedInk
 version: 0.1.0.4
 maintainer: haskell-open-source@noredink.com
-copyright: 2021 NoRedInk Corp.
+copyright: 2022 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-http
 license-file: LICENSE
 category: Web
