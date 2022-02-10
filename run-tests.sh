@@ -16,18 +16,23 @@ pg_ctl start -o '-k .'
 mkdir -p ./_build/redis/data
 redis-server --daemonize yes --dir ./_build/redis/data
 
-## start zookeeper (for kafka) 
+## start zookeeper (for kafka)
+zk_server_properties_path=$(dirname "$(which zkServer.sh)")/../conf/zoo_sample.cfg
 mkdir -p /tmp/zookeeper /tmp/zookeeper-logs
-ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs  zkServer.sh stop zoo_sample.cfg
+ZOOPIDFILE=/tmp/zookeeper-logs/pid \
+          ZOO_LOG_DIR=/tmp/zookeeper-logs \
+          zkServer.sh stop "$zk_server_properties_path"
 rm -rf /tmp/zookeeper/* /tmp/zookeeper-logs/*
-ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs zkServer.sh start zoo_sample.cfg
+ZOOPIDFILE=/tmp/zookeeper-logs/pid \
+          ZOO_LOG_DIR=/tmp/zookeeper-logs \
+          zkServer.sh start "$zk_server_properties_path"
 
 ## wait for zookeeper
 echo "waiting for zookeeper to start"
 until nc -vz localhost 2181
 do
   sleep 1
-done 
+done
 echo "zookeeper available"
 
 ## start kafka
@@ -50,4 +55,6 @@ cabal test all
 
 # cleanup
 kafka-server-stop.sh
-ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs  zkServer.sh stop zoo_sample.cfg
+ZOOPIDFILE=/tmp/zookeeper-logs/pid \
+          ZOO_LOG_DIR=/tmp/zookeeper-logs  \
+          zkServer.sh stop "$zk_server_properties_path"
