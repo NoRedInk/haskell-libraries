@@ -25,7 +25,7 @@ import NriPrelude
 import qualified Servant
 import Servant.API
   ( Capture',
-    Header,
+    Header',
     QueryFlag,
     Raw,
     ReqBody',
@@ -228,7 +228,7 @@ instance
     Examples.HasExamples val,
     IsApi a
   ) =>
-  IsApi (Header key val :> a)
+  IsApi (Header' mods key val :> a)
   where
   crawl _ =
     crawl (Proxy :: Proxy a)
