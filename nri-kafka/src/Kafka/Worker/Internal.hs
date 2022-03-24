@@ -70,7 +70,31 @@ data PartitionOffset = PartitionOffset
     offset :: Int
   }
 
-type StatsCallback = (ByteString -> Task Text ())
+type StatsCallback = (Stats -> Task Text ())
+
+data Stats = Stats {rtt :: Rtt}
+
+data Rtt = Rtt
+  { min :: Int,
+    max :: Int,
+    avg :: Int,
+    sum :: Int,
+    stddev :: Int,
+    p50 :: Int,
+    p75 :: Int,
+    p90 :: Int,
+    p95 :: Int,
+    p99 :: Int,
+    p99_99 :: Int,
+    outofrange :: Int,
+    hdrsize :: Int,
+    cnt :: Int
+  }
+
+-- TODO add aeson instances
+-- TODO move to shared location to use in both worker and producer
+-- TODO add more metrics
+-- TODO expose set of all available metrics
 
 -- | Create a subscription for a topic.
 --
