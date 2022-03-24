@@ -11,7 +11,12 @@ module Kafka
     Settings.Settings,
     Settings.decoder,
     handler,
-    Internal.StatsCallback,
+
+    -- * Stats
+    Stats.StatsCallback,
+    Stats.Stats (..),
+    Stats.Rtt (..),
+    Stats.allStats,
 
     -- * Creating messages
     Internal.Msg,
@@ -44,6 +49,7 @@ import qualified Dict
 import qualified Kafka.Internal as Internal
 import qualified Kafka.Producer as Producer
 import qualified Kafka.Settings as Settings
+import qualified Kafka.Stats as Stats
 import qualified Platform
 import qualified Prelude
 
@@ -156,7 +162,7 @@ key msg = Maybe.map Internal.unKey (Internal.key msg)
 -- | Function for creating a Kafka handler.
 --
 -- See 'Kafka.Settings' for potential customizations.
-handler :: Settings.Settings -> Maybe Internal.StatsCallback -> Conduit.Acquire Internal.Handler
+handler :: Settings.Settings -> Maybe Stats.StatsCallback -> Conduit.Acquire Internal.Handler
 handler settings maybeStatsCallback = do
   producer <- Conduit.mkAcquire (mkProducer settings maybeStatsCallback) Producer.closeProducer
   _ <- Conduit.mkAcquire (startPollEventLoop producer) (\terminator -> STM.atomically (TMVar.putTMVar terminator Terminate))
@@ -216,7 +222,7 @@ doSTM doAnything stm =
     |> map Ok
     |> Platform.doAnything doAnything
 
-mkProducer :: Settings.Settings -> Maybe Internal.StatsCallback -> Prelude.IO Producer.KafkaProducer
+mkProducer :: Settings.Settings -> Maybe Stats.StatsCallback -> Prelude.IO Producer.KafkaProducer
 mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages} maybeStatsCallback = do
   let properties =
         Producer.brokersList brokerAddresses
@@ -240,10 +246,13 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
             Nothing -> Prelude.mempty
             Just statsCallback ->
               Producer.setCallback
-                ( Producer.statsCallback <| \content -> do
-                    log <- Platform.silentHandler
-                    _ <- Task.attempt log (statsCallback content)
-                    Prelude.pure ()
+                ( Producer.statsCallback <| \content ->
+                    case Aeson.decodeStrict content of
+                      Nothing -> Prelude.pure ()
+                      Just stats -> do
+                        log <- Platform.silentHandler
+                        _ <- Task.attempt log (statsCallback stats)
+                        Prelude.pure ()
                 )
   eitherProducer <- Producer.newProducer properties
   case eitherProducer of

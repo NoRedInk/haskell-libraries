@@ -16,6 +16,7 @@ import qualified GHC.Clock
 import qualified Kafka.Consumer as Consumer
 import qualified Kafka.Internal as Kafka
 import qualified Kafka.Metadata
+import qualified Kafka.Stats as Stats
 import qualified Kafka.Worker.Analytics as Analytics
 import qualified Kafka.Worker.Fetcher as Fetcher
 import qualified Kafka.Worker.Partition as Partition
@@ -68,38 +69,6 @@ data PartitionOffset = PartitionOffset
     -- | The partition's offset.
     offset :: Int
   }
-
-type StatsCallback = (Stats -> Task Text ())
-
-newtype Stats = Stats {rtt :: Rtt}
-  deriving (Generic)
-
-instance Aeson.FromJSON Stats
-
-data Rtt = Rtt
-  { min :: Int,
-    max :: Int,
-    avg :: Int,
-    sum :: Int,
-    stddev :: Int,
-    p50 :: Int,
-    p75 :: Int,
-    p90 :: Int,
-    p95 :: Int,
-    p99 :: Int,
-    p99_99 :: Int,
-    outofrange :: Int,
-    hdrsize :: Int,
-    cnt :: Int
-  }
-  deriving (Generic)
-
-instance Aeson.FromJSON Rtt
-
--- TODO add aeson instances
--- TODO move to shared location to use in both worker and producer
--- TODO add more metrics
--- TODO expose set of all available metrics
 
 -- | Create a subscription for a topic.
 --
@@ -209,7 +178,7 @@ data OffsetSource where
     OffsetSource
 
 -- | Starts the kafka worker handling messages.
-process :: Settings.Settings -> Text -> TopicSubscription -> Maybe StatsCallback -> Prelude.IO ()
+process :: Settings.Settings -> Text -> TopicSubscription -> Maybe Stats.StatsCallback -> Prelude.IO ()
 process settings groupIdText topicSubscriptions maybeStatsCallback = do
   processWithoutShutdownEnsurance settings (Consumer.ConsumerGroupId groupIdText) topicSubscriptions maybeStatsCallback
   -- Start an ensurance policy to make sure we exit in 5 seconds. We've seen
@@ -230,7 +199,7 @@ process settings groupIdText topicSubscriptions maybeStatsCallback = do
 -- | Like `process`, but doesn't exit the current process by itself. This risks
 -- leaving zombie processes when used in production but is safer in tests, where
 -- the worker shares the OS process with other test code and the test runner.
-processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Maybe StatsCallback -> Prelude.IO ()
+processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Maybe Stats.StatsCallback -> Prelude.IO ()
 processWithoutShutdownEnsurance settings groupId topicSubscriptions maybeStatsCallback = do
   let TopicSubscription {onMessage, topic, offsetSource, commitToKafkaAsWell} = topicSubscriptions
   state <- initState
@@ -264,7 +233,7 @@ createConsumer ::
   OffsetSource ->
   CommitToKafkaAsWell ->
   Partition.MessageCallback ->
-  Maybe StatsCallback ->
+  Maybe Stats.StatsCallback ->
   Kafka.Topic ->
   State ->
   Prelude.IO Consumer.KafkaConsumer
@@ -307,12 +276,12 @@ createConsumer
               Nothing -> Prelude.mempty
               Just statsCallback ->
                 Consumer.setCallback
-                  ( Consumer.statsCallback <| \content -> do
-                      log <- Platform.silentHandler
+                  ( Consumer.statsCallback <| \content ->
                       case Aeson.decodeStrict content of
                         Nothing ->
                           Prelude.pure ()
                         Just stats -> do
+                          log <- Platform.silentHandler
                           _ <- Task.attempt log (statsCallback stats)
                           Prelude.pure ()
                   )
