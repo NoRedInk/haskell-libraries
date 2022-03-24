@@ -1,4 +1,15 @@
-module Kafka.Stats where
+-- | Kafka is a module for _writing_ to Kafka
+--
+-- See Kafka.Worker for the basic building blocks of a CLI app that will poll &
+-- process kafka messages
+module Kafka.Stats
+  ( StatsCallback,
+    Stats (..),
+    Broker (..),
+    Rtt (..),
+    allStats,
+  )
+where
 
 import qualified Data.Aeson as Aeson
 import Dict (Dict)

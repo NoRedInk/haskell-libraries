@@ -12,12 +12,6 @@ module Kafka
     Settings.decoder,
     handler,
 
-    -- * Stats
-    Stats.StatsCallback,
-    Stats.Stats (..),
-    Stats.Rtt (..),
-    Stats.allStats,
-
     -- * Creating messages
     Internal.Msg,
     emptyMsg,

@@ -34,6 +34,7 @@ library:
   exposed-modules:
     - Kafka
     - Kafka.Worker
+    - Kafka.Stats
     - Kafka.Test
   source-dirs: src
 tests:

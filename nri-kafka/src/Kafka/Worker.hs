@@ -27,16 +27,9 @@ module Kafka.Worker
     Internal.PartitionOffset (..),
     Partition.SeekCmd (..),
     Internal.CommitToKafkaAsWell (..),
-
-    -- * Stats
-    Stats.StatsCallback,
-    Stats.Stats (..),
-    Stats.Rtt (..),
-    Stats.allStats,
   )
 where
 
-import qualified Kafka.Stats as Stats
 import qualified Kafka.Worker.Internal as Internal
 import qualified Kafka.Worker.Partition as Partition
 import qualified Kafka.Worker.Settings as Settings
