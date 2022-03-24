@@ -9,7 +9,6 @@ import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TVar as TVar
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
-import Data.ByteString (ByteString)
 import qualified Data.UUID
 import qualified Data.UUID.V4
 import qualified Dict
@@ -72,7 +71,10 @@ data PartitionOffset = PartitionOffset
 
 type StatsCallback = (Stats -> Task Text ())
 
-data Stats = Stats {rtt :: Rtt}
+newtype Stats = Stats {rtt :: Rtt}
+  deriving (Generic)
+
+instance Aeson.FromJSON Stats
 
 data Rtt = Rtt
   { min :: Int,
@@ -90,6 +92,9 @@ data Rtt = Rtt
     hdrsize :: Int,
     cnt :: Int
   }
+  deriving (Generic)
+
+instance Aeson.FromJSON Rtt
 
 -- TODO add aeson instances
 -- TODO move to shared location to use in both worker and producer
@@ -304,8 +309,12 @@ createConsumer
                 Consumer.setCallback
                   ( Consumer.statsCallback <| \content -> do
                       log <- Platform.silentHandler
-                      _ <- Task.attempt log (statsCallback content)
-                      Prelude.pure ()
+                      case Aeson.decodeStrict content of
+                        Nothing ->
+                          Prelude.pure ()
+                        Just stats -> do
+                          _ <- Task.attempt log (statsCallback stats)
+                          Prelude.pure ()
                   )
     let subscription' =
           Consumer.topics [Consumer.TopicName (Kafka.unTopic topic)]
