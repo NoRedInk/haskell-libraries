@@ -27,6 +27,7 @@ module Kafka.Worker
     Internal.PartitionOffset (..),
     Partition.SeekCmd (..),
     Internal.CommitToKafkaAsWell (..),
+    Internal.StatsCallback,
   )
 where
 
