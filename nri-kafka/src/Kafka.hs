@@ -11,6 +11,7 @@ module Kafka
     Settings.Settings,
     Settings.decoder,
     handler,
+    Internal.StatsCallback,
 
     -- * Creating messages
     Internal.Msg,
@@ -155,9 +156,9 @@ key msg = Maybe.map Internal.unKey (Internal.key msg)
 -- | Function for creating a Kafka handler.
 --
 -- See 'Kafka.Settings' for potential customizations.
-handler :: Settings.Settings -> Conduit.Acquire Internal.Handler
-handler settings = do
-  producer <- Conduit.mkAcquire (mkProducer settings) Producer.closeProducer
+handler :: Settings.Settings -> Maybe Internal.StatsCallback -> Conduit.Acquire Internal.Handler
+handler settings maybeStatsCallback = do
+  producer <- Conduit.mkAcquire (mkProducer settings maybeStatsCallback) Producer.closeProducer
   _ <- Conduit.mkAcquire (startPollEventLoop producer) (\terminator -> STM.atomically (TMVar.putTMVar terminator Terminate))
   liftIO (mkHandler settings producer)
 
@@ -215,8 +216,8 @@ doSTM doAnything stm =
     |> map Ok
     |> Platform.doAnything doAnything
 
-mkProducer :: Settings.Settings -> Prelude.IO Producer.KafkaProducer
-mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages} = do
+mkProducer :: Settings.Settings -> Maybe Internal.StatsCallback -> Prelude.IO Producer.KafkaProducer
+mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages} maybeStatsCallback = do
   let properties =
         Producer.brokersList brokerAddresses
           ++ Producer.sendTimeout deliveryTimeout
@@ -235,6 +236,15 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
                   ("acks", "all")
                 ]
             )
+          ++ case maybeStatsCallback of
+            Nothing -> Prelude.mempty
+            Just statsCallback ->
+              Producer.setCallback
+                ( Producer.statsCallback <| \content -> do
+                    log <- Platform.silentHandler
+                    _ <- Task.attempt log (statsCallback content)
+                    Prelude.pure ()
+                )
   eitherProducer <- Producer.newProducer properties
   case eitherProducer of
     Prelude.Left err ->

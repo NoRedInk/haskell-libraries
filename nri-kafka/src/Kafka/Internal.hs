@@ -4,6 +4,7 @@ module Kafka.Internal where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
+import Data.ByteString (ByteString)
 import qualified Kafka.Producer as Producer
 import qualified Prelude
 
@@ -81,3 +82,5 @@ instance Aeson.ToJSON MetaData
 instance Aeson.FromJSON MetaData
 
 newtype Offset = Offset Int
+
+type StatsCallback = (ByteString -> Task Text ())
