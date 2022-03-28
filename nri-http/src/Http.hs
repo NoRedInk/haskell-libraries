@@ -343,7 +343,7 @@ prepareManagerForRequest manager = do
               |> (\showS -> Text.fromList (showS ""))
        in Platform.tracingSpanIO
             log
-            "Outoing HTTP Request"
+            "Outgoing HTTP Request"
             ( \log' ->
                 Exception.finally
                   io
