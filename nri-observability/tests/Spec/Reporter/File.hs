@@ -102,7 +102,7 @@ tests =
                 |> Just
           },
       logTest
-        "logs information about an outoing http request"
+        "logs information about an outgoing http request"
         emptyTracingSpan
           { Platform.details =
               HttpRequest.emptyDetails

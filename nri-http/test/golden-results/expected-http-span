@@ -21,7 +21,7 @@ TracingSpan
   , allocated = 0
   , children =
       [ TracingSpan
-          { name = "Outoing HTTP Request"
+          { name = "Outgoing HTTP Request"
           , started = MonotonicTime { inMicroseconds = 0 }
           , finished = MonotonicTime { inMicroseconds = 0 }
           , frame =
