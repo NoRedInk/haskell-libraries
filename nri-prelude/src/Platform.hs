@@ -18,6 +18,7 @@ module Platform
     Internal.tracingSpan,
     Internal.tracingSpanIO,
     Internal.rootTracingSpanIO,
+    Internal.eventedLogHandlerIO,
     Internal.setTracingSpanDetails,
     Internal.setTracingSpanDetailsIO,
     Internal.setTracingSpanSummary,

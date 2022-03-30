@@ -563,6 +563,40 @@ data LogHandler = LogHandler
 -- internal use in this library only and not for exposing. Outside of this
 -- library the @rootTracingSpanIO@ is the more user-friendly way to get hands
 -- on a @LogHandler@.
+mkEventHandler ::
+  Stack.HasCallStack =>
+  Text ->
+  Clock ->
+  (TracingSpan -> IO ()) ->
+  Text ->
+  IO LogHandler
+mkEventHandler requestId clock onFinish name' = do
+  tracingSpanRef <-
+    Stack.withFrozenCallStack startTracingSpan clock name'
+      |> andThen IORef.newIORef
+  pure
+    LogHandler
+      { requestId,
+        startChildTracingSpan = mkHandler requestId clock onFinish,
+        setTracingSpanDetailsIO = \details' ->
+          updateIORef
+            tracingSpanRef
+            (\tracingSpan' -> tracingSpan' {details = Just (toTracingSpanDetails details')}),
+        setTracingSpanSummaryIO = \text ->
+          updateIORef
+            tracingSpanRef
+            (\tracingSpan' -> tracingSpan' {summary = Just text}),
+        markTracingSpanFailedIO =
+          updateIORef
+            tracingSpanRef
+            (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed}),
+        finishTracingSpan = \_ -> pure ()
+      }
+
+-- | Helper that creates one of the handler's above. This is intended for
+-- internal use in this library only and not for exposing. Outside of this
+-- library the @rootTracingSpanIO@ is the more user-friendly way to get hands
+-- on a @LogHandler@.
 mkHandler ::
   Stack.HasCallStack =>
   Text ->
@@ -778,6 +812,14 @@ rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError
     (Stack.withFrozenCallStack mkHandler requestId clock' (onFinish >> reportSafely) name)
+    (Prelude.flip finishTracingSpan)
+    runIO
+
+eventedLogHandlerIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Text -> (LogHandler -> IO a) -> IO a
+eventedLogHandlerIO requestId onFinish name runIO = do
+  clock' <- mkClock
+  Exception.bracketWithError
+    (Stack.withFrozenCallStack mkEventHandler requestId clock' (onFinish >> reportSafely) name)
     (Prelude.flip finishTracingSpan)
     runIO
 
