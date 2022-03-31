@@ -31,8 +31,8 @@ writeSpanToDevLog span = do
           fileStatus <- Files.getFileStatus logFile
           let fileMode = Files.fileMode fileStatus
           let fileAccessModes = Files.intersectFileModes fileMode Files.accessModes
-          Control.Monad.unless (fileAccessModes == Files.stdFileMode) <|
-            Files.setFileMode logFile Files.stdFileMode
+          Control.Monad.unless (fileAccessModes == Files.stdFileMode)
+            <| Files.setFileMode logFile Files.stdFileMode
           Data.ByteString.Lazy.hPut handle (Aeson.encode (now, span))
           Data.ByteString.Lazy.hPut handle "\n"
       )
