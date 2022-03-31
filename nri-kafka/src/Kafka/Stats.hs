@@ -27,7 +27,7 @@ data Stats = Stats
     time :: Int,
     brokers :: Dict Text Broker
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Aeson.FromJSON Stats
 
@@ -35,7 +35,7 @@ data Broker = Broker
   { brokerName :: Text,
     brokerRtt :: Rtt
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Aeson.FromJSON Broker where
   parseJSON = Aeson.genericParseJSON (removePrefix "broker")
@@ -65,7 +65,7 @@ data Rtt = Rtt
     hdrsize :: Int,
     cnt :: Int
   }
-  deriving (Generic)
+  deriving (Generic, Show)
 
 instance Aeson.FromJSON Rtt
 
