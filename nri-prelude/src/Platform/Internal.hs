@@ -766,6 +766,14 @@ tracingSpan name (Task run) =
           run
     )
 
+-- | Run a task in a tracingSpan replacing its parent.
+--
+-- > newRoot "No need for my parent" <| do
+-- >   whateverHappensInHere
+-- >   itWillHappen asIfMyParentDid it
+--
+-- This can help in flushing logs; by replacing the parent span, we also
+-- "inherit" its finalization point
 newRoot :: Stack.HasCallStack => Text -> Task e a -> Task e a
 newRoot name (Task run) =
   Task
@@ -791,6 +799,13 @@ tracingSpanIO handler name run =
     (Prelude.flip finishTracingSpan)
     run
 
+-- | Like @tracingSpan@, but this one runs in @IO@ instead of @Task@. We
+-- sometimes need this in libraries. @Task@ has the concept of a @LogHandler@
+-- built in but @IO@ does not, so we'll have to pass it around ourselves.
+--
+-- > tracingSpanIO handler "code dance" <| \childHandler -> do
+-- >   waltzPassLeft childHandler
+-- >   clockwiseTurn childHandler 60
 newRootIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 newRootIO handler name run = do
   Exception.bracketWithError
