@@ -581,7 +581,14 @@ mkHandler requestId clock onFinish name' = do
     LogHandler
       { requestId,
         startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef),
-        replaceParentWithChild = mkHandler requestId clock (replaceParent tracingSpanRef),
+        replaceParentWithChild =
+          mkHandler
+            requestId
+            clock
+            ( \span -> do
+                _ <- onFinish span
+                replaceParent tracingSpanRef span
+            ),
         setTracingSpanDetailsIO = \details' ->
           updateIORef
             tracingSpanRef
@@ -786,7 +793,6 @@ tracingSpanIO handler name run =
 
 newRootIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 newRootIO handler name run = do
-  finishTracingSpan handler Nothing
   Exception.bracketWithError
     (Stack.withFrozenCallStack (replaceParentWithChild handler name))
     (Prelude.flip finishTracingSpan)
