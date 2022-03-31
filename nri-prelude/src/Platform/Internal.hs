@@ -531,6 +531,8 @@ data LogHandler = LogHandler
     -- the information belongs to. This function creates a new handler for
     -- a child tracingSpan of the current handler.
     startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
+    -- | TODO
+    replaceParentWithChild :: Stack.HasCallStack => Text -> IO LogHandler,
     -- | There's common fields all tracingSpans have such as a name and
     -- start and finish times. On top of that each tracingSpan can define a
     -- custom type containing useful custom data. This function allows us
@@ -579,6 +581,7 @@ mkHandler requestId clock onFinish name' = do
     LogHandler
       { requestId,
         startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef),
+        replaceParentWithChild = mkHandler requestId clock (replaceParent tracingSpanRef),
         setTracingSpanDetailsIO = \details' ->
           updateIORef
             tracingSpanRef
@@ -726,6 +729,10 @@ appendTracingSpanToParent parentRef child =
     -- are ordered new-to-old.
     parentTracingSpan {children = child : children parentTracingSpan}
 
+replaceParent :: IORef.IORef TracingSpan -> TracingSpan -> IO ()
+replaceParent parentRef child =
+  updateIORef parentRef <| \_ -> child
+
 updateIORef :: IORef.IORef a -> (a -> a) -> IO ()
 updateIORef ref f = IORef.atomicModifyIORef' ref (\x -> (f x, ()))
 
@@ -752,6 +759,17 @@ tracingSpan name (Task run) =
           run
     )
 
+newRoot :: Stack.HasCallStack => Text -> Task e a -> Task e a
+newRoot name (Task run) =
+  Task
+    ( \handler ->
+        Stack.withFrozenCallStack
+          newRootIO
+          handler
+          name
+          run
+    )
+
 -- | Like @tracingSpan@, but this one runs in @IO@ instead of @Task@. We
 -- sometimes need this in libraries. @Task@ has the concept of a @LogHandler@
 -- built in but @IO@ does not, so we'll have to pass it around ourselves.
@@ -763,6 +781,14 @@ tracingSpanIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a
 tracingSpanIO handler name run =
   Exception.bracketWithError
     (Stack.withFrozenCallStack (startChildTracingSpan handler name))
+    (Prelude.flip finishTracingSpan)
+    run
+
+newRootIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
+newRootIO handler name run = do
+  finishTracingSpan handler Nothing
+  Exception.bracketWithError
+    (Stack.withFrozenCallStack (replaceParentWithChild handler name))
     (Prelude.flip finishTracingSpan)
     run
 

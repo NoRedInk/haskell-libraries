@@ -24,6 +24,8 @@ module Platform
     Internal.setTracingSpanSummaryIO,
     Internal.markTracingSpanFailed,
     Internal.markTracingSpanFailedIO,
+    Internal.newRoot,
+    Internal.newRootIO,
 
     -- * Interpreting tracingSpans for reporting to monitoring platforms
     Internal.TracingSpan,
