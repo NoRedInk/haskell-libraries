@@ -532,8 +532,13 @@ data LogHandler = LogHandler
     -- the information belongs to. This function creates a new handler for
     -- a child tracingSpan of the current handler.
     startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
-    -- | TODO
-    copyRoot :: Stack.HasCallStack => Text -> IO LogHandler,
+    -- | This allows creating a new `LogHandler` with the same behaviour as
+    -- the root of this LogHandler. Remember that every tracingSpan gets its
+    -- own handler, and that tracingSpans form a tree. Allowing a tracingSpan
+    -- which copies the behaviour of the root allows long-lived constructs to
+    -- treat its children as a new root. For example, a webserver could use
+    -- this to create a new tracingSpan for each request.
+    startNewRoot :: Stack.HasCallStack => Text -> IO LogHandler,
     -- | There's common fields all tracingSpans have such as a name and
     -- start and finish times. On top of that each tracingSpan can define a
     -- custom type containing useful custom data. This function allows us
@@ -586,7 +591,7 @@ mkHandler requestId clock onFinish onFinishRoot' name' = do
     LogHandler
       { requestId,
         startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
-        copyRoot = mkHandler requestId clock onFinishRoot Nothing,
+        startNewRoot = mkHandler requestId clock onFinishRoot Nothing,
         setTracingSpanDetailsIO = \details' ->
           updateIORef
             tracingSpanRef
@@ -803,7 +808,7 @@ tracingSpanIO handler name run =
 newRootIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 newRootIO handler name run = do
   Exception.bracketWithError
-    (Stack.withFrozenCallStack (copyRoot handler name))
+    (Stack.withFrozenCallStack (startNewRoot handler name))
     (Prelude.flip finishTracingSpan)
     run
 
