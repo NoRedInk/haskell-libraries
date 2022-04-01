@@ -35,14 +35,15 @@ tests =
         spans <-
           Expect.fromIO <| do
             (recordedTracingSpans, handler) <- newHandler
-            _ <- do
-              withContext "foo" [] <| info "logging a message!" [context "a number" (12 :: Int)]
-              Internal.newRoot "inner" <| info "logging a first 'inner' message" []
-              Internal.newRoot "inner" <| do
-                info "logging a second 'inner' message" []
-                info "logging a third 'inner' message" []
-              Task.succeed ()
-              |> Task.attempt handler
+            _ <-
+              do
+                withContext "foo" [] <| info "logging a message!" [context "a number" (12 :: Int)]
+                Internal.newRoot "inner" <| info "logging a first 'inner' message" []
+                Internal.newRoot "inner" <| do
+                  info "logging a second 'inner' message" []
+                  info "logging a third 'inner' message" []
+                Task.succeed ()
+                |> Task.attempt handler
             recordedTracingSpans
         spans
           |> Debug.toString
