@@ -24,6 +24,7 @@ import Internal.Shortcut (andThen, map)
 import qualified Internal.Shortcut as Shortcut
 import qualified List
 import Maybe (Maybe (..))
+import qualified Maybe
 import Result (Result (Err, Ok))
 import qualified System.Mem
 import qualified System.Mem as Mem
@@ -532,7 +533,7 @@ data LogHandler = LogHandler
     -- a child tracingSpan of the current handler.
     startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
     -- | TODO
-    replaceParentWithChild :: Stack.HasCallStack => Text -> IO LogHandler,
+    copyRoot :: Stack.HasCallStack => Text -> IO LogHandler,
     -- | There's common fields all tracingSpans have such as a name and
     -- start and finish times. On top of that each tracingSpan can define a
     -- custom type containing useful custom data. This function allows us
@@ -569,10 +570,14 @@ mkHandler ::
   Stack.HasCallStack =>
   Text ->
   Clock ->
+  -- Finalizer for this loghandler
   (TracingSpan -> IO ()) ->
+  -- Root finalizer
+  Maybe (TracingSpan -> IO ()) ->
   Text ->
   IO LogHandler
-mkHandler requestId clock onFinish name' = do
+mkHandler requestId clock onFinish onFinishRoot' name' = do
+  let onFinishRoot = Maybe.withDefault onFinish onFinishRoot'
   tracingSpanRef <-
     Stack.withFrozenCallStack startTracingSpan clock name'
       |> andThen IORef.newIORef
@@ -580,15 +585,8 @@ mkHandler requestId clock onFinish name' = do
   pure
     LogHandler
       { requestId,
-        startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef),
-        replaceParentWithChild =
-          mkHandler
-            requestId
-            clock
-            ( \span -> do
-                _ <- onFinish span
-                replaceParent tracingSpanRef span
-            ),
+        startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
+        copyRoot = mkHandler requestId clock onFinishRoot Nothing,
         setTracingSpanDetailsIO = \details' ->
           updateIORef
             tracingSpanRef
@@ -736,10 +734,6 @@ appendTracingSpanToParent parentRef child =
     -- are ordered new-to-old.
     parentTracingSpan {children = child : children parentTracingSpan}
 
-replaceParent :: IORef.IORef TracingSpan -> TracingSpan -> IO ()
-replaceParent parentRef child =
-  updateIORef parentRef <| \_ -> child
-
 updateIORef :: IORef.IORef a -> (a -> a) -> IO ()
 updateIORef ref f = IORef.atomicModifyIORef' ref (\x -> (f x, ()))
 
@@ -809,7 +803,7 @@ tracingSpanIO handler name run =
 newRootIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 newRootIO handler name run = do
   Exception.bracketWithError
-    (Stack.withFrozenCallStack (replaceParentWithChild handler name))
+    (Stack.withFrozenCallStack (copyRoot handler name))
     (Prelude.flip finishTracingSpan)
     run
 
@@ -824,7 +818,7 @@ rootTracingSpanIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Tex
 rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError
-    (Stack.withFrozenCallStack mkHandler requestId clock' (onFinish >> reportSafely) name)
+    (Stack.withFrozenCallStack mkHandler requestId clock' (onFinish >> reportSafely) Nothing name)
     (Prelude.flip finishTracingSpan)
     runIO
 
