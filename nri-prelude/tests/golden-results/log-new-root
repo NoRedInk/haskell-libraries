@@ -9,10 +9,10 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 40
-              , srcLocStartCol = 43
-              , srcLocEndLine = 40
-              , srcLocEndCol = 84
+              , srcLocStartLine = 173
+              , srcLocStartCol = 45
+              , srcLocEndLine = 173
+              , srcLocEndCol = 86
               }
           )
     , details = Just "{\"level\":\"Info\"}"
@@ -32,10 +32,10 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 43
-              , srcLocStartCol = 17
-              , srcLocEndLine = 43
-              , srcLocEndCol = 58
+              , srcLocStartLine = 176
+              , srcLocStartCol = 19
+              , srcLocEndLine = 176
+              , srcLocEndCol = 60
               }
           )
     , details = Just "{\"level\":\"Info\"}"
@@ -55,10 +55,10 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 42
-              , srcLocStartCol = 17
-              , srcLocEndLine = 42
-              , srcLocEndCol = 59
+              , srcLocStartLine = 175
+              , srcLocStartCol = 19
+              , srcLocEndLine = 175
+              , srcLocEndCol = 61
               }
           )
     , details = Just "{\"level\":\"Info\"}"
@@ -78,10 +78,10 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 39
-              , srcLocStartCol = 15
-              , srcLocEndLine = 39
-              , srcLocEndCol = 35
+              , srcLocStartLine = 172
+              , srcLocStartCol = 17
+              , srcLocEndLine = 172
+              , srcLocEndCol = 37
               }
           )
     , details = Just "{}"
@@ -100,10 +100,10 @@
                       { srcLocPackage = "main"
                       , srcLocModule = "LogSpec"
                       , srcLocFile = "tests/LogSpec.hs"
-                      , srcLocStartLine = 39
-                      , srcLocStartCol = 39
-                      , srcLocEndLine = 39
-                      , srcLocEndCol = 97
+                      , srcLocStartLine = 172
+                      , srcLocStartCol = 41
+                      , srcLocEndLine = 172
+                      , srcLocEndCol = 99
                       }
                   )
             , details = Just "{\"level\":\"Info\",\"a number\":12}"
