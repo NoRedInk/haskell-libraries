@@ -31,6 +31,22 @@ tests =
         spans
           |> Debug.toString
           |> Expect.equalToContentsOf "tests/golden-results/log-info",
+      test "`info` with `newRoot` produces expected debugging info" <| \_ -> do
+        spans <-
+          Expect.fromIO <| do
+            (recordedTracingSpans, handler) <- newHandler
+            _ <- do
+              withContext "foo" [] <| info "logging a message!" [context "a number" (12 :: Int)]
+              Internal.newRoot "inner" <| info "logging a first 'inner' message" []
+              Internal.newRoot "inner" <| do
+                info "logging a second 'inner' message" []
+                info "logging a third 'inner' message" []
+              Task.succeed ()
+              |> Task.attempt handler
+            recordedTracingSpans
+        spans
+          |> Debug.toString
+          |> Expect.equalToContentsOf "tests/golden-results/log-new-root",
       test "`debug` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -177,7 +193,8 @@ newHandler = do
       Internal.mkHandler
       ""
       (Internal.Clock (Prelude.pure 0))
-      (IORef.writeIORef recordedTracingSpans << Internal.children)
+      (\span -> IORef.modifyIORef recordedTracingSpans (\cs -> cs ++ Internal.children span))
+      Nothing
       ""
   Prelude.pure
     ( do

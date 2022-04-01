@@ -9,9 +9,9 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 80
+              , srcLocStartLine = 96
               , srcLocStartCol = 20
-              , srcLocEndLine = 80
+              , srcLocEndLine = 96
               , srcLocEndCol = 76
               }
           )
@@ -31,9 +31,9 @@
                       { srcLocPackage = "main"
                       , srcLocModule = "LogSpec"
                       , srcLocFile = "tests/LogSpec.hs"
-                      , srcLocStartLine = 79
+                      , srcLocStartLine = 95
                       , srcLocStartCol = 20
-                      , srcLocEndLine = 79
+                      , srcLocEndLine = 95
                       , srcLocEndCol = 84
                       }
                   )
@@ -53,9 +53,9 @@
                               { srcLocPackage = "main"
                               , srcLocModule = "LogSpec"
                               , srcLocFile = "tests/LogSpec.hs"
-                              , srcLocStartLine = 78
+                              , srcLocStartLine = 94
                               , srcLocStartCol = 15
-                              , srcLocEndLine = 78
+                              , srcLocEndLine = 94
                               , srcLocEndCol = 29
                               }
                           )

@@ -9,9 +9,9 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 39
+              , srcLocStartLine = 55
               , srcLocStartCol = 15
-              , srcLocEndLine = 41
+              , srcLocEndLine = 57
               , srcLocEndCol = 53
               }
           )
