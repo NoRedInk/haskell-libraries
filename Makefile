@@ -41,7 +41,7 @@ ghcid-nri-observability-test: nri-observability/nri-observability.cabal
 nri-prelude/nri-prelude.cabal: nri-prelude/package.yaml
 	hpack nri-prelude
 
-ghcid-nri-prelude-test: nri-prelude-test/nri-prelude-test.cabal
+ghcid-nri-prelude-test: nri-prelude/nri-prelude.cabal
 	cd nri-prelude && ghcid --command "cabal repl nri-prelude:test:tests" --test Main.main
 
 ghcid-nri-prelude: nri-prelude/nri-prelude.cabal

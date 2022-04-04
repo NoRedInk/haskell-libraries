@@ -24,6 +24,7 @@ import Internal.Shortcut (andThen, map)
 import qualified Internal.Shortcut as Shortcut
 import qualified List
 import Maybe (Maybe (..))
+import qualified Maybe
 import Result (Result (Err, Ok))
 import qualified System.Mem
 import qualified System.Mem as Mem
@@ -531,6 +532,13 @@ data LogHandler = LogHandler
     -- the information belongs to. This function creates a new handler for
     -- a child tracingSpan of the current handler.
     startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
+    -- | This allows creating a new `LogHandler` with the same behaviour as
+    -- the root of this LogHandler. Remember that every tracingSpan gets its
+    -- own handler, and that tracingSpans form a tree. Allowing a tracingSpan
+    -- which copies the behaviour of the root allows long-lived constructs to
+    -- treat its children as a new root. For example, a webserver could use
+    -- this to create a new tracingSpan for each request.
+    startNewRoot :: Stack.HasCallStack => Text -> IO LogHandler,
     -- | There's common fields all tracingSpans have such as a name and
     -- start and finish times. On top of that each tracingSpan can define a
     -- custom type containing useful custom data. This function allows us
@@ -567,10 +575,14 @@ mkHandler ::
   Stack.HasCallStack =>
   Text ->
   Clock ->
+  -- Finalizer for this loghandler
   (TracingSpan -> IO ()) ->
+  -- Root finalizer
+  Maybe (TracingSpan -> IO ()) ->
   Text ->
   IO LogHandler
-mkHandler requestId clock onFinish name' = do
+mkHandler requestId clock onFinish onFinishRoot' name' = do
+  let onFinishRoot = Maybe.withDefault onFinish onFinishRoot'
   tracingSpanRef <-
     Stack.withFrozenCallStack startTracingSpan clock name'
       |> andThen IORef.newIORef
@@ -578,7 +590,8 @@ mkHandler requestId clock onFinish name' = do
   pure
     LogHandler
       { requestId,
-        startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef),
+        startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
+        startNewRoot = mkHandler requestId clock onFinishRoot Nothing,
         setTracingSpanDetailsIO = \details' ->
           updateIORef
             tracingSpanRef
@@ -752,6 +765,25 @@ tracingSpan name (Task run) =
           run
     )
 
+-- | Run a task in a tracingSpan forking the root tracingSpan
+--
+-- > newRoot "No need for my parent" <| do
+-- >   whateverHappensInHere
+-- >   itWillHappen asIfMyParentDid it
+--
+-- This can help in flushing logs; by replacing the parent span, we also
+-- "inherit" its finalization point
+newRoot :: Stack.HasCallStack => Text -> Task e a -> Task e a
+newRoot name (Task run) =
+  Task
+    ( \handler ->
+        Stack.withFrozenCallStack
+          newRootIO
+          handler
+          name
+          run
+    )
+
 -- | Like @tracingSpan@, but this one runs in @IO@ instead of @Task@. We
 -- sometimes need this in libraries. @Task@ has the concept of a @LogHandler@
 -- built in but @IO@ does not, so we'll have to pass it around ourselves.
@@ -766,6 +798,20 @@ tracingSpanIO handler name run =
     (Prelude.flip finishTracingSpan)
     run
 
+-- | Like @newRoot@, but this one runs in @IO@ instead of @Task@. We
+-- sometimes need this in libraries. @Task@ has the concept of a @LogHandler@
+-- built in but @IO@ does not, so we'll have to pass it around ourselves.
+--
+-- > newRootIO handler "code dance" <| \childHandler -> do
+-- >   waltzPassLeft childHandler
+-- >   clockwiseTurn childHandler 60
+newRootIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
+newRootIO handler name run = do
+  Exception.bracketWithError
+    (Stack.withFrozenCallStack (startNewRoot handler name))
+    (Prelude.flip finishTracingSpan)
+    run
+
 -- | Special version of @tracingSpanIO@ to call in the root of your application.
 -- Instead of taking a parent handler it takes a continuation that will be
 -- called with this root tracingSpan after it has run.
@@ -777,7 +823,7 @@ rootTracingSpanIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Tex
 rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError
-    (Stack.withFrozenCallStack mkHandler requestId clock' (onFinish >> reportSafely) name)
+    (Stack.withFrozenCallStack mkHandler requestId clock' (onFinish >> reportSafely) Nothing name)
     (Prelude.flip finishTracingSpan)
     runIO
 
