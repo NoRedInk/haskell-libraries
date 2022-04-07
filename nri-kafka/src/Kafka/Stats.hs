@@ -1,4 +1,5 @@
 -- | Kafka is a module for _writing_ to Kafka
+-- See https://github.com/edenhill/librdkafka/blob/0261c86228e910cc84c4c7ab74e563c121f50696/STATISTICS.md
 --
 -- See Kafka.Worker for the basic building blocks of a CLI app that will poll &
 -- process kafka messages
@@ -18,28 +19,6 @@ import qualified Set
 
 type StatsCallback = (Stats -> Task Text ())
 
--- | See https://github.com/edenhill/librdkafka/blob/0261c86228e910cc84c4c7ab74e563c121f50696/STATISTICS.md
-data Stats = Stats
-  { name :: Text,
-    client_id :: Text,
-    type_ :: Text,
-    ts :: Int,
-    time :: Int,
-    brokers :: Dict Text Broker
-  }
-  deriving (Generic, Show)
-
-instance Aeson.FromJSON Stats
-
-data Broker = Broker
-  { brokerName :: Text,
-    brokerRtt :: Rtt
-  }
-  deriving (Generic, Show)
-
-instance Aeson.FromJSON Broker where
-  parseJSON = Aeson.genericParseJSON (removePrefix "broker")
-
 removePrefix :: Text -> Aeson.Options
 removePrefix prefix =
   Aeson.defaultOptions
@@ -48,26 +27,6 @@ removePrefix prefix =
           << (if Text.isEmpty prefix then identity else Text.replace prefix "")
           << Text.fromList
     }
-
-data Rtt = Rtt
-  { min :: Int,
-    max :: Int,
-    avg :: Int,
-    sum :: Int,
-    stddev :: Int,
-    p50 :: Int,
-    p75 :: Int,
-    p90 :: Int,
-    p95 :: Int,
-    p99 :: Int,
-    p99_99 :: Int,
-    outofrange :: Int,
-    hdrsize :: Int,
-    cnt :: Int
-  }
-  deriving (Generic, Show)
-
-instance Aeson.FromJSON Rtt
 
 allStats :: Set Text
 allStats =
@@ -93,3 +52,11 @@ allStats =
       "brokers.rtt.hdrsize",
       "brokers.rtt.cnt"
     ]
+
+-- | Currengly suggested strucure
+data Value = IntValue Int | TextValue Text | BoolValue Bool
+type Stats = Dict Key Value
+data Key = Key (List Text)
+
+-- | Type exposed for clients
+-- TODO statsDict :: Text Aeson.Value
