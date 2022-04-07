@@ -243,8 +243,7 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
               Producer.setCallback
                 ( Producer.statsCallback <| \content ->
                     case Aeson.decodeStrict content of
-                      Nothing -> let _ = Debug.log "kafka stats content" content
-                                 in Debug.todo "decoding broke"
+                      Nothing -> Debug.todo <| Data.Text.Encoding.decodeUtf8 content
                       Just stats -> do
                         log <- Platform.silentHandler
                         _ <- Task.attempt log (statsCallback stats)
