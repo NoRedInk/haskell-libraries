@@ -10,11 +10,10 @@ in pkgs.mkShell {
   buildInputs = [
     (haskellPackages.ghcWithPackages (haskellPackages:
       with haskellPackages; [
-        aeson_2_0_1_0
-        aeson_2_0_1_0
+        aeson
         semialign_1_2_0_1
         time-compat_1_9_6_1
-        postgresql-binary_0_12_4_2
+        postgresql-binary
         aeson-pretty
         async
         auto-update

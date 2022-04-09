@@ -1,14 +1,12 @@
 let
   sources = import ./nix/sources.nix { };
 
-  pkgs = import sources.nixpkgs { };
+  pkgs = import sources.nixpkgs-unstable { };
 in import nix/mk-shell.nix {
   pkgs = pkgs;
   haskellPackages = pkgs.haskell.packages.ghc8107.extend (self: super: {
-    aeson = super.aeson_2_0_1_0;
     semialign = super.semialign_1_2_0_1;
     time-compat = super.time-compat_1_9_6_1;
-    postgresql-binary = super.postgresql-binary_0_12_4_2;
     hashable-time = super.hashable-time_0_3;
     hashable = super.callHackageDirect {
       pkg = "hashable";
