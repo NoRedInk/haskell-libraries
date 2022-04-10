@@ -427,8 +427,12 @@ toBatchEvents span =
 
 encodesTo :: Text -> [Honeycomb.BatchEvent] -> Expect.Expectation
 encodesTo filename events =
-  events
-    |> Data.Aeson.Encode.Pretty.encodePretty
-    |> Data.ByteString.Lazy.toStrict
-    |> Data.Text.Encoding.decodeUtf8
-    |> Expect.equalToContentsOf ("test/golden-results/" ++ filename ++ ".json")
+  let config =
+        Data.Aeson.Encode.Pretty.defConfig
+          { Data.Aeson.Encode.Pretty.confCompare = Data.Aeson.Encode.Pretty.compare
+          }
+   in events
+        |> Data.Aeson.Encode.Pretty.encodePretty' config
+        |> Data.ByteString.Lazy.toStrict
+        |> Data.Text.Encoding.decodeUtf8
+        |> Expect.equalToContentsOf ("test/golden-results/" ++ filename ++ ".json")

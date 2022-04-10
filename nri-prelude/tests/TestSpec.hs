@@ -404,9 +404,12 @@ logfileReporter =
 
 writeSpan :: System.IO.Handle -> Platform.Internal.TracingSpan -> Prelude.IO ()
 writeSpan handle span =
-  do
-    Data.Aeson.Encode.Pretty.encodePretty span
-    |> Data.ByteString.Lazy.hPut handle
+  let config =
+        Data.Aeson.Encode.Pretty.defConfig
+          { Data.Aeson.Encode.Pretty.confCompare = Data.Aeson.Encode.Pretty.compare
+          }
+   in Data.Aeson.Encode.Pretty.encodePretty' config span
+        |> Data.ByteString.Lazy.hPut handle
 
 -- | Provide a temporary file for a test to do some work in, then return the
 -- contents of the file when the test is done with it.

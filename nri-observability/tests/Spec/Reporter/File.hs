@@ -157,13 +157,17 @@ logTest name span =
 
 reEncodePretty :: Data.ByteString.Lazy.ByteString -> Result Text Text
 reEncodePretty str =
-  case Aeson.eitherDecode' str of
-    Prelude.Left err -> Err (Text.fromList err)
-    Prelude.Right (json :: Aeson.Value) ->
-      Data.Aeson.Encode.Pretty.encodePretty json
-        |> Data.Text.Lazy.Encoding.decodeUtf8
-        |> Data.Text.Lazy.toStrict
-        |> Ok
+  let config =
+        Data.Aeson.Encode.Pretty.defConfig
+          { Data.Aeson.Encode.Pretty.confCompare = Data.Aeson.Encode.Pretty.compare
+          }
+   in case Aeson.eitherDecode' str of
+        Prelude.Left err -> Err (Text.fromList err)
+        Prelude.Right (json :: Aeson.Value) ->
+          Data.Aeson.Encode.Pretty.encodePretty' config json
+            |> Data.Text.Lazy.Encoding.decodeUtf8
+            |> Data.Text.Lazy.toStrict
+            |> Ok
 
 newtype CustomException = CustomException Text deriving (Show)
 
