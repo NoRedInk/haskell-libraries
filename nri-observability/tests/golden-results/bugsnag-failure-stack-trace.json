@@ -1,59 +1,59 @@
 {
-    "exceptions": [
-        {
-            "stacktrace": [
-                {
-                    "inProject": true,
-                    "lineNumber": 20,
-                    "method": "function3",
-                    "columnNumber": 21,
-                    "file": "Filename3.hs"
-                },
-                {
-                    "inProject": true,
-                    "lineNumber": 0,
-                    "method": "function1",
-                    "columnNumber": 1,
-                    "file": "Filename1.hs"
-                }
-            ],
-            "errorClass": "some span"
-        }
-    ],
     "breadcrumbs": [
         {
-            "name": "Starting: some span",
             "metaData": {
                 "duration in milliseconds": "0.0",
                 "stack frame": "Filename1.hs:0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "name": "Starting: some span",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
         },
         {
-            "name": "some span",
             "metaData": {
                 "duration in milliseconds": "0.0",
                 "stack frame": "Filename5.hs:40"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "name": "some span",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
         },
         {
-            "name": "some span",
             "metaData": {
                 "duration in milliseconds": "0.0",
                 "stack frame": "Filename4.hs:30"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "name": "some span",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        }
+    ],
+    "exceptions": [
+        {
+            "errorClass": "some span",
+            "stacktrace": [
+                {
+                    "columnNumber": 21,
+                    "file": "Filename3.hs",
+                    "inProject": true,
+                    "lineNumber": 20,
+                    "method": "function3"
+                },
+                {
+                    "columnNumber": 1,
+                    "file": "Filename1.hs",
+                    "inProject": true,
+                    "lineNumber": 0,
+                    "method": "function1"
+                }
+            ]
         }
     ],
     "metaData": {
         "request": {
+            "megabytes allocated": 0,
             "request id": "request-id-1234",
-            "response time in ms": 0,
-            "megabytes allocated": 0
+            "response time in ms": 0
         }
     },
     "unhandled": false

@@ -1,29 +1,29 @@
 {
+    "breadcrumbs": [],
+    "context": "GET /hats/:hat_id",
     "exceptions": [
         {
-            "stacktrace": [],
-            "errorClass": "some span"
+            "errorClass": "some span",
+            "stacktrace": []
         }
     ],
-    "context": "GET /hats/:hat_id",
-    "breadcrumbs": [],
     "metaData": {
         "request": {
-            "http version": "1",
-            "path": "/hats/5",
-            "request id": "request-id-1234",
-            "query string": "?top=flat",
-            "response status": 500,
-            "response time in ms": 0,
             "endpoint": "GET /hats/:hat_id",
-            "megabytes allocated": 0
+            "http version": "1",
+            "megabytes allocated": 0,
+            "path": "/hats/5",
+            "query string": "?top=flat",
+            "request id": "request-id-1234",
+            "response status": 500,
+            "response time in ms": 0
         }
     },
-    "unhandled": false,
     "request": {
-        "httpMethod": "GET",
         "headers": {
             "Accept": "application/json"
-        }
-    }
+        },
+        "httpMethod": "GET"
+    },
+    "unhandled": false
 }

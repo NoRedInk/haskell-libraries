@@ -1,23 +1,23 @@
 {
-    "hostname": "some-host",
+    "allocated_mb": 0.0,
+    "details": {
+        "database": "nri",
+        "database type": "PostgreSQL",
+        "host": "http://antsonline.com",
+        "port": 5432,
+        "queried relation": "ants",
+        "query": "Secret *****",
+        "query template": "SELECT name FROM ants WHERE id = ${id}",
+        "rows returned": 5,
+        "sql operation": "SELECT"
+    },
+    "duration_ms": 0.0,
     "env": "narnia",
+    "hostname": "some-host",
+    "name": "",
     "namespace": [
         "app"
     ],
-    "allocated_mb": 0.0,
-    "duration_ms": 0.0,
-    "name": "",
-    "details": {
-        "query template": "SELECT name FROM ants WHERE id = ${id}",
-        "rows returned": 5,
-        "queried relation": "ants",
-        "database": "nri",
-        "database type": "PostgreSQL",
-        "sql operation": "SELECT",
-        "query": "Secret *****",
-        "host": "http://antsonline.com",
-        "port": 5432
-    },
-    "start_utc": "1970-01-01T00:00:00Z",
-    "request-id": "request-id"
+    "request-id": "request-id",
+    "start_utc": "1970-01-01T00:00:00Z"
 }

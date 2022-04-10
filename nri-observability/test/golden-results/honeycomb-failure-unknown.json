@@ -1,45 +1,45 @@
 [
     {
-        "time": "1970-01-01T00:00:00Z",
         "data": {
-            "stats.count.measure_humidity": 1,
+            "allocated_bytes": 0,
+            "apdex": 1,
+            "duration_ms": 0,
+            "endpoint": "GET /hats/:hat_id",
+            "failed": true,
             "hostname": "some-service-oaiefiowh-aoidawi",
             "measure weather": "32 C",
-            "apdex": 1,
+            "name": "measure weather",
+            "revision": "gitref",
+            "service_name": "some service",
+            "source_location": null,
+            "stats.average_time_ms.measure_humidity": 0,
+            "stats.count.measure_humidity": 1,
             "stats.total_time_ms.measure_humidity": 0,
             "trace.parent_id": null,
             "trace.span_id": "request-id-123-0",
-            "trace.trace_id": "request-id-123",
-            "duration_ms": 0,
-            "name": "measure weather",
-            "stats.average_time_ms.measure_humidity": 0,
-            "source_location": null,
-            "allocated_bytes": 0,
-            "service_name": "some service",
-            "endpoint": "GET /hats/:hat_id",
-            "revision": "gitref",
-            "failed": true
+            "trace.trace_id": "request-id-123"
         },
-        "samplerate": 1
+        "samplerate": 1,
+        "time": "1970-01-01T00:00:00Z"
     },
     {
-        "time": "1970-01-01T00:00:00Z",
         "data": {
-            "hostname": "some-service-oaiefiowh-aoidawi",
+            "allocated_bytes": 0,
             "apdex": 1,
+            "duration_ms": 0,
+            "endpoint": "GET /hats/:hat_id",
+            "failed": true,
+            "hostname": "some-service-oaiefiowh-aoidawi",
+            "measure humidity": "25 %",
+            "name": "measure humidity",
+            "revision": "gitref",
+            "service_name": "some service",
+            "source_location": null,
             "trace.parent_id": "request-id-123-0",
             "trace.span_id": "request-id-123-1",
-            "trace.trace_id": "request-id-123",
-            "duration_ms": 0,
-            "name": "measure humidity",
-            "source_location": null,
-            "allocated_bytes": 0,
-            "service_name": "some service",
-            "endpoint": "GET /hats/:hat_id",
-            "revision": "gitref",
-            "failed": true,
-            "measure humidity": "25 %"
+            "trace.trace_id": "request-id-123"
         },
-        "samplerate": 1
+        "samplerate": 1,
+        "time": "1970-01-01T00:00:00Z"
     }
 ]
