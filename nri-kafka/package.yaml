@@ -72,3 +72,4 @@ ghc-options:
   - -Wincomplete-uni-patterns
   - -fno-warn-type-defaults
   - -fplugin=NriPrelude.Plugin
+  - -Wunused-packages

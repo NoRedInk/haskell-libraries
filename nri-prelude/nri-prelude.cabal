@@ -1,6 +1,6 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.34.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -82,10 +82,9 @@ library
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -Wunused-packages
   build-depends:
       aeson >=1.4.6.0 && <2.1
-    , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , auto-update >=0.1.6 && <0.2
     , base >=4.12.0.0 && <4.17
@@ -97,7 +96,6 @@ library
     , ghc >=8.6.1 && <9.3
     , hedgehog >=1.0.2 && <1.1
     , junit-xml >=0.1.0.0 && <0.2.0.0
-    , lens >=4.16.1 && <5.1
     , pretty-diff >=0.4.0.2 && <0.5
     , pretty-show >=1.9.5 && <1.11
     , safe-coloured-text >=0.1.0.0 && <0.2
@@ -175,7 +173,7 @@ test-suite tests
       Strict
       TypeOperators
       ExtendedDefaultRules
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -Wunused-packages -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
       aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9
@@ -190,7 +188,6 @@ test-suite tests
     , ghc >=8.6.1 && <9.3
     , hedgehog >=1.0.2 && <1.1
     , junit-xml >=0.1.0.0 && <0.2.0.0
-    , lens >=4.16.1 && <5.1
     , pretty-diff >=0.4.0.2 && <0.5
     , pretty-show >=1.9.5 && <1.11
     , safe-coloured-text >=0.1.0.0 && <0.2

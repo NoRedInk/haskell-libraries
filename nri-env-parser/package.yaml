@@ -45,4 +45,5 @@ ghc-options:
   - -Wpartial-fields
   - -Wredundant-constraints
   - -Wincomplete-uni-patterns
+  - -Wunused-packages
   - -fplugin=NriPrelude.Plugin

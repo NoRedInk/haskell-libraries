@@ -64,3 +64,4 @@ ghc-options:
   - -rtsopts "-with-rtsopts=-N -T -xq10m"
   - -O2
   - -fplugin=NriPrelude.Plugin
+  - -Wunused-packages

@@ -15,11 +15,8 @@ extra-doc-files:
   - CHANGELOG.md
 dependencies:
   - aeson >= 1.4.6.0 && < 2.1
-  - async >=2.2.2 && <2.3
   - base >= 4.12.0.0 && < 4.17
   - bytestring >= 0.10.8.2 && < 0.12
-  - conduit >= 1.3.0 && < 1.4
-  # hedis 14 introduces redis-cluster support
   - hedis >= 0.14.0 && < 0.16
   - nri-env-parser >= 0.1.0.0 && < 0.2
   - nri-observability >= 0.1.0 && < 0.2
@@ -28,7 +25,6 @@ dependencies:
   - safe-exceptions >= 0.1.7.0 && < 1.3
   - text >= 1.2.3.1 && < 2.1
   - unordered-containers >=0.2.0.0 && <0.3
-  - uuid >=1.3.0 && < 1.4
 library:
   exposed-modules:
     - NonEmptyDict
@@ -64,11 +60,14 @@ ghc-options:
   - -Wpartial-fields
   - -Wredundant-constraints
   - -Wincomplete-uni-patterns
+  - -Wunused-packages
   - -fno-warn-type-defaults
   - -fplugin=NriPrelude.Plugin
 tests:
   tests:
     main: Main.hs
+    dependencies:
+      - conduit >= 1.3.0 && < 1.4
     source-dirs:
       - test
       - src

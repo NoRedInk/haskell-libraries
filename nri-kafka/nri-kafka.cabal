@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.34.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -61,7 +61,7 @@ library
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -Wunused-packages
   build-depends:
       aeson >=1.4.6.0 && <2.1
     , async >=2.2.2 && <2.3
@@ -120,7 +120,7 @@ test-suite tests
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -Wunused-packages -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
       aeson >=1.4.6.0 && <2.1
     , async >=2.2.2 && <2.3
