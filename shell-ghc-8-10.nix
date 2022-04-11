@@ -5,18 +5,9 @@ let
 in import nix/mk-shell.nix {
   pkgs = pkgs;
   haskellPackages = pkgs.haskell.packages.ghc8107.extend (self: super: {
-    semialign = super.semialign_1_2_0_1;
-    time-compat = super.time-compat_1_9_6_1;
-    hashable-time = super.hashable-time_0_3;
-    hashable = super.callHackageDirect {
-      pkg = "hashable";
-      ver = "1.3.4.1";
-      sha256 = "13f2hy8jr519avnv9kg5hfx2n5s1l5d7786zfyj6w3ax77nsi8bm";
-    } { };
-    safe-coloured-text = super.callCabal2nix "safe-coloured-text"
-      "${sources.safe-coloured-text}/safe-coloured-text" { };
-    safe-coloured-text-terminfo =
-      super.callCabal2nix "safe-coloured-text-terminfo"
-      "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { };
+    # Default is 1.1.0.0 but servant-auth-server requires >=1.2.1.0
+    base64-bytestring = super.base64-bytestring_1_2_1_0;
+    # Skip broken tests
+    servant-auth-server = pkgs.haskell.lib.dontCheck super.servant-auth-server;
   });
 }
