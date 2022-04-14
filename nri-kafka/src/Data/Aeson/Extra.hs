@@ -56,7 +56,7 @@ decodeIntoFlatDict content =
             |> HM.foldlWithKey' (\acc' k -> objectToDict [] acc' (Key k)) Dict.empty
             |> Ok
         Aeson.Array arr -> Ok (arrayToDict [] Dict.empty arr)
-        _ -> Err "We can only parse top-level objects or arrays"
+        _ -> Ok (Dict.singleton [] value)
 
 objectToDict :: Path -> Dict Path Aeson.Value -> Segment -> Aeson.Value -> Dict Path Aeson.Value
 objectToDict path acc segment val =

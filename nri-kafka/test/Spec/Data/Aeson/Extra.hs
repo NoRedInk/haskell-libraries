@@ -69,7 +69,11 @@ decodeIntoFlatDictTest =
                       ([Index 2], Aeson.Number 3)
                     ]
                 )
-            )
+            ),
+      test "with top-level value" <| \() ->
+        "true"
+          |> decodeIntoFlatDict
+          |> Expect.equal (Ok (Dict.fromList [([], Aeson.Bool True)]))
     ]
 
 pathToTextTest :: Test
