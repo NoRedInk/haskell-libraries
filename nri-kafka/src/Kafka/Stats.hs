@@ -14,7 +14,7 @@ import qualified Dict
 import qualified Tuple
 import qualified Prelude
 
-type Stats = Dict Aeson.Extra.Path Metric
+type Stats = Dict Path Metric
 
 type StatsCallback = (Result Text Stats -> Task Text ())
 
