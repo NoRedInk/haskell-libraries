@@ -49,10 +49,10 @@ decodeIntoFlatDict :: ByteString -> Result Text (Dict Path Aeson.Value)
 decodeIntoFlatDict content =
   case Aeson.eitherDecodeStrict content of
     Left err -> Err (Text.fromList err)
-    Right value -> Ok (valueToDict [] Nothing value)
+    Right value -> Ok (valueToDict [] value Nothing)
 
-valueToDict :: Path -> Maybe Segment -> Aeson.Value -> Dict Path Aeson.Value
-valueToDict path maybeSegment val =
+valueToDict :: Path -> Aeson.Value -> Maybe Segment -> Dict Path Aeson.Value
+valueToDict path val maybeSegment =
   let newPath =
         case maybeSegment of
           Nothing -> path
@@ -62,7 +62,8 @@ valueToDict path maybeSegment val =
         Aeson.Object obj ->
           HM.foldlWithKey'
             ( \acc k v ->
-                valueToDict newPath (Just (Key k)) v
+                Just (Key k)
+                  |> valueToDict newPath v
                   |> Dict.union acc
             )
             Dict.empty
@@ -73,7 +74,9 @@ arrayToDict :: Path -> Aeson.Array -> Dict Path Aeson.Value
 arrayToDict path =
   Vector.ifoldl
     ( \acc index item ->
-        valueToDict path (Just (Index (Prelude.fromIntegral index))) item
+        Index (Prelude.fromIntegral index)
+          |> Just
+          |> valueToDict path item
           |> Dict.union acc
     )
     Dict.empty
