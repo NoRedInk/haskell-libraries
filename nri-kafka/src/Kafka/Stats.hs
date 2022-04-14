@@ -193,6 +193,7 @@ partitions =
       ("app_offset", IntGaugeType),
       ("stored_offset", IntGaugeType),
       ("committed_offset", IntGaugeType),
+      ("commited_offset", IntGaugeType),
       ("eof_offset", IntGaugeType),
       ("lo_offset", IntGaugeType),
       ("hi_offset", IntGaugeType),
