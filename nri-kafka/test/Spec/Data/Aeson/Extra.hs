@@ -1,7 +1,7 @@
 module Spec.Data.Aeson.Extra (tests) where
 
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Extra (decodeIntoFlatDict)
+import Data.Aeson.Extra (Segment (..), decodeIntoFlatDict)
 import qualified Dict
 import qualified Expect
 import Test
@@ -13,15 +13,15 @@ tests =
     [ test "simple object" <| \() ->
         "{\"foo\": 1}"
           |> decodeIntoFlatDict
-          |> Expect.equal (Ok (Dict.fromList [("foo", Aeson.Number 1)])),
+          |> Expect.equal (Ok (Dict.fromList [([Key "foo"], Aeson.Number 1)])),
       test "with nested object" <| \() ->
         "{\"foo\": 1, \"bar\": { \"moo\": \"cow\" }}"
           |> decodeIntoFlatDict
           |> Expect.equal
             ( Ok
                 ( Dict.fromList
-                    [ ("foo", Aeson.Number 1),
-                      ("bar.moo", Aeson.String "cow")
+                    [ ([Key "foo"], Aeson.Number 1),
+                      ([Key "bar", Key "moo"], Aeson.String "cow")
                     ]
                 )
             ),
@@ -31,9 +31,9 @@ tests =
           |> Expect.equal
             ( Ok
                 ( Dict.fromList
-                    [ ("foo", Aeson.Number 1),
-                      ("bar.moo", Aeson.String "cow"),
-                      ("bar.hello.world", Aeson.Bool True)
+                    [ ([Key "foo"], Aeson.Number 1),
+                      ([Key "bar", Key "moo"], Aeson.String "cow"),
+                      ([Key "bar", Key "hello", Key "world"], Aeson.Bool True)
                     ]
                 )
             ),
@@ -43,10 +43,10 @@ tests =
           |> Expect.equal
             ( Ok
                 ( Dict.fromList
-                    [ ("foo", Aeson.Number 1),
-                      ("bar[0]", Aeson.Number 1),
-                      ("bar[1]", Aeson.Number 2),
-                      ("bar[2]", Aeson.Number 3)
+                    [ ([Key "foo"], Aeson.Number 1),
+                      ([Key "bar", Index 0], Aeson.Number 1),
+                      ([Key "bar", Index 1], Aeson.Number 2),
+                      ([Key "bar", Index 2], Aeson.Number 3)
                     ]
                 )
             ),
@@ -56,9 +56,9 @@ tests =
           |> Expect.equal
             ( Ok
                 ( Dict.fromList
-                    [ ("[0]", Aeson.Number 1),
-                      ("[1]", Aeson.Number 2),
-                      ("[2]", Aeson.Number 3)
+                    [ ([Index 0], Aeson.Number 1),
+                      ([Index 1], Aeson.Number 2),
+                      ([Index 2], Aeson.Number 3)
                     ]
                 )
             )

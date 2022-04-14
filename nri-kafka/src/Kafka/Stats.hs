@@ -10,7 +10,7 @@ import qualified Data.Aeson.Extra as Aeson.Extra
 import Data.ByteString (ByteString)
 import Dict (Dict)
 
-type Stats = Dict Text Aeson.Value
+type Stats = Dict Aeson.Extra.Path Aeson.Value
 
 type StatsCallback = (Result Text Stats -> Task Text ())
 
