@@ -34,6 +34,7 @@ decode raw =
         |> Result.map Dict.fromList
 
 data Metric = StringMetric Text | IntMetric Int | IntGauge Int | BoolMetric Bool
+  deriving (Show)
 
 toMetric :: Path -> Aeson.Value -> Result Text Metric
 toMetric path value =
