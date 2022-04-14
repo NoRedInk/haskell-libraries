@@ -134,7 +134,9 @@ brokers =
       ("buf_grow", IntType),
       ("wakeups", IntType),
       ("connects", IntType),
-      ("disconnects", IntType)
+      ("disconnects", IntType),
+      -- This is an object that has custom entries. We are special casing it in metricTypeToMetric
+      ("req", IntType)
     ]
 
 windowStats :: Dict Text MetricType
