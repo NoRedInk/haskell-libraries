@@ -3,9 +3,10 @@
 --
 -- See Kafka.Worker for the basic building blocks of a CLI app that will poll &
 -- process kafka messages
-module Kafka.Stats (StatsCallback, Stats, decode) where
+module Kafka.Stats (StatsCallback, Stats, decode, Path, pathToText) where
 
 import qualified Data.Aeson as Aeson
+import Data.Aeson.Extra (Path, pathToText)
 import qualified Data.Aeson.Extra as Aeson.Extra
 import Data.ByteString (ByteString)
 import Dict (Dict)
