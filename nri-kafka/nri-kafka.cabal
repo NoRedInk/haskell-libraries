@@ -31,8 +31,10 @@ library
   exposed-modules:
       Kafka
       Kafka.Worker
+      Kafka.Stats
       Kafka.Test
   other-modules:
+      Data.Aeson.Extra
       Kafka.Internal
       Kafka.Settings
       Kafka.Settings.Internal
@@ -78,17 +80,21 @@ library
     , text >=1.2.3.1 && <2.1
     , time >=1.8.0.2 && <2
     , unix >=2.7.2.2 && <2.8.0.0
+    , unordered-containers >=0.2.14.0 && <0.3
     , uuid >=1.3.0 && <1.4
+    , vector >=0.12.3.1 && <0.13
   default-language: Haskell2010
 
 test-suite tests
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      Data.Aeson.Extra
       Kafka
       Kafka.Internal
       Kafka.Settings
       Kafka.Settings.Internal
+      Kafka.Stats
       Kafka.Test
       Kafka.Worker
       Kafka.Worker.Analytics
@@ -98,6 +104,7 @@ test-suite tests
       Kafka.Worker.Settings
       Kafka.Worker.Stopping
       Helpers
+      Spec.Data.Aeson.Extra
       Spec.Kafka.Worker.Integration
       Spec.Kafka.Worker.Partition
       Paths_nri_kafka
@@ -137,5 +144,7 @@ test-suite tests
     , text >=1.2.3.1 && <2.1
     , time >=1.8.0.2 && <2
     , unix >=2.7.2.2 && <2.8.0.0
+    , unordered-containers >=0.2.14.0 && <0.3
     , uuid >=1.3.0 && <1.4
+    , vector >=0.12.3.1 && <0.13
   default-language: Haskell2010

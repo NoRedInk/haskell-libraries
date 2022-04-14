@@ -1,5 +1,6 @@
 module Main (main) where
 
+import qualified Spec.Data.Aeson.Extra
 import qualified Spec.Kafka.Worker.Integration
 import qualified Spec.Kafka.Worker.Partition
 import qualified Test
@@ -13,5 +14,6 @@ tests =
   Test.describe
     "lib/kafka"
     [ Spec.Kafka.Worker.Integration.tests,
-      Spec.Kafka.Worker.Partition.tests
+      Spec.Kafka.Worker.Partition.tests,
+      Spec.Data.Aeson.Extra.tests
     ]
