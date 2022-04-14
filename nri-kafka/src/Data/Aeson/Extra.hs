@@ -1,4 +1,4 @@
-module Data.Aeson.Extra (decodeIntoFlatDict, Path, Segment (..)) where
+module Data.Aeson.Extra (decodeIntoFlatDict, Path, Segment (..), pathToText) where
 
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
@@ -13,6 +13,30 @@ data Segment = Key Text | Index Int
   deriving (Ord, Eq, Show)
 
 type Path = List Segment
+
+-- | Turns a path into a json-path like text
+--
+-- > pathToText [Key "foo", Index 0, Key "bar"]
+-- > ==> "foo[0].bar"
+pathToText :: Path -> Text
+pathToText path =
+  case path of
+    [] -> ""
+    segment : [] -> segmentToText segment
+    segment : next : rest ->
+      segmentToText segment ++ separator next ++ pathToText (next : rest)
+
+segmentToText :: Segment -> Text
+segmentToText (Key k) =
+  k
+    |> Text.replace "." "\\."
+    |> Text.replace "[" "\\["
+    |> Text.replace "]" "\\]"
+segmentToText (Index idx) = "[" ++ Text.fromInt idx ++ "]"
+
+separator :: Segment -> Text
+separator (Key _) = "."
+separator (Index _) = ""
 
 -- | Decodes JSON into a flat dict.
 --

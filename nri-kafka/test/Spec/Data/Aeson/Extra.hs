@@ -1,13 +1,21 @@
 module Spec.Data.Aeson.Extra (tests) where
 
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Extra (Segment (..), decodeIntoFlatDict)
+import Data.Aeson.Extra (Segment (..), decodeIntoFlatDict, pathToText)
 import qualified Dict
 import qualified Expect
 import Test
 
 tests :: Test
 tests =
+  describe
+    "Data.Aeson.Extra"
+    [ decodeIntoFlatDictTest,
+      pathToTextTest
+    ]
+
+decodeIntoFlatDictTest :: Test
+decodeIntoFlatDictTest =
   describe
     "decodeIntoFlatDict"
     [ test "simple object" <| \() ->
@@ -62,4 +70,25 @@ tests =
                     ]
                 )
             )
+    ]
+
+pathToTextTest :: Test
+pathToTextTest =
+  describe
+    "pathToText"
+    [ test "keys get separated" <| \() ->
+        pathToText [Key "foo", Key "bar"]
+          |> Expect.equal "foo.bar",
+      test "indexes have brackets" <| \() ->
+        pathToText [Index 0]
+          |> Expect.equal "[0]",
+      test "indexes within a key" <| \() ->
+        pathToText [Key "foo", Index 0, Index 1]
+          |> Expect.equal "foo[0][1]",
+      test "keys within an index" <| \() ->
+        pathToText [Index 0, Key "foo", Key "bar"]
+          |> Expect.equal "[0].foo.bar",
+      test "keys get escaped" <| \() ->
+        pathToText [Key "foo.bar[0]"]
+          |> Expect.equal "foo\\.bar\\[0\\]"
     ]
