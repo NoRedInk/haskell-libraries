@@ -49,27 +49,31 @@ decodeIntoFlatDict :: ByteString -> Result Text (Dict Path Aeson.Value)
 decodeIntoFlatDict content =
   case Aeson.eitherDecodeStrict content of
     Left err -> Err (Text.fromList err)
-    Right value -> Ok (valueToDict [] Dict.empty Nothing value)
+    Right value -> Ok (valueToDict [] Nothing value)
 
-valueToDict :: Path -> Dict Path Aeson.Value -> Maybe Segment -> Aeson.Value -> Dict Path Aeson.Value
-valueToDict path acc maybeSegment val =
+valueToDict :: Path -> Maybe Segment -> Aeson.Value -> Dict Path Aeson.Value
+valueToDict path maybeSegment val =
   let newPath =
         case maybeSegment of
           Nothing -> path
           Just segment -> segment : path
    in case val of
+        Aeson.Array arr -> arrayToDict newPath arr
         Aeson.Object obj ->
-          HM.foldlWithKey' (\acc' k -> valueToDict newPath acc' (Just (Key k))) acc obj
-        Aeson.Array arr -> arrayToDict newPath acc arr
-        _ -> Dict.insert (List.reverse newPath) val acc
+          HM.foldlWithKey'
+            ( \acc k v ->
+                valueToDict newPath (Just (Key k)) v
+                  |> Dict.union acc
+            )
+            Dict.empty
+            obj
+        _ -> Dict.singleton (List.reverse newPath) val
 
-arrayToDict :: Path -> Dict Path Aeson.Value -> Aeson.Array -> Dict Path Aeson.Value
+arrayToDict :: Path -> Aeson.Array -> Dict Path Aeson.Value
 arrayToDict path =
   Vector.ifoldl
     ( \acc index item ->
-        valueToDict
-          path
-          acc
-          (Just (Index (Prelude.fromIntegral index)))
-          item
+        valueToDict path (Just (Index (Prelude.fromIntegral index))) item
+          |> Dict.union acc
     )
+    Dict.empty
