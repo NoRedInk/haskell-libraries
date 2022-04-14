@@ -41,15 +41,26 @@ toMetric path value =
   case List.reverse path of
     (Aeson.Extra.Key last) : _ ->
       case Dict.get last allMetrics of
-        Nothing -> Err ("Unknown metric: " ++ pathToText path)
-        Just metricType ->
-          case (metricType, value) of
-            (StringType, Aeson.String str) -> Ok (StringMetric str)
-            (IntType, Aeson.Number num) -> Ok (IntMetric (Prelude.floor num))
-            (IntGaugeType, Aeson.Number num) -> Ok (IntGauge (Prelude.floor num))
-            (BoolType, Aeson.Bool bool) -> Ok (BoolMetric bool)
-            _ -> Err ("Metric type mismatch: " ++ pathToText path)
+        Nothing ->
+          -- Get second to last segment of path for `req` case.
+          case List.tail (List.reverse path) of
+            Just ((Aeson.Extra.Key secondToLast) : _) ->
+              case Dict.get secondToLast allMetrics of
+                Just metricType -> metricTypeToMetric metricType value path
+                Nothing -> Err ("Unknown metric type: " ++ pathToText path)
+            _ ->
+              Err ("Unknown metric: " ++ pathToText path)
+        Just metricType -> metricTypeToMetric metricType value path
     _ -> Err "Empty path"
+
+metricTypeToMetric :: MetricType -> Aeson.Value -> Path -> Result Text Metric
+metricTypeToMetric metricType value path =
+  case (metricType, value) of
+    (StringType, Aeson.String str) -> Ok (StringMetric str)
+    (IntType, Aeson.Number num) -> Ok (IntMetric (Prelude.floor num))
+    (IntGaugeType, Aeson.Number num) -> Ok (IntGauge (Prelude.floor num))
+    (BoolType, Aeson.Bool bool) -> Ok (BoolMetric bool)
+    _ -> Err ("Metric type mismatch: " ++ pathToText path)
 
 data MetricType = StringType | IntType | IntGaugeType | BoolType
 
