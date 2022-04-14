@@ -241,13 +241,10 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
             Nothing -> Prelude.mempty
             Just statsCallback ->
               Producer.setCallback
-                ( Producer.statsCallback <| \content ->
-                    case Aeson.decodeStrict content of
-                      Nothing -> Debug.todo <| Data.Text.Encoding.decodeUtf8 content
-                      Just stats -> do
-                        log <- Platform.silentHandler
-                        _ <- Task.attempt log (statsCallback stats)
-                        Prelude.pure ()
+                ( Producer.statsCallback <| \content -> do
+                    log <- Platform.silentHandler
+                    _ <- Task.attempt log (statsCallback (Stats.decode content))
+                    Prelude.pure ()
                 )
   eitherProducer <- Producer.newProducer properties
   case eitherProducer of

@@ -276,14 +276,10 @@ createConsumer
               Nothing -> Prelude.mempty
               Just statsCallback ->
                 Consumer.setCallback
-                  ( Consumer.statsCallback <| \content ->
-                      case Aeson.decodeStrict content of
-                        Nothing ->
-                          Prelude.pure ()
-                        Just stats -> do
-                          log <- Platform.silentHandler
-                          _ <- Task.attempt log (statsCallback stats)
-                          Prelude.pure ()
+                  ( Consumer.statsCallback <| \content -> do
+                      log <- Platform.silentHandler
+                      _ <- Task.attempt log (statsCallback (Stats.decode content))
+                      Prelude.pure ()
                   )
     let subscription' =
           Consumer.topics [Consumer.TopicName (Kafka.unTopic topic)]
