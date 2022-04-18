@@ -401,7 +401,8 @@ emptySettings =
       Honeycomb.fractionOfSuccessRequestsLogged = 0.0,
       Honeycomb.apdexTimeMs = 10,
       Honeycomb.modifyFractionOfSuccessRequestsLogged = always,
-      Honeycomb.modifyApdexTimeMs = always
+      Honeycomb.modifyApdexTimeMs = always,
+      Honeycomb.k8sNode = Nothing
     }
 
 toBatchEvents :: Platform.TracingSpan -> [Honeycomb.BatchEvent]
