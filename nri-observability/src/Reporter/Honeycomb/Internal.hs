@@ -480,11 +480,15 @@ handler settings = do
   http <- HTTP.TLS.getGlobalManager
   revision <- getRevision
   hostname' <- Network.HostName.getHostName
-  let baseSpan =
+  let baseSpan' =
         emptySpan
           |> addField "service_name" (serviceName settings)
           |> addField "hostname" (Text.fromList hostname')
           |> addField "revision" revision
+  let baseSpan =
+        case k8sNode settings of
+          Nothing -> baseSpan'
+          Just node -> addField "k8s_node" node baseSpan'
   Prelude.pure
     Handler
       { http = http,
@@ -585,7 +589,11 @@ data Settings = Settings
     -- application, for example if a path is significantly lower volume than
     -- another the apdex may require tuning.
     -- [@default value@] the input int
-    modifyApdexTimeMs :: Int -> Platform.TracingSpan -> Int
+    modifyApdexTimeMs :: Int -> Platform.TracingSpan -> Int,
+    -- | When not @Nothing@, an extra @k8s_label@ label is applied to every logged
+    -- span.
+    -- [@default value@] Nothing
+    k8sNode :: Maybe Text
   }
 
 -- | Read 'Settings' from environment variables. Default variables will be used
@@ -600,6 +608,7 @@ decoder =
     |> andMap apdexTimeMsDecoder
     |> andMap (Prelude.pure always)
     |> andMap (Prelude.pure always)
+    |> andMap k8sNodeDecoder
 
 honeycombApiKeyDecoder :: Environment.Decoder (Log.Secret ByteString.ByteString)
 honeycombApiKeyDecoder =
@@ -650,3 +659,17 @@ apdexTimeMsDecoder =
         Environment.defaultValue = "100"
       }
     Environment.int
+
+k8sNodeDecoder :: Environment.Decoder (Maybe Text)
+k8sNodeDecoder =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "HONEYCOMB_K8S_NODE",
+        Environment.description = "The Kubernetes node this service instance is running on.",
+        Environment.defaultValue = ""
+      }
+    ( Environment.custom Environment.text <| \str ->
+        if Text.isEmpty str
+          then Ok Nothing
+          else Ok (Just str)
+    )
