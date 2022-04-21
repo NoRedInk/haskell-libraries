@@ -161,6 +161,7 @@ record topicName partitionId val =
     { Producer.prTopic = Producer.TopicName (Internal.unTopic topicName),
       Producer.prPartition = Producer.SpecifiedPartition (Prelude.fromIntegral partitionId),
       Producer.prKey = Nothing,
+      Producer.prHeaders = Prelude.mempty,
       Producer.prValue =
         Internal.MsgWithMetaData
           { Internal.metaData =
