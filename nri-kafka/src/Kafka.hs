@@ -137,6 +137,7 @@ record msg = do
                   |> ByteString.Lazy.toStrict
             )
             (Internal.payload msg)
+      , Producer.prHeaders = Prelude.mempty
       }
 
 -- | The topic of a message. This function might sometimes be useful in tests.
