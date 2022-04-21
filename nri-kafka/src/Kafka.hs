@@ -159,7 +159,7 @@ key msg = Maybe.map Internal.unKey (Internal.key msg)
 handler :: Settings.Settings -> Maybe Stats.StatsCallback -> Conduit.Acquire Internal.Handler
 handler settings maybeStatsCallback = do
   producer <- Conduit.mkAcquire (mkProducer settings maybeStatsCallback) Producer.closeProducer
-  _ <- Conduit.mkAcquire (startPollEventLoop producer) (\terminator -> STM.atomically (TMVar.putTMVar terminator Terminate))
+  _ <- Conduit.mkAcquire (startFlushLoop producer) (\terminator -> STM.atomically (TMVar.putTMVar terminator Terminate))
   liftIO (mkHandler settings producer)
 
 data Terminate = Terminate
@@ -167,24 +167,24 @@ data Terminate = Terminate
 -- | By default events only get polled right before sending a record to kafka.
 -- This means that the deliveryCallback only gets fired on the next call to produceMessage'.
 -- We want to be informed about delivery status as soon as possible though.
-startPollEventLoop :: Producer.KafkaProducer -> Prelude.IO (TMVar.TMVar b)
-startPollEventLoop producer = do
+-- The only way to do that right now in hw-kafka-client is by flushing the queue
+startFlushLoop :: Producer.KafkaProducer -> Prelude.IO (TMVar.TMVar b)
+startFlushLoop producer = do
   terminator <- STM.atomically TMVar.newEmptyTMVar
   _ <-
     Async.race_
-      (pollEvents producer)
+      (flushProducer producer)
       (STM.atomically <| TMVar.readTMVar terminator)
       |> Async.async
   Prelude.pure terminator
 
 -- | We use a little trick here to poll events, by sending an empty message batch.
 -- This will call the internal pollEvent function in hw-kafka-client.
-pollEvents :: Producer.KafkaProducer -> Prelude.IO ()
-pollEvents producer = do
-  Producer.produceMessageBatch producer []
-    |> map (\_ -> ())
+flushProducer :: Producer.KafkaProducer -> Prelude.IO ()
+flushProducer producer = do
+  Producer.flushProducer producer
   Control.Concurrent.threadDelay 100_000 {- 100ms -}
-  pollEvents producer
+  flushProducer producer
 
 -- |
 mkHandler :: Settings.Settings -> Producer.KafkaProducer -> Prelude.IO Internal.Handler
