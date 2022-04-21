@@ -3,12 +3,13 @@
 --
 -- See Kafka.Worker for the basic building blocks of a CLI app that will poll &
 -- process kafka messages
-module Kafka.Stats (StatsCallback, Stats, decode, Path, pathToText, Metric (..)) where
+module Kafka.Stats (StatsCallback, Stats, decode, Path, Segment(..), Metric (..)) where
 
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Extra (Path, pathToText)
+import Data.Aeson.Extra (Path, Segment(..))
 import qualified Data.Aeson.Extra as Aeson.Extra
 import Data.ByteString (ByteString)
+import qualified Data.Text
 import Dict (Dict)
 import qualified Dict
 import qualified Tuple
@@ -47,9 +48,9 @@ toMetric path value =
             Just ((Aeson.Extra.Key secondToLast) : _) ->
               case Dict.get secondToLast allMetrics of
                 Just metricType -> metricTypeToMetric metricType value path
-                Nothing -> Err ("Unknown metric type: " ++ pathToText path)
+                Nothing -> Err ("Unknown metric type: " ++ Data.Text.pack (Prelude.show path))
             _ ->
-              Err ("Unknown metric: " ++ pathToText path)
+              Err ("Unknown metric: " ++ Data.Text.pack (Prelude.show path))
         Just metricType -> metricTypeToMetric metricType value path
     _ -> Err "Empty path"
 
@@ -60,7 +61,7 @@ metricTypeToMetric metricType value path =
     (IntType, Aeson.Number num) -> Ok (IntMetric (Prelude.floor num))
     (IntGaugeType, Aeson.Number num) -> Ok (IntGauge (Prelude.floor num))
     (BoolType, Aeson.Bool bool) -> Ok (BoolMetric bool)
-    _ -> Err ("Metric type mismatch: " ++ pathToText path)
+    _ -> Err ("Metric type mismatch: " ++ Data.Text.pack (Prelude.show path))
 
 data MetricType = StringType | IntType | IntGaugeType | BoolType
 
