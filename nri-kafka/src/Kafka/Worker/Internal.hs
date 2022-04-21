@@ -270,7 +270,7 @@ createConsumer
             ++ Consumer.logLevel logLevel
             ++ Consumer.setCallback (Consumer.rebalanceCallback rebalance)
             ++ Consumer.compression Consumer.Snappy
-            ++ Consumer.setAssignmentStrategy AssignmentStrategy.CooperativeSticky
+            ++ Consumer.setAssignmentStrategy [AssignmentStrategy.CooperativeStickyAssignor]
             ++ Consumer.extraProps
               ( Dict.fromList
                   [ ("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs)),
