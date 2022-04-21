@@ -1,4 +1,16 @@
 {
+    "hw-kafka-client": {
+        "branch": "main",
+        "description": "Kafka client for Haskell, including auto-rebalancing consumers",
+        "homepage": null,
+        "owner": "NoRedInk",
+        "repo": "hw-kafka-client",
+        "rev": "afb77994286f9c4876f562fb0a8c7b098b56248f",
+        "sha256": "1ygmvw508n7dc6is9yzz8yc1k8nhz66f6snagvb7sjijfsym31lw",
+        "type": "tarball",
+        "url": "https://github.com/NoRedInk/hw-kafka-client/archive/afb77994286f9c4876f562fb0a8c7b098b56248f.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
     "niv": {
         "branch": "master",
         "description": "Easy dependency management for Nix projects",

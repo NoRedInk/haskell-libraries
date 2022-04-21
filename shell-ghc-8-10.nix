@@ -10,5 +10,7 @@ in import nix/mk-shell.nix {
     safe-coloured-text-terminfo =
       super.callCabal2nix "safe-coloured-text-terminfo"
       "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { };
+    hw-kafka-client = super.haskell.lib.dontCheck
+      (super.callCabal2nix "hw-kafka-client" sources.hw-kafka-client { });
   });
 }
