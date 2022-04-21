@@ -14,6 +14,7 @@ import qualified Data.UUID.V4
 import qualified Dict
 import qualified GHC.Clock
 import qualified Kafka.Consumer as Consumer
+import qualified Kafka.Consumer.AssignmentStrategy as AssignmentStrategy
 import qualified Kafka.Internal as Kafka
 import qualified Kafka.Metadata
 import qualified Kafka.Stats as Stats
@@ -269,11 +270,11 @@ createConsumer
             ++ Consumer.logLevel logLevel
             ++ Consumer.setCallback (Consumer.rebalanceCallback rebalance)
             ++ Consumer.compression Consumer.Snappy
+            ++ Consumer.setAssignmentStrategy AssignmentStrategy.CooperativeSticky
             ++ Consumer.extraProps
               ( Dict.fromList
                   [ ("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs)),
-                    ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs)),
-                    ("partition.assignment.strategy", "cooperative-sticky")
+                    ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs))
                   ]
               )
             ++ case maybeStatsCallback of
