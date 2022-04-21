@@ -273,7 +273,7 @@ createConsumer
               ( Dict.fromList
                   [ ("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs)),
                     ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs)),
-                    ("partition.assignment.strategy", "range,cooperative-sticky")
+                    ("partition.assignment.strategy", "cooperative-sticky")
                   ]
               )
             ++ case maybeStatsCallback of
