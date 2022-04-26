@@ -12,6 +12,7 @@ where
 import qualified Environment
 import qualified Kafka.Producer
 import qualified Kafka.Settings.Internal as Internal
+import qualified Prelude
 
 -- | Settings required to write to Kafka
 data Settings = Settings
@@ -45,13 +46,12 @@ exampleBatchNumMessages = BatchNumMessages 1
 -- KAFKA_BATCH_SIZE=10000
 decoder :: Environment.Decoder Settings
 decoder =
-  map5
-    Settings
-    Internal.decoderBrokerAddresses
-    Internal.decoderKafkaLogLevel
-    decoderDeliveryTimeout
-    decoderBatchNumMessages
-    decoderStatisticsIntervalMs
+  Prelude.pure Settings
+    |> andMap Internal.decoderBrokerAddresses
+    |> andMap Internal.decoderKafkaLogLevel
+    |> andMap decoderDeliveryTimeout
+    |> andMap decoderBatchNumMessages
+    |> andMap decoderStatisticsIntervalMs
 
 decoderDeliveryTimeout :: Environment.Decoder Kafka.Producer.Timeout
 decoderDeliveryTimeout =
