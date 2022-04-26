@@ -217,45 +217,53 @@ doSTM doAnything stm =
     |> Platform.doAnything doAnything
 
 mkProducer :: Settings.Settings -> Maybe Stats.StatsCallback -> Prelude.IO Producer.KafkaProducer
-mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages, Settings.statisticsIntervalMs} maybeStatsCallback = do
-  let properties =
-        Producer.brokersList brokerAddresses
-          ++ Producer.sendTimeout deliveryTimeout
-          ++ Producer.logLevel logLevel
-          ++ Producer.compression Producer.Snappy
-          ++ Producer.extraProps
-            ( Dict.fromList
-                [ ( "batch.num.messages",
-                    batchNumMessages
-                      |> Settings.unBatchNumMessages
-                      |> Text.fromInt
-                  ),
-                  -- Enable idemptent producers
-                  -- See https://www.cloudkarafka.com/blog/apache-kafka-idempotent-producer-avoiding-message-duplication.html for reference
-                  ("enable.idempotence", "true"),
-                  ("acks", "all"),
-                  ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs))
-                ]
-            )
-          ++ case maybeStatsCallback of
-            Nothing -> Prelude.mempty
-            Just statsCallback ->
-              Producer.setCallback
-                ( Producer.statsCallback <| \content -> do
-                    log <- Platform.silentHandler
-                    _ <- Task.attempt log (statsCallback (Stats.decode content))
-                    Prelude.pure ()
-                )
-  eitherProducer <- Producer.newProducer properties
-  case eitherProducer of
-    Prelude.Left err ->
-      -- We create the handler as part of starting the application. Throwing
-      -- means that if there's a problem with the settings the application will
-      -- fail immediately upon start. It won't result in runtime errors during
-      -- operation.
-      Exception.throwIO err
-    Prelude.Right producer ->
-      Prelude.pure producer
+mkProducer
+  Settings.Settings
+    { Settings.brokerAddresses,
+      Settings.deliveryTimeout,
+      Settings.logLevel,
+      Settings.batchNumMessages,
+      Settings.statisticsIntervalMs
+    }
+  maybeStatsCallback = do
+    let properties =
+          Producer.brokersList brokerAddresses
+            ++ Producer.sendTimeout deliveryTimeout
+            ++ Producer.logLevel logLevel
+            ++ Producer.compression Producer.Snappy
+            ++ Producer.extraProps
+              ( Dict.fromList
+                  [ ( "batch.num.messages",
+                      batchNumMessages
+                        |> Settings.unBatchNumMessages
+                        |> Text.fromInt
+                    ),
+                    -- Enable idemptent producers
+                    -- See https://www.cloudkarafka.com/blog/apache-kafka-idempotent-producer-avoiding-message-duplication.html for reference
+                    ("enable.idempotence", "true"),
+                    ("acks", "all"),
+                    ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs))
+                  ]
+              )
+            ++ case maybeStatsCallback of
+              Nothing -> Prelude.mempty
+              Just statsCallback ->
+                Producer.setCallback
+                  ( Producer.statsCallback <| \content -> do
+                      log <- Platform.silentHandler
+                      _ <- Task.attempt log (statsCallback (Stats.decode content))
+                      Prelude.pure ()
+                  )
+    eitherProducer <- Producer.newProducer properties
+    case eitherProducer of
+      Prelude.Left err ->
+        -- We create the handler as part of starting the application. Throwing
+        -- means that if there's a problem with the settings the application will
+        -- fail immediately upon start. It won't result in runtime errors during
+        -- operation.
+        Exception.throwIO err
+      Prelude.Right producer ->
+        Prelude.pure producer
 
 sendHelperAsync ::
   Producer.KafkaProducer ->
