@@ -234,6 +234,7 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
                   -- See https://www.cloudkarafka.com/blog/apache-kafka-idempotent-producer-avoiding-message-duplication.html for reference
                   ("enable.idempotence", "true"),
                   ("acks", "all"),
+                  -- TODO make this configurable?
                   ("statistics.interval.ms", "1000")
                 ]
             )
