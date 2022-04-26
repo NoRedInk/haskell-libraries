@@ -217,7 +217,7 @@ doSTM doAnything stm =
     |> Platform.doAnything doAnything
 
 mkProducer :: Settings.Settings -> Maybe Stats.StatsCallback -> Prelude.IO Producer.KafkaProducer
-mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages} maybeStatsCallback = do
+mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages, Settings.statisticsIntervalMs} maybeStatsCallback = do
   let properties =
         Producer.brokersList brokerAddresses
           ++ Producer.sendTimeout deliveryTimeout
@@ -234,8 +234,7 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
                   -- See https://www.cloudkarafka.com/blog/apache-kafka-idempotent-producer-avoiding-message-duplication.html for reference
                   ("enable.idempotence", "true"),
                   ("acks", "all"),
-                  -- TODO make this configurable?
-                  ("statistics.interval.ms", "1000")
+                  ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs))
                 ]
             )
           ++ case maybeStatsCallback of

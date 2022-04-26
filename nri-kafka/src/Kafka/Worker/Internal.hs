@@ -242,7 +242,8 @@ createConsumer
     { Settings.brokerAddresses,
       Settings.logLevel,
       Settings.maxPollIntervalMs,
-      Settings.onProcessMessageSkip
+      Settings.onProcessMessageSkip,
+      Settings.statisticsIntervalMs
     }
   groupId
   observability
@@ -271,8 +272,7 @@ createConsumer
             ++ Consumer.extraProps
               ( Dict.fromList
                   [ ("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs)),
-                    -- TODO make this configurable?
-                    ("statistics.interval.ms", "1000")
+                    ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs))
                   ]
               )
             ++ case maybeStatsCallback of
