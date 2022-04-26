@@ -270,7 +270,10 @@ createConsumer
             ++ Consumer.compression Consumer.Snappy
             ++ Consumer.extraProps
               ( Dict.fromList
-                  [("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs))]
+                  [ ("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs)),
+                    -- TODO make this configurable?
+                    ("statistics.interval.ms", "1000")
+                  ]
               )
             ++ case maybeStatsCallback of
               Nothing -> Prelude.mempty
