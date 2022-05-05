@@ -10,6 +10,7 @@ module Kafka.Settings
 where
 
 import qualified Environment
+import qualified Kafka.Consumer.AssignmentStrategy as AssignmentStrategy
 import qualified Kafka.Producer
 import qualified Kafka.Settings.Internal as Internal
 import qualified Prelude
@@ -27,7 +28,11 @@ data Settings = Settings
     -- | librdkafka statistics emit interval. The application also needs to
     -- register a stats callback using rd_kafka_conf_set_stats_cb(). The
     -- granularity is 1000ms. A value of 0 disables statistics.
-    statisticsIntervalMs :: StatisticsIntervalMs
+    statisticsIntervalMs :: StatisticsIntervalMs,
+    -- | partition assignment strategy for workers. one of
+    --   RangeAssignor: https://kafka.apache.org/27/javadoc/org/apache/kafka/clients/consumer/RangeAssignor.html
+    --   CooperativeStickyAssignor: https://kafka.apache.org/27/javadoc/org/apache/kafka/clients/consumer/CooperativeStickyAssignor.html
+    partitionAssignmentStrategy :: AssignmentStrategy.ConsumerAssignmentStrategy
   }
 
 -- | Number of messages to batch together before sending to Kafka.
@@ -52,6 +57,7 @@ decoder =
     |> andMap decoderDeliveryTimeout
     |> andMap decoderBatchNumMessages
     |> andMap decoderStatisticsIntervalMs
+    |> andMap decoderPartitionAssignmentStrategy
 
 decoderDeliveryTimeout :: Environment.Decoder Kafka.Producer.Timeout
 decoderDeliveryTimeout =
@@ -82,3 +88,18 @@ decoderStatisticsIntervalMs =
         Environment.defaultValue = "0"
       }
     (map StatisticsIntervalMs Environment.int)
+
+decoderPartitionAssignmentStrategy :: Environment.Decoder AssignmentStrategy.ConsumerAssignmentStrategy
+decoderPartitionAssignmentStrategy =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "KAFKA_PARTITION_ASSIGNMENT_STRATEGY",
+        Environment.description = "sets the kafka partition assignemnt strategy. one of: {cooperative-sticky,range-assignor}",
+        Environment.defaultValue = "cooperative-sticky"
+      }
+    ( Environment.custom Environment.text
+        <| \str -> case str of
+          "cooperative-sticky" -> Ok AssignmentStrategy.CooperativeStickyAssignor
+          "range-assignor" -> Ok AssignmentStrategy.RangeAssignor
+          invalidValue -> Err ("Invalid value: " ++ invalidValue)
+    )

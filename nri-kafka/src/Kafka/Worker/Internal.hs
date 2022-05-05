@@ -14,6 +14,7 @@ import qualified Data.UUID.V4
 import qualified Dict
 import qualified GHC.Clock
 import qualified Kafka.Consumer as Consumer
+import qualified Kafka.Consumer.AssignmentStrategy as AssignmentStrategy
 import qualified Kafka.Internal as Kafka
 import qualified Kafka.Metadata
 import qualified Kafka.Stats as Stats
@@ -269,6 +270,7 @@ createConsumer
             ++ Consumer.logLevel logLevel
             ++ Consumer.setCallback (Consumer.rebalanceCallback rebalance)
             ++ Consumer.compression Consumer.Snappy
+            ++ Consumer.setAssignmentStrategy [AssignmentStrategy.CooperativeStickyAssignor]
             ++ Consumer.extraProps
               ( Dict.fromList
                   [ ("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs)),
