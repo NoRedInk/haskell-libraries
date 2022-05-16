@@ -27,6 +27,7 @@ import Servant.API
   ( Capture',
     Header',
     QueryFlag,
+    QueryParam,
     Raw,
     ReqBody',
     Summary,
@@ -66,6 +67,7 @@ tests _ =
 
 data Route = Route
   { path :: [Text],
+    queryParams :: [(Text, SomeType)],
     method :: Text,
     headers :: [(Text, SomeType)],
     requestBody :: Maybe SomeType,
@@ -108,7 +110,17 @@ routesToText routes =
   routes
     |> List.concatMap
       ( \route ->
-          [ case headers route of
+          [ case queryParams route of
+              [] -> Nothing
+              queryParams' ->
+                Just
+                  <| Text.concat
+                    ( routeName route :
+                      "?" :
+                      Text.join "&" (List.map printQueryParam headers')
+                    ),
+
+          , case headers route of
               [] -> Nothing
               headers' ->
                 Just
@@ -144,6 +156,10 @@ routesToText routes =
 printHeaders :: (Text, SomeType) -> Text
 printHeaders (key, val) =
   "(" ++ key ++ ", " ++ printType val ++ ")"
+
+printQueryParam :: (Text, SomeType) -> Text
+printQueryParam (key, val) =
+  key ++ "={" ++ printType val ++ "}"
 
 printType :: SomeType -> Text
 printType (SomeType t) =
@@ -211,6 +227,19 @@ instance IsApi Raw where
 
 instance (IsApi a) => IsApi (QueryFlag flag :> a) where
   crawl _ = crawl (Proxy :: Proxy a)
+
+instance (IsApi a) => IsApi (QueryParam' x key value :> a) where
+  crawl _ = crawl (Proxy :: Proxy a)
+    |> List.map
+      ( \route ->
+          route
+              { queryParams =
+                  ( Text.fromList (symbolVal (Proxy :: Proxy key)),
+                    SomeType (Proxy :: Proxy value)
+                  ) :
+                  queryParams route
+              }
+      )
 
 instance (Typeable.Typeable body, Examples.HasExamples body, IsApi a) => IsApi (ReqBody' x encodings body :> a) where
   crawl _ =
