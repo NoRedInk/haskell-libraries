@@ -27,7 +27,7 @@ import Servant.API
   ( Capture',
     Header',
     QueryFlag,
-    QueryParam,
+    QueryParam',
     Raw,
     ReqBody',
     Summary,
@@ -117,10 +117,9 @@ routesToText routes =
                   <| Text.concat
                     ( routeName route :
                       "?" :
-                      Text.join "&" (List.map printQueryParam headers')
+                      [Text.join "&" (List.map printQueryParam queryParams')]
                     ),
-
-          , case headers route of
+            case headers route of
               [] -> Nothing
               headers' ->
                 Just
@@ -210,6 +209,7 @@ instance
   crawl _ =
     [ Route
         { path = [],
+          queryParams = [],
           headers = [],
           requestBody = Nothing,
           method =
@@ -228,7 +228,14 @@ instance IsApi Raw where
 instance (IsApi a) => IsApi (QueryFlag flag :> a) where
   crawl _ = crawl (Proxy :: Proxy a)
 
-instance (IsApi a) => IsApi (QueryParam' x key value :> a) where
+instance
+  ( KnownSymbol key,
+    Typeable.Typeable value,
+    Examples.HasExamples value,
+    IsApi a
+  ) =>
+  IsApi (QueryParam' x key value :> a)
+  where
   crawl _ = crawl (Proxy :: Proxy a)
     |> List.map
       ( \route ->
