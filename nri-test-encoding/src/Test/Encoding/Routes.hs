@@ -236,17 +236,18 @@ instance
   ) =>
   IsApi (QueryParam' x key value :> a)
   where
-  crawl _ = crawl (Proxy :: Proxy a)
-    |> List.map
-      ( \route ->
-          route
+  crawl _ =
+    crawl (Proxy :: Proxy a)
+      |> List.map
+        ( \route ->
+            route
               { queryParams =
                   ( Text.fromList (symbolVal (Proxy :: Proxy key)),
                     SomeType (Proxy :: Proxy value)
                   ) :
                   queryParams route
               }
-      )
+        )
 
 instance (Typeable.Typeable body, Examples.HasExamples body, IsApi a) => IsApi (ReqBody' x encodings body :> a) where
   crawl _ =
