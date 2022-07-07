@@ -27,6 +27,7 @@ import NriPrelude
 import Platform (TracingSpan)
 import qualified Platform
 import qualified Platform.Internal
+import qualified System.Environment
 import qualified Task
 import qualified Tuple
 import qualified Prelude
@@ -214,6 +215,15 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
         }
     ]
 
+getMinTests :: Prelude.IO Hedgehog.Internal.Property.TestLimit
+getMinTests = do
+  minTests <- System.Environment.lookupEnv "PROPERTY_NUM_TESTS"
+  minTests
+    |> Maybe.andThen Prelude.read
+    |> Maybe.withDefault 100
+    |> Hedgehog.Internal.Property.TestLimit
+    |> Prelude.pure
+
 fuzzBody :: Show a => Fuzzer a -> (a -> Expectation) -> Expectation
 fuzzBody (Fuzzer gen) expectation = do
   Expectation
@@ -228,9 +238,10 @@ fuzzBody (Fuzzer gen) expectation = do
           silentLog <- Platform.silentHandler
           seed <- Hedgehog.Internal.Seed.random
           failureRef <- IORef.newIORef Nothing
+          minTests <- getMinTests
           hedgehogResult <-
             Hedgehog.Internal.Runner.checkReport
-              Hedgehog.Internal.Property.defaultConfig
+              (Hedgehog.Internal.Property.defaultConfig {Hedgehog.Internal.Property.propertyTerminationCriteria = Hedgehog.Internal.Property.NoConfidenceTermination minTests})
               0 -- Same value used as in Hedgehog internals.
               seed
               ( do
