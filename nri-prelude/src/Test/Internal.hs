@@ -29,6 +29,7 @@ import qualified Platform
 import qualified Platform.Internal
 import qualified System.Environment
 import qualified Task
+import qualified Text.Read
 import qualified Tuple
 import qualified Prelude
 
@@ -219,7 +220,7 @@ getMinTests :: Prelude.IO Hedgehog.Internal.Property.TestLimit
 getMinTests = do
   minTests <- System.Environment.lookupEnv "PROPERTY_NUM_TESTS"
   minTests
-    |> Maybe.andThen Prelude.read
+    |> Maybe.andThen Text.Read.readMaybe
     |> Maybe.withDefault 100
     |> Hedgehog.Internal.Property.TestLimit
     |> Prelude.pure
