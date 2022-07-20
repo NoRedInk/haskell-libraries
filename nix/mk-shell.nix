@@ -5,6 +5,12 @@ let
   workaround140774 = hpkg:
     with pkgs.haskell.lib;
     overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
+  # It is still necessary to run `hpack --force` into packages home dirs
+  haskell-language-server = pkgs.haskellPackages.haskell-language-server.override {
+    hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
+      ormolu = (workaround140774 pkgs.haskellPackages.ormolu);
+    };
+  };
 
 in pkgs.mkShell {
   buildInputs = [
@@ -59,17 +65,18 @@ in pkgs.mkShell {
         vector
         vty
       ]))
+    (workaround140774 pkgs.haskellPackages.ghcid)
+    (workaround140774 pkgs.haskellPackages.niv)
+    (workaround140774 pkgs.haskellPackages.ormolu)
     pkgs.apacheKafka # for nri-kafka
     pkgs.cabal-install
     pkgs.cachix
     pkgs.gnumake
-    (workaround140774 pkgs.haskellPackages.ghcid)
+    haskell-language-server
     pkgs.haskellPackages.hpack
-    (workaround140774 pkgs.haskellPackages.niv)
-    (workaround140774 pkgs.haskellPackages.ormolu)
     pkgs.pcre
-    pkgs.redis # for nri-redis
     pkgs.postgresql # for nri-postgres
+    pkgs.redis # for nri-redis
     pkgs.zlib
     pkgs.zookeeper # for nri-kafka
   ];
