@@ -3,6 +3,7 @@
 -- missing such a branch in a case statement looks like a problem and so is
 -- distracting.
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Tasks make it easy to describe asynchronous operations that may fail, like
 -- HTTP requests or writing to a database.
@@ -33,6 +34,7 @@ module Task
     -- * Special (custom helpers not found in Elm)
     timeout,
     parallel,
+    background,
   )
 where
 
@@ -46,7 +48,7 @@ import Platform.Internal (Task)
 import qualified Platform.Internal as Internal
 import Result (Result (..))
 import qualified System.Timeout
-import Prelude (IO)
+import Prelude (IO, (*>))
 import qualified Prelude
 
 -- BASICS
@@ -196,6 +198,23 @@ parallel tasks =
     ( \handler ->
         Async.forConcurrently tasks (\task -> Internal._run task handler)
           |> Shortcut.map Prelude.sequence
+    )
+
+-- | Given a task and a callback, execute the task in a greenthread
+-- and sends its result to callback.
+-- Always returns @OK ()@
+background :: forall x a . Task x a -> (Result x a -> Task x a) -> Task x ()
+background task callback =
+  Internal.Task
+    ( \handler ->
+        let runTask :: Task x a -> IO (Result x a)
+            runTask task' = Internal._run task' handler
+            waitForTask :: Async.Async (Result x a) -> IO (Result x a)
+            waitForTask greenTask = do
+              result <- Async.wait greenTask
+              runTask <| callback result
+         in Async.withAsync (runTask task) waitForTask
+              *> (Prelude.return <| Ok ())
     )
 
 -- | Recover from a failure in a task. If the given task fails, we use the
