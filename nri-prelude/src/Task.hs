@@ -3,7 +3,6 @@
 -- missing such a branch in a case statement looks like a problem and so is
 -- distracting.
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Tasks make it easy to describe asynchronous operations that may fail, like
 -- HTTP requests or writing to a database.
