@@ -47,7 +47,7 @@ import Platform.Internal (Task)
 import qualified Platform.Internal as Internal
 import Result (Result (..))
 import qualified System.Timeout
-import Prelude (IO, (*>))
+import Prelude (IO)
 import qualified Prelude
 
 -- BASICS
@@ -205,15 +205,13 @@ parallel tasks =
 background :: forall x a . Task x a -> (Result x a -> Task x a) -> Task x ()
 background task callback =
   Internal.Task
-    ( \handler ->
-        let runTask :: Task x a -> IO (Result x a)
-            runTask task' = Internal._run task' handler
-            waitForTask :: Async.Async (Result x a) -> IO (Result x a)
-            waitForTask greenTask = do
-              result <- Async.wait greenTask
-              runTask <| callback result
-         in Async.withAsync (runTask task) waitForTask
-              *> (Prelude.return <| Ok ())
+    ( \handler -> do
+        let runBackgroundTask :: Task x a -> IO (Result x a)
+            runBackgroundTask greenTask = do
+              result <- Internal._run greenTask handler
+              Internal._run (callback result) handler
+        _ <- Async.async (runBackgroundTask task)
+        Prelude.pure <| Ok ()
     )
 
 -- | Recover from a failure in a task. If the given task fails, we use the
