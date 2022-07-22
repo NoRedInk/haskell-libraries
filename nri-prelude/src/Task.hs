@@ -33,6 +33,7 @@ module Task
     -- * Special (custom helpers not found in Elm)
     timeout,
     parallel,
+    background,
   )
 where
 
@@ -196,6 +197,21 @@ parallel tasks =
     ( \handler ->
         Async.forConcurrently tasks (\task -> Internal._run task handler)
           |> Shortcut.map Prelude.sequence
+    )
+
+-- | Given a task and a callback, execute the task in a greenthread
+-- and sends its result to callback.
+-- Always returns @OK ()@
+background :: forall x a . Task x a -> (Result x a -> Task x a) -> Task x ()
+background task callback =
+  Internal.Task
+    ( \handler -> do
+        let runBackgroundTask :: Task x a -> IO (Result x a)
+            runBackgroundTask greenTask = do
+              result <- Internal._run greenTask handler
+              Internal._run (callback result) handler
+        _ <- Async.async (runBackgroundTask task)
+        Prelude.pure <| Ok ()
     )
 
 -- | Recover from a failure in a task. If the given task fails, we use the
