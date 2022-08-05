@@ -14,7 +14,7 @@ tests :: Test
 tests =
   describe "Task"
     [ describe "parallel"
-      [ test "returns the right values and executes in parallel" <| \() -> do
+      [ test "returns the right values" <| \() -> do
         let results = [1, 2, 3]
         let tasks = List.map afterDelay results
 
@@ -23,7 +23,7 @@ tests =
         Expect.equal results parallelResults
       ]
     , describe "concurrently"
-      [ test "returns the right values and executes concurrently" <| \() -> do
+      [ test "returns the right values" <| \() -> do
         let results = (1, ("two", 3.0 :: Float))
         let (taskA, (taskB, taskC)) = Tuple.mapBoth afterDelay (Tuple.mapBoth afterDelay afterDelay) results
 
