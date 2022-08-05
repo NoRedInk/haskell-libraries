@@ -32,6 +32,7 @@ module Task
 
     -- * Special (custom helpers not found in Elm)
     timeout,
+    concurrently,
     parallel,
     background,
   )
@@ -198,6 +199,19 @@ parallel tasks =
         Async.forConcurrently tasks (\task -> Internal._run task handler)
           |> Shortcut.map Prelude.sequence
     )
+
+-- | Given two tasks, turn them into a single task that returns a tuple.
+-- The tasks will be run concurrently and if either task fails the combined
+-- task also fails.
+--
+-- > concurrently (succeed 1) (succed "Expecto Patronum!") == succeed (1, "Expecto Patronum!")
+concurrently :: Task x a -> Task x b -> Task x (a, b)
+concurrently taskA taskB =
+    Internal.Task
+      ( \handler -> do
+          (resultA, resultB) <- Async.concurrently (Internal._run taskA handler) (Internal._run taskB handler)
+          Prelude.pure <| Shortcut.map2 (,) resultA resultB
+      )
 
 -- | Given a task and a callback, execute the task in a greenthread
 -- and sends its result to callback.
