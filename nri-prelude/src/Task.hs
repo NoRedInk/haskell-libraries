@@ -207,11 +207,11 @@ parallel tasks =
 -- > concurrently (succeed 1) (succeed "Expecto Patronum!") == succeed (1, "Expecto Patronum!")
 concurrently :: Task x a -> Task x b -> Task x (a, b)
 concurrently taskA taskB =
-    Internal.Task
-      ( \handler -> do
-          (resultA, resultB) <- Async.concurrently (Internal._run taskA handler) (Internal._run taskB handler)
-          Prelude.pure <| Shortcut.map2 (,) resultA resultB
-      )
+  Internal.Task
+    ( \handler -> do
+        (resultA, resultB) <- Async.concurrently (Internal._run taskA handler) (Internal._run taskB handler)
+        Prelude.pure <| Shortcut.map2 (,) resultA resultB
+    )
 
 -- | Given a task and a callback, execute the task in a greenthread
 -- and sends its result to callback.

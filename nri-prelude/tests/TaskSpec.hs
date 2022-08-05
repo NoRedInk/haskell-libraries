@@ -15,8 +15,7 @@ import qualified Tuple
 
 tests :: Test
 tests =
-  describe
-    "Task"
+  describe "Task"
     [ describe "parallel"
       [ test "returns the right values and executes in parallel" <| \() -> do
         let results = [1, 2, 3]
