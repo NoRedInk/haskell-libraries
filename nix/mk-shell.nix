@@ -60,6 +60,7 @@ in pkgs.mkShell {
         text
         text-zipper
         time
+        timeit
         unordered-containers
         uuid
         vector
