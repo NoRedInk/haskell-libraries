@@ -38,11 +38,11 @@ tests =
       ]
     , describe "concurrently"
       [ test "returns the right values and executes concurrently" <| \() -> do
-        let results = (1, "two")
-        let (taskA, taskB) = Tuple.mapBoth afterDelay afterDelay results
+        let results = (1, ("two", 3.0 :: Float))
+        let (taskA, (taskB, taskC)) = Tuple.mapBoth afterDelay (Tuple.mapBoth afterDelay afterDelay) results
 
         (concurrentExecutionTime, concurrentResults) <-
-          Expect.succeeds <| timeIt <| Task.concurrently taskA taskB
+          Expect.succeeds <| timeIt <| Task.concurrently taskA <| Task.concurrently taskB taskC
         (sequentialExecutionTime, _) <-
           Expect.succeeds <| timeIt <| Task.andThen (\_ -> taskB) taskA
         (singleExecutionTime, ()) <-
