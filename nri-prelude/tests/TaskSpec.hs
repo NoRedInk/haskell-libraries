@@ -25,16 +25,11 @@ tests =
           Expect.succeeds <| timeIt <| Task.parallel tasks
         (sequentialExecutionTime, _) <-
           Expect.succeeds <| timeIt <| Task.sequence tasks
-        (singleExecutionTime, ()) <-
-          Expect.succeeds <| timeIt <| afterDelay ()
 
         Expect.equal results parallelResults
 
         parallelExecutionTime |>
-          Expect.all
-            [ Expect.atLeast singleExecutionTime
-            , Expect.lessThan sequentialExecutionTime
-            ]
+          Expect.lessThan sequentialExecutionTime
       ]
     , describe "concurrently"
       [ test "returns the right values and executes concurrently" <| \() -> do
@@ -45,16 +40,11 @@ tests =
           Expect.succeeds <| timeIt <| Task.concurrently taskA <| Task.concurrently taskB taskC
         (sequentialExecutionTime, _) <-
           Expect.succeeds <| timeIt <| Task.andThen (\_ -> taskB) taskA
-        (singleExecutionTime, ()) <-
-          Expect.succeeds <| timeIt <| afterDelay ()
 
         Expect.equal results concurrentResults
 
         concurrentExecutionTime |>
-          Expect.all
-            [ Expect.atLeast singleExecutionTime
-            , Expect.lessThan sequentialExecutionTime
-            ]
+          Expect.lessThan sequentialExecutionTime
       ]
     ]
 
