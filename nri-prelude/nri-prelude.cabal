@@ -121,6 +121,7 @@ test-suite tests
       LogSpec
       PlatformSpec
       SetSpec
+      TaskSpec
       TestSpec
       TextSpec
       Array
