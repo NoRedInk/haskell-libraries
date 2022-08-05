@@ -20,34 +20,41 @@ tests =
     [ describe "parallel"
       [ test "returns the right values and executes in parallel" <| \() -> do
         let results = [1, 2, 3]
-        let parallelTask = Task.parallel <| List.map afterDelay results
+        let tasks = List.map afterDelay results
 
-        (singleExecutionTime, ()) <- Expect.succeeds <| timeIt <| afterDelay ()
-        (parallelExecutionTime, parallelResults) <- Expect.succeeds <| timeIt parallelTask
+        (parallelExecutionTime, parallelResults) <-
+          Expect.succeeds <| timeIt <| Task.parallel tasks
+        (sequentialExecutionTime, _) <-
+          Expect.succeeds <| timeIt <| Task.sequence tasks
+        (singleExecutionTime, ()) <-
+          Expect.succeeds <| timeIt <| afterDelay ()
 
         Expect.equal results parallelResults
 
         parallelExecutionTime |>
           Expect.all
             [ Expect.atLeast singleExecutionTime
-            , Expect.lessThan (2 * singleExecutionTime)
+            , Expect.lessThan sequentialExecutionTime
             ]
       ]
     , describe "concurrently"
       [ test "returns the right values and executes concurrently" <| \() -> do
         let results = (1, "two")
         let (taskA, taskB) = Tuple.mapBoth afterDelay afterDelay results
-        let concurrentTask = Task.concurrently taskA taskB
 
-        (singleExecutionTime, ()) <- Expect.succeeds <| timeIt <| afterDelay ()
-        (concurrentExecutionTime, concurrentResults) <- Expect.succeeds <| timeIt concurrentTask
+        (concurrentExecutionTime, concurrentResults) <-
+          Expect.succeeds <| timeIt <| Task.concurrently taskA taskB
+        (sequentialExecutionTime, _) <-
+          Expect.succeeds <| timeIt <| Task.andThen (\_ -> taskB) taskA
+        (singleExecutionTime, ()) <-
+          Expect.succeeds <| timeIt <| afterDelay ()
 
         Expect.equal results concurrentResults
 
         concurrentExecutionTime |>
           Expect.all
             [ Expect.atLeast singleExecutionTime
-            , Expect.lessThan (2 * singleExecutionTime)
+            , Expect.lessThan sequentialExecutionTime
             ]
       ]
     ]
