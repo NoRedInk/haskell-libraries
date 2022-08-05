@@ -204,7 +204,7 @@ parallel tasks =
 -- The tasks will be run concurrently and if either task fails the combined
 -- task also fails.
 --
--- > concurrently (succeed 1) (succed "Expecto Patronum!") == succeed (1, "Expecto Patronum!")
+-- > concurrently (succeed 1) (succeed "Expecto Patronum!") == succeed (1, "Expecto Patronum!")
 concurrently :: Task x a -> Task x b -> Task x (a, b)
 concurrently taskA taskB =
     Internal.Task
