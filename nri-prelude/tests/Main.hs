@@ -13,6 +13,7 @@ import qualified PlatformSpec
 import qualified SetSpec
 import qualified System.IO
 import Test (Test, describe, run)
+import qualified TaskSpec
 import qualified TestSpec
 import qualified TextSpec
 import qualified Prelude
@@ -30,6 +31,7 @@ tests =
       BitwiseSpec.tests,
       DictSpec.tests,
       SetSpec.tests,
+      TaskSpec.tests,
       TestSpec.tests,
       TextSpec.tests,
       LogSpec.tests,
