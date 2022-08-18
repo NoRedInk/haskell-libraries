@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
 -- | A library to create @Expectation@s, which describe a claim to be tested.
@@ -19,6 +20,9 @@ module Expect
     notEqual,
     all,
     equalToContentsOf,
+
+    -- * Heterogeneous Expectations
+    equalH,
 
     -- * Floating Point Comparisons
     FloatingPointTolerance (..),
@@ -58,6 +62,7 @@ module Expect
 where
 
 import qualified Data.Text
+import Type.Reflection (Typeable, eqTypeRep, typeOf, (:~~:) (HRefl))
 import qualified Data.Text.IO
 import qualified Debug
 import qualified GHC.Stack as Stack
@@ -149,6 +154,20 @@ onFail msg (Internal.Expectation task) =
 -- > -}
 equal :: (Stack.HasCallStack, Show a, Eq a) => a -> a -> Expectation
 equal = Stack.withFrozenCallStack assert (==) "Expect.equal"
+
+-- | Passes if the arguments are equal and of the same type
+-- useful for usage with GADTs, existential quantification and
+-- type applications.
+-- Prefer the usage of Expect.equal!
+--
+-- > Expect.equalH 0 ""
+-- >
+-- > -- Faild because 0 is not the same type as ""
+equalH :: (Stack.HasCallStack, Show a, Eq a, Typeable a, Typeable b) => a -> b -> Expectation
+equalH x y = Stack.withFrozenCallStack <|
+  case eqTypeRep (typeOf x) (typeOf y) of
+      Nothing -> fail "Expect.equalH"
+      Just HRefl -> assert (==) "Expect.equalH" x y
 
 -- | Passes if the arguments are not equal.
 --
