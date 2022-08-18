@@ -162,12 +162,12 @@ equal = Stack.withFrozenCallStack assert (==) "Expect.equal"
 --
 -- > Expect.equalH 0 ""
 -- >
--- > -- Faild because 0 is not the same type as ""
+-- > -- Fails because 0 is not the same type as ""
 equalH :: (Stack.HasCallStack, Show a, Eq a, Typeable a, Typeable b) => a -> b -> Expectation
-equalH x y = Stack.withFrozenCallStack <|
+equalH x y =
   case eqTypeRep (typeOf x) (typeOf y) of
-      Nothing -> fail "Expect.equalH"
-      Just HRefl -> assert (==) "Expect.equalH" x y
+    Nothing -> Stack.withFrozenCallStack <| Expect.fail "Expect.equalH"
+    Just HRefl -> Stack.withFrozenCallStack <| assert (==) "Expect.equalH" x y
 
 -- | Passes if the arguments are not equal.
 --
