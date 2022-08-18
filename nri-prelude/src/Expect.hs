@@ -163,11 +163,14 @@ equal = Stack.withFrozenCallStack assert (==) "Expect.equal"
 -- > Expect.equalH 0 ""
 -- >
 -- > -- Fails because 0 is not the same type as ""
-equalH :: (Stack.HasCallStack, Show a, Eq a, Typeable a, Typeable b) => a -> b -> Expectation
-equalH x y =
+equalH :: (Stack.HasCallStack, Show a, Show b, Eq a, Typeable a, Typeable b) => a -> b -> Expectation
+equalH = Stack.withFrozenCallStack assert equalHPredicate "Expect.equalH"
+
+equalHPredicate :: (Eq a, Typeable a, Typeable b) => a -> b -> Bool
+equalHPredicate x y =
   case eqTypeRep (typeOf x) (typeOf y) of
-    Nothing -> Stack.withFrozenCallStack <| Expect.fail "Expect.equalH"
-    Just HRefl -> Stack.withFrozenCallStack <| assert (==) "Expect.equalH" x y
+    Nothing -> False
+    Just HRefl -> x == y
 
 -- | Passes if the arguments are not equal.
 --
@@ -563,7 +566,7 @@ newtype UnescapedShow = UnescapedShow Text deriving (Eq)
 instance Show UnescapedShow where
   show (UnescapedShow text) = Data.Text.unpack text
 
-assert :: (Stack.HasCallStack, Show a) => (a -> a -> Bool) -> Text -> a -> a -> Expectation
+assert :: (Stack.HasCallStack, Show a, Show b) => (a -> b -> Bool) -> Text -> a -> b -> Expectation
 assert pred funcName expected actual =
   if pred expected actual
     then Stack.withFrozenCallStack Internal.pass funcName ()
