@@ -436,9 +436,13 @@ emptyTracingSpan =
 
 encodesTo :: Text -> Platform.TracingSpan -> Expect.Expectation
 encodesTo filename span =
-  span
-    |> Bugsnag.toEvent "request-id-1234" timer Network.Bugsnag.defaultEvent
-    |> Data.Aeson.Encode.Pretty.encodePretty
-    |> Data.ByteString.Lazy.toStrict
-    |> Data.Text.Encoding.decodeUtf8
-    |> Expect.equalToContentsOf ("tests/golden-results/" ++ filename ++ ".json")
+  let config =
+        Data.Aeson.Encode.Pretty.defConfig
+          { Data.Aeson.Encode.Pretty.confCompare = Data.Aeson.Encode.Pretty.compare
+          }
+   in span
+        |> Bugsnag.toEvent "request-id-1234" timer Network.Bugsnag.defaultEvent
+        |> Data.Aeson.Encode.Pretty.encodePretty' config
+        |> Data.ByteString.Lazy.toStrict
+        |> Data.Text.Encoding.decodeUtf8
+        |> Expect.equalToContentsOf ("tests/golden-results/" ++ filename ++ ".json")

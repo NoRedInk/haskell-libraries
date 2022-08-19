@@ -1,6 +1,6 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.34.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -17,6 +17,8 @@ copyright:      2022 NoRedInk Corp.
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
+extra-source-files:
+    test/golden-results/observability-spec-postgres-reporting
 extra-doc-files:
     README.md
     LICENSE
@@ -55,7 +57,7 @@ library
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -Wunused-packages -fplugin=NriPrelude.Plugin
   build-depends:
       attoparsec >=0.13.0.0 && <0.15
     , base >=4.12.0.0 && <4.17
@@ -109,7 +111,7 @@ test-suite tests
       Strict
       TypeOperators
       ExtendedDefaultRules
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -Wunused-packages -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
       attoparsec >=0.13.0.0 && <0.15
     , base >=4.12.0.0 && <4.17

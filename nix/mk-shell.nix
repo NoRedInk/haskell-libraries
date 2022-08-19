@@ -18,51 +18,36 @@ in pkgs.mkShell {
       with haskellPackages; [
         aeson
         aeson-pretty
-        async
         auto-update
-        base
+        base64-bytestring_1_2_1_0
         brick
         bugsnag-hs
-        bytestring
         conduit
-        containers
-        directory
-        exceptions
-        filepath
         fuzzy
-        ghc
         hedgehog
         hedis
         hostname
-        http-client
         http-client-tls
+        http-types
         hw-kafka-client
         io-streams
         junit-xml
-        microlens
+        lens
+        mime-types
         modern-uri
         network-uri
         pcre-light
         postgresql-typed
         pretty-diff
         pretty-show
-        process
-        random
-        resourcet
-        safe-coloured-text
+        resource-pool
+        terminal-size
         safe-coloured-text-terminfo
         safe-exceptions
-        servant
         servant-auth-server
         servant-server
-        stm
-        terminal-size
-        text
         text-zipper
-        time
-        unordered-containers
         uuid
-        vector
         vty
       ]))
     (workaround140774 pkgs.haskellPackages.ghcid)

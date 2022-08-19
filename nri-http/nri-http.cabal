@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.34.6.
 --
 -- see: https://github.com/sol/hpack
 
@@ -52,7 +52,7 @@ library
       TypeOperators
       ExtendedDefaultRules
       NumericUnderscores
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -Wunused-packages
   build-depends:
       aeson >=1.4.6.0 && <2.1
     , base >=4.12.0.0 && <4.17
@@ -96,7 +96,7 @@ test-suite spec
       TypeOperators
       ExtendedDefaultRules
       NumericUnderscores
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -fno-warn-type-defaults
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -Wunused-packages -fno-warn-type-defaults
   build-depends:
       aeson >=1.4.6.0 && <2.1
     , base >=4.12.0.0 && <4.17

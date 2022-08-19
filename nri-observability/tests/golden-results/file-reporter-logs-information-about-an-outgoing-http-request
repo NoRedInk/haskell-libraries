@@ -1,23 +1,23 @@
 {
-    "hostname": "some-host",
-    "env": "narnia",
-    "namespace": [
-        "app"
-    ],
     "allocated_mb": 0.0,
-    "duration_ms": 0.0,
-    "name": "",
     "details": {
-        "status": 500,
-        "http version": "1",
-        "path": "/hats/5",
+        "endpoint": "/hats/:hat_id",
         "headers": {
             "Accept": "application/json"
         },
-        "query string": "?top=flat",
+        "http version": "1",
         "method": "GET",
-        "endpoint": "/hats/:hat_id"
+        "path": "/hats/5",
+        "query string": "?top=flat",
+        "status": 500
     },
-    "start_utc": "1970-01-01T00:00:00Z",
-    "request-id": "request-id"
+    "duration_ms": 0.0,
+    "env": "narnia",
+    "hostname": "some-host",
+    "name": "",
+    "namespace": [
+        "app"
+    ],
+    "request-id": "request-id",
+    "start_utc": "1970-01-01T00:00:00Z"
 }

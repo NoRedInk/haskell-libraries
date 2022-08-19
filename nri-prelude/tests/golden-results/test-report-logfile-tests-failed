@@ -1,111 +1,111 @@
 {
-    "summary": "nri-prelude",
+    "allocated": 0,
     "children": [
         {
-            "summary": "suite",
+            "allocated": 0,
             "children": [
                 {
-                    "summary": "sub suite",
+                    "allocated": 0,
                     "children": [
                         {
-                            "summary": null,
-                            "children": [],
                             "allocated": 1,
-                            "name": "name",
+                            "children": [],
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "name": "name",
+                            "started": 0,
                             "succeeded": "Succeeded",
-                            "started": 0
+                            "summary": null
                         },
                         {
-                            "summary": null,
-                            "children": [],
                             "allocated": 1,
-                            "name": "name",
+                            "children": [],
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "name": "name",
+                            "started": 0,
                             "succeeded": "Succeeded",
-                            "started": 0
+                            "summary": null
                         },
                         {
-                            "summary": null,
-                            "children": [],
                             "allocated": 1,
-                            "name": "name",
+                            "children": [],
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "name": "name",
+                            "started": 0,
                             "succeeded": "Succeeded",
-                            "started": 0
+                            "summary": null
                         },
                         {
-                            "summary": null,
-                            "children": [],
                             "allocated": 1,
-                            "name": "name",
+                            "children": [],
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "name": "name",
+                            "started": 0,
                             "succeeded": "Succeeded",
-                            "started": 0
+                            "summary": null
                         },
                         {
-                            "summary": null,
-                            "children": [],
                             "allocated": 1,
-                            "name": "name",
+                            "children": [],
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "name": "name",
+                            "started": 0,
                             "succeeded": "Succeeded",
-                            "started": 0
+                            "summary": null
                         },
                         {
-                            "summary": null,
-                            "children": [],
                             "allocated": 1,
-                            "name": "name",
+                            "children": [],
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "name": "name",
+                            "started": 0,
                             "succeeded": "Succeeded",
-                            "started": 0
+                            "summary": null
                         }
                     ],
-                    "allocated": 0,
-                    "name": "describe",
                     "details": null,
                     "finished": 0,
                     "frame": null,
+                    "name": "describe",
+                    "started": 0,
                     "succeeded": "Succeeded",
-                    "started": 0
+                    "summary": "sub suite"
                 }
             ],
-            "allocated": 0,
-            "name": "describe",
             "details": null,
             "finished": 0,
             "frame": null,
+            "name": "describe",
+            "started": 0,
             "succeeded": "Succeeded",
-            "started": 0
+            "summary": "suite"
         }
     ],
-    "allocated": 0,
-    "name": "test run",
     "details": null,
     "finished": 0,
     "frame": {
-        "startLine": 399,
-        "endLine": 399,
-        "name": "report",
         "endCol": 69,
+        "endLine": 399,
+        "file": "tests/TestSpec.hs",
         "module": "TestSpec",
+        "name": "report",
         "package": "main",
         "startCol": 22,
-        "file": "tests/TestSpec.hs"
+        "startLine": 399
     },
+    "name": "test run",
+    "started": 0,
     "succeeded": "Failed",
-    "started": 0
+    "summary": "nri-prelude"
 }

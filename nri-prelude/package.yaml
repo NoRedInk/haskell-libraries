@@ -15,32 +15,30 @@ extra-doc-files:
   - CHANGELOG.md
   - licenses/ELM_CORE_LICENSE
   - licenses/ELM_TEST_LICENSE
+dependencies: &dependencies
+  - aeson >= 1.4.6.0 && < 2.1
+  - async >= 2.2.2 && < 2.3
+  - auto-update >= 0.1.6 && < 0.2
+  - base >= 4.12.0.0 && < 4.17
+  - bytestring >= 0.10.8.2 && < 0.12
+  - containers >= 0.6.0.1 && < 0.7
+  - directory >= 1.3.3.0 && < 1.4
+  - exceptions >= 0.10.4 && < 0.11
+  - filepath >= 1.4.2.1 && < 1.5
+  - ghc >= 8.6.1 && < 9.3
+  - hedgehog >= 1.0.2 && < 1.1
+  - junit-xml >= 0.1.0.0 && < 0.2.0.0
+  - pretty-diff >= 0.4.0.2 && < 0.5
+  - pretty-show >= 1.9.5 && < 1.11
+  - safe-coloured-text >= 0.1.0.0 && < 0.2
+  - safe-coloured-text-terminfo >= 0.0.0.0 && < 0.1
+  - safe-exceptions >= 0.1.7.0 && < 1.3
+  - terminal-size >= 0.3.2.1 && < 0.4
+  - text >= 1.2.3.1 && < 2.1
+  - time >= 1.8.0.2 && < 2
+  - unix >= 2.7.2.2 && < 2.8.0.0
+  - vector >= 0.12.1.2 && < 0.13
 library:
-  dependencies: &dependencies
-    - aeson >= 1.4.6.0 && < 2.1
-    - aeson-pretty >= 0.8.0 && < 0.9
-    - async >= 2.2.2 && < 2.3
-    - auto-update >= 0.1.6 && < 0.2
-    - base >= 4.12.0.0 && < 4.17
-    - bytestring >= 0.10.8.2 && < 0.12
-    - containers >= 0.6.0.1 && < 0.7
-    - directory >= 1.3.3.0 && < 1.4
-    - exceptions >= 0.10.4 && < 0.11
-    - filepath >= 1.4.2.1 && < 1.5
-    - ghc >= 8.6.1 && < 9.3
-    - hedgehog >= 1.0.2 && < 1.1
-    - junit-xml >= 0.1.0.0 && < 0.2.0.0
-    - lens >=4.16.1 && <5.1
-    - pretty-diff >= 0.4.0.2 && < 0.5
-    - pretty-show >= 1.9.5 && < 1.11
-    - safe-coloured-text >= 0.1.0.0 && < 0.2
-    - safe-coloured-text-terminfo >= 0.0.0.0 && < 0.1
-    - safe-exceptions >= 0.1.7.0 && < 1.3
-    - terminal-size >= 0.3.2.1 && < 0.4
-    - text >= 1.2.3.1 && < 2.1
-    - time >= 1.8.0.2 && < 2
-    - unix >= 2.7.2.2 && < 2.8.0.0
-    - vector >= 0.12.1.2 && < 0.13
   exposed-modules:
     - Array
     - Basics
@@ -87,9 +85,11 @@ ghc-options:
   - -Wpartial-fields
   - -Wredundant-constraints
   - -Wincomplete-uni-patterns
+  - -Wunused-packages
 tests:
   tests:
-    dependencies: *dependencies
+    dependencies:
+      - aeson-pretty >= 0.8.0 && < 0.9
     main: Main.hs
     source-dirs:
       - tests
