@@ -22,11 +22,9 @@ where
 
 import Data.Function ((&))
 import qualified Data.List
-#if __GLASGOW_HASKELL__ >= 900
 import qualified GHC.Plugins as GhcPlugins
-#else
-import GhcPlugins
-#endif
+import qualified GHC.Hs
+import qualified GHC
 import NriPrelude.Plugin.GhcVersionDependent
   ( hsmodImports,
     hsmodName,
@@ -60,20 +58,20 @@ plugin =
 addImplicitImports ::
   [GhcPlugins.CommandLineOption] ->
   GhcPlugins.ModSummary ->
-  GhcPlugins.HsParsedModule ->
-  GhcPlugins.Hsc GhcPlugins.HsParsedModule
+  GHC.Hs.HsParsedModule ->
+  GhcPlugins.Hsc GHC.Hs.HsParsedModule
 addImplicitImports _ _ parsed =
   Prelude.pure
     parsed
-      { GhcPlugins.hpm_module =
-          fmap addImportsWhenNotPath (GhcPlugins.hpm_module parsed)
+      { GHC.Hs.hpm_module =
+          fmap addImportsWhenNotPath (GHC.Hs.hpm_module parsed)
       }
   where
     addImportsWhenNotPath hsModule =
-      case fmap unLocate (hsmodName hsModule) of
+      case fmap GHC.unLoc (hsmodName hsModule) of
         Nothing -> addImports hsModule
         Just modName ->
-          if Data.List.isPrefixOf "Paths_" modName
+          if Data.List.isPrefixOf "Paths_" (show modName)
             then hsModule
             else addImports hsModule
 
@@ -98,17 +96,18 @@ addImplicitImports _ _ parsed =
       hsmodImports hsModule
         & fmap
           ( \(GhcPlugins.L _ imp) ->
-              case (isQualified imp, unLocate (ideclName imp)) of
+              case (isQualified imp, (show . GHC.unLoc . ideclName) imp) of
                 (True, name) -> Qualified name
                 (False, name) -> Unqualified name
           )
         & Set.fromList
 
-    unLocate (GhcPlugins.L _ x) = GhcPlugins.moduleNameString x
-
     unqualified name =
-      GhcPlugins.noLoc (simpleImportDecl (GhcPlugins.mkModuleName name))
-        & fmap (\qual -> qual {ideclImplicit = True})
+      name &
+      GhcPlugins.mkModuleName &
+      simpleImportDecl &
+      GHC.noLocA &
+      fmap (\qual -> qual {ideclImplicit = True})
     qualified name =
       fmap (\qual -> qual {ideclQualified = mkQualified}) (unqualified name)
 

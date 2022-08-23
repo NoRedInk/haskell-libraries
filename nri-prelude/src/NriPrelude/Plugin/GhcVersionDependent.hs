@@ -1,11 +1,3 @@
-{-# LANGUAGE CPP #-}
-
--- A couple of imports we need to write this module have been moved in GHC
--- version 8.10. This module uses the CPP extension to import the right values
--- dependent on the version of GHC.
-
-#if __GLASGOW_HASKELL__ >= 810
-
 module NriPrelude.Plugin.GhcVersionDependent (
   module GHC.Hs,
   isQualified,
@@ -27,22 +19,3 @@ isQualified imp =
 
 mkQualified :: ImportDeclQualifiedStyle
 mkQualified = QualifiedPre
-
-#else
-
-module NriPrelude.Plugin.GhcVersionDependent (
-  module HsSyn,
-  isQualified,
-  mkQualified,
-) where
-
-import HsSyn
-import Prelude
-
-isQualified :: ImportDecl pass -> Bool
-isQualified = ideclQualified
-
-mkQualified :: Bool
-mkQualified = True
-
-#endif
