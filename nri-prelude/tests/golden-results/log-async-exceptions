@@ -12,7 +12,7 @@
               , srcLocStartLine = 112
               , srcLocStartCol = 20
               , srcLocEndLine = 112
-              , srcLocEndCol = 76
+              , srcLocEndCol = 31
               }
           )
     , details = Just "{\"number\":825}"
@@ -34,7 +34,7 @@
                       , srcLocStartLine = 111
                       , srcLocStartCol = 20
                       , srcLocEndLine = 111
-                      , srcLocEndCol = 84
+                      , srcLocEndCol = 31
                       }
                   )
             , details = Just "{\"word\":\"sabbatical\"}"

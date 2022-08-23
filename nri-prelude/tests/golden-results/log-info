@@ -12,7 +12,7 @@
               , srcLocStartLine = 29
               , srcLocStartCol = 18
               , srcLocEndLine = 29
-              , srcLocEndCol = 76
+              , srcLocEndCol = 22
               }
           )
     , details = Just "{\"level\":\"Info\",\"a number\":12}"

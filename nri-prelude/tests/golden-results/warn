@@ -11,8 +11,8 @@
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 52
               , srcLocStartCol = 15
-              , srcLocEndLine = 54
-              , srcLocEndCol = 56
+              , srcLocEndLine = 52
+              , srcLocEndCol = 19
               }
           )
     , details = Just "{\"level\":\"Warn\",\"modal\":\"SURPRISE!\"}"

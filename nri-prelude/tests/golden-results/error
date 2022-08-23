@@ -11,8 +11,8 @@
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 65
               , srcLocStartCol = 15
-              , srcLocEndLine = 67
-              , srcLocEndCol = 52
+              , srcLocEndLine = 65
+              , srcLocEndCol = 20
               }
           )
     , details = Just "{\"level\":\"Error\",\"house number\":5}"

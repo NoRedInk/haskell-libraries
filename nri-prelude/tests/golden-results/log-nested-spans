@@ -12,7 +12,7 @@
               , srcLocStartLine = 80
               , srcLocStartCol = 20
               , srcLocEndLine = 80
-              , srcLocEndCol = 76
+              , srcLocEndCol = 31
               }
           )
     , details = Just "{\"number\":825}"
@@ -34,7 +34,7 @@
                       , srcLocStartLine = 79
                       , srcLocStartCol = 20
                       , srcLocEndLine = 79
-                      , srcLocEndCol = 84
+                      , srcLocEndCol = 31
                       }
                   )
             , details = Just "{\"word\":\"sabbatical\"}"
@@ -56,7 +56,7 @@
                               , srcLocStartLine = 78
                               , srcLocStartCol = 15
                               , srcLocEndLine = 78
-                              , srcLocEndCol = 29
+                              , srcLocEndCol = 19
                               }
                           )
                     , details = Just "{\"level\":\"Info\"}"

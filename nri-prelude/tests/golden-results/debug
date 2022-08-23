@@ -11,8 +11,8 @@
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 39
               , srcLocStartCol = 15
-              , srcLocEndLine = 41
-              , srcLocEndCol = 53
+              , srcLocEndLine = 39
+              , srcLocEndCol = 20
               }
           )
     , details = Just "{\"level\":\"Debug\",\"button\":\"PRESS\"}"
