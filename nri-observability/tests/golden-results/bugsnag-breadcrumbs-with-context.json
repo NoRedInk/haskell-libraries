@@ -1,39 +1,39 @@
 {
-    "exceptions": [
-        {
-            "stacktrace": [],
-            "errorClass": "some span"
-        }
-    ],
     "breadcrumbs": [
         {
-            "name": "Starting: some span",
             "metaData": {
                 "duration in milliseconds": "0.0",
                 "number": "4.0"
             },
-            "type": "process",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "name": "Starting: some span",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "process"
         },
         {
-            "name": "some span",
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "name": "some span",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
         },
         {
             "name": "Finished: some span",
-            "type": "log",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "log"
+        }
+    ],
+    "exceptions": [
+        {
+            "errorClass": "some span",
+            "stacktrace": []
         }
     ],
     "metaData": {
         "request": {
+            "megabytes allocated": 0,
             "request id": "request-id-1234",
-            "response time in ms": 0,
-            "megabytes allocated": 0
+            "response time in ms": 0
         }
     },
     "unhandled": false

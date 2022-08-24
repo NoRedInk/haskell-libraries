@@ -1,17 +1,17 @@
 {
+    "breadcrumbs": [],
     "exceptions": [
         {
-            "stacktrace": [],
+            "errorClass": "CustomException",
             "message": "CustomException \"something went wrong\"",
-            "errorClass": "CustomException"
+            "stacktrace": []
         }
     ],
-    "breadcrumbs": [],
     "metaData": {
         "request": {
+            "megabytes allocated": 0,
             "request id": "request-id-1234",
-            "response time in ms": 0,
-            "megabytes allocated": 0
+            "response time in ms": 0
         }
     },
     "unhandled": true
