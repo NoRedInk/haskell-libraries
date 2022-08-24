@@ -71,7 +71,7 @@ addImplicitImports _ _ parsed =
       case fmap GHC.unLoc (hsmodName hsModule) of
         Nothing -> addImports hsModule
         Just modName ->
-          if Data.List.isPrefixOf "Paths_" (show modName)
+          if Data.List.isPrefixOf "Paths_" (GHC.moduleNameString modName)
             then hsModule
             else addImports hsModule
 
@@ -96,7 +96,7 @@ addImplicitImports _ _ parsed =
       hsmodImports hsModule
         & fmap
           ( \(GhcPlugins.L _ imp) ->
-              case (isQualified imp, (show . GHC.unLoc . ideclName) imp) of
+              case (isQualified imp, (GHC.moduleNameString . GHC.unLoc . ideclName) imp) of
                 (True, name) -> Qualified name
                 (False, name) -> Unqualified name
           )

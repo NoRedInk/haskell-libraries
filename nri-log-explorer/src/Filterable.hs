@@ -11,7 +11,6 @@ where
 
 import qualified Brick.Widgets.List as ListWidget
 import qualified Data.Vector as Vector
-import NriPrelude
 import qualified Prelude
 
 data ListWidget name a = ListWidget

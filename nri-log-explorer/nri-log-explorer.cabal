@@ -47,7 +47,7 @@ executable log-explorer
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T -xq10m" -O2
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T -xq10m" -O2 -fplugin=NriPrelude.Plugin
   build-depends:
       aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9

@@ -48,7 +48,7 @@ library
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
       base >=4.16.3.0 && <4.17
     , modern-uri >=0.3.1.0 && <0.4

@@ -56,18 +56,11 @@ where
 
 import qualified Data.List
 import qualified Data.Text
-import qualified Debug
-import qualified Dict
-import qualified List
-import qualified Log
-import NriPrelude
-import qualified Maybe
 import qualified Network.URI
-import qualified Result
+import qualified Dict
 import qualified System.Environment
 import Text.Read (readMaybe)
 import qualified Text.URI
-import qualified Tuple
 import Prelude
   ( Applicative,
     Either (Left, Right),

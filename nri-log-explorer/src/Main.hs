@@ -37,13 +37,9 @@ import qualified Graphics.Vty as Vty
 import qualified Graphics.Vty.Attributes as Vty.Attributes
 import qualified Graphics.Vty.Attributes.Color as Vty.Color
 import Lens.Micro ((^.))
-import NriPrelude
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 
-import qualified List
-import qualified Maybe
-import qualified Tuple
 import qualified Paths_nri_log_explorer as Paths
 import qualified Platform
 import qualified System.Directory
@@ -53,7 +49,6 @@ import qualified System.IO
 import qualified System.IO.Streams as Streams
 import qualified System.IO.Streams.ByteString as Streams.ByteString
 import qualified System.Process
-import qualified Text
 import qualified Text.Fuzzy as Fuzzy
 import qualified Text.Regex.PCRE.Light as Regex
 import qualified Prelude
