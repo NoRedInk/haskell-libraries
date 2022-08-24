@@ -8,6 +8,8 @@ import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
 import qualified Data.Text.IO
@@ -131,7 +133,7 @@ toEvent requestId timer defaultEvent span =
         "request id" .= requestId
       ]
         |> Aeson.object
-        |> HashMap.singleton "request"
+        |> Aeson.KeyMap.singleton "request"
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
@@ -267,7 +269,8 @@ doBreadcrumb timer span =
           { Bugsnag.breadcrumb_name = Platform.name span,
             Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
             Bugsnag.breadcrumb_timestamp = Timer.toISO8601 timer (Platform.started span),
-            Bugsnag.breadcrumb_metaData = stackFrameMetaData ++ durationMetaData
+            -- Bugsnag library defines breadcrumb_metaData as Maybe (HashMap Text Text)
+            Bugsnag.breadcrumb_metaData = fmap Aeson.KeyMap.toHashMapText <| stackFrameMetaData ++ durationMetaData
           }
       stackFrameMetaData =
         case Platform.frame span of
@@ -275,11 +278,11 @@ doBreadcrumb timer span =
           Just (_, frame) ->
             Stack.srcLocFile frame ++ ":" ++ Prelude.show (Stack.srcLocStartLine frame)
               |> Text.fromList
-              |> HashMap.singleton "stack frame"
+              |> Aeson.KeyMap.singleton "stack frame"
               |> Just
       durationMetaData =
         Just
-          ( HashMap.singleton
+          ( Aeson.KeyMap.singleton
               "duration in milliseconds"
               ( Timer.durationInUs span
                   |> Prelude.fromIntegral
@@ -308,7 +311,7 @@ outgoingHttpRequestAsBreadcrumb breadcrumb (HttpRequest.Outgoing details) =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
       Bugsnag.breadcrumb_metaData =
-        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Helpers.toHashMap details)
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Aeson.KeyMap.toHashMapText <| Helpers.toFlat details)
     }
 
 sqlQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> SqlQuery.Details -> Bugsnag.Breadcrumb
@@ -316,7 +319,7 @@ sqlQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
       Bugsnag.breadcrumb_metaData =
-        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Helpers.toHashMap details)
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Aeson.KeyMap.toHashMapText <| Helpers.toFlat details)
     }
 
 redisQueryAsBreadcrumb :: Bugsnag.Breadcrumb -> RedisCommands.Details -> Bugsnag.Breadcrumb
@@ -324,7 +327,7 @@ redisQueryAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.requestBreadcrumbType,
       Bugsnag.breadcrumb_metaData =
-        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Helpers.toHashMap details)
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Aeson.KeyMap.toHashMapText <| Helpers.toFlat details)
     }
 
 logAsBreadcrumb :: Platform.TracingSpan -> Bugsnag.Breadcrumb -> Log.LogContexts -> Bugsnag.Breadcrumb
@@ -335,7 +338,7 @@ logAsBreadcrumb span breadcrumb details =
           then Bugsnag.logBreadcrumbType
           else Bugsnag.processBreadcrumbType,
       Bugsnag.breadcrumb_metaData =
-        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Helpers.toHashMap details)
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Aeson.KeyMap.toHashMapText <| Helpers.toFlat details)
     }
 
 unknownAsBreadcrumb :: Bugsnag.Breadcrumb -> Platform.SomeTracingSpanDetails -> Bugsnag.Breadcrumb
@@ -343,7 +346,7 @@ unknownAsBreadcrumb breadcrumb details =
   breadcrumb
     { Bugsnag.breadcrumb_type = Bugsnag.manualBreadcrumbType,
       Bugsnag.breadcrumb_metaData =
-        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Helpers.toHashMap details)
+        Bugsnag.breadcrumb_metaData breadcrumb ++ Just (Aeson.KeyMap.toHashMapText <| Helpers.toFlat details)
     }
 
 decorateEventWithTracingSpanData :: Platform.TracingSpan -> Bugsnag.Event -> Bugsnag.Event
@@ -363,7 +366,7 @@ renderRemainingTracingSpanDetails span event details =
   event
     { Bugsnag.event_metaData =
         Aeson.toJSON details
-          |> HashMap.singleton (Platform.name span)
+          |> Aeson.KeyMap.singleton (Aeson.Key.fromText <| Platform.name span)
           |> Just
           |> (++) (Bugsnag.event_metaData event)
     }
@@ -373,10 +376,10 @@ renderLog event details =
   event
     { Bugsnag.event_metaData =
         Aeson.toJSON details
-          |> HashMap.singleton "custom"
-          |> HashMap.unionWith
+          |> Aeson.KeyMap.singleton "custom"
+          |> Aeson.KeyMap.unionWith
             mergeJson
-            (Bugsnag.event_metaData event |> Maybe.withDefault HashMap.empty)
+            (Bugsnag.event_metaData event |> Maybe.withDefault Aeson.KeyMap.empty)
           |> Just
     }
 
@@ -385,12 +388,12 @@ mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (AesonHelpers.mergeOb
 mergeJson _ last = last
 
 mergeMetaData ::
-  Maybe (HashMap.HashMap Text Aeson.Value) ->
-  Maybe (HashMap.HashMap Text Aeson.Value) ->
-  Maybe (HashMap.HashMap Text Aeson.Value)
+  Maybe (Aeson.KeyMap.KeyMap Aeson.Value) ->
+  Maybe (Aeson.KeyMap.KeyMap Aeson.Value) ->
+  Maybe (Aeson.KeyMap.KeyMap Aeson.Value)
 mergeMetaData Nothing x = x
 mergeMetaData x Nothing = x
-mergeMetaData (Just x) (Just y) = Just (HashMap.unionWith mergeJson x y)
+mergeMetaData (Just x) (Just y) = Just (Aeson.KeyMap.unionWith mergeJson x y)
 
 renderIncomingHttpRequest ::
   Bugsnag.Event ->
@@ -422,7 +425,7 @@ renderIncomingHttpRequest event (HttpRequest.Incoming request) =
               "query string" .= HttpRequest.queryString request
             ]
               |> Aeson.object
-              |> HashMap.singleton "request"
+              |> Aeson.KeyMap.singleton "request"
               |> Just
           )
     }

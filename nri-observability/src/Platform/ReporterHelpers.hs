@@ -1,10 +1,12 @@
-module Platform.ReporterHelpers (toHashMap, srcString) where
+module Platform.ReporterHelpers (toHashMap, srcString, toFlat) where
 
 import qualified Data.Aeson as Aeson
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified GHC.Stack as Stack
 import qualified List
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Platform.AesonHelpers as AesonHelpers
 import qualified Text
 import qualified Prelude
@@ -37,6 +39,40 @@ toHashMap x =
         HashMap.empty
         object
     val -> jsonAsText "value" val
+
+toFlat :: Aeson.ToJSON a => a -> Aeson.KeyMap.KeyMap Text
+toFlat x =
+  case Aeson.toJSON x of
+    Aeson.Object object ->
+      AesonHelpers.foldObject
+        (\key value acc -> flatten (Aeson.Key.fromText key) value ++ acc)
+        Aeson.KeyMap.empty
+        object
+    val -> flatten "value" val
+
+flatten :: Aeson.Key -> Aeson.Value -> Aeson.KeyMap.KeyMap Text
+flatten key val =
+  case val of
+    Aeson.Object dict ->
+      AesonHelpers.foldObject
+        (\key2 value acc ->
+           let keyFromText = Aeson.Key.fromText key2
+               flattenKeyText = key ++ "." ++ keyFromText
+           in flatten flattenKeyText value ++ acc)
+        Aeson.KeyMap.empty
+        dict
+    Aeson.Array vals ->
+      Foldable.toList vals
+        |> List.indexedMap
+        (\i elem ->
+           let keyFromText = (Aeson.Key.fromText << Text.fromInt) i
+               flattenKeyText = key ++ "." ++ keyFromText
+           in flatten flattenKeyText elem)
+        |> Prelude.mconcat
+    Aeson.String str -> Aeson.KeyMap.singleton key str
+    Aeson.Number n -> Aeson.KeyMap.singleton key (Text.fromList (Prelude.show n))
+    Aeson.Bool bool -> Aeson.KeyMap.singleton key (Text.fromList (Prelude.show bool))
+    Aeson.Null -> Aeson.KeyMap.empty
 
 jsonAsText :: Text -> Aeson.Value -> HashMap.HashMap Text Text
 jsonAsText key val =
