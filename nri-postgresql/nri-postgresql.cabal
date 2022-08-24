@@ -1,6 +1,6 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.34.7.
 --
 -- see: https://github.com/sol/hpack
 
@@ -60,7 +60,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
       attoparsec >=0.13.0.0 && <0.15
-    , base >=4.12.0.0 && <4.17
+    , base >=4.16.3.0 && <4.17
     , bytestring >=0.10.8.2 && <0.12
     , filepath >=1.4.2.1 && <1.5
     , network >=3.1.0.0 && <3.2
@@ -118,7 +118,7 @@ test-suite tests
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
       attoparsec >=0.13.0.0 && <0.15
-    , base >=4.12.0.0 && <4.17
+    , base >=4.16.3.0 && <4.17
     , bytestring >=0.10.8.2 && <0.12
     , filepath >=1.4.2.1 && <1.5
     , network >=3.1.0.0 && <3.2
