@@ -60,9 +60,9 @@ import qualified Debug
 import qualified Dict
 import qualified List
 import qualified Log
+import NriPrelude
 import qualified Maybe
 import qualified Network.URI
-import NriPrelude
 import qualified Result
 import qualified System.Environment
 import Text.Read (readMaybe)

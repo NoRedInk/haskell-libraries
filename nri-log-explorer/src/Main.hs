@@ -21,7 +21,6 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString as ByteString
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Text
 import qualified Data.Text.Encoding as TE
@@ -38,8 +37,13 @@ import qualified Graphics.Vty as Vty
 import qualified Graphics.Vty.Attributes as Vty.Attributes
 import qualified Graphics.Vty.Attributes.Color as Vty.Color
 import Lens.Micro ((^.))
-import qualified List
 import NriPrelude
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
+
+import qualified List
+import qualified Maybe
+import qualified Tuple
 import qualified Paths_nri_log_explorer as Paths
 import qualified Platform
 import qualified System.Directory
@@ -1065,11 +1069,11 @@ viewSpanDetails Span {original} =
                     |> Data.Text.Lazy.toStrict
                 )
             Just (Aeson.Object object) ->
-              HashMap.toList object
+              Aeson.KeyMap.toList object
                 |> List.map
                   ( \(name, val) ->
                       viewDetail
-                        name
+                        (Aeson.Key.toText name)
                         ( case Aeson.toJSON val of
                             Aeson.Null -> "Null"
                             Aeson.String str -> str

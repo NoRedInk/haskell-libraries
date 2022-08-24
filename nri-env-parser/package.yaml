@@ -15,8 +15,8 @@ extra-doc-files:
   - CHANGELOG.md
 library:
   dependencies: &dependencies
-    - base >= 4.12.0.0 && < 4.17
-    - nri-prelude >= 0.1.0.0 && < 0.7
+    - base >= 4.16.3.0 && < 4.17
+    - nri-prelude >= 0.1.0.0
     - modern-uri >= 0.3.1.0 && < 0.4
     - network-uri >= 2.6.2.0 && < 2.8
     - text >= 1.2.3.1 && < 2.1
