@@ -10,6 +10,13 @@ in pkgs.mkShell {
   buildInputs = [
     (haskellPackages.ghcWithPackages (haskellPackages:
       with haskellPackages; [
+        # These tests take waaaaay too much time
+        # We may want to revert this later
+        (pkgs.haskell.lib.dontCheck servant)
+        (pkgs.haskell.lib.dontCheck servant-auth-server)
+        (pkgs.haskell.lib.dontCheck servant-server)
+        (pkgs.haskell.lib.dontCheck text-zipper)
+        (pkgs.haskell.lib.dontCheck vector)
         aeson
         aeson-pretty
         async
@@ -46,17 +53,12 @@ in pkgs.mkShell {
         safe-coloured-text
         safe-coloured-text-terminfo
         safe-exceptions
-        servant
-        servant-auth-server
-        servant-server
         stm
         terminal-size
         text
-        text-zipper
         time
         unordered-containers
         uuid
-        vector
         vty
       ]))
     (workaround140774 pkgs.haskellPackages.niv)
