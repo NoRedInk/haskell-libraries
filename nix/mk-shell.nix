@@ -1,16 +1,10 @@
-{ pkgs, haskellPackages }:
+{ pkgs, pkgs-unstable, haskellPackages }:
 
 # Fix from https://github.com/srid/haskell-template
 let
   workaround140774 = hpkg:
     with pkgs.haskell.lib;
     overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
-  # It is still necessary to run `hpack --force` into packages home dirs
-  haskell-language-server = pkgs.haskellPackages.haskell-language-server.override {
-    hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
-      ormolu = (workaround140774 pkgs.haskellPackages.ormolu);
-    };
-  };
 
 in pkgs.mkShell {
   buildInputs = [
@@ -65,15 +59,15 @@ in pkgs.mkShell {
         vector
         vty
       ]))
-    (workaround140774 pkgs.haskellPackages.ghcid)
     (workaround140774 pkgs.haskellPackages.niv)
-    (workaround140774 pkgs.haskellPackages.ormolu)
+    pkgs-unstable.cabal-install
+    pkgs-unstable.haskellPackages.ghcid
+    pkgs-unstable.haskellPackages.haskell-language-server
+    pkgs-unstable.haskellPackages.hpack
+    pkgs-unstable.haskellPackages.ormolu
     pkgs.apacheKafka # for nri-kafka
-    pkgs.cabal-install
     pkgs.cachix
     pkgs.gnumake
-    haskell-language-server
-    pkgs.haskellPackages.hpack
     pkgs.pcre
     pkgs.postgresql # for nri-postgres
     pkgs.redis # for nri-redis
