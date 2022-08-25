@@ -21,7 +21,7 @@ import qualified Prelude
 main :: Prelude.IO ()
 main = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
-  run [] tests
+  run tests
 
 tests :: Test
 tests =
