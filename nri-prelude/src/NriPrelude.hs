@@ -24,7 +24,6 @@ module NriPrelude
 where
 
 import Basics
-
 import qualified Char
 import qualified GHC.Generics
 import Internal.Shortcut

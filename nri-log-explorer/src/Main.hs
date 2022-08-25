@@ -20,6 +20,8 @@ import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.ByteString as ByteString
 import qualified Data.List
 import qualified Data.Text
@@ -37,9 +39,6 @@ import qualified Graphics.Vty as Vty
 import qualified Graphics.Vty.Attributes as Vty.Attributes
 import qualified Graphics.Vty.Attributes.Color as Vty.Color
 import Lens.Micro ((^.))
-import qualified Data.Aeson.Key as Aeson.Key
-import qualified Data.Aeson.KeyMap as Aeson.KeyMap
-
 import qualified Paths_nri_log_explorer as Paths
 import qualified Platform
 import qualified System.Directory

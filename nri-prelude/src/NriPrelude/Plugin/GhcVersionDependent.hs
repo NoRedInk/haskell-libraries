@@ -1,8 +1,9 @@
-module NriPrelude.Plugin.GhcVersionDependent (
-  module GHC.Hs,
-  isQualified,
-  mkQualified,
-) where
+module NriPrelude.Plugin.GhcVersionDependent
+  ( module GHC.Hs,
+    isQualified,
+    mkQualified,
+  )
+where
 
 import GHC.Hs
 import Prelude

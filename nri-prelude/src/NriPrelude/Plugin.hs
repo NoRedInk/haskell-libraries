@@ -22,9 +22,9 @@ where
 
 import Data.Function ((&))
 import qualified Data.List
-import qualified GHC.Plugins as GhcPlugins
-import qualified GHC.Hs
 import qualified GHC
+import qualified GHC.Hs
+import qualified GHC.Plugins as GhcPlugins
 import NriPrelude.Plugin.GhcVersionDependent
   ( hsmodImports,
     hsmodName,
@@ -103,11 +103,11 @@ addImplicitImports _ _ parsed =
         & Set.fromList
 
     unqualified name =
-      name &
-      GhcPlugins.mkModuleName &
-      simpleImportDecl &
-      GHC.noLocA &
-      fmap (\qual -> qual {ideclImplicit = True})
+      name
+        & GhcPlugins.mkModuleName
+        & simpleImportDecl
+        & GHC.noLocA
+        & fmap (\qual -> qual {ideclImplicit = True})
     qualified name =
       fmap (\qual -> qual {ideclQualified = mkQualified}) (unqualified name)
 

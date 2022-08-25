@@ -1,12 +1,12 @@
 module Platform.ReporterHelpers (toHashMap, srcString, toFlat) where
 
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as Aeson.Key
+import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Data.Foldable as Foldable
 import qualified Data.HashMap.Strict as HashMap
 import qualified GHC.Stack as Stack
 import qualified List
-import qualified Data.Aeson.Key as Aeson.Key
-import qualified Data.Aeson.KeyMap as Aeson.KeyMap
 import qualified Platform.AesonHelpers as AesonHelpers
 import qualified Text
 import qualified Prelude
@@ -55,19 +55,21 @@ flatten key val =
   case val of
     Aeson.Object dict ->
       AesonHelpers.foldObject
-        (\key2 value acc ->
-           let keyFromText = Aeson.Key.fromText key2
-               flattenKeyText = key ++ "." ++ keyFromText
-           in flatten flattenKeyText value ++ acc)
+        ( \key2 value acc ->
+            let keyFromText = Aeson.Key.fromText key2
+                flattenKeyText = key ++ "." ++ keyFromText
+             in flatten flattenKeyText value ++ acc
+        )
         Aeson.KeyMap.empty
         dict
     Aeson.Array vals ->
       Foldable.toList vals
         |> List.indexedMap
-        (\i elem ->
-           let keyFromText = (Aeson.Key.fromText << Text.fromInt) i
-               flattenKeyText = key ++ "." ++ keyFromText
-           in flatten flattenKeyText elem)
+          ( \i elem ->
+              let keyFromText = (Aeson.Key.fromText << Text.fromInt) i
+                  flattenKeyText = key ++ "." ++ keyFromText
+               in flatten flattenKeyText elem
+          )
         |> Prelude.mconcat
     Aeson.String str -> Aeson.KeyMap.singleton key str
     Aeson.Number n -> Aeson.KeyMap.singleton key (Text.fromList (Prelude.show n))

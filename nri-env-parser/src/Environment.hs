@@ -56,8 +56,8 @@ where
 
 import qualified Data.List
 import qualified Data.Text
-import qualified Network.URI
 import qualified Dict
+import qualified Network.URI
 import qualified System.Environment
 import Text.Read (readMaybe)
 import qualified Text.URI

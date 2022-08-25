@@ -7,9 +7,9 @@ module Reporter.Bugsnag.Internal where
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Aeson.Key as Aeson.Key
 import qualified Data.Aeson.KeyMap as Aeson.KeyMap
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
 import qualified Data.Text.IO
