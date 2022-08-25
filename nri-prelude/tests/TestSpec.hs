@@ -58,6 +58,24 @@ api =
         result
           |> simplify
           |> Expect.equal (OnlysPassed ["test 2"] ["test 1"]),
+      test "suite result is 'AllPassed' with only the one test when passed a filepath" <| \_ -> do
+        let suite =
+              describe
+                "suite"
+                [ test "test 1" (\_ -> Expect.pass),
+                  test "test 2" (\_ -> Expect.pass),
+                  test "test 3" (\_ -> Expect.pass)
+                ]
+        result <-
+          Expect.succeeds
+            <| Internal.run
+              [ "tests/TestSpec.hs:65",
+                "tests/TestSpec.hs:67"
+              ]
+              suite
+        result
+          |> simplify
+          |> Expect.equal (AllPassed ["test 1", "test 3"]),
       test "suite result is 'PassedWithSkipped' when containing  skipped test" <| \_ -> do
         let suite =
               describe

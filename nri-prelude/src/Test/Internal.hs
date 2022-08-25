@@ -14,7 +14,6 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.Either
 import qualified Data.IORef as IORef
-import qualified Debug
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Hedgehog
@@ -360,8 +359,10 @@ run runSubset (Test all) = do
           |> Tuple.mapBoth (List.concatMap Tuple.second) (List.concatMap Tuple.second)
   let notToRun = List.map (\test' -> test' {body = NotRan}) notToRun'
   results <-
-    toRun
-      |> List.filter (subset runSubset)
+    ( case runSubset of
+        [] -> toRun
+        _ -> List.filter (subset runSubset) toRun
+      )
       |> List.map runSingle
       |> Task.parallel
   let (failed, passed) =
@@ -390,8 +391,14 @@ run runSubset (Test all) = do
     Summary {} -> AllPassed passed
 
 subset :: List FilePath -> SingleTest expectation -> Bool
-subset [] _ = True
-subset _ _ = Debug.todo "TODO"
+subset filePaths singleTest =
+  case (filePaths, loc singleTest) of
+    ([], _) -> False
+    (_, Nothing) -> False
+    (x : rest, Just Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine}) ->
+      if x == srcLocFile ++ ":" ++ Prelude.show srcLocStartLine
+        then True
+        else subset rest singleTest
 
 data Summary = Summary
   { noTests :: Bool,
