@@ -363,7 +363,28 @@ stdoutReporter =
                 Test.Reporter.Stdout.report handle result
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-subset"
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-subset",
+      test "tests failed (actually running) only run onefile" <| \_ -> do
+        let suite =
+              describe
+                "suite loc"
+                [ test "test fail" (\_ -> Expect.fail "fail"),
+                  test "test equal" (\_ -> Expect.equal True True),
+                  test "test notEqual" (\_ -> Expect.notEqual True False)
+                ]
+        contents <-
+          withTempFile
+            ( \_ handle -> do
+                log <- Platform.silentHandler
+                result <-
+                  Internal.run
+                    ["tests/TestSpec.hs"]
+                    suite
+                    |> Task.perform log
+                Test.Reporter.Stdout.report handle result
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-one-file"
     ]
 
 logfileReporter :: Test
