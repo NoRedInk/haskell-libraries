@@ -14,6 +14,7 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.Either
 import qualified Data.IORef as IORef
+import qualified Debug
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Hedgehog
@@ -341,7 +342,7 @@ only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
 run :: List FilePath -> Test -> Task e SuiteResult
-run _ (Test all) = do
+run runSubset (Test all) = do
   let grouped = groupBy label all
   let skipped = Dict.get Skip grouped |> Maybe.withDefault []
   let todos = Dict.get Todo grouped |> Maybe.withDefault []
@@ -358,7 +359,11 @@ run _ (Test all) = do
           |> List.partition (doRun << Tuple.first)
           |> Tuple.mapBoth (List.concatMap Tuple.second) (List.concatMap Tuple.second)
   let notToRun = List.map (\test' -> test' {body = NotRan}) notToRun'
-  results <- Task.parallel (List.map runSingle toRun)
+  results <-
+    toRun
+      |> List.filter (subset runSubset)
+      |> List.map runSingle
+      |> Task.parallel
   let (failed, passed) =
         results
           |> List.map
@@ -383,6 +388,10 @@ run _ (Test all) = do
     Summary {anyOnlys = True} -> OnlysPassed passed notToRun
     Summary {noneSkipped = False} -> PassedWithSkipped passed notToRun
     Summary {} -> AllPassed passed
+
+subset :: List FilePath -> SingleTest expectation -> Bool
+subset [] _ = True
+subset _ _ = Debug.todo "TODO"
 
 data Summary = Summary
   { noTests :: Bool,
