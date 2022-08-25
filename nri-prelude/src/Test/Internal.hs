@@ -14,7 +14,7 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.Either
 import qualified Data.IORef as IORef
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, isSuffixOf)
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Hedgehog
@@ -401,7 +401,7 @@ subset filePaths singleTest =
             if ":" `isInfixOf` x
               then ":" ++ Prelude.show srcLocStartLine
               else ""
-       in if x == srcLocFile ++ postfix
+       in if (srcLocFile ++ postfix) `isSuffixOf` x
             then True
             else subset rest singleTest
 
