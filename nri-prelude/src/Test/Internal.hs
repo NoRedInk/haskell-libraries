@@ -27,6 +27,7 @@ import NriPrelude
 import Platform (TracingSpan)
 import qualified Platform
 import qualified Platform.Internal
+import System.FilePath (FilePath)
 import qualified Task
 import qualified Tuple
 import qualified Prelude
@@ -339,8 +340,8 @@ only :: Test -> Test
 only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
-run :: Test -> Task e SuiteResult
-run (Test all) = do
+run :: List FilePath -> Test -> Task e SuiteResult
+run _ (Test all) = do
   let grouped = groupBy label all
   let skipped = Dict.get Skip grouped |> Maybe.withDefault []
   let todos = Dict.get Todo grouped |> Maybe.withDefault []

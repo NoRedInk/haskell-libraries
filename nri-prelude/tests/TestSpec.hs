@@ -43,7 +43,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run [] suite
         result
           |> simplify
           |> Expect.equal (AllPassed ["test 1", "test 2"]),
@@ -54,7 +54,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   only <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run [] suite
         result
           |> simplify
           |> Expect.equal (OnlysPassed ["test 2"] ["test 1"]),
@@ -65,7 +65,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   skip <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run [] suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
@@ -76,13 +76,13 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   todo "test 2"
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run [] suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
       test "suite result is 'NoTestsInSuite' when it contains no tests" <| \_ -> do
         let suite = describe "suite" []
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run [] suite
         result
           |> simplify
           |> Expect.equal NoTestsInSuite,
@@ -94,7 +94,7 @@ api =
                   skip <| test "test 2" (\_ -> Expect.pass),
                   test "test 3" (\_ -> Expect.fail "oops")
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run [] suite
         result
           |> simplify
           |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"]),
@@ -317,7 +317,7 @@ stdoutReporter =
             ( \_ handle -> do
                 log <- Platform.silentHandler
                 result <-
-                  Internal.run suite
+                  Internal.run [] suite
                     |> Task.perform log
                 Test.Reporter.Stdout.report handle result
             )

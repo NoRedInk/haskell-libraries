@@ -12,8 +12,8 @@ import qualified LogSpec
 import qualified PlatformSpec
 import qualified SetSpec
 import qualified System.IO
-import Test (Test, describe, run)
 import qualified TaskSpec
+import Test (Test, describe, run)
 import qualified TestSpec
 import qualified TextSpec
 import qualified Prelude
@@ -21,7 +21,7 @@ import qualified Prelude
 main :: Prelude.IO ()
 main = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
-  run tests
+  run [] tests
 
 tests :: Test
 tests =

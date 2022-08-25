@@ -26,6 +26,7 @@ import qualified Platform
 import qualified Platform.DevLog
 import qualified System.Directory
 import qualified System.Environment
+import System.FilePath (FilePath)
 import qualified System.IO
 import qualified Task
 import qualified Test.Internal as Internal
@@ -43,16 +44,16 @@ import qualified Prelude
 -- > import qualified Test
 -- >
 -- > main :: IO ()
--- > main = Test.run (Test.todo "write your tests here!")
-run :: Stack.HasCallStack => Internal.Test -> Prelude.IO ()
-run suite = do
+-- > main = Test.run [] (Test.todo "write your tests here!")
+run :: Stack.HasCallStack => List FilePath -> Internal.Test -> Prelude.IO ()
+run runSubset suite = do
   -- Work around `hGetContents: invalid argument (invalid byte sequence)` bug on
   -- Nix: https://github.com/dhall-lang/dhall-haskell/issues/865
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   log <- Platform.silentHandler
   (results, logExplorerAvailable) <-
     Async.concurrently
-      (Task.perform log (Internal.run suite))
+      (Task.perform log (Internal.run runSubset suite))
       isLogExplorerAvailable
   Async.mapConcurrently_
     identity
