@@ -14,7 +14,7 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.Either
 import qualified Data.IORef as IORef
-import Data.List (isInfixOf, isSuffixOf)
+import Data.List (isSuffixOf)
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Hedgehog
@@ -30,6 +30,7 @@ import qualified Platform
 import qualified Platform.Internal
 import System.FilePath (FilePath)
 import qualified Task
+import qualified Text
 import qualified Tuple
 import qualified Prelude
 
@@ -396,14 +397,23 @@ subset filePaths singleTest =
   case (filePaths, loc singleTest) of
     ([], _) -> False
     (_, Nothing) -> False
-    (x : rest, Just Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine}) ->
-      let postfix =
-            if ":" `isInfixOf` x
-              then ":" ++ Prelude.show srcLocStartLine
-              else ""
+    (x : rest, Just Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine, Stack.srcLocEndLine}) ->
+      let (requestedFile, maybeLoc) = case x |> Text.fromList |> Text.split ":" of
+            -- This will never happen, split produces a nonempty list
+            [fileName, loc] ->
+              ( fileName |> Text.toList,
+                loc |> Text.toInt |> Maybe.map Prelude.fromIntegral
+              )
+            [fileName] -> (fileName |> Text.toList, Nothing)
+            _ -> Prelude.undefined
        in -- isSuffixOf allows us to write --files=quiz-engine-http/spec/Smth/DerpSpec.hs
-          if (srcLocFile ++ postfix) `isSuffixOf` x
-            then True
+          if srcLocFile `isSuffixOf` requestedFile
+            then case maybeLoc of
+              Nothing -> True
+              Just requestedLoc ->
+                if requestedLoc >= srcLocStartLine && requestedLoc <= srcLocEndLine
+                  then True
+                  else subset rest singleTest
             else subset rest singleTest
 
 data Summary = Summary
