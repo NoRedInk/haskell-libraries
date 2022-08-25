@@ -401,7 +401,8 @@ subset filePaths singleTest =
             if ":" `isInfixOf` x
               then ":" ++ Prelude.show srcLocStartLine
               else ""
-       in if (srcLocFile ++ postfix) `isSuffixOf` x
+       in -- isSuffixOf allows us to write --files=quiz-engine-http/spec/Smth/DerpSpec.hs
+          if (srcLocFile ++ postfix) `isSuffixOf` x
             then True
             else subset rest singleTest
 
