@@ -21,7 +21,6 @@ where
 import qualified Control.Concurrent.Async as Async
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
-import qualified List
 import NriPrelude
 import qualified Platform
 import qualified Platform.DevLog
@@ -55,20 +54,19 @@ run suite = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   log <- Platform.silentHandler
   args <- System.Environment.getArgs
-  let requests' = CliParser.parseArgs args
-  requests <- case requests' of
+  let requestOrError = CliParser.parseArgs args
+  request <- case requestOrError of
     Prelude.Left errs -> do
       let error = ("Invalid arguments:\n" ++ (Prelude.show errs))
       hPutStrLn stderr error
       Test.Reporter.ExitCode.report (Internal.CouldntRun (Text.fromList error))
       -- The program will exit from above, but this makes the compiler happy:
       Prelude.pure Internal.All
-    Prelude.Right requests ->
-      Prelude.pure requests
-  let runSubset = getFilesArg args
+    Prelude.Right request ->
+      Prelude.pure request
   (results, logExplorerAvailable) <-
     Async.concurrently
-      (Task.perform log (Internal.run runSubset suite))
+      (Task.perform log (Internal.run request suite))
       isLogExplorerAvailable
   Async.mapConcurrently_
     identity
@@ -80,16 +78,6 @@ run suite = do
     then Prelude.putStrLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
     else Prelude.putStrLn "\nInstall the log-explorer tool to inspect logs collected during test runs. Find it at github.com/NoRedInk/haskell-libraries."
   Test.Reporter.ExitCode.report results
-
-getFilesArg :: List Prelude.String -> List Prelude.String
-getFilesArg args =
-  case args of
-    [] -> []
-    "--files" : path : _ ->
-      Text.fromList path
-        |> Text.split ","
-        |> List.map Text.toList
-    _ : rest -> getFilesArg rest
 
 reportStdout :: Internal.SuiteResult -> Prelude.IO ()
 reportStdout results =

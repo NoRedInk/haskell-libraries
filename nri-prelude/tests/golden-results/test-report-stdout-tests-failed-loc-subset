@@ -1,3 +1,17 @@
-[4mTEST RUN PASSED[m
+↓ tests/TestSpec.hs:353
+↓ suite loc
+✗ test fail
 
-Passed:    0
+Expectation failed at tests/TestSpec.hs:353
+  351:               describe
+  352:                 "suite loc"
+✗ 353:                 [ test "test fail" (\_ -> Expect.fail "fail"),
+  354:                   test "test equal" (\_ -> Expect.equal True True),
+  355:                   test "test notEqual" (\_ -> Expect.notEqual True False)
+
+fail
+
+[4mTEST RUN FAILED[m
+
+Passed:    1
+Failed:    1

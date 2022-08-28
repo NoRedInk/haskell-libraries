@@ -30,7 +30,6 @@ import qualified Platform
 import qualified Platform.Internal
 import System.FilePath (FilePath)
 import qualified Task
-import qualified Text
 import qualified Tuple
 import qualified Prelude
 
@@ -349,8 +348,8 @@ only :: Test -> Test
 only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
-run :: List FilePath -> Test -> Task e SuiteResult
-run runSubset (Test all) = do
+run :: Request -> Test -> Task e SuiteResult
+run request (Test all) = do
   let grouped = groupBy label all
   let skipped = Dict.get Skip grouped |> Maybe.withDefault []
   let todos = Dict.get Todo grouped |> Maybe.withDefault []
@@ -368,9 +367,9 @@ run runSubset (Test all) = do
           |> Tuple.mapBoth (List.concatMap Tuple.second) (List.concatMap Tuple.second)
   let notToRun = List.map (\test' -> test' {body = NotRan}) notToRun'
   results <-
-    ( case runSubset of
-        [] -> toRun
-        _ -> List.filter (subset runSubset) toRun
+    ( case request of
+        All -> toRun
+        Some tests -> List.filter (subset tests) toRun
       )
       |> List.map runSingle
       |> Task.parallel
@@ -399,29 +398,22 @@ run runSubset (Test all) = do
     Summary {noneSkipped = False} -> PassedWithSkipped passed notToRun
     Summary {} -> AllPassed passed
 
-subset :: List FilePath -> SingleTest expectation -> Bool
-subset filePaths singleTest =
-  case (filePaths, loc singleTest) of
-    ([], _) -> False
-    (_, Nothing) -> False
-    (x : rest, Just Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine, Stack.srcLocEndLine}) ->
-      let (requestedFile, maybeLoc) = case x |> Text.fromList |> Text.split ":" of
-            -- This will never happen, split produces a nonempty list
-            [fileName, loc] ->
-              ( fileName |> Text.toList,
-                loc |> Text.toInt |> Maybe.map Prelude.fromIntegral
-              )
-            [fileName] -> (fileName |> Text.toList, Nothing)
-            _ -> Prelude.undefined
-       in -- isSuffixOf allows us to write --files=quiz-engine-http/spec/Smth/DerpSpec.hs
-          if srcLocFile `isSuffixOf` requestedFile
-            then case maybeLoc of
-              Nothing -> True
-              Just requestedLoc ->
-                if requestedLoc >= srcLocStartLine && requestedLoc <= srcLocEndLine
+subset :: List SubsetOfTests -> SingleTest expectation -> Bool
+subset subsets singleTest =
+  case (subsets, loc singleTest) of
+    ([], _) -> False -- Should never happen, we should have a NonEmpty SubsetOfTests tbh
+    (_, Nothing) -> False -- When can this happen??
+    (SubsetOfTests {requestedPath, lineOfCode} : rest, Just Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine, Stack.srcLocEndLine}) ->
+      -- isSuffixOf allows us to write --files=quiz-engine-http/spec/Smth/DerpSpec.hs
+      if srcLocFile `isSuffixOf` requestedPath
+        then case lineOfCode of
+          Nothing -> True
+          Just requestedLoc' ->
+            let requestedLoc = Prelude.fromIntegral requestedLoc'
+             in if requestedLoc >= srcLocStartLine && requestedLoc <= srcLocEndLine
                   then True
                   else subset rest singleTest
-            else subset rest singleTest
+        else subset rest singleTest
 
 data Summary = Summary
   { noTests :: Bool,

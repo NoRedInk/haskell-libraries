@@ -2,7 +2,6 @@ module TestSpec (tests) where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson.Encode.Pretty
-import qualified Data.Attoparsec.Text as Attoparsec
 import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Text.IO
@@ -46,7 +45,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run [] suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (AllPassed ["test 1", "test 2"]),
@@ -57,7 +56,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   only <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run [] suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (OnlysPassed ["test 2"] ["test 1"]),
@@ -70,12 +69,15 @@ api =
                   test "test 3" (\_ -> Expect.pass)
                 ]
         result <-
-          Expect.succeeds
-            <| Internal.run
-              [ "tests/TestSpec.hs:68",
-                "tests/TestSpec.hs:70"
-              ]
-              suite
+          suite
+            |> Internal.run
+              ( Internal.Some
+                  [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just 67),
+                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just 69)
+                  ]
+              )
+            |> Expect.succeeds
+
         result
           |> simplify
           |> Expect.equal (AllPassed ["test 1", "test 3"]),
@@ -86,7 +88,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   skip <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run [] suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
@@ -97,13 +99,13 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   todo "test 2"
                 ]
-        result <- Expect.succeeds <| Internal.run [] suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
       test "suite result is 'NoTestsInSuite' when it contains no tests" <| \_ -> do
         let suite = describe "suite" []
-        result <- Expect.succeeds <| Internal.run [] suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal NoTestsInSuite,
@@ -115,7 +117,7 @@ api =
                   skip <| test "test 2" (\_ -> Expect.pass),
                   test "test 3" (\_ -> Expect.fail "oops")
                 ]
-        result <- Expect.succeeds <| Internal.run [] suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"]),
@@ -338,7 +340,7 @@ stdoutReporter =
             ( \_ handle -> do
                 log <- Platform.silentHandler
                 result <-
-                  Internal.run [] suite
+                  Internal.run Internal.All suite
                     |> Task.perform log
                 Test.Reporter.Stdout.report handle result
             )
@@ -357,11 +359,13 @@ stdoutReporter =
             ( \_ handle -> do
                 log <- Platform.silentHandler
                 result <-
-                  Internal.run
-                    [ "tests/TestSpec.hs:348",
-                      "tests/TestSpec.hs:350"
-                    ]
-                    suite
+                  suite
+                    |> Internal.run
+                      ( Internal.Some
+                          [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just 353),
+                            Internal.SubsetOfTests "tests/TestSpec.hs" (Just 355)
+                          ]
+                      )
                     |> Task.perform log
                 Test.Reporter.Stdout.report handle result
             )
@@ -380,9 +384,9 @@ stdoutReporter =
             ( \_ handle -> do
                 log <- Platform.silentHandler
                 result <-
-                  Internal.run
-                    ["tests/TestSpec.hs"]
-                    suite
+                  suite
+                    |> Internal.run
+                      (Internal.Some [Internal.SubsetOfTests "tests/TestSpec.hs" Nothing])
                     |> Task.perform log
                 Test.Reporter.Stdout.report handle result
             )
