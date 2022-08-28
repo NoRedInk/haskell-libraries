@@ -26,6 +26,7 @@ import qualified Platform
 import qualified Platform.DevLog
 import qualified System.Directory
 import qualified System.Environment
+import qualified System.Exit
 import System.IO (hPutStrLn, stderr)
 import qualified System.IO
 import qualified Task
@@ -35,7 +36,6 @@ import qualified Test.Reporter.ExitCode
 import qualified Test.Reporter.Junit
 import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
-import qualified Text
 import qualified Prelude
 
 -- | Turn a test suite into a program that can be executed in Haskell. Use like
@@ -59,9 +59,7 @@ run suite = do
     Prelude.Left errs -> do
       let error = ("Invalid arguments:\n" ++ (Prelude.show errs))
       hPutStrLn stderr error
-      Test.Reporter.ExitCode.report (Internal.CouldntRun (Text.fromList error))
-      -- The program will exit from above, but this makes the compiler happy:
-      Prelude.pure Internal.All
+      System.Exit.exitFailure
     Prelude.Right request ->
       Prelude.pure request
   (results, logExplorerAvailable) <-

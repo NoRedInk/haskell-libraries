@@ -70,7 +70,6 @@ data SuiteResult
   | PassedWithSkipped [SingleTest TracingSpan] [SingleTest NotRan]
   | TestsFailed [SingleTest TracingSpan] [SingleTest NotRan] [SingleTest (TracingSpan, Failure)]
   | NoTestsInSuite
-  | CouldntRun Text
 
 data NotRan = NotRan
 
