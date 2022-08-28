@@ -72,8 +72,8 @@ api =
         result <-
           Expect.succeeds
             <| Internal.run
-              [ "tests/TestSpec.hs:69",
-                "tests/TestSpec.hs:71"
+              [ "tests/TestSpec.hs:68",
+                "tests/TestSpec.hs:70"
               ]
               suite
         result
@@ -542,19 +542,19 @@ cliParser =
           test "Invalid argument" <| \_ ->
             expectFail
               ["invalid"]
-              "string",
+              "Failed reading: expected argument: --files",
           test "Missing separator" <| \_ ->
             expectFail
               ["--files"]
-              "not enough input",
+              "Failed reading: expected format: --files=bla.hs or --files bla.hs",
           test "Missing files" <| \_ ->
             expectFail
               ["--files="]
-              "not enough input",
+              "Failed reading: must inform at least one file",
           test "Missing files 2" <| \_ ->
             expectFail
               ["--files=,"]
-              "Failed reading: takeWhile1",
+              "Failed reading: must inform at least one file",
           test "Missing files 3" <| \_ ->
             -- Shouldn't error, but debugging attoparsec is maddening
             expectFail

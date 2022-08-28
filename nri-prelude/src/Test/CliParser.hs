@@ -1,7 +1,7 @@
 module Test.CliParser where
 
 import Control.Applicative ((<*), (<|>))
-import Data.Attoparsec.Text (Parser)
+import Data.Attoparsec.Text (Parser, (<?>))
 import qualified Data.Attoparsec.Text as Attoparsec
 import qualified Data.Bifunctor
 import qualified List
@@ -34,13 +34,17 @@ parse input =
 
 argParser :: Parser [Internal.SubsetOfTests]
 argParser = do
-  _ <- Attoparsec.string "--files"
-  _ <- Attoparsec.string "=" <|> Attoparsec.string " "
-  Attoparsec.sepBy1' fileParser (Attoparsec.char ',')
+  _ <- Attoparsec.string "--files" <|> Prelude.fail "expected argument: --files"
+  _ <-
+    Attoparsec.string "="
+      <|> Attoparsec.string " "
+      <|> Prelude.fail "expected format: --files=bla.hs or --files bla.hs"
+  (Attoparsec.sepBy1' fileParser (Attoparsec.char ',') <?> "comma-separated files")
+    <|> Prelude.fail "must inform at least one file"
 
 fileParser :: Parser Internal.SubsetOfTests
 fileParser = do
-  fileName <- Attoparsec.takeWhile1 <| \word -> word /= ':' && word /= ','
+  fileName <- (Attoparsec.takeWhile1 <| \word -> word /= ':' && word /= ',')
   let filepath = Text.toList fileName
   maybeNextChar <- Attoparsec.peekChar
   case maybeNextChar of
