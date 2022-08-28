@@ -34,6 +34,10 @@ import qualified Text
 import qualified Tuple
 import qualified Prelude
 
+data Request = All | Some [SubsetOfTests]
+
+data SubsetOfTests = SubsetOfTests {requestedPath :: FilePath, lineOfCode :: Maybe Int}
+
 data SingleTest a = SingleTest
   { describes :: [Text],
     name :: Text,
@@ -65,6 +69,7 @@ data SuiteResult
   | PassedWithSkipped [SingleTest TracingSpan] [SingleTest NotRan]
   | TestsFailed [SingleTest TracingSpan] [SingleTest NotRan] [SingleTest (TracingSpan, Failure)]
   | NoTestsInSuite
+  | CouldntRun Text
 
 data NotRan = NotRan
 

@@ -27,8 +27,10 @@ import qualified Platform
 import qualified Platform.DevLog
 import qualified System.Directory
 import qualified System.Environment
+import System.IO (hPutStrLn, stderr)
 import qualified System.IO
 import qualified Task
+import qualified Test.CliParser as CliParser
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
 import qualified Test.Reporter.Junit
@@ -53,6 +55,16 @@ run suite = do
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   log <- Platform.silentHandler
   args <- System.Environment.getArgs
+  let requests' = CliParser.parseArgs args
+  requests <- case requests' of
+    Prelude.Left errs -> do
+      let error = ("Invalid arguments:\n" ++ (Prelude.show errs))
+      hPutStrLn stderr error
+      Test.Reporter.ExitCode.report (Internal.CouldntRun (Text.fromList error))
+      -- The program will exit from above, but this makes the compiler happy:
+      Prelude.pure Internal.All
+    Prelude.Right requests ->
+      Prelude.pure requests
   let runSubset = getFilesArg args
   (results, logExplorerAvailable) <-
     Async.concurrently
