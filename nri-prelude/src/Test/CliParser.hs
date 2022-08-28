@@ -39,12 +39,11 @@ argParser = do
     Attoparsec.string "="
       <|> Attoparsec.string " "
       <|> Prelude.fail "expected format: --files=bla.hs or --files bla.hs"
-  (Attoparsec.sepBy1' fileParser (Attoparsec.char ',') <?> "comma-separated files")
-    <|> Prelude.fail "must inform at least one file"
+  (Attoparsec.sepBy1' fileParser (Attoparsec.char ',') <?> "must inform at least one file")
 
 fileParser :: Parser Internal.SubsetOfTests
 fileParser = do
-  fileName <- (Attoparsec.takeWhile1 <| \word -> word /= ':' && word /= ',')
+  fileName <- (Attoparsec.takeWhile1 <| \word -> word /= ':' && word /= ',') <?> "filename"
   let filepath = Text.toList fileName
   maybeNextChar <- Attoparsec.peekChar
   case maybeNextChar of
@@ -52,6 +51,8 @@ fileParser = do
     Just ',' -> Prelude.pure <| Internal.SubsetOfTests filepath Nothing
     Just ':' -> do
       _ <- Attoparsec.char ':'
-      loc <- Attoparsec.decimal
-      Prelude.pure <| Internal.SubsetOfTests filepath (Just loc)
-    Just c -> Prelude.fail <| c : ": invalid character"
+      maybeLoc <- (Attoparsec.takeWhile1 <| \word -> word /= ',') <|> Prelude.fail "missing line number"
+      case Text.toInt maybeLoc of
+        Nothing -> Prelude.fail <| "invalid line number: " ++ (Text.toList maybeLoc)
+        Just loc -> Prelude.pure <| Internal.SubsetOfTests filepath (Just loc)
+    Just c -> Prelude.fail <| c : ": invalid character" -- Can't ever happen

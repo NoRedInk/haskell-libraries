@@ -550,11 +550,11 @@ cliParser =
           test "Missing files" <| \_ ->
             expectFail
               ["--files="]
-              "Failed reading: must inform at least one file",
+              "must inform at least one file > filename: not enough input",
           test "Missing files 2" <| \_ ->
             expectFail
               ["--files=,"]
-              "Failed reading: must inform at least one file",
+              "must inform at least one file > filename: Failed reading: takeWhile1",
           test "Missing files 3" <| \_ ->
             -- Shouldn't error, but debugging attoparsec is maddening
             expectFail
@@ -573,5 +573,13 @@ cliParser =
           test "Doesn't really parse file paths" <| \_ ->
             expectPass
               ["--files=bla.hs\nble.hs"]
-              (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing])
+              (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing]),
+          test "File with LoC" <| \_ ->
+            expectPass
+              ["--files=bla.hs:123"]
+              (Internal.Some [Internal.SubsetOfTests "bla.hs" (Just 123)]),
+          test "File with bad LoC" <| \_ ->
+            expectFail
+              ["--files=bla.hs:1asd"]
+              "must inform at least one file: Failed reading: invalid line number: 1asd"
         ]
