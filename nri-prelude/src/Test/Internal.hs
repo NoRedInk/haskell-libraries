@@ -35,8 +35,10 @@ import qualified Tuple
 import qualified Prelude
 
 data Request = All | Some [SubsetOfTests]
+  deriving (Eq, Show)
 
 data SubsetOfTests = SubsetOfTests {requestedPath :: FilePath, lineOfCode :: Maybe Int}
+  deriving (Eq, Show)
 
 data SingleTest a = SingleTest
   { describes :: [Text],

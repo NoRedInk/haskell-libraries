@@ -2,6 +2,7 @@ module TestSpec (tests) where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson.Encode.Pretty
+import qualified Data.Attoparsec.Text as Attoparsec
 import qualified Data.ByteString.Lazy
 import qualified Data.Text
 import qualified Data.Text.IO
@@ -16,6 +17,7 @@ import qualified Platform.Internal
 import qualified System.IO
 import qualified Task
 import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, test, todo)
+import qualified Test.CliParser as CliParser
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
@@ -29,7 +31,8 @@ tests =
     [ api,
       floatComparison,
       stdoutReporter,
-      logfileReporter
+      logfileReporter,
+      cliParser
     ]
 
 api :: Test
@@ -69,8 +72,8 @@ api =
         result <-
           Expect.succeeds
             <| Internal.run
-              [ "tests/TestSpec.hs:65",
-                "tests/TestSpec.hs:67"
+              [ "tests/TestSpec.hs:69",
+                "tests/TestSpec.hs:71"
               ]
               suite
         result
@@ -525,3 +528,50 @@ mockException :: Exception.SomeException
 mockException =
   Exception.StringException "exception" (GHC.Exts.fromList [])
     |> Exception.toException
+
+cliParser :: Test
+cliParser =
+  let expectPass args value = Expect.equal (Prelude.Right value) (CliParser.parseArgs args)
+      expectFail args value = Expect.equal (Prelude.Left value) (CliParser.parseArgs args)
+   in describe
+        "CLI Parser"
+        [ test "All tests" <| \_ ->
+            expectPass
+              []
+              Internal.All,
+          test "Invalid argument" <| \_ ->
+            expectFail
+              ["invalid"]
+              "string",
+          test "Missing separator" <| \_ ->
+            expectFail
+              ["--files"]
+              "not enough input",
+          test "Missing files" <| \_ ->
+            expectFail
+              ["--files="]
+              "not enough input",
+          test "Missing files 2" <| \_ ->
+            expectFail
+              ["--files=,"]
+              "Failed reading: takeWhile1",
+          test "Missing files 3" <| \_ ->
+            -- Shouldn't error, but debugging attoparsec is maddening
+            expectFail
+              ["--files=a.hs,"]
+              "endOfInput",
+          test "1 file" <| \_ ->
+            expectPass
+              ["--files=a.hs"]
+              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
+          test "2 files" <| \_ ->
+            expectPass
+              ["--files=a.hs,b.hs"]
+              ( Internal.Some
+                  [Internal.SubsetOfTests "a.hs" Nothing, Internal.SubsetOfTests "b.hs" Nothing]
+              ),
+          test "Doesn't really parse file paths" <| \_ ->
+            expectPass
+              ["--files=bla.hs\nble.hs"]
+              (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing])
+        ]
