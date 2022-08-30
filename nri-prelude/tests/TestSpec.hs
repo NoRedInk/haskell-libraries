@@ -16,6 +16,7 @@ import qualified Platform.Internal
 import qualified System.IO
 import qualified Task
 import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, test, todo)
+import qualified Test.CliParser as CliParser
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
@@ -29,7 +30,8 @@ tests =
     [ api,
       floatComparison,
       stdoutReporter,
-      logfileReporter
+      logfileReporter,
+      cliParser
     ]
 
 api :: Test
@@ -43,7 +45,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (AllPassed ["test 1", "test 2"]),
@@ -54,10 +56,31 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   only <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (OnlysPassed ["test 2"] ["test 1"]),
+      test "suite result is 'AllPassed' with only the one test when passed a filepath" <| \_ -> do
+        let suite =
+              describe
+                "suite"
+                [ test "test 1" (\_ -> Expect.pass),
+                  test "test 2" (\_ -> Expect.pass),
+                  test "test 3" (\_ -> Expect.pass)
+                ]
+        result <-
+          suite
+            |> Internal.run
+              ( Internal.Some
+                  [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just 67),
+                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just 69)
+                  ]
+              )
+            |> Expect.succeeds
+
+        result
+          |> simplify
+          |> Expect.equal (AllPassed ["test 1", "test 3"]),
       test "suite result is 'PassedWithSkipped' when containing  skipped test" <| \_ -> do
         let suite =
               describe
@@ -65,7 +88,7 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   skip <| test "test 2" (\_ -> Expect.pass)
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
@@ -76,13 +99,13 @@ api =
                 [ test "test 1" (\_ -> Expect.pass),
                   todo "test 2"
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (PassedWithSkipped ["test 1"] ["test 2"]),
       test "suite result is 'NoTestsInSuite' when it contains no tests" <| \_ -> do
         let suite = describe "suite" []
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal NoTestsInSuite,
@@ -94,7 +117,7 @@ api =
                   skip <| test "test 2" (\_ -> Expect.pass),
                   test "test 3" (\_ -> Expect.fail "oops")
                 ]
-        result <- Expect.succeeds <| Internal.run suite
+        result <- Expect.succeeds <| Internal.run Internal.All suite
         result
           |> simplify
           |> Expect.equal (TestsFailed ["test 1"] ["test 2"] ["test 3"]),
@@ -169,13 +192,11 @@ expectSingleTest check (Internal.Test tests') =
 
 expectSrcFile :: Text -> Internal.SingleTest a -> Expect.Expectation
 expectSrcFile expected test' =
-  case Internal.loc test' of
-    Nothing ->
-      Expect.fail "Expected source file location for test, but none was set."
-    Just loc ->
-      Stack.srcLocFile loc
-        |> Data.Text.pack
-        |> Expect.equal expected
+  test'
+    |> Internal.loc
+    |> Stack.srcLocFile
+    |> Data.Text.pack
+    |> Expect.equal expected
 
 -- | A type mirroring `Internal.SuiteResult`, simplified to allow easy
 -- comparisons in tests.
@@ -274,7 +295,7 @@ stdoutReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
@@ -317,12 +338,64 @@ stdoutReporter =
             ( \_ handle -> do
                 log <- Platform.silentHandler
                 result <-
-                  Internal.run suite
+                  Internal.run Internal.All suite
                     |> Task.perform log
                 Test.Reporter.Stdout.report handle result
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc"
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc",
+      test "tests failed (actually running) only run subset" <| \_ -> do
+        let srcLoc =
+              Internal.getFrame "subset test"
+                |> Stack.srcLocStartLine
+                |> Prelude.fromIntegral
+            suite =
+              describe
+                "suite loc"
+                [ test "test fail" (\_ -> Expect.fail "fail"),
+                  test "test equal" (\_ -> Expect.equal True True),
+                  test "test notEqual" (\_ -> Expect.notEqual True False)
+                ]
+        contents <-
+          withTempFile
+            ( \_ handle -> do
+                log <- Platform.silentHandler
+                result <-
+                  suite
+                    |> Internal.run
+                      ( Internal.Some
+                          [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 6)),
+                            Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 8))
+                          ]
+                      )
+                    |> Task.perform log
+                Test.Reporter.Stdout.report handle result
+            )
+        Expect.true (Text.contains "Passed:    1" contents)
+        Expect.true (Text.contains "Failed:    1" contents)
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-subset",
+      test "tests failed (actually running) only run onefile" <| \_ -> do
+        let suite =
+              describe
+                "suite loc"
+                [ test "test fail" (\_ -> Expect.fail "fail"),
+                  test "test equal" (\_ -> Expect.equal True True),
+                  test "test notEqual" (\_ -> Expect.notEqual True False)
+                ]
+        contents <-
+          withTempFile
+            ( \_ handle -> do
+                log <- Platform.silentHandler
+                result <-
+                  suite
+                    |> Internal.run
+                      (Internal.Some [Internal.SubsetOfTests "tests/TestSpec.hs" Nothing])
+                    |> Task.perform log
+                Test.Reporter.Stdout.report handle result
+            )
+        contents
+          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-one-file"
     ]
 
 logfileReporter :: Test
@@ -391,7 +464,7 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
@@ -429,7 +502,7 @@ mockTest name body =
     { Internal.describes = ["suite", "sub suite"],
       Internal.name = name,
       Internal.label = Internal.None,
-      Internal.loc = Just mockSrcLoc,
+      Internal.loc = mockSrcLoc,
       Internal.body = body
     }
 
@@ -463,3 +536,72 @@ mockException :: Exception.SomeException
 mockException =
   Exception.StringException "exception" (GHC.Exts.fromList [])
     |> Exception.toException
+
+cliParser :: Test
+cliParser =
+  let expectPass args value = Stack.withFrozenCallStack Expect.equal (Ok value) (CliParser.parseArgs args)
+      expectFail args value = Stack.withFrozenCallStack Expect.equal (Err value) (CliParser.parseArgs args)
+   in describe
+        "CLI Parser"
+        [ test "All tests" <| \_ ->
+            expectPass
+              []
+              Internal.All,
+          test "Invalid argument" <| \_ ->
+            expectFail
+              ["invalid"]
+              "expected argument: --files: string",
+          test "Missing separator" <| \_ ->
+            expectFail
+              ["--files"]
+              "must inform at least one file: not enough input",
+          test "Missing files" <| \_ ->
+            expectFail
+              ["--files="]
+              "must inform at least one file: not enough input",
+          test "Missing files 2" <| \_ ->
+            expectFail
+              ["--files=,"]
+              "must inform at least one file: Failed reading: expected format: --files=bla.hs or --files bla.hs: \",\"",
+          test "Missing files 3" <| \_ ->
+            -- Shouldn't error, but debugging attoparsec is maddening
+            expectPass
+              ["--files=a.hs,"]
+              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
+          test "1 file" <| \_ ->
+            expectPass
+              ["--files=a.hs"]
+              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
+          test "2 files" <| \_ ->
+            expectPass
+              ["--files=a.hs,b.hs"]
+              ( Internal.Some
+                  [Internal.SubsetOfTests "a.hs" Nothing, Internal.SubsetOfTests "b.hs" Nothing]
+              ),
+          test "Doesn't really parse file paths" <| \_ ->
+            expectPass
+              ["--files=bla.hs\nble.hs"]
+              (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing]),
+          test "File with LoC" <| \_ ->
+            expectPass
+              ["--files=bla.hs:123"]
+              (Internal.Some [Internal.SubsetOfTests "bla.hs" (Just 123)]),
+          test "File with bad LoC" <| \_ ->
+            expectFail
+              ["--files=bla.hs:1asd"]
+              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd\"",
+          test "File with bad LoC in first file" <| \_ ->
+            expectFail
+              ["--files=bla.hs:1asd,b.hs"]
+              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd,b.hs\"",
+          fuzz (Fuzz.intRange 1 3) "spaces after --files" <| \x ->
+            expectPass
+              [ [ Text.fromList "--files",
+                  Text.repeat x " ",
+                  Text.fromList "bla.hs"
+                ]
+                  |> Text.join ""
+                  |> Text.toList
+              ]
+              (Internal.Some [Internal.SubsetOfTests "bla.hs" Nothing])
+        ]

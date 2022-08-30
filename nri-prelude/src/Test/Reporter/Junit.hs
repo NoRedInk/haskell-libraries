@@ -87,29 +87,20 @@ renderFailed test maybeSrcLoc =
                 |> (\srcStr -> srcStr ++ "\n" ++ msg)
        in JUnit.failed (Internal.name test)
             |> JUnit.stderr msg'
-            |> ( case stackFrame test of
-                   Nothing -> identity
-                   Just frame -> JUnit.failureStackTrace [frame]
-               )
+            |> JUnit.failureStackTrace [stackFrame test]
             |> JUnit.time (duration tracingSpan)
             |> JUnit.inSuite (suiteName test)
     (tracingSpan, Internal.ThrewException err) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test threw an exception."
         |> JUnit.stderr (Data.Text.pack (Exception.displayException err))
-        |> ( case stackFrame test of
-               Nothing -> identity
-               Just frame -> JUnit.errorStackTrace [frame]
-           )
+        |> JUnit.errorStackTrace [stackFrame test]
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
     (tracingSpan, Internal.TookTooLong) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test timed out."
-        |> ( case stackFrame test of
-               Nothing -> identity
-               Just frame -> JUnit.errorStackTrace [frame]
-           )
+        |> JUnit.errorStackTrace [stackFrame test]
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
     (tracingSpan, Internal.TestRunnerMessedUp msg) ->
@@ -125,10 +116,7 @@ renderFailed test maybeSrcLoc =
                 "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
               ]
           )
-        |> ( case stackFrame test of
-               Nothing -> identity
-               Just frame -> JUnit.errorStackTrace [frame]
-           )
+        |> JUnit.errorStackTrace [stackFrame test]
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
 
@@ -137,17 +125,14 @@ suiteName test =
   Internal.describes test
     |> Text.join " - "
 
-stackFrame :: Internal.SingleTest a -> Maybe Text
+stackFrame :: Internal.SingleTest a -> Text
 stackFrame test =
-  Internal.loc test
-    |> map
-      ( \loc ->
-          Data.Text.pack
-            ( Stack.srcLocFile loc
-                ++ ":"
-                ++ Prelude.show (Stack.srcLocStartLine loc)
-            )
-      )
+  let loc = Internal.loc test
+   in Data.Text.pack
+        ( Stack.srcLocFile loc
+            ++ ":"
+            ++ Prelude.show (Stack.srcLocStartLine loc)
+        )
 
 duration :: Platform.TracingSpan -> Float
 duration test =

@@ -26,8 +26,11 @@ import qualified Platform
 import qualified Platform.DevLog
 import qualified System.Directory
 import qualified System.Environment
+import qualified System.Exit
+import System.IO (hPutStrLn, stderr)
 import qualified System.IO
 import qualified Task
+import qualified Test.CliParser as CliParser
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.ExitCode
 import qualified Test.Reporter.Junit
@@ -43,22 +46,31 @@ import qualified Prelude
 -- > import qualified Test
 -- >
 -- > main :: IO ()
--- > main = Test.run (Test.todo "write your tests here!")
+-- > main = Test.run  (Test.todo "write your tests here!")
 run :: Stack.HasCallStack => Internal.Test -> Prelude.IO ()
 run suite = do
   -- Work around `hGetContents: invalid argument (invalid byte sequence)` bug on
   -- Nix: https://github.com/dhall-lang/dhall-haskell/issues/865
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
   log <- Platform.silentHandler
+  args <- System.Environment.getArgs
+  let requestOrError = CliParser.parseArgs args
+  request <- case requestOrError of
+    Err errs -> do
+      let error = ("Invalid arguments:\n" ++ errs)
+      hPutStrLn stderr error
+      System.Exit.exitFailure
+    Ok request ->
+      Prelude.pure request
   (results, logExplorerAvailable) <-
     Async.concurrently
-      (Task.perform log (Internal.run suite))
+      (Task.perform log (Internal.run request suite))
       isLogExplorerAvailable
   Async.mapConcurrently_
     identity
     [ reportStdout results,
       Stack.withFrozenCallStack reportLogfile results,
-      reportJunit results
+      reportJunit args results
     ]
   if logExplorerAvailable
     then Prelude.putStrLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
@@ -76,13 +88,11 @@ reportLogfile results =
     Platform.DevLog.writeSpanToDevLog
     results
 
-reportJunit :: Internal.SuiteResult -> Prelude.IO ()
-reportJunit results =
-  do
-    args <- System.Environment.getArgs
-    case getPath args of
-      Nothing -> Prelude.pure ()
-      Just path -> Test.Reporter.Junit.report path results
+reportJunit :: [Prelude.String] -> Internal.SuiteResult -> Prelude.IO ()
+reportJunit args results =
+  case getPath args of
+    Nothing -> Prelude.pure ()
+    Just path -> Test.Reporter.Junit.report path results
 
 getPath :: [Prelude.String] -> Maybe Prelude.String
 getPath args =

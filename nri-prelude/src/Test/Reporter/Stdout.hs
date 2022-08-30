@@ -135,11 +135,9 @@ renderFailureInFile maybeSrcLoc =
 
 prettyPath :: (Text.Colour.Chunk -> Text.Colour.Chunk) -> Internal.SingleTest a -> List Text.Colour.Chunk
 prettyPath style test =
-  List.concat
-    [ case Internal.loc test of
-        Nothing -> []
-        Just loc ->
-          [ grey
+  let loc = Internal.loc test
+   in List.concat
+        [ [ grey
               <| chunk
                 ( "↓ "
                     ++ Text.fromList (Stack.srcLocFile loc)
@@ -148,16 +146,16 @@ prettyPath style test =
                     ++ "\n"
                 )
           ],
-      [ grey
-          ( chunk
-              <| Prelude.foldMap
-                (\text -> "↓ " ++ text ++ "\n")
-                (Internal.describes test)
-          ),
-        style (chunk ("✗ " ++ Internal.name test)),
-        "\n"
-      ]
-    ]
+          [ grey
+              ( chunk
+                  <| Prelude.foldMap
+                    (\text -> "↓ " ++ text ++ "\n")
+                    (Internal.describes test)
+              ),
+            style (chunk ("✗ " ++ Internal.name test)),
+            "\n"
+          ]
+        ]
 
 testFailure :: Internal.SingleTest Internal.Failure -> Text.Colour.Chunk
 testFailure test =

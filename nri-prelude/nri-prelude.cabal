@@ -59,6 +59,7 @@ library
       Platform.DevLog
       Platform.DoAnything
       Platform.Internal
+      Test.CliParser
       Test.Internal
       Test.Reporter.ExitCode
       Test.Reporter.Internal
@@ -87,6 +88,7 @@ library
       aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
+    , attoparsec >=0.13.0.0 && <0.15
     , auto-update >=0.1.6 && <0.2
     , base >=4.12.0.0 && <4.17
     , bytestring >=0.10.8.2 && <0.12
@@ -149,6 +151,7 @@ test-suite tests
       Set
       Task
       Test
+      Test.CliParser
       Test.Internal
       Test.Reporter.ExitCode
       Test.Reporter.Internal
@@ -181,6 +184,7 @@ test-suite tests
       aeson >=1.4.6.0 && <2.1
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
+    , attoparsec >=0.13.0.0 && <0.15
     , auto-update >=0.1.6 && <0.2
     , base >=4.12.0.0 && <4.17
     , bytestring >=0.10.8.2 && <0.12

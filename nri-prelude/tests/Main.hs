@@ -12,8 +12,8 @@ import qualified LogSpec
 import qualified PlatformSpec
 import qualified SetSpec
 import qualified System.IO
-import Test (Test, describe, run)
 import qualified TaskSpec
+import Test (Test, describe, run)
 import qualified TestSpec
 import qualified TextSpec
 import qualified Prelude
