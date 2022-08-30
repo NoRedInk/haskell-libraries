@@ -43,12 +43,20 @@ data SingleTest a = SingleTest
   { describes :: [Text],
     name :: Text,
     label :: Label,
+    -- This is used for serializing execution of grouped tests (e.g. database tests)
+    group :: Group,
     loc :: Stack.SrcLoc,
     body :: a
   }
   deriving (Prelude.Functor)
 
 data Label = None | Skip | Only | Todo
+  deriving (Eq, Ord)
+
+data Group = Grouped (List GroupKey) | Ungrouped
+  deriving (Eq, Ord)
+
+newtype GroupKey = GroupKey {unGroupkey :: Text}
   deriving (Eq, Ord)
 
 data TestResult
@@ -143,6 +151,7 @@ todo name =
         { describes = [],
           name = name,
           loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = Todo,
           body = Expectation (Task.succeed ())
         }
@@ -164,6 +173,7 @@ test name expectation =
         { describes = [],
           name = name,
           loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body = handleUnexpectedErrors (expectation ())
         }
@@ -185,6 +195,7 @@ fuzz fuzzer name expectation =
         { describes = [],
           name = name,
           loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body = fuzzBody fuzzer expectation
         }
@@ -198,6 +209,7 @@ fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
         { describes = [],
           name = name,
           loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body =
             fuzzBody
@@ -214,6 +226,7 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
         { describes = [],
           name = name,
           loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body =
             fuzzBody

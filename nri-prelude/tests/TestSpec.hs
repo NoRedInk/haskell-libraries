@@ -503,6 +503,7 @@ mockTest name body =
       Internal.name = name,
       Internal.label = Internal.None,
       Internal.loc = mockSrcLoc,
+      Internal.group = Internal.Ungrouped,
       Internal.body = body
     }
 
