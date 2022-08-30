@@ -1,13 +1,13 @@
-↓ tests/TestSpec.hs:353
+↓ tests/TestSpec.hs:355
 ↓ suite loc
 ✗ test fail
 
-Expectation failed at tests/TestSpec.hs:353
-  351:               describe
-  352:                 "suite loc"
-✗ 353:                 [ test "test fail" (\_ -> Expect.fail "fail"),
-  354:                   test "test equal" (\_ -> Expect.equal True True),
-  355:                   test "test notEqual" (\_ -> Expect.notEqual True False)
+Expectation failed at tests/TestSpec.hs:355
+  353:               describe
+  354:                 "suite loc"
+✗ 355:                 [ test "test fail" (\_ -> Expect.fail "fail"),
+  356:                   test "test equal" (\_ -> Expect.equal True True),
+  357:                   test "test notEqual" (\_ -> Expect.notEqual True False)
 
 fail
 

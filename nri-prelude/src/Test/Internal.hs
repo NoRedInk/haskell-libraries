@@ -43,7 +43,7 @@ data SingleTest a = SingleTest
   { describes :: [Text],
     name :: Text,
     label :: Label,
-    loc :: Maybe Stack.SrcLoc,
+    loc :: Stack.SrcLoc,
     body :: a
   }
   deriving (Prelude.Functor)
@@ -56,7 +56,7 @@ data TestResult
   | Failed Failure
 
 data Failure
-  = FailedAssertion Text (Maybe Stack.SrcLoc)
+  = FailedAssertion Text Stack.SrcLoc
   | ThrewException Exception.SomeException
   | TookTooLong
   | TestRunnerMessedUp Text
@@ -142,7 +142,7 @@ todo name =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
           label = Todo,
           body = Expectation (Task.succeed ())
         }
@@ -163,7 +163,7 @@ test name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
           label = None,
           body = handleUnexpectedErrors (expectation ())
         }
@@ -184,7 +184,7 @@ fuzz fuzzer name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
           label = None,
           body = fuzzBody fuzzer expectation
         }
@@ -197,7 +197,7 @@ fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
           label = None,
           body =
             fuzzBody
@@ -213,7 +213,7 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
           label = None,
           body =
             fuzzBody
@@ -401,8 +401,7 @@ subset :: List SubsetOfTests -> SingleTest expectation -> Bool
 subset subsets singleTest =
   case (subsets, loc singleTest) of
     ([], _) -> False -- Should never happen, we should have a NonEmpty SubsetOfTests tbh
-    (_, Nothing) -> False -- When can this happen??
-    (SubsetOfTests {requestedPath, lineOfCode} : rest, Just Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine, Stack.srcLocEndLine}) ->
+    (SubsetOfTests {requestedPath, lineOfCode} : rest, Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine, Stack.srcLocEndLine}) ->
       -- isSuffixOf allows us to write --files=quiz-engine-http/spec/Smth/DerpSpec.hs
       if srcLocFile `isSuffixOf` requestedPath
         then case lineOfCode of
@@ -456,7 +455,7 @@ runSingle test' =
         let span =
               span'
                 { Platform.Internal.summary = Just (name test'),
-                  Platform.Internal.frame = map (\loc -> ("", loc)) (loc test'),
+                  Platform.Internal.frame = Just ("", loc test'),
                   Platform.Internal.succeeded = case testRest of
                     Succeeded -> Platform.Internal.Succeeded
                     Failed failure ->
@@ -481,12 +480,17 @@ onException f (Platform.Internal.Task run') =
           |> Exception.handleAny (Task.attempt log << f)
     )
 
-getFrame :: Stack.HasCallStack => Maybe Stack.SrcLoc
-getFrame =
-  Stack.callStack
-    |> Stack.getCallStack
-    |> List.head
-    |> map Tuple.second
+getFrame :: Stack.HasCallStack => Text -> Stack.SrcLoc
+getFrame testName =
+  case Stack.callStack |> Stack.getCallStack |> List.head of
+    Just (_, srcLoc) ->
+      srcLoc
+    Nothing ->
+      ( "Oops! We can't find the source location for this test: " ++ testName ++ "\n"
+          ++ "This indicates a bug in our Test module in nri-prelude.\n"
+      )
+        |> TestRunnerMessedUp
+        |> Exception.impureThrow
 
 groupBy :: Ord key => (a -> key) -> [a] -> Dict.Dict key [a]
 groupBy key xs =
@@ -521,7 +525,7 @@ pass name a = Stack.withFrozenCallStack traceExpectation name (Task.succeed a)
 
 failAssertion :: Stack.HasCallStack => Text -> Text -> Expectation' a
 failAssertion name err =
-  FailedAssertion err (Stack.withFrozenCallStack getFrame)
+  FailedAssertion err (Stack.withFrozenCallStack getFrame name)
     |> Task.fail
     |> Stack.withFrozenCallStack traceExpectation name
 

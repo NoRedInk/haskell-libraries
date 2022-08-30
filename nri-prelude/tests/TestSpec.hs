@@ -192,13 +192,11 @@ expectSingleTest check (Internal.Test tests') =
 
 expectSrcFile :: Text -> Internal.SingleTest a -> Expect.Expectation
 expectSrcFile expected test' =
-  case Internal.loc test' of
-    Nothing ->
-      Expect.fail "Expected source file location for test, but none was set."
-    Just loc ->
-      Stack.srcLocFile loc
-        |> Data.Text.pack
-        |> Expect.equal expected
+  test'
+    |> Internal.loc
+    |> Stack.srcLocFile
+    |> Data.Text.pack
+    |> Expect.equal expected
 
 -- | A type mirroring `Internal.SuiteResult`, simplified to allow easy
 -- comparisons in tests.
@@ -297,7 +295,7 @@ stdoutReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
@@ -347,7 +345,11 @@ stdoutReporter =
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc",
       test "tests failed (actually running) only run subset" <| \_ -> do
-        let suite =
+        let srcLoc =
+              Internal.getFrame "subset test"
+                |> Stack.srcLocStartLine
+                |> Prelude.fromIntegral
+            suite =
               describe
                 "suite loc"
                 [ test "test fail" (\_ -> Expect.fail "fail"),
@@ -362,13 +364,15 @@ stdoutReporter =
                   suite
                     |> Internal.run
                       ( Internal.Some
-                          [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just 353),
-                            Internal.SubsetOfTests "tests/TestSpec.hs" (Just 355)
+                          [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 6)),
+                            Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 8))
                           ]
                       )
                     |> Task.perform log
                 Test.Reporter.Stdout.report handle result
             )
+        Expect.true (Text.contains "Passed:    1" contents)
+        Expect.true (Text.contains "Failed:    1" contents)
         contents
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-subset",
       test "tests failed (actually running) only run onefile" <| \_ -> do
@@ -460,7 +464,7 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" Nothing),
+                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
                     mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
                     mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
                     mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
@@ -498,7 +502,7 @@ mockTest name body =
     { Internal.describes = ["suite", "sub suite"],
       Internal.name = name,
       Internal.label = Internal.None,
-      Internal.loc = Just mockSrcLoc,
+      Internal.loc = mockSrcLoc,
       Internal.body = body
     }
 
