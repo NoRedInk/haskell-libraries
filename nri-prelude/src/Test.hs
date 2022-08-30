@@ -56,11 +56,11 @@ run suite = do
   args <- System.Environment.getArgs
   let requestOrError = CliParser.parseArgs args
   request <- case requestOrError of
-    Prelude.Left errs -> do
-      let error = ("Invalid arguments:\n" ++ (Prelude.show errs))
+    Err errs -> do
+      let error = ("Invalid arguments:\n" ++ errs)
       hPutStrLn stderr error
       System.Exit.exitFailure
-    Prelude.Right request ->
+    Ok request ->
       Prelude.pure request
   (results, logExplorerAvailable) <-
     Async.concurrently

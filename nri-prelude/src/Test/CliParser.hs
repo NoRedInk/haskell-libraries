@@ -6,24 +6,26 @@ import qualified Data.Attoparsec.Text as Attoparsec
 import Data.Functor (void)
 import qualified List
 import NriPrelude
+import qualified Result
 import qualified Test.Internal as Internal
 import qualified Text
 import qualified Prelude
 
-parseArgs :: List Prelude.String -> Prelude.Either Prelude.String Internal.Request
+parseArgs :: List Prelude.String -> Result Prelude.String Internal.Request
 parseArgs args =
   Prelude.traverse parse args
-    |> map
+    |> Result.map
       ( \lists -> case List.concat lists of
           [] -> Internal.All
           subsetOfTests -> Internal.Some subsetOfTests
       )
 
-parse :: Prelude.String -> Prelude.Either Prelude.String (List Internal.SubsetOfTests)
+parse :: Prelude.String -> Result Prelude.String (List Internal.SubsetOfTests)
 parse input =
   input
     |> Text.fromList
     |> Attoparsec.parseOnly (argParser <* endParser)
+    |> Prelude.either Err Ok
 
 endParser :: Parser ()
 endParser = Attoparsec.endOfInput <|> void (Attoparsec.char ',') <|> unexpectedInput

@@ -535,8 +535,8 @@ mockException =
 
 cliParser :: Test
 cliParser =
-  let expectPass args value = Stack.withFrozenCallStack Expect.equal (Prelude.Right value) (CliParser.parseArgs args)
-      expectFail args value = Stack.withFrozenCallStack Expect.equal (Prelude.Left value) (CliParser.parseArgs args)
+  let expectPass args value = Stack.withFrozenCallStack Expect.equal (Ok value) (CliParser.parseArgs args)
+      expectFail args value = Stack.withFrozenCallStack Expect.equal (Err value) (CliParser.parseArgs args)
    in describe
         "CLI Parser"
         [ test "All tests" <| \_ ->
