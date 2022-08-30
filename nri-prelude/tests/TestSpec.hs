@@ -546,24 +546,24 @@ cliParser =
           test "Invalid argument" <| \_ ->
             expectFail
               ["invalid"]
-              "Failed reading: expected argument: --files",
+              "expected argument: --files: string",
           test "Missing separator" <| \_ ->
             expectFail
               ["--files"]
-              "Failed reading: expected format: --files=bla.hs or --files bla.hs",
+              "must inform at least one file: not enough input",
           test "Missing files" <| \_ ->
             expectFail
               ["--files="]
-              "must inform at least one file > filename: not enough input",
+              "must inform at least one file: not enough input",
           test "Missing files 2" <| \_ ->
             expectFail
               ["--files=,"]
-              "must inform at least one file > filename: Failed reading: takeWhile1",
+              "must inform at least one file: Failed reading: expected format: --files=bla.hs or --files bla.hs: \",\"",
           test "Missing files 3" <| \_ ->
             -- Shouldn't error, but debugging attoparsec is maddening
-            expectFail
+            expectPass
               ["--files=a.hs,"]
-              "endOfInput",
+              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
           test "1 file" <| \_ ->
             expectPass
               ["--files=a.hs"]
@@ -585,7 +585,11 @@ cliParser =
           test "File with bad LoC" <| \_ ->
             expectFail
               ["--files=bla.hs:1asd"]
-              "must inform at least one file: Failed reading: invalid line number: 1asd",
+              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd\"",
+          test "File with bad LoC in first file" <| \_ ->
+            expectFail
+              ["--files=bla.hs:1asd,b.hs"]
+              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd,b.hs\"",
           fuzz (Fuzz.intRange 1 3) "spaces after --files" <| \x ->
             expectPass
               [ [ Text.fromList "--files",
