@@ -585,5 +585,15 @@ cliParser =
           test "File with bad LoC" <| \_ ->
             expectFail
               ["--files=bla.hs:1asd"]
-              "must inform at least one file: Failed reading: invalid line number: 1asd"
+              "must inform at least one file: Failed reading: invalid line number: 1asd",
+          fuzz (Fuzz.intRange 1 3) "spaces after --files" <| \x ->
+            expectPass
+              [ [ Text.fromList "--files",
+                  Text.repeat x " ",
+                  Text.fromList "bla.hs"
+                ]
+                  |> Text.join ""
+                  |> Text.toList
+              ]
+              (Internal.Some [Internal.SubsetOfTests "bla.hs" Nothing])
         ]

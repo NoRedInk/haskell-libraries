@@ -1,9 +1,10 @@
 module Test.CliParser where
 
-import Control.Applicative ((<*), (<|>))
+import Control.Applicative (some, (<*), (<|>))
 import Data.Attoparsec.Text (Parser, (<?>))
 import qualified Data.Attoparsec.Text as Attoparsec
-import qualified Data.Bifunctor
+import qualified Data.Char
+import Data.Functor (void)
 import qualified List
 import NriPrelude
 import qualified Test.Internal as Internal
@@ -12,32 +13,25 @@ import qualified Prelude
 
 parseArgs :: [Prelude.String] -> Prelude.Either Text Internal.Request
 parseArgs args =
-  let parsedArgs :: Prelude.Either Text [Internal.SubsetOfTests]
-      parsedArgs =
-        args
-          |> map Text.fromList
-          |> Prelude.traverse parse
-          |> Data.Bifunctor.second List.concat
-   in parsedArgs
-        |> Data.Bifunctor.second
-          ( \list ->
-              case list of
-                [] -> Internal.All
-                subsetOfTests -> Internal.Some subsetOfTests
-          )
+  case Prelude.traverse parse args of
+    Prelude.Left err -> Prelude.Left (Text.fromList err)
+    Prelude.Right lists ->
+      Prelude.Right <| case List.concat lists of
+        [] -> Internal.All
+        subsetOfTests -> Internal.Some subsetOfTests
 
-parse :: Text -> Prelude.Either Text [Internal.SubsetOfTests]
+parse :: Prelude.String -> Prelude.Either Prelude.String [Internal.SubsetOfTests]
 parse input =
   input
+    |> Text.fromList
     |> Attoparsec.parseOnly (argParser <* Attoparsec.endOfInput)
-    |> Data.Bifunctor.first Text.fromList
 
 argParser :: Parser [Internal.SubsetOfTests]
 argParser = do
   _ <- Attoparsec.string "--files" <|> Prelude.fail "expected argument: --files"
   _ <-
-    Attoparsec.string "="
-      <|> Attoparsec.string " "
+    void (Attoparsec.string "=")
+      <|> void (some (Attoparsec.satisfy Data.Char.isSpace))
       <|> Prelude.fail "expected format: --files=bla.hs or --files bla.hs"
   (Attoparsec.sepBy1' fileParser (Attoparsec.char ',') <?> "must inform at least one file")
 
