@@ -399,8 +399,11 @@ run request (Test all) = do
         All -> toRun
         Some tests -> List.filter (subset tests) toRun
       )
-      |> List.map runSingle
+      |> groupBy group
+      |> Dict.toList
+      |> List.map runGroup
       |> Task.parallel
+      |> Task.map List.concat
   let (failed, passed) =
         results
           |> List.map
@@ -456,6 +459,15 @@ handleUnexpectedErrors (Expectation task') =
     |> Task.timeout 10_000 TookTooLong
     |> Task.onError Task.fail
     |> Expectation
+
+runGroup :: (Group, List (SingleTest Expectation)) -> Task e (List (SingleTest (TracingSpan, TestResult)))
+runGroup (groupkey, tests) =
+  let testTasks = List.map runSingle tests
+   in case groupkey of
+        Ungrouped ->
+          Task.parallel testTasks
+        Grouped _ ->
+          Task.sequence testTasks
 
 runSingle :: SingleTest Expectation -> Task e (SingleTest (TracingSpan, TestResult))
 runSingle test' =
