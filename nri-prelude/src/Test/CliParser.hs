@@ -33,7 +33,7 @@ argParser = do
     void (Attoparsec.string "=")
       <|> void (some (Attoparsec.satisfy Data.Char.isSpace))
       <|> Prelude.fail "expected format: --files=bla.hs or --files bla.hs"
-  (Attoparsec.sepBy1' fileParser (Attoparsec.char ',') <?> "must inform at least one file")
+  Attoparsec.sepBy1' fileParser (Attoparsec.char ',') <?> "must inform at least one file"
 
 fileParser :: Parser Internal.SubsetOfTests
 fileParser = do
