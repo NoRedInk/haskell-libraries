@@ -295,10 +295,10 @@ stdoutReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
-                    mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
-                    mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
-                    mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
+                  [ mockTest "test 5" (Internal.FailedSpan mockTracingSpan (Internal.FailedAssertion "assertion error" mockSrcLoc)),
+                    mockTest "test 6" (Internal.FailedSpan mockTracingSpan (Internal.ThrewException mockException)),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan Internal.TookTooLong),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan (Internal.TestRunnerMessedUp "sorry"))
                   ]
                   |> Test.Reporter.Stdout.report handle
             )
@@ -464,10 +464,10 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
-                    mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
-                    mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
-                    mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
+                  [ mockTest "test 5" (Internal.FailedSpan mockTracingSpan (Internal.FailedAssertion "assertion error" mockSrcLoc)),
+                    mockTest "test 6" (Internal.FailedSpan mockTracingSpan (Internal.ThrewException mockException)),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan Internal.TookTooLong),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan (Internal.TestRunnerMessedUp "sorry"))
                   ]
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )

@@ -19,7 +19,6 @@ import qualified Text
 import Text.Colour (chunk)
 import qualified Text.Colour
 import qualified Text.Colour.Capabilities.FromEnv
-import qualified Tuple
 import qualified Prelude
 
 report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
@@ -93,7 +92,7 @@ renderReport results =
       let amountPassed = List.length passed
       let amountFailed = List.length failed
       let amountSkipped = List.length skipped
-      let failures = List.map (map Tuple.second) failed
+      let failures = List.map (map (\(Internal.FailedSpan _ failure) -> failure)) failed
       srcLocs <- Prelude.traverse Test.Reporter.Internal.readSrcLoc failures
       let failuresSrcs = List.map renderFailureInFile srcLocs
       Prelude.pure

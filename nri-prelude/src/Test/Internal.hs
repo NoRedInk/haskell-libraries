@@ -49,16 +49,16 @@ data SingleTest a = SingleTest
     loc :: Stack.SrcLoc,
     body :: a
   }
-  deriving (Prelude.Functor)
+  deriving (Show, Prelude.Functor)
 
 data Label = None | Skip | Only | Todo
-  deriving (Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 data Group = Grouped (Set.Set GroupKey) | Ungrouped
-  deriving (Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 newtype GroupKey = GroupKey {unGroupkey :: Text}
-  deriving (Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 data TestResult
   = Succeeded
@@ -77,10 +77,17 @@ data SuiteResult
   = AllPassed [SingleTest TracingSpan]
   | OnlysPassed [SingleTest TracingSpan] [SingleTest NotRan]
   | PassedWithSkipped [SingleTest TracingSpan] [SingleTest NotRan]
-  | TestsFailed [SingleTest TracingSpan] [SingleTest NotRan] [SingleTest (TracingSpan, Failure)]
+  | TestsFailed [SingleTest TracingSpan] [SingleTest NotRan] [SingleTest FailedSpan]
   | NoTestsInSuite
+  deriving (Show)
 
 data NotRan = NotRan
+  deriving (Show)
+
+data FailedSpan = FailedSpan TracingSpan Failure
+
+instance Show FailedSpan where
+  show (FailedSpan span failure) = Prelude.show failure ++ ": " ++ Prelude.show span
 
 -- | A test which has yet to be evaluated. When evaluated, it produces one
 -- or more 'Expect.Expectation's.
@@ -410,7 +417,7 @@ run request (Test all) = do
             ( \test' ->
                 case body test' of
                   (tracingSpan, Failed failure) ->
-                    Prelude.Left test' {body = (tracingSpan, failure)}
+                    Prelude.Left test' {body = FailedSpan tracingSpan failure}
                   (tracingSpan, Succeeded) ->
                     Prelude.Right test' {body = tracingSpan}
             )
