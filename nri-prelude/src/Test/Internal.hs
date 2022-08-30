@@ -28,6 +28,7 @@ import NriPrelude
 import Platform (TracingSpan)
 import qualified Platform
 import qualified Platform.Internal
+import qualified Set
 import System.FilePath (FilePath)
 import qualified Task
 import qualified Tuple
@@ -53,7 +54,7 @@ data SingleTest a = SingleTest
 data Label = None | Skip | Only | Todo
   deriving (Eq, Ord)
 
-data Group = Grouped (List GroupKey) | Ungrouped
+data Group = Grouped (Set.Set GroupKey) | Ungrouped
   deriving (Eq, Ord)
 
 newtype GroupKey = GroupKey {unGroupkey :: Text}
@@ -178,6 +179,21 @@ test name expectation =
           body = handleUnexpectedErrors (expectation ())
         }
     ]
+
+-- | Serializes the execution of 'Test' based on a certain grouping
+--
+-- > serialize "mysql" <| todo "some db stuff!"
+serialize :: Text -> Test -> Test
+serialize groupKey (Test tests) =
+  tests
+    |> List.map
+      ( \singleTest ->
+          let groupKeys = case group singleTest of
+                Ungrouped -> Set.empty
+                Grouped keys -> keys
+           in singleTest {group = Grouped (Set.insert (GroupKey groupKey) groupKeys)}
+      )
+    |> Test
 
 -- | Take a function that produces a test, and calls it several (usually 100)
 -- times, using a randomly-generated input from a 'Fuzzer' each time. This
