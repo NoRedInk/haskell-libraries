@@ -4,7 +4,6 @@ import Control.Applicative (optional, some, (*>), (<*), (<|>))
 import Data.Attoparsec.Text (Parser, (<?>))
 import qualified Data.Attoparsec.Text as Attoparsec
 import Data.Functor (void)
-import qualified List
 import NriPrelude
 import qualified Result
 import qualified Test.Internal as Internal
@@ -13,12 +12,17 @@ import qualified Prelude
 
 parseArgs :: List Prelude.String -> Result Prelude.String Internal.Request
 parseArgs args =
-  Prelude.traverse parse args
-    |> Result.map
-      ( \lists -> case List.concat lists of
-          [] -> Internal.All
-          subsetOfTests -> Internal.Some subsetOfTests
-      )
+  case args of
+    [] -> Ok Internal.All
+    ["--files"] -> Err "must inform at least one file: not enough input"
+    ["--files", files] ->
+      parse files
+        |> Result.andThen
+          ( \lists -> case lists of
+              [] -> Err "must inform at least one file: not enough input"
+              subsetOfTests -> Ok (Internal.Some subsetOfTests)
+          )
+    _ : rest -> parseArgs rest
 
 parse :: Prelude.String -> Result Prelude.String (List Internal.SubsetOfTests)
 parse input =
@@ -31,10 +35,7 @@ endParser :: Parser ()
 endParser = Attoparsec.endOfInput <|> void (Attoparsec.char ',') <|> unexpectedInput
 
 argParser :: Parser (List Internal.SubsetOfTests)
-argParser = do
-  _ <- Attoparsec.string "--files" <?> "expected argument: --files"
-  _ <- Attoparsec.skip (\c -> c == '=') <|> Attoparsec.skipSpace
-  Attoparsec.sepBy1' (fileParser <|> unexpectedInput) (Attoparsec.char ',') <?> "must inform at least one file"
+argParser = Attoparsec.sepBy1' (fileParser <|> unexpectedInput) (Attoparsec.char ',') <?> "must inform at least one file"
 
 fileParser :: Parser Internal.SubsetOfTests
 fileParser = do

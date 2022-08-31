@@ -13,6 +13,9 @@ module Test
     Internal.fuzz2,
     Internal.fuzz3,
 
+    -- * Serialize test execution
+    Internal.serialize,
+
     -- * Running test
     run,
   )

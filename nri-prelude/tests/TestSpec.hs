@@ -1,5 +1,7 @@
 module TestSpec (tests) where
 
+import Control.Concurrent (threadDelay)
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString.Lazy
@@ -15,7 +17,7 @@ import qualified Platform
 import qualified Platform.Internal
 import qualified System.IO
 import qualified Task
-import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, test, todo)
+import Test (Test, describe, fuzz, fuzz2, fuzz3, only, serialize, skip, test, todo)
 import qualified Test.CliParser as CliParser
 import qualified Test.Internal as Internal
 import qualified Test.Reporter.Logfile
@@ -31,7 +33,8 @@ tests =
       floatComparison,
       stdoutReporter,
       logfileReporter,
-      cliParser
+      cliParser,
+      deadlockPrevention
     ]
 
 api :: Test
@@ -61,19 +64,27 @@ api =
           |> simplify
           |> Expect.equal (OnlysPassed ["test 2"] ["test 1"]),
       test "suite result is 'AllPassed' with only the one test when passed a filepath" <| \_ -> do
-        let suite =
+        let srcLoc =
+              Internal.getFrame "subset test"
+                |> Stack.srcLocStartLine
+                |> Prelude.fromIntegral
+            suite =
               describe
                 "suite"
                 [ test "test 1" (\_ -> Expect.pass),
                   test "test 2" (\_ -> Expect.pass),
-                  test "test 3" (\_ -> Expect.pass)
+                  test
+                    "test 3"
+                    ( \_ ->
+                        Expect.pass
+                    )
                 ]
         result <-
           suite
             |> Internal.run
               ( Internal.Some
-                  [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just 67),
-                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just 69)
+                  [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 6)),
+                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 11))
                   ]
               )
             |> Expect.succeeds
@@ -295,10 +306,10 @@ stdoutReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
-                    mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
-                    mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
-                    mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
+                  [ mockTest "test 5" (Internal.FailedSpan mockTracingSpan (Internal.FailedAssertion "assertion error" mockSrcLoc)),
+                    mockTest "test 6" (Internal.FailedSpan mockTracingSpan (Internal.ThrewException mockException)),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan Internal.TookTooLong),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan (Internal.TestRunnerMessedUp "sorry"))
                   ]
                   |> Test.Reporter.Stdout.report handle
             )
@@ -464,10 +475,10 @@ logfileReporter =
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (mockTracingSpan, Internal.FailedAssertion "assertion error" mockSrcLoc),
-                    mockTest "test 6" (mockTracingSpan, Internal.ThrewException mockException),
-                    mockTest "test 7" (mockTracingSpan, Internal.TookTooLong),
-                    mockTest "test 7" (mockTracingSpan, Internal.TestRunnerMessedUp "sorry")
+                  [ mockTest "test 5" (Internal.FailedSpan mockTracingSpan (Internal.FailedAssertion "assertion error" mockSrcLoc)),
+                    mockTest "test 6" (Internal.FailedSpan mockTracingSpan (Internal.ThrewException mockException)),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan Internal.TookTooLong),
+                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan (Internal.TestRunnerMessedUp "sorry"))
                   ]
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
@@ -503,6 +514,7 @@ mockTest name body =
       Internal.name = name,
       Internal.label = Internal.None,
       Internal.loc = mockSrcLoc,
+      Internal.group = Internal.Ungrouped,
       Internal.body = body
     }
 
@@ -539,69 +551,101 @@ mockException =
 
 cliParser :: Test
 cliParser =
-  let expectPass args value = Stack.withFrozenCallStack Expect.equal (Ok value) (CliParser.parseArgs args)
-      expectFail args value = Stack.withFrozenCallStack Expect.equal (Err value) (CliParser.parseArgs args)
-   in describe
-        "CLI Parser"
-        [ test "All tests" <| \_ ->
-            expectPass
-              []
-              Internal.All,
-          test "Invalid argument" <| \_ ->
-            expectFail
-              ["invalid"]
-              "expected argument: --files: string",
-          test "Missing separator" <| \_ ->
-            expectFail
-              ["--files"]
-              "must inform at least one file: not enough input",
-          test "Missing files" <| \_ ->
-            expectFail
-              ["--files="]
-              "must inform at least one file: not enough input",
-          test "Missing files 2" <| \_ ->
-            expectFail
-              ["--files=,"]
-              "must inform at least one file: Failed reading: expected format: --files=bla.hs or --files bla.hs: \",\"",
-          test "Missing files 3" <| \_ ->
-            -- Shouldn't error, but debugging attoparsec is maddening
-            expectPass
-              ["--files=a.hs,"]
-              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
-          test "1 file" <| \_ ->
-            expectPass
-              ["--files=a.hs"]
-              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
-          test "2 files" <| \_ ->
-            expectPass
-              ["--files=a.hs,b.hs"]
-              ( Internal.Some
-                  [Internal.SubsetOfTests "a.hs" Nothing, Internal.SubsetOfTests "b.hs" Nothing]
-              ),
-          test "Doesn't really parse file paths" <| \_ ->
-            expectPass
-              ["--files=bla.hs\nble.hs"]
-              (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing]),
-          test "File with LoC" <| \_ ->
-            expectPass
-              ["--files=bla.hs:123"]
-              (Internal.Some [Internal.SubsetOfTests "bla.hs" (Just 123)]),
-          test "File with bad LoC" <| \_ ->
-            expectFail
-              ["--files=bla.hs:1asd"]
-              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd\"",
-          test "File with bad LoC in first file" <| \_ ->
-            expectFail
-              ["--files=bla.hs:1asd,b.hs"]
-              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd,b.hs\"",
-          fuzz (Fuzz.intRange 1 3) "spaces after --files" <| \x ->
-            expectPass
-              [ [ Text.fromList "--files",
-                  Text.repeat x " ",
-                  Text.fromList "bla.hs"
-                ]
-                  |> Text.join ""
-                  |> Text.toList
-              ]
-              (Internal.Some [Internal.SubsetOfTests "bla.hs" Nothing])
-        ]
+  describe
+    "CLI Parser"
+    [ test "All tests" <| \_ ->
+        CliParser.parseArgs
+          []
+          |> Expect.equal (Ok Internal.All),
+      test "Missing separator" <| \_ ->
+        CliParser.parseArgs
+          ["--files"]
+          |> Expect.equal (Err "must inform at least one file: not enough input"),
+      test "trailing comma" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "a.hs,"]
+          |> Expect.equal (Ok (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing])),
+      test "1 file" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "a.hs"]
+          |> Expect.equal (Ok (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing])),
+      test "2 files" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "a.hs,b.hs"]
+          |> Expect.equal
+            ( Ok
+                ( Internal.Some
+                    [Internal.SubsetOfTests "a.hs" Nothing, Internal.SubsetOfTests "b.hs" Nothing]
+                )
+            ),
+      test "Doesn't really parse file paths" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs\nble.hs"]
+          |> Expect.equal
+            ( Ok
+                (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing])
+            ),
+      test "File with LoC" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs:123"]
+          |> Expect.equal
+            ( Ok
+                (Internal.Some [Internal.SubsetOfTests "bla.hs" (Just 123)])
+            ),
+      test "File with bad LoC" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs:1asd"]
+          |> Expect.equal
+            (Err "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd\""),
+      test "File with bad LoC in first file" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs:1asd,b.hs"]
+          |> Expect.equal
+            (Err "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd,b.hs\"")
+    ]
+
+deadlockPrevention :: Test
+deadlockPrevention =
+  describe
+    "Prevent deadlocks in tests"
+    [ test "a test that deadlocks" <| \_ -> do
+        mvar1 <- Expect.fromIO MVar.newEmptyMVar
+        mvar2 <- Expect.fromIO MVar.newEmptyMVar
+
+        _ <-
+          deadlockSuite mvar1 mvar2
+            |> Internal.run Internal.All
+            |> Task.timeout 1000 Internal.TookTooLong
+            |> Expect.fails
+        Expect.pass,
+      test "serial tests don't deadlock" <| \_ -> do
+        mvar1 <- Expect.fromIO MVar.newEmptyMVar
+        mvar2 <- Expect.fromIO MVar.newEmptyMVar
+
+        _ <-
+          deadlockSuite mvar1 mvar2
+            |> serialize "groupKey"
+            |> Internal.run Internal.All
+            |> Expect.succeeds
+        Expect.pass
+    ]
+
+deadlockSuite :: MVar.MVar () -> MVar.MVar () -> Test
+deadlockSuite mvar1 mvar2 =
+  describe
+    "two deadlocking tests"
+    [ test "test 1" <| \_ -> do
+        Expect.fromIO (MVar.putMVar mvar1 ())
+        Expect.fromIO <| threadDelay 100
+        Expect.fromIO (MVar.putMVar mvar2 ())
+        _ <- Expect.fromIO (MVar.takeMVar mvar2)
+        _ <- Expect.fromIO (MVar.takeMVar mvar1)
+        Expect.pass,
+      test "test 2" <| \_ -> do
+        Expect.fromIO (MVar.putMVar mvar2 ())
+        Expect.fromIO <| threadDelay 100
+        Expect.fromIO (MVar.putMVar mvar1 ())
+        _ <- Expect.fromIO (MVar.takeMVar mvar1)
+        _ <- Expect.fromIO (MVar.takeMVar mvar2)
+        Expect.pass
+    ]
