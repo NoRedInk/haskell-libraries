@@ -3,6 +3,7 @@ module Test.Encoding (examplesToTest) where
 
 import qualified Examples
 import qualified Expect
+import qualified GHC.Stack as Stack
 import NriPrelude
 import System.FilePath ((</>))
 import qualified System.FilePath as FilePath
@@ -10,7 +11,7 @@ import Test (Test, test)
 import qualified Text
 
 -- | Creates tests for some examples
-examplesToTest :: Text -> Text -> Examples.Examples -> Test
+examplesToTest :: Stack.HasCallStack => Text -> Text -> Examples.Examples -> Test
 examplesToTest name fileName examples =
   test name <| \() ->
     Expect.equalToContentsOf
