@@ -622,22 +622,24 @@ deadlockPrevention =
         mvar1 <- Expect.fromIO MVar.newEmptyMVar
         mvar2 <- Expect.fromIO MVar.newEmptyMVar
 
-        deadlockSuite mvar1 mvar2
-          |> describe "two deadlocking tests"
-          |> Internal.run Internal.All
-          |> Task.timeout 1000 Internal.TookTooLong
-          |> Expect.fails
-          |> map (always ()),
+        _ <-
+          deadlockSuite mvar1 mvar2
+            |> describe "two deadlocking tests"
+            |> Internal.run Internal.All
+            |> Task.timeout 1000 Internal.TookTooLong
+            |> Expect.fails
+        Expect.pass,
       test "serial tests don't deadlock" <| \_ -> do
         mvar1 <- Expect.fromIO MVar.newEmptyMVar
         mvar2 <- Expect.fromIO MVar.newEmptyMVar
 
-        deadlockSuite mvar1 mvar2
-          |> describe "two deadlocking tests"
-          |> serialize "groupKey"
-          |> Internal.run Internal.All
-          |> Expect.succeeds
-          |> map (always ())
+        _ <-
+          deadlockSuite mvar1 mvar2
+            |> describe "two deadlocking tests"
+            |> serialize "groupKey"
+            |> Internal.run Internal.All
+            |> Expect.succeeds
+        Expect.pass
     ]
 
 deadlockSuite :: MVar.MVar () -> MVar.MVar () -> List Test
