@@ -447,7 +447,7 @@ subset subsets singleTest =
           Nothing -> True
           Just requestedLoc' ->
             let requestedLoc = Prelude.fromIntegral requestedLoc'
-             in if requestedLoc >= srcLocStartLine && requestedLoc <= srcLocEndLine
+             in if srcLocStartLine <= requestedLoc && requestedLoc <= srcLocEndLine
                   then True
                   else subset rest singleTest
         else subset rest singleTest

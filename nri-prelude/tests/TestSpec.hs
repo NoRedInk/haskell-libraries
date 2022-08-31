@@ -73,14 +73,18 @@ api =
                 "suite"
                 [ test "test 1" (\_ -> Expect.pass),
                   test "test 2" (\_ -> Expect.pass),
-                  test "test 3" (\_ -> Expect.pass)
+                  test
+                    "test 3"
+                    ( \_ ->
+                        Expect.pass
+                    )
                 ]
         result <-
           suite
             |> Internal.run
               ( Internal.Some
                   [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 6)),
-                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 8))
+                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 11))
                   ]
               )
             |> Expect.succeeds
