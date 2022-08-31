@@ -622,8 +622,8 @@ deadlockPrevention =
         mvar1 <- Expect.fromIO MVar.newEmptyMVar
         mvar2 <- Expect.fromIO MVar.newEmptyMVar
 
-        let suite = deadlockSuite mvar1 mvar2 test
-        suite
+        deadlockSuite mvar1 mvar2
+          |> describe "two deadlocking tests"
           |> Internal.run Internal.All
           |> Task.timeout 1000 Internal.TookTooLong
           |> Expect.fails
@@ -632,31 +632,28 @@ deadlockPrevention =
         mvar1 <- Expect.fromIO MVar.newEmptyMVar
         mvar2 <- Expect.fromIO MVar.newEmptyMVar
 
-        let suite = deadlockSuite mvar1 mvar2 (\a b -> serialize "groupKey" (test a b))
-        suite
+        deadlockSuite mvar1 mvar2
+          |> describe "two deadlocking tests"
+          |> serialize "groupKey"
           |> Internal.run Internal.All
           |> Expect.succeeds
           |> map (always ())
     ]
 
-type TestF = Text -> (() -> Expect.Expectation) -> Test
-
-deadlockSuite :: MVar.MVar () -> MVar.MVar () -> TestF -> Test
-deadlockSuite mvar1 mvar2 testF = do
-  describe
-    "two deadlocking tests"
-    [ testF "test 1" <| \_ -> do
-        Expect.fromIO (MVar.putMVar mvar1 ())
-        Expect.fromIO <| threadDelay 100
-        Expect.fromIO (MVar.putMVar mvar2 ())
-        _ <- Expect.fromIO (MVar.takeMVar mvar2)
-        _ <- Expect.fromIO (MVar.takeMVar mvar1)
-        Expect.pass,
-      testF "test 2" <| \_ -> do
-        Expect.fromIO (MVar.putMVar mvar2 ())
-        Expect.fromIO <| threadDelay 100
-        Expect.fromIO (MVar.putMVar mvar1 ())
-        _ <- Expect.fromIO (MVar.takeMVar mvar1)
-        _ <- Expect.fromIO (MVar.takeMVar mvar2)
-        Expect.pass
-    ]
+deadlockSuite :: MVar.MVar () -> MVar.MVar () -> List Test
+deadlockSuite mvar1 mvar2 =
+  [ test "test 1" <| \_ -> do
+      Expect.fromIO (MVar.putMVar mvar1 ())
+      Expect.fromIO <| threadDelay 100
+      Expect.fromIO (MVar.putMVar mvar2 ())
+      _ <- Expect.fromIO (MVar.takeMVar mvar2)
+      _ <- Expect.fromIO (MVar.takeMVar mvar1)
+      Expect.pass,
+    test "test 2" <| \_ -> do
+      Expect.fromIO (MVar.putMVar mvar2 ())
+      Expect.fromIO <| threadDelay 100
+      Expect.fromIO (MVar.putMVar mvar1 ())
+      _ <- Expect.fromIO (MVar.takeMVar mvar1)
+      _ <- Expect.fromIO (MVar.takeMVar mvar2)
+      Expect.pass
+  ]
