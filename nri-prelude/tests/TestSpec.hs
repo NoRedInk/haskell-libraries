@@ -547,72 +547,58 @@ mockException =
 
 cliParser :: Test
 cliParser =
-  let expectPass args value = Stack.withFrozenCallStack Expect.equal (Ok value) (CliParser.parseArgs args)
-      expectFail args value = Stack.withFrozenCallStack Expect.equal (Err value) (CliParser.parseArgs args)
-   in describe
-        "CLI Parser"
-        [ test "All tests" <| \_ ->
-            expectPass
-              []
-              Internal.All,
-          test "Invalid argument" <| \_ ->
-            expectFail
-              ["invalid"]
-              "expected argument: --files: string",
-          test "Missing separator" <| \_ ->
-            expectFail
-              ["--files"]
-              "must inform at least one file: not enough input",
-          test "Missing files" <| \_ ->
-            expectFail
-              ["--files="]
-              "must inform at least one file: not enough input",
-          test "Missing files 2" <| \_ ->
-            expectFail
-              ["--files=,"]
-              "must inform at least one file: Failed reading: expected format: --files=bla.hs or --files bla.hs: \",\"",
-          test "Missing files 3" <| \_ ->
-            -- Shouldn't error, but debugging attoparsec is maddening
-            expectPass
-              ["--files=a.hs,"]
-              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
-          test "1 file" <| \_ ->
-            expectPass
-              ["--files=a.hs"]
-              (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing]),
-          test "2 files" <| \_ ->
-            expectPass
-              ["--files=a.hs,b.hs"]
-              ( Internal.Some
-                  [Internal.SubsetOfTests "a.hs" Nothing, Internal.SubsetOfTests "b.hs" Nothing]
-              ),
-          test "Doesn't really parse file paths" <| \_ ->
-            expectPass
-              ["--files=bla.hs\nble.hs"]
-              (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing]),
-          test "File with LoC" <| \_ ->
-            expectPass
-              ["--files=bla.hs:123"]
-              (Internal.Some [Internal.SubsetOfTests "bla.hs" (Just 123)]),
-          test "File with bad LoC" <| \_ ->
-            expectFail
-              ["--files=bla.hs:1asd"]
-              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd\"",
-          test "File with bad LoC in first file" <| \_ ->
-            expectFail
-              ["--files=bla.hs:1asd,b.hs"]
-              "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd,b.hs\"",
-          fuzz (Fuzz.intRange 1 3) "spaces after --files" <| \x ->
-            expectPass
-              [ [ Text.fromList "--files",
-                  Text.repeat x " ",
-                  Text.fromList "bla.hs"
-                ]
-                  |> Text.join ""
-                  |> Text.toList
-              ]
-              (Internal.Some [Internal.SubsetOfTests "bla.hs" Nothing])
-        ]
+  describe
+    "CLI Parser"
+    [ test "All tests" <| \_ ->
+        CliParser.parseArgs
+          []
+          |> Expect.equal (Ok Internal.All),
+      test "Missing separator" <| \_ ->
+        CliParser.parseArgs
+          ["--files"]
+          |> Expect.equal (Err "must inform at least one file: not enough input"),
+      test "trailing comma" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "a.hs,"]
+          |> Expect.equal (Ok (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing])),
+      test "1 file" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "a.hs"]
+          |> Expect.equal (Ok (Internal.Some [Internal.SubsetOfTests "a.hs" Nothing])),
+      test "2 files" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "a.hs,b.hs"]
+          |> Expect.equal
+            ( Ok
+                ( Internal.Some
+                    [Internal.SubsetOfTests "a.hs" Nothing, Internal.SubsetOfTests "b.hs" Nothing]
+                )
+            ),
+      test "Doesn't really parse file paths" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs\nble.hs"]
+          |> Expect.equal
+            ( Ok
+                (Internal.Some [Internal.SubsetOfTests "bla.hs\nble.hs" Nothing])
+            ),
+      test "File with LoC" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs:123"]
+          |> Expect.equal
+            ( Ok
+                (Internal.Some [Internal.SubsetOfTests "bla.hs" (Just 123)])
+            ),
+      test "File with bad LoC" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs:1asd"]
+          |> Expect.equal
+            (Err "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd\""),
+      test "File with bad LoC in first file" <| \_ ->
+        CliParser.parseArgs
+          ["--files", "bla.hs:1asd,b.hs"]
+          |> Expect.equal
+            (Err "Failed reading: expected format: --files=bla.hs or --files bla.hs: \"asd,b.hs\"")
+    ]
 
 deadlockPrevention :: Test
 deadlockPrevention =
