@@ -406,7 +406,7 @@ run request (Test all) = do
         All -> toRun
         Some tests -> List.filter (subset tests) toRun
       )
-      |> groupBy group
+      |> groupBy runStrategy
       |> Dict.toList
       |> List.map runGroup
       |> Task.parallel
@@ -435,6 +435,14 @@ run request (Test all) = do
     Summary {anyOnlys = True} -> OnlysPassed passed notToRun
     Summary {noneSkipped = False} -> PassedWithSkipped passed notToRun
     Summary {} -> AllPassed passed
+
+data RunStrategy = Parallel | Sequence deriving (Eq, Ord)
+
+runStrategy :: SingleTest exp -> RunStrategy
+runStrategy singleTest =
+  case group singleTest of
+    Grouped _ -> Sequence
+    Ungrouped -> Parallel
 
 subset :: List SubsetOfTests -> SingleTest expectation -> Bool
 subset subsets singleTest =
@@ -467,14 +475,13 @@ handleUnexpectedErrors (Expectation task') =
     |> Task.onError Task.fail
     |> Expectation
 
-runGroup :: (Group, List (SingleTest Expectation)) -> Task e (List (SingleTest (TracingSpan, TestResult)))
-runGroup (groupkey, tests) =
-  let testTasks = List.map runSingle tests
-   in case groupkey of
-        Ungrouped ->
-          Task.parallel testTasks
-        Grouped _ ->
-          Task.sequence testTasks
+runGroup :: (RunStrategy, List (SingleTest Expectation)) -> Task e (List (SingleTest (TracingSpan, TestResult)))
+runGroup (groupped, tests) =
+  List.map runSingle tests
+    |> ( case groupped of
+           Sequence -> Task.sequence
+           Parallel -> Task.parallel
+       )
 
 runSingle :: SingleTest Expectation -> Task e (SingleTest (TracingSpan, TestResult))
 runSingle test' =
