@@ -215,13 +215,11 @@ concurrently taskA taskB =
 
 -- | Given a task and a callback, execute the task in a greenthread
 -- and sends its result to callback.
--- Always returns @OK ()@
-background :: forall x a . Task x a -> (Result x a -> Task x a) -> Task x ()
+background :: Task x a -> (Result x a -> Task y b) -> Task z ()
 background task callback =
   Internal.Task
     ( \handler -> do
-        let runBackgroundTask :: Task x a -> IO (Result x a)
-            runBackgroundTask greenTask = do
+        let runBackgroundTask greenTask = do
               result <- Internal._run greenTask handler
               Internal._run (callback result) handler
         _ <- Async.async (runBackgroundTask task)
