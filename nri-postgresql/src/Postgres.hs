@@ -23,7 +23,7 @@ module Postgres
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
     PGTypes.PGType (..),
-    PGTypes.PGRep (..),
+    PGDynamic.PGRep (..),
     PGEnum.PGEnum (pgEnumValues),
   )
 where
@@ -40,6 +40,7 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollback,
     pgRollbackAll,
   )
+import qualified Database.PostgreSQL.Typed.Dynamic as PGDynamic
 import qualified Database.PostgreSQL.Typed.Enum as PGEnum
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
