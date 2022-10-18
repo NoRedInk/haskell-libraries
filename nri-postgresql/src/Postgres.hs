@@ -22,6 +22,9 @@ module Postgres
     -- Reexposing useful postgresql-typed types
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
+    PGTypes.PGType (..),
+    PGTypes.PGRep (..),
+    PGEnum.PGEnum (pgEnumValues),
   )
 where
 
@@ -37,6 +40,7 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollback,
     pgRollbackAll,
   )
+import qualified Database.PostgreSQL.Typed.Enum as PGEnum
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified List
