@@ -22,6 +22,7 @@ module Postgres
     -- Reexposing useful postgresql-typed types
     PGTypes.PGColumn (pgDecode),
     PGTypes.PGParameter (pgEncode),
+    PGTypes.PGStringType (..),
     PGTypes.PGType (..),
     PGDynamic.PGRep (..),
     PGEnum.PGEnum (..),
