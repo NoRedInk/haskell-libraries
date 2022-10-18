@@ -24,7 +24,7 @@ module Postgres
     PGTypes.PGParameter (pgEncode),
     PGTypes.PGType (..),
     PGDynamic.PGRep (..),
-    PGEnum.PGEnum (pgEnumValues),
+    PGEnum.PGEnum (..),
   )
 where
 
