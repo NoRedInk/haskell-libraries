@@ -213,16 +213,12 @@ concurrently taskA taskB =
         Prelude.pure <| Shortcut.map2 (,) resultA resultB
     )
 
--- | Given a task and a callback, execute the task in a greenthread
--- and sends its result to callback.
-background :: Task x a -> (Result x a -> Task y b) -> Task z ()
-background task callback =
+-- | Given a task, execute the task in a greenthread.
+background :: Task Never a -> Task x ()
+background task =
   Internal.Task
     ( \handler -> do
-        let runBackgroundTask greenTask = do
-              result <- Internal._run greenTask handler
-              Internal._run (callback result) handler
-        _ <- Async.async (runBackgroundTask task)
+        _ <- Async.async (Internal._run task handler)
         Prelude.pure <| Ok ()
     )
 
