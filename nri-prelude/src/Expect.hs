@@ -62,7 +62,6 @@ module Expect
 where
 
 import qualified Data.Text
-import Type.Reflection (Typeable, eqTypeRep, typeOf, (:~~:) (HRefl))
 import qualified Data.Text.IO
 import qualified Debug
 import qualified GHC.Stack as Stack
@@ -77,6 +76,7 @@ import qualified Task
 import Test.Internal (Expectation)
 import qualified Test.Internal as Internal
 import qualified Text.Show.Pretty
+import Type.Reflection (Typeable, eqTypeRep, typeOf, (:~~:) (HRefl))
 import qualified Prelude
 
 -- | Always passes.
