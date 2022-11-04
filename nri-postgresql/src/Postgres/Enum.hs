@@ -9,7 +9,8 @@ import qualified Language.Haskell.TH as TH
 import Database.PostgreSQL.Typed.Enum
 import Database.PostgreSQL.Typed.Protocol (pgSimpleQuery)
 import Database.PostgreSQL.Typed.TH (withTPGConnection)
-import Database.PostgreSQL.Typed.Dynamic (pgDecodeRep)
+import Database.PostgreSQL.Typed.Dynamic (pgDecodeRep, PGRepType, PGRep)
+import Database.PostgreSQL.Typed.Types (PGType, PGVal, PGParameter, pgEncode, PGColumn, pgDecode)
 import Set (Set)
 import qualified Set
 import qualified Prelude 
@@ -149,4 +150,44 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
       (pgOnlyValues, _) -> 
         Prelude.fail <| "The following values from the pg enum type '" ++ Text.toList databaseTypeName ++ "' are not mapped to values of " ++ hsTypeString ++ ": " ++ Text.toList (makeValueList pgOnlyValues)
 
-  Prelude.fail "TODO"
+  -- Validation passed! Let's generate some instances
+  let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList databaseTypeName))
+
+  variable <- TH.newName "x"
+
+  let hsToPg = TH.CaseE (TH.VarE variable) (mapping |> List.map (\(conName, pgValue) -> 
+                  TH.Match (TH.ConP conName []) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) [] 
+                ))
+
+  let pgToHs = TH.CaseE (TH.VarE variable) ((mapping |> List.map (\(conName, pgValue) ->
+                  TH.Match (TH.LitP <| TH.StringL <| Text.toList pgValue) (TH.NormalB <| TH.ConE conName) []
+                )) ++ [TH.Match TH.WildP (TH.NormalB <| TH.VarE 'Prelude.error `TH.AppE` (TH.LitE <| TH.StringL "The impossible happened!") ) [] ] )
+
+  Prelude.pure
+    [ -- instance PGType "display_element_type" where
+      --   PGVal "display_element_type" = DisplayElementType
+      TH.InstanceD Nothing [] (TH.ConT ''PGType `TH.AppT` pgTypeString) 
+        [ TH.TySynInstD <| TH.TySynEqn Nothing (TH.AppT (TH.ConT ''PGVal) pgTypeString) (TH.ConT hsTypeName) ] 
+
+      -- instance PGParameter "display_element_type" DisplayElementType where
+      --   pgEncode _ x = 
+      --     case x of 
+      --       Labeled -> "labeled"
+      --       Blank -> "blank"
+    , TH.InstanceD Nothing [] (TH.ConT ''PGParameter `TH.AppT` pgTypeString `TH.AppT` (TH.ConT hsTypeName))
+        [ TH.FunD 'pgEncode [ TH.Clause [TH.WildP, TH.VarP variable] (TH.NormalB hsToPg) [] ] ]
+
+      -- instance PGColumn "display_element_type" DisplayElementType where
+      --   pgDecode _ x = 
+      --     case x of 
+      --       "labeled" -> Labeled
+      --       "blank" -> Blank
+      --       _ -> Prelude.error "The impossible happened!"
+    , TH.InstanceD Nothing [] (TH.ConT ''PGColumn `TH.AppT` pgTypeString `TH.AppT` (TH.ConT hsTypeName))
+        [ TH.FunD 'pgDecode [ TH.Clause [TH.WildP, TH.VarP variable] (TH.NormalB pgToHs) [] ] ]
+
+      -- instance PGRep DisplayElementType where
+      --   PGRepType DisplayElementType = "display_element_type"
+    , TH.InstanceD Nothing [] (TH.ConT ''PGRep `TH.AppT` (TH.ConT hsTypeName))
+        [ TH.TySynInstD <| TH.TySynEqn Nothing ((TH.ConT ''PGRepType) `TH.AppT` (TH.ConT hsTypeName)) pgTypeString ] 
+    ]
