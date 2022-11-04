@@ -37,8 +37,6 @@ import Database.PostgreSQL.Typed.Protocol
     pgRollback,
     pgRollbackAll,
   )
-import qualified Database.PostgreSQL.Typed.Dynamic as PGDynamic
-import qualified Database.PostgreSQL.Typed.Enum as PGEnum
 import qualified Database.PostgreSQL.Typed.Types as PGTypes
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import qualified List
