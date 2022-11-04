@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS -Wno-orphans #-}
 
 module Postgres.Enum where
 
@@ -6,12 +8,10 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.List (group)
 import qualified Data.Text.Encoding as Encoding
 import qualified Language.Haskell.TH as TH
-import Database.PostgreSQL.Typed.Enum
 import Database.PostgreSQL.Typed.Protocol (pgSimpleQuery)
 import Database.PostgreSQL.Typed.TH (withTPGConnection)
 import Database.PostgreSQL.Typed.Dynamic (pgDecodeRep, PGRepType, PGRep)
 import Database.PostgreSQL.Typed.Types (PGType, PGVal, PGParameter, pgEncode, PGColumn, pgDecode)
-import Set (Set)
 import qualified Set
 import qualified Prelude 
 
@@ -27,7 +27,7 @@ makeConList :: List TH.Name -> Text
 makeConList list =
   makeValueList (List.map (Prelude.show >> Text.fromList) list)
 
-findDuplicates :: (Ord a, Eq a) => List a -> List a
+findDuplicates :: (Ord a) => List a -> List a
 findDuplicates list = 
   list
     |> List.sort 
