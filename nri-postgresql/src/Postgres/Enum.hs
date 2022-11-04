@@ -22,7 +22,22 @@ makeValueList :: List Text -> Text
 makeValueList list = 
   "[" ++ Text.join ", " (List.map quote list) ++ "]"
 
-generatePGEnum :: (Ord a, Eq a) => TH.Name -> Text -> [(a, Text)] -> TH.Q [TH.Dec]
+findDuplicates :: (Ord a, Eq a) => List a -> List a
+findDuplicates list = 
+  list
+    |> List.sort 
+    |> group
+    |> List.filterMap 
+        (\items -> 
+          case items of 
+            (item : _ : _) -> 
+              Just item
+
+            _ ->
+              Nothing
+        )
+
+generatePGEnum :: TH.Name -> Text -> [(TH.Name, Text)] -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
   let hsTypeString = Prelude.show hsTypeName
 
@@ -48,26 +63,21 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
   -- Check for duplicate values specified in the mapping
   _ <- 
-    List.map Tuple.second mapping
-      |> List.sort 
-      |> group
-      |> List.filterMap 
-          (\items -> 
-            case items of 
-              (item : _ : _) -> 
-                Just item
+    case findDuplicates (List.map Tuple.second mapping) of 
+      [] -> 
+        Prelude.pure () 
 
-              _ ->
-                Nothing
-          )
-      |> (\duplicateValues -> 
-            case duplicateValues of 
-              [] -> 
-                Prelude.pure () 
+      duplicates ->
+        Prelude.fail <| "The following values in the mapping are duplicated: " ++ Text.toList (makeValueList duplicates)  
 
-              _ -> 
-                Prelude.fail <| "The following values in the mapping are duplicated: " ++ Text.toList (makeValueList duplicateValues)  
-          )
+  -- Check for duplicate constructor names specified in the mapping
+  _ <-
+    case findDuplicates (List.map Tuple.first mapping) of
+      [] -> 
+        Prelude.pure ()
+
+      duplicates ->
+        Prelude.fail <| "The following constructors in the mapping are duplicated: " ++ Text.toList (makeValueList (List.map (Prelude.show >> Text.fromList) duplicates))
 
   (pgEnumValues :: List Text) <-
     TH.runIO <| withTPGConnection (\connection -> do 
