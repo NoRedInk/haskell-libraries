@@ -21,11 +21,7 @@ module Postgres
     inTestTransaction,
     -- Reexposing useful postgresql-typed types
     PGTypes.PGColumn (pgDecode),
-    PGTypes.PGParameter (pgEncode),
-    PGTypes.PGStringType (..),
-    PGTypes.PGType (..),
-    PGDynamic.PGRep (..),
-    PGEnum.PGEnum (..),
+    PGTypes.PGParameter (pgEncode)
   )
 where
 
