@@ -57,6 +57,7 @@ ghc-options:
 library:
   exposed-modules:
   - Postgres
+  - Postgres.Enum
   - Postgres.Test
   source-dirs: src
 tests:

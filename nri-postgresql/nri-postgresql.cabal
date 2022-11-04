@@ -30,6 +30,7 @@ source-repository head
 library
   exposed-modules:
       Postgres
+      Postgres.Enum
       Postgres.Test
   other-modules:
       Postgres.Connection
@@ -80,6 +81,7 @@ test-suite tests
   other-modules:
       Postgres
       Postgres.Connection
+      Postgres.Enum
       Postgres.Error
       Postgres.Query
       Postgres.QueryParser
