@@ -4,12 +4,14 @@
 
 module Postgres.Enum where
 
+import qualified Environment
+import qualified Postgres.Settings
 import qualified Data.ByteString.Lazy as BSL
 import Data.List (group)
 import qualified Data.Text.Encoding as Encoding
 import qualified Language.Haskell.TH as TH
 import Database.PostgreSQL.Typed.Protocol (pgSimpleQuery)
-import Database.PostgreSQL.Typed.TH (withTPGConnection)
+import Database.PostgreSQL.Typed.TH (withTPGConnection, useTPGDatabase)
 import Database.PostgreSQL.Typed.Dynamic (pgDecodeRep, PGRepType, PGRep)
 import Database.PostgreSQL.Typed.Types (PGType, PGVal, PGParameter, pgEncode, PGColumn, pgDecode)
 import qualified Set
@@ -98,6 +100,13 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
       (hsOnlyCons, _) -> 
         Prelude.fail <| "The following constructors are not present in the mapping: " ++ Text.toList (makeConList hsOnlyCons)
 
+  pgDatabase <-
+    TH.runIO <| do 
+      nriSettings <- Environment.decode Postgres.Settings.decoder
+      Prelude.pure (Postgres.Settings.toPGDatabase nriSettings)
+
+  dbConnectDecls <- useTPGDatabase pgDatabase
+
   (pgEnumValues :: List Text) <-
     TH.runIO <| withTPGConnection (\connection -> do 
       -- Check if the databaseTypeName exists on the PG database and is an enum
@@ -163,7 +172,9 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
                   TH.Match (TH.LitP <| TH.StringL <| Text.toList pgValue) (TH.NormalB <| TH.ConE conName) []
                 )) ++ [TH.Match TH.WildP (TH.NormalB <| TH.VarE 'Prelude.error `TH.AppE` (TH.LitE <| TH.StringL "The impossible happened!") ) [] ] )
 
-  Prelude.pure
+  Prelude.pure <|
+    dbConnectDecls
+    ++
     [ -- instance PGType "display_element_type" where
       --   PGVal "display_element_type" = DisplayElementType
       TH.InstanceD Nothing [] (TH.ConT ''PGType `TH.AppT` pgTypeString) 
