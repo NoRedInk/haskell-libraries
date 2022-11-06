@@ -17,13 +17,12 @@ import Database.PostgreSQL.Typed.Types (PGType, PGVal, PGParameter, pgEncode, PG
 import qualified Set
 import qualified Prelude 
 
-
-quote :: Text -> Text
-quote t = "'" ++ t ++ "'"
+quote :: Prelude.String -> Prelude.String
+quote t = "\"" ++ t ++ "\""
 
 makeValueList :: List Text -> Text
 makeValueList list = 
-  "[" ++ Text.join ", " (List.map quote list) ++ "]"
+  "[" ++ Text.join ", " (List.map (Text.toList >> quote >> Text.fromList) list) ++ "]"
 
 makeConList :: List TH.Name -> Text
 makeConList list =
@@ -59,14 +58,14 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
                   Prelude.pure name
 
                 TH.NormalC name _ ->
-                  Prelude.fail <| "Constructor '" ++ Prelude.show name ++ "' cannot have any arguments in order to be mapped to an enum."
+                  Prelude.fail <| "Constructor " ++ quote (Prelude.show name) ++ " cannot have any arguments in order to be mapped to an enum."
 
                 _ -> 
-                  Prelude.fail <| "Data type '" ++ hsTypeString ++ "' must contain only simple constructors with no arguments."
+                  Prelude.fail <| "Data type " ++ quote hsTypeString ++ " must contain only simple constructors with no arguments."
               )
 
       _ ->
-        Prelude.fail <| "The datatype name '" ++ hsTypeString ++ "' must be a data declaration."
+        Prelude.fail <| "The datatype name " ++ quote hsTypeString ++ " must be a data declaration."
 
   -- Check for duplicate values specified in the mapping
   _ <- 
@@ -95,7 +94,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.pure ()
 
       ([], mappingOnlyCons) ->
-        Prelude.fail <| "The following names in the mapping are not constructors from the data type '" ++ hsTypeString ++ "': " ++ Text.toList (makeConList mappingOnlyCons)
+        Prelude.fail <| "The following names in the mapping are not constructors from the data type " ++ quote hsTypeString ++ ": " ++ Text.toList (makeConList mappingOnlyCons)
 
       (hsOnlyCons, _) -> 
         Prelude.fail <| "The following constructors are not present in the mapping: " ++ Text.toList (makeConList hsOnlyCons)
@@ -120,14 +119,14 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
       _ <- case List.map (\[v] -> pgDecodeRep v) typeRows of 
         [] -> 
-          Prelude.fail ("Type '" ++ Text.toList databaseTypeName ++ "' does not exist on the database.")
+          Prelude.fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " does not exist on the database.")
         
         -- 'e' means enum type
         ['e'] -> 
           Prelude.pure ()
         
         _ -> 
-          Prelude.fail ("Type '" ++ Text.toList databaseTypeName ++ "' is not an enum type.")
+          Prelude.fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " is not an enum type.")
 
       (_, enumRows) <- 
         pgSimpleQuery connection (BSL.fromChunks
@@ -139,7 +138,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         
       case List.map (\[value] -> pgDecodeRep value) enumRows of 
         [] -> 
-          Prelude.fail ("Enum type '" ++ Text.toList databaseTypeName ++ "' does not contain any values.")
+          Prelude.fail ("Enum type " ++ quote (Text.toList databaseTypeName) ++ " does not contain any values.")
 
         vs -> 
           Prelude.pure vs
@@ -154,10 +153,10 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.pure ()
 
       ([], hsOnlyValues) ->
-        Prelude.fail <| "The following values of type '" ++ hsTypeString ++ "' are not mapped to values of pg enum type '" ++ Text.toList databaseTypeName ++ "': " ++ Text.toList (makeValueList hsOnlyValues)
+        Prelude.fail <| "The following values of type " ++ quote hsTypeString ++ " are not mapped to values of pg enum type " ++ quote (Text.toList databaseTypeName) ++ ": " ++ Text.toList (makeValueList hsOnlyValues)
 
       (pgOnlyValues, _) -> 
-        Prelude.fail <| "The following values from the pg enum type '" ++ Text.toList databaseTypeName ++ "' are not mapped to values of " ++ hsTypeString ++ ": " ++ Text.toList (makeValueList pgOnlyValues)
+        Prelude.fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ Text.toList (makeValueList pgOnlyValues)
 
   -- Validation passed! Let's generate some instances
   let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList databaseTypeName))
