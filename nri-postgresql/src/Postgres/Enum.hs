@@ -43,6 +43,10 @@ findDuplicates list =
               Nothing
         )
 
+unexpectedValue :: Prelude.String -> a
+unexpectedValue value = 
+  Prelude.error <| "Unexpected enum value " ++ quote value ++ " encountered. Perhaps your database is out of sync with your compiled executabe?"
+
 generatePGEnum :: TH.Name -> Text -> [(TH.Name, Text)] -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
   let hsTypeString = Prelude.show hsTypeName
@@ -170,13 +174,15 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
   variable <- TH.newName "x"
 
+  -- See definition of PGParameter below
   let hsToPg = TH.CaseE (TH.VarE variable) (mapping |> List.map (\(conName, pgValue) -> 
                   TH.Match (TH.ConP conName []) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) [] 
                 ))
 
+  -- See definition of PGColumn below
   let pgToHs = TH.CaseE (TH.VarE variable) ((mapping |> List.map (\(conName, pgValue) ->
                   TH.Match (TH.LitP <| TH.StringL <| Text.toList pgValue) (TH.NormalB <| TH.ConE conName) []
-                )) ++ [TH.Match TH.WildP (TH.NormalB <| TH.VarE 'Prelude.error `TH.AppE` (TH.LitE <| TH.StringL "The impossible happened!") ) [] ] )
+                )) ++ [TH.Match TH.WildP (TH.NormalB <| TH.AppE (TH.VarE 'unexpectedValue) (TH.AppE (TH.VarE 'Prelude.show) (TH.VarE variable))) [] ] )
 
   Prelude.pure <|
     dbConnectDecls
@@ -199,7 +205,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
       --     case x of 
       --       "labeled" -> Labeled
       --       "blank" -> Blank
-      --       _ -> Prelude.error "The impossible happened!"
+      --       _ -> unexpectedValue (Prelude.show x)
     , TH.InstanceD Nothing [] (TH.ConT ''PGColumn `TH.AppT` pgTypeString `TH.AppT` (TH.ConT hsTypeName))
         [ TH.FunD 'pgDecode [ TH.Clause [TH.WildP, TH.VarP variable] (TH.NormalB pgToHs) [] ] ]
 
