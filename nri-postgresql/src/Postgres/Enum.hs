@@ -47,6 +47,13 @@ generatePGEnum :: TH.Name -> Text -> [(TH.Name, Text)] -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
   let hsTypeString = Prelude.show hsTypeName
 
+  typeFamiliesEnabled <- TH.isExtEnabled TH.TypeFamilies
+
+  if not typeFamiliesEnabled then 
+    Prelude.fail "You need to enable the `TypeFamilies` extension in this module to automatically derive enum instances. Add {-# LANGUAGE TypeFamilies #-} above the module definition."
+  else
+    Prelude.pure ()
+
   info <- TH.reify hsTypeName
 
   conNames <-
@@ -175,7 +182,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
     dbConnectDecls
     ++
     [ -- instance PGType "display_element_type" where
-      --   PGVal "display_element_type" = DisplayElementType
+      --   PGVal "display_element_type" = DisplayElementType 
       TH.InstanceD Nothing [] (TH.ConT ''PGType `TH.AppT` pgTypeString) 
         [ TH.TySynInstD <| TH.TySynEqn Nothing (TH.AppT (TH.ConT ''PGVal) pgTypeString) (TH.ConT hsTypeName) ] 
 
