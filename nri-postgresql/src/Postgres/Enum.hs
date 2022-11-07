@@ -47,6 +47,30 @@ unexpectedValue :: Prelude.String -> a
 unexpectedValue value = 
   Prelude.error <| "Unexpected enum value " ++ quote value ++ " encountered. Perhaps your database is out of sync with your compiled executabe?"
 
+{- Generate instances to connect a Haskell enum type to a postgres ENUM datatype. 
+
+```
+data DisplayElementType
+  = Labeled
+  | Blank
+  deriving (Eq, Show, Ord)
+
+$(generatePGEnum ''DisplayElementType "display_element_type" 
+    [ ('Labeled, "labeled")
+    , ('Blank, "blank")
+    ]
+  )
+```
+
+Note: You will need to enable the `TemplateHaskell` and `TypeFamilies` extensions and disable the orphan instances warning in the module you call `generatePGEnum` from.  
+Add the following to the top of your file:
+
+```
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS -Wno-orphans #-}
+```
+-}
 generatePGEnum :: TH.Name -> Text -> [(TH.Name, Text)] -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
   let hsTypeString = Prelude.show hsTypeName
@@ -173,6 +197,8 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
   let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList databaseTypeName))
 
   variable <- TH.newName "x"
+
+  -- Note: Most of these instance definitions borrowed from https://hackage.haskell.org/package/postgresql-typed-0.6.2.1/docs/src/Database.PostgreSQL.Typed.Enum.html
 
   -- See definition of PGParameter below
   let hsToPg = TH.CaseE (TH.VarE variable) (mapping |> List.map (\(conName, pgValue) -> 
