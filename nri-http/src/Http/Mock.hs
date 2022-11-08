@@ -22,26 +22,24 @@ import qualified Data.Dynamic as Dynamic
 import qualified Data.IORef
 import Data.String (fromString)
 import qualified Data.Text.Encoding
-import qualified Debug
 import qualified Expect
 import qualified GHC.Stack as Stack
 import qualified Http.Internal as Internal
 import qualified Platform
 import qualified Task
-import qualified Type.Reflection
 import qualified Prelude
 
 -- | A stub for a single request type. If your test body can perform multiple
 -- different kinds of http requests, you'll want one of these per request type.
 data Stub x a where
   Stub ::
-    ( Dynamic.Typeable expect ) =>
+    (Dynamic.Typeable expect) =>
     (Internal.Request x expect -> Task x (a, expect)) ->
     Stub x a
 
 -- | Create a 'Stub'.
 mkStub ::
-  ( Dynamic.Typeable expect ) =>
+  (Dynamic.Typeable expect) =>
   (Internal.Request x expect -> Task x (a, expect)) ->
   Stub x a
 mkStub = Stub
@@ -74,22 +72,19 @@ stub ::
   ) =>
   (List (Stub x a)) ->
   x ->
-  (Internal.Handler -> Expect.Expectation) ->
+  ((Internal.Request x a -> Task x a) -> Expect.Expectation) ->
   Expect.Expectation' (List a)
 stub responders error stubbedTestBody = do
   logRef <- Expect.fromIO (Data.IORef.newIORef [])
   doAnything <- Expect.fromIO Platform.doAnythingHandler
   let mockHandler =
-        Internal.Handler
-          ( \req -> do
-              (log, res) <- tryRespond responders error req
-              Data.IORef.modifyIORef' logRef (\prev -> log : prev)
-                |> map Ok
-                |> Platform.doAnything doAnything
-              Prelude.pure res
-          )
-          (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
-          (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
+        ( \req -> do
+            (log, res) <- tryRespond responders error req
+            Data.IORef.modifyIORef' logRef (\prev -> log : prev)
+              |> map Ok
+              |> Platform.doAnything doAnything
+            Prelude.pure res
+        )
   Expect.around (\f -> f mockHandler) (Stack.withFrozenCallStack stubbedTestBody)
   Expect.fromIO (Data.IORef.readIORef logRef)
     |> map List.reverse
@@ -150,14 +145,13 @@ tryRespond ::
   ( Dynamic.Typeable expect,
     Dynamic.Typeable x,
     Dynamic.Typeable a
-  ) => List (Stub x a) -> x -> Internal.Request x expect -> Task x (a, expect)
+  ) =>
+  List (Stub x a) ->
+  x ->
+  Internal.Request x expect ->
+  Task x (a, expect)
 tryRespond [] err _ = Task.fail err
 tryRespond (Stub respond : rest) err req =
   Dynamic.dynApply (Dynamic.toDyn respond) (Dynamic.toDyn req)
     |> Maybe.andThen Dynamic.fromDynamic
     |> Maybe.withDefault (tryRespond rest err req)
-
-printType :: Dynamic.Typeable expect => proxy expect -> Text
-printType expect =
-  Type.Reflection.someTypeRep expect
-    |> Debug.toString
