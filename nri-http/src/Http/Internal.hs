@@ -12,16 +12,17 @@ import qualified Network.HTTP.Types.Header as Header
 import qualified Network.Mime as Mime
 import qualified Platform
 import Prelude (IO)
+import Dict (Dict)
 
 -- | A handler for making HTTP requests.
 data Handler = Handler
-  { handlerRequest :: forall expect. Dynamic.Typeable expect => Request expect -> Task Error expect,
-    handlerWithThirdParty :: forall a e. (HTTP.Manager -> Task e a) -> Task e a,
+  { handlerRequest :: forall e expect. (Dynamic.Typeable e, Dynamic.Typeable expect) => Request e expect -> Task e expect,
+    handlerWithThirdParty :: forall e a. (HTTP.Manager -> Task e a) -> Task e a,
     handlerWithThirdPartyIO :: forall a. Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
   }
 
 -- | A custom request.
-data Request a = Request
+data Request x a = Request
   { -- | The request method, like @"GET"@ or @"PUT"@.
     method :: Text,
     -- | A list of request headers.
@@ -33,7 +34,7 @@ data Request a = Request
     -- | The amount of microseconds you're willing to wait before giving up.
     timeout :: Maybe Int,
     -- | The type of response you expect back from the request.
-    expect :: Expect a
+    expect :: Expect x a
   }
 
 -- | An HTTP header for configuration requests.
@@ -48,10 +49,11 @@ data Body = Body
 
 -- |
 -- Logic for interpreting a response body.
-data Expect a where
-  ExpectJson :: Aeson.FromJSON a => Expect a
-  ExpectText :: Expect Text
-  ExpectWhatever :: Expect ()
+data Expect x a where
+  ExpectJson :: Aeson.FromJSON a => Expect Error a
+  ExpectText :: Expect Error Text
+  ExpectWhatever :: Expect Error ()
+  ExpectStringResponse :: (Response body -> Result x a) -> Expect x a
 
 -- | A 'Request' can fail in a couple of ways:
 --
@@ -71,3 +73,40 @@ data Error
 instance Exception.Exception Error
 
 instance Aeson.ToJSON Error
+
+-- | A 'Response' can come back a couple different ways:
+--
+-- - 'BadUrl_' — you did not provide a valid URL.
+-- - 'Timeout_' — it took too long to get a response.
+-- - 'NetworkError_' — the user turned off their wifi, went in a cave, etc.
+-- - 'BadStatus_' — a response arrived, but the status code indicates failure.
+-- - 'GoodStatus_' — a response arrived with a nice status code!
+-- - The type of the body depends on whether you use expectStringResponse or expectBytesResponse.
+data Response body
+  = BadUrl_ Text
+  | Timeout_
+  | NetworkError_
+  | BadStatus_ Metadata body
+  | GoodStatus_ Metadata body
+  deriving (Generic, Eq, Show)
+
+instance (Dynamic.Typeable body, Show body) => Exception.Exception (Response body)
+
+instance (Aeson.ToJSON body) => Aeson.ToJSON (Response body)
+
+-- Extra information about the response:
+--
+-- Note: It is possible for a response to have the same header multiple times. In that case, all the values end up in a single entry in the headers dictionary. The values are separated by commas, following the rules outlined here.
+data Metadata = Metadata
+  { -- url of the server that actually responded (so you can detect redirects)
+    metadataUrl :: Text,
+    -- statusCode like 200 or 404
+    metadataStatusCode :: Int,
+    -- statusText describing what the statusCode means a little
+    metadataStatusText :: Text,
+    -- headers like Content-Length and Expires
+    metadataHeaders :: Dict Text Text
+  }
+  deriving (Generic, Eq, Show)
+
+instance Aeson.ToJSON Metadata
