@@ -25,16 +25,8 @@ findDuplicates list =
   list
     |> List.sort 
     |> group
-    |> List.filterMap 
-        (\items -> 
-          case items of 
-            (item : _ : _) -> 
-              Just item
-
-            _ ->
-              Nothing
-        )
-
+    |> List.filterMap (List.drop 1 >> List.head)
+    
 unexpectedValue :: Prelude.String -> a
 unexpectedValue value = 
   Prelude.error <| "Unexpected enum value " ++ quote value ++ " encountered. Perhaps your database is out of sync with your compiled executabe?"
