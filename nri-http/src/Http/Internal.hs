@@ -5,16 +5,15 @@ module Http.Internal where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString
 import qualified Data.ByteString.Lazy
 import qualified Data.Dynamic as Dynamic
+import Dict (Dict)
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Types.Header as Header
 import qualified Network.Mime as Mime
 import qualified Platform
 import Prelude (IO)
-import Dict (Dict)
-
-
 
 -- | A handler for making HTTP requests.
 data Handler = Handler
@@ -22,8 +21,6 @@ data Handler = Handler
     handlerWithThirdParty :: forall e a. (HTTP.Manager -> Task e a) -> Task e a,
     handlerWithThirdPartyIO :: forall a. Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
   }
-
-
 
 -- | A custom request.
 data Request a = Request
@@ -58,6 +55,7 @@ data Expect a where
   ExpectText :: Expect Text
   ExpectWhatever :: Expect ()
   ExpectTextResponse :: (Response Text -> Result Error a) -> Expect a
+  ExpectBytesResponse :: (Response Data.ByteString.ByteString -> Result Error a) -> Expect a
 
 -- | A 'Request' can fail in a couple of ways:
 --

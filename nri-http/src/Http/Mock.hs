@@ -34,13 +34,13 @@ import qualified Prelude
 -- different kinds of http requests, you'll want one of these per request type.
 data Stub a where
   Stub ::
-    ( Dynamic.Typeable expect ) =>
+    (Dynamic.Typeable expect) =>
     (Internal.Request expect -> Task Internal.Error (a, expect)) ->
     Stub a
 
 -- | Create a 'Stub'.
 mkStub ::
-  ( Dynamic.Typeable expect ) =>
+  (Dynamic.Typeable expect) =>
   (Internal.Request expect -> Task Internal.Error (a, expect)) ->
   Stub a
 mkStub = Stub
@@ -143,12 +143,14 @@ tryRespond ::
   List (Stub a) ->
   Internal.Request expect ->
   Task Internal.Error (a, expect)
-tryRespond [] req = Task.fail (Internal.NetworkError
-                      (  "Http request was made with expected return type "
-                          ++ printType req
-                          ++ ", but I don't know how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
-                      )
-                  )
+tryRespond [] req =
+  Task.fail
+    ( Internal.NetworkError
+        ( "Http request was made with expected return type "
+            ++ printType req
+            ++ ", but I don't know how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
+        )
+    )
 tryRespond (Stub respond : rest) req =
   Dynamic.dynApply (Dynamic.toDyn respond) (Dynamic.toDyn req)
     |> Maybe.andThen Dynamic.fromDynamic

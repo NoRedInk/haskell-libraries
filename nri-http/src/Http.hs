@@ -31,6 +31,7 @@ module Http
     expectText,
     expectWhatever,
     expectTextResponse,
+    expectBytesResponse,
 
     -- * Elaborate Expectations
     Internal.Response,
@@ -52,6 +53,7 @@ import Data.String (fromString)
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
+import qualified Dict
 import Http.Internal (Body, Expect, Handler)
 import qualified Http.Internal as Internal
 import qualified Log.HttpRequest as HttpRequest
@@ -64,7 +66,6 @@ import qualified Network.URI
 import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
-import qualified Dict
 
 -- | Create a 'Handler' for making HTTP requests.
 handler :: Conduit.Acquire Handler
@@ -218,24 +219,6 @@ _request doAnythingHandler manager settings = do
                 }
         HTTP.httpLbs finalRequest requestManager
     pure <| handleResponse (Internal.expect settings) response
-    -- pure <| case response of
-    --   Right okResponse ->
-    --     decode (Internal.expect settings) (HTTP.responseBody okResponse)
-    --   Left (HTTP.HttpExceptionRequest _ content) ->
-    --     case content of
-    --       HTTP.StatusCodeException res _ ->
-    --         let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
-    --          in Err (Internal.BadStatus (statusCode res))
-    --       HTTP.ResponseTimeout ->
-    --         Err Internal.Timeout
-    --       HTTP.ConnectionTimeout ->
-    --         Err (Internal.NetworkError "ConnectionTimeout")
-    --       HTTP.ConnectionFailure err ->
-    --         Err (Internal.NetworkError (Text.fromList (Exception.displayException err)))
-    --       err ->
-    --         Err (Internal.NetworkError (Text.fromList (show err)))
-    --   Left (HTTP.InvalidUrlException _ message) ->
-    --     Err (Internal.BadUrl (Text.fromList message))
 
 handleResponse :: Expect a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result Error a
 handleResponse expect response =
@@ -243,25 +226,42 @@ handleResponse expect response =
     Right okResponse ->
       let bytes = HTTP.responseBody okResponse
           bodyAsText = Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes
-      in
-      case expect of
-        Internal.ExpectJson ->
-          case Aeson.eitherDecode bytes of
-            Left err -> Err (Internal.BadBody (Text.fromList err))
-            Right x -> Ok x
-        Internal.ExpectText -> Ok bodyAsText
-        Internal.ExpectWhatever -> Ok ()
-        Internal.ExpectStringResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) bodyAsText)
+       in case expect of
+            Internal.ExpectJson ->
+              case Aeson.eitherDecode bytes of
+                Left err -> Err (Internal.BadBody (Text.fromList err))
+                Right x -> Ok x
+            Internal.ExpectText -> Ok bodyAsText
+            Internal.ExpectWhatever -> Ok ()
+            Internal.ExpectTextResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) bodyAsText)
+            Internal.ExpectBytesResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) (Data.ByteString.Lazy.toStrict bytes))
     Left exception ->
       case expect of
-        Internal.ExpectStringResponse mkResult ->
-          mkResult <|
-            case exception of
+        Internal.ExpectTextResponse mkResult ->
+          mkResult
+            <| case exception of
               HTTP.HttpExceptionRequest _ content ->
                 case content of
                   HTTP.StatusCodeException res bytes ->
                     let bodyAsText = Data.Text.Encoding.decodeUtf8 bytes
-                    in Internal.BadStatus_ ( mkMetadata res) bodyAsText
+                     in Internal.BadStatus_ (mkMetadata res) bodyAsText
+                  HTTP.ResponseTimeout ->
+                    Internal.Timeout_
+                  HTTP.ConnectionTimeout ->
+                    Internal.NetworkError_ "ConnectionTimeout"
+                  HTTP.ConnectionFailure err ->
+                    Internal.NetworkError_ (Text.fromList (Exception.displayException err))
+                  err ->
+                    Internal.NetworkError_ (Text.fromList (show err))
+              HTTP.InvalidUrlException _ message ->
+                Internal.BadUrl_ (Text.fromList message)
+        Internal.ExpectBytesResponse mkResult ->
+          mkResult
+            <| case exception of
+              HTTP.HttpExceptionRequest _ content ->
+                case content of
+                  HTTP.StatusCodeException res bytes ->
+                    Internal.BadStatus_ (mkMetadata res) bytes
                   HTTP.ResponseTimeout ->
                     Internal.Timeout_
                   HTTP.ConnectionTimeout ->
@@ -278,7 +278,7 @@ handleResponse expect response =
               case content of
                 HTTP.StatusCodeException res _ ->
                   let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
-                  in Err (Internal.BadStatus (statusCode res))
+                   in Err (Internal.BadStatus (statusCode res))
                 HTTP.ResponseTimeout ->
                   Err Internal.Timeout
                 HTTP.ConnectionTimeout ->
@@ -289,17 +289,15 @@ handleResponse expect response =
                   Err (Internal.NetworkError (Text.fromList (show err)))
             HTTP.InvalidUrlException _ message ->
               Err (Internal.BadUrl (Text.fromList message))
-   
 
 mkMetadata :: HTTP.Response a -> Internal.Metadata
-mkMetadata response = Internal.Metadata
-  { Internal.metadataStatusCode = (fromIntegral << Status.statusCode << HTTP.responseStatus) response
-  , Internal.metadataStatusText = ""
-  -- , Internal.metadataHeaders = Dict.fromList <| HTTP.responseHeaders response
-  , Internal.metadataHeaders = Dict.empty
-  }
-
-
+mkMetadata response =
+  Internal.Metadata
+    { Internal.metadataStatusCode = (fromIntegral << Status.statusCode << HTTP.responseStatus) response,
+      Internal.metadataStatusText = "",
+      -- , Internal.metadataHeaders = Dict.fromList <| HTTP.responseHeaders response
+      Internal.metadataHeaders = Dict.empty
+    }
 
 -- |
 -- Expect the response body to be JSON.
@@ -319,7 +317,12 @@ expectWhatever = Internal.ExpectWhatever
 -- |
 -- Expect a `Response` with a `Text` body.
 expectTextResponse :: (Internal.Response Text -> Result Error a) -> Expect a
-expectTextResponse f = Internal.ExpectTextResponse f
+expectTextResponse = Internal.ExpectTextResponse
+
+-- |
+-- Expect a `Response` with a `ByteString` body
+expectBytesResponse :: (Internal.Response ByteString -> Result Error a) -> Expect a
+expectBytesResponse = Internal.ExpectBytesResponse
 
 -- |
 type Error = Internal.Error
