@@ -48,6 +48,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
+import qualified Data.CaseInsensitive
 import qualified Data.Dynamic as Dynamic
 import Data.String (fromString)
 import qualified Data.Text.Encoding
@@ -292,12 +293,19 @@ handleResponse expect response =
 
 mkMetadata :: HTTP.Response a -> Internal.Metadata
 mkMetadata response =
-  Internal.Metadata
-    { Internal.metadataStatusCode = (fromIntegral << Status.statusCode << HTTP.responseStatus) response,
-      Internal.metadataStatusText = "",
-      -- , Internal.metadataHeaders = Dict.fromList <| HTTP.responseHeaders response
-      Internal.metadataHeaders = Dict.empty
-    }
+  let status = HTTP.responseStatus response
+   in Internal.Metadata
+        { Internal.metadataStatusCode = fromIntegral <| Status.statusCode status,
+          Internal.metadataStatusText =
+            status
+              |> Status.statusMessage
+              |> Data.Text.Encoding.decodeUtf8,
+          Internal.metadataHeaders =
+            response
+              |> HTTP.responseHeaders
+              |> List.map (Tuple.mapBoth (Data.CaseInsensitive.original >> Data.Text.Encoding.decodeUtf8) (Data.Text.Encoding.decodeUtf8))
+              |> Dict.fromList
+        }
 
 -- |
 -- Expect the response body to be JSON.
