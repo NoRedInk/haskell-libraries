@@ -1,5 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS -Wno-orphans #-}
 
 module Postgres.Enum where
@@ -26,7 +25,7 @@ findDuplicates list =
     |> List.sort 
     |> group
     |> List.filterMap (List.drop 1 >> List.head)
-    
+
 unexpectedValue :: Prelude.String -> a
 unexpectedValue value = 
   Prelude.error <| "Unexpected enum value " ++ quote value ++ " encountered. Perhaps your database is out of sync with your compiled executabe?"
@@ -129,14 +128,25 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
     TH.runIO <| withTPGConnection (\connection -> do 
       -- Check if the databaseTypeName exists on the PG database and is an enum
       -- See https://www.postgresql.org/docs/current/catalog-pg-type.html
-      (_, typeRows) <-
+      typeType <-
         pgSimpleQuery connection (BSL.fromChunks
           [ "SELECT typtype"
           , " FROM pg_catalog.pg_type"
           , " WHERE typname = '", Encoding.encodeUtf8 databaseTypeName, "'"
           ])
+          |> Prelude.fmap (\(_, rows) ->
+                rows
+                  |> List.filterMap (\cols ->
+                      case cols of 
+                        [enumlabel] ->
+                          Just (pgDecodeRep enumlabel)
 
-      _ <- case List.map (\[v] -> pgDecodeRep v) typeRows of 
+                        _ -> 
+                          Nothing   
+                    )
+          )
+
+      _ <- case typeType of 
         [] -> 
           Prelude.fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " does not exist on the database.")
         
@@ -147,15 +157,26 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         _ -> 
           Prelude.fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " is not an enum type.")
 
-      (_, enumRows) <- 
+      enumLabels <- 
         pgSimpleQuery connection (BSL.fromChunks
           [ "SELECT enumlabel"
           , " FROM pg_catalog.pg_enum"
           , " WHERE enumtypid = '", Encoding.encodeUtf8 databaseTypeName, "'::regtype"
           , " ORDER BY enumsortorder"
           ])
+          |> Prelude.fmap (\(_, rows) ->
+                rows
+                  |> List.filterMap (\cols ->
+                      case cols of 
+                        [enumlabel] ->
+                          Just (pgDecodeRep enumlabel)
+
+                        _ -> 
+                          Nothing   
+                    )
+          )
         
-      case List.map (\[value] -> pgDecodeRep value) enumRows of 
+      case enumLabels of 
         [] -> 
           Prelude.fail ("Enum type " ++ quote (Text.toList databaseTypeName) ++ " does not contain any values.")
 
