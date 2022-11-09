@@ -38,6 +38,7 @@ library
       Postgres.Query
       Postgres.QueryParser
       Postgres.Settings
+      Postgres.TH
       Postgres.Time
       Paths_nri_postgresql
   hs-source-dirs:
@@ -87,7 +88,9 @@ test-suite tests
       Postgres.QueryParser
       Postgres.Settings
       Postgres.Test
+      Postgres.TH
       Postgres.Time
+      Enum
       ObservabilitySpec
       PostgresSettingsSpec
       QueryParserSpec

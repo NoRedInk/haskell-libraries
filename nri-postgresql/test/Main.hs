@@ -11,6 +11,7 @@ import qualified PostgresSettingsSpec
 import qualified QueryParserSpec
 import Test (Test, describe, run)
 import qualified TimeSpec
+import qualified Enum
 import qualified Prelude
 
 -- `Test.run` exits after finishing, so run other tests first.
@@ -28,5 +29,6 @@ tests postgres =
     [ PostgresSettingsSpec.tests,
       QueryParserSpec.tests,
       TimeSpec.tests,
-      ObservabilitySpec.tests postgres
+      ObservabilitySpec.tests postgres,
+      Enum.tests
     ]
