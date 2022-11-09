@@ -17,8 +17,8 @@ import Prelude (IO)
 
 -- | A handler for making HTTP requests.
 data Handler = Handler
-  { handlerRequest :: forall expect. (Dynamic.Typeable expect) => Request expect -> Task Error expect,
-    handlerWithThirdParty :: forall e a. (HTTP.Manager -> Task e a) -> Task e a,
+  { handlerRequest :: forall expect. Dynamic.Typeable expect => Request expect -> Task Error expect,
+    handlerWithThirdParty :: forall a e. (HTTP.Manager -> Task e a) -> Task e a,
     handlerWithThirdPartyIO :: forall a. Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
   }
 

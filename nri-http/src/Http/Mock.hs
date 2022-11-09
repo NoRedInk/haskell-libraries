@@ -22,6 +22,7 @@ import qualified Data.Dynamic as Dynamic
 import qualified Data.IORef
 import Data.String (fromString)
 import qualified Data.Text.Encoding
+import qualified Debug
 import qualified Expect
 import qualified GHC.Stack as Stack
 import qualified Http.Internal as Internal
@@ -34,13 +35,13 @@ import qualified Prelude
 -- different kinds of http requests, you'll want one of these per request type.
 data Stub a where
   Stub ::
-    (Dynamic.Typeable expect) =>
+    Dynamic.Typeable expect =>
     (Internal.Request expect -> Task Internal.Error (a, expect)) ->
     Stub a
 
 -- | Create a 'Stub'.
 mkStub ::
-  (Dynamic.Typeable expect) =>
+  Dynamic.Typeable expect =>
   (Internal.Request expect -> Task Internal.Error (a, expect)) ->
   Stub a
 mkStub = Stub
@@ -79,7 +80,16 @@ stub responders stubbedTestBody = do
   let mockHandler =
         Internal.Handler
           ( \req -> do
-              (log, res) <- tryRespond responders req
+              (log, res) <-
+                tryRespond
+                  responders
+                  ( Internal.NetworkError
+                      ( "Http request was made with expected return type "
+                          ++ printType req
+                          ++ ", but I don't how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
+                      )
+                  )
+                  req
               Data.IORef.modifyIORef' logRef (\prev -> log : prev)
                 |> map Ok
                 |> Platform.doAnything doAnything
@@ -141,20 +151,14 @@ tryRespond ::
     Dynamic.Typeable a
   ) =>
   List (Stub a) ->
+  Internal.Error ->
   Internal.Request expect ->
   Task Internal.Error (a, expect)
-tryRespond [] req =
-  Task.fail
-    ( Internal.NetworkError
-        ( "Http request was made with expected return type "
-            ++ printType req
-            ++ ", but I don't know how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
-        )
-    )
-tryRespond (Stub respond : rest) req =
+tryRespond [] err _ = Task.fail err
+tryRespond (Stub respond : rest) err req =
   Dynamic.dynApply (Dynamic.toDyn respond) (Dynamic.toDyn req)
     |> Maybe.andThen Dynamic.fromDynamic
-    |> Maybe.withDefault (tryRespond rest req)
+    |> Maybe.withDefault (tryRespond rest err req)
 
 printType :: Dynamic.Typeable expect => proxy expect -> Text
 printType expect =
