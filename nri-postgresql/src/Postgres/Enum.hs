@@ -24,10 +24,6 @@ makeValueList :: List Text -> Text
 makeValueList list = 
   "[" ++ Text.join ", " (List.map (Text.toList >> quote >> Text.fromList) list) ++ "]"
 
-makeConList :: List TH.Name -> Text
-makeConList list =
-  makeValueList (List.map (Prelude.show >> Text.fromList) list)
-
 findDuplicates :: (Ord a) => List a -> List a
 findDuplicates list = 
   list
@@ -118,7 +114,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.pure ()
 
       duplicates ->
-        Prelude.fail <| "The following constructors in the mapping are duplicated: " ++ Text.toList (makeConList duplicates)
+        Prelude.fail <| "The following constructors in the mapping are duplicated: " ++ Prelude.show duplicates
 
   let hsConSet = Set.fromList conNames
   let mappingConSet = Set.fromList (List.map Tuple.first mapping)
@@ -129,10 +125,10 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.pure ()
 
       ([], mappingOnlyCons) ->
-        Prelude.fail <| "The following names in the mapping are not constructors from the data type " ++ quote hsTypeString ++ ": " ++ Text.toList (makeConList mappingOnlyCons)
+        Prelude.fail <| "The following names in the mapping are not constructors from the data type " ++ quote hsTypeString ++ ": " ++ Prelude.show mappingOnlyCons
 
       (hsOnlyCons, _) -> 
-        Prelude.fail <| "The following constructors are not present in the mapping: " ++ Text.toList (makeConList hsOnlyCons)
+        Prelude.fail <| "The following constructors are not present in the mapping: " ++ Prelude.show hsOnlyCons
 
   pgDatabase <-
     TH.runIO <| do 
