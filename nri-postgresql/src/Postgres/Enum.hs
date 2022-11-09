@@ -20,10 +20,6 @@ import qualified Prelude
 quote :: Prelude.String -> Prelude.String
 quote t = "\"" ++ t ++ "\""
 
-makeValueList :: List Text -> Text
-makeValueList list = 
-  "[" ++ Text.join ", " (List.map (Text.toList >> quote >> Text.fromList) list) ++ "]"
-
 findDuplicates :: (Ord a) => List a -> List a
 findDuplicates list = 
   list
@@ -105,7 +101,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.pure () 
 
       duplicates ->
-        Prelude.fail <| "The following values in the mapping are duplicated: " ++ Text.toList (makeValueList duplicates)  
+        Prelude.fail <| "The following values in the mapping are duplicated: " ++ Prelude.show duplicates
 
   -- Check for duplicate constructor names specified in the mapping
   _ <-
@@ -184,10 +180,10 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.pure ()
 
       ([], hsOnlyValues) ->
-        Prelude.fail <| "The following values of type " ++ quote hsTypeString ++ " are not mapped to values of pg enum type " ++ quote (Text.toList databaseTypeName) ++ ": " ++ Text.toList (makeValueList hsOnlyValues)
+        Prelude.fail <| "The following values of type " ++ quote hsTypeString ++ " are not mapped to values of pg enum type " ++ quote (Text.toList databaseTypeName) ++ ": " ++ Prelude.show hsOnlyValues
 
       (pgOnlyValues, _) -> 
-        Prelude.fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ Text.toList (makeValueList pgOnlyValues)
+        Prelude.fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ Prelude.show pgOnlyValues1
 
   -- Validation passed! Let's generate some instances
   let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList databaseTypeName))
