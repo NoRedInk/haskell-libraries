@@ -30,6 +30,7 @@ module Http
     expectJson,
     expectText,
     expectWhatever,
+    expectTextResponse,
 
     -- * Elaborate Expectations
     Internal.Response,
@@ -104,7 +105,7 @@ _withThirdPartyIO manager log library = do
 -- QUICKS
 
 -- | Create a @GET@ request.
-get :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Expect x a -> Task x a
+get :: (Dynamic.Typeable a) => Handler -> Text -> Expect a -> Task Error a
 get handler' url expect =
   request
     handler'
@@ -118,7 +119,7 @@ get handler' url expect =
       }
 
 -- | Create a @POST@ request.
-post :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Body -> Expect x a -> Task x a
+post :: (Dynamic.Typeable a) => Handler -> Text -> Body -> Expect a -> Task Error a
 post handler' url body expect =
   request
     handler'
@@ -183,13 +184,13 @@ bytesBody mimeType bytes =
 
 -- | Create a custom request.
 request ::
-  (Dynamic.Typeable x, Dynamic.Typeable expect) =>
+  (Dynamic.Typeable expect) =>
   Handler ->
-  Internal.Request x expect ->
-  Task x expect
+  Internal.Request expect ->
+  Task Error expect
 request Internal.Handler {Internal.handlerRequest} settings = handlerRequest settings
 
-_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request x expect -> Task x expect
+_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request expect -> Task Error expect
 _request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
@@ -236,27 +237,63 @@ _request doAnythingHandler manager settings = do
     --   Left (HTTP.InvalidUrlException _ message) ->
     --     Err (Internal.BadUrl (Text.fromList message))
 
-decode :: Expect x a -> Data.ByteString.Lazy.ByteString -> Result x a
-decode Internal.ExpectJson bytes =
-  case Aeson.eitherDecode bytes of
-    Left err -> Err (Internal.BadBody (Text.fromList err))
-    Right x -> Ok x
-decode Internal.ExpectText bytes = (Ok << Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8) bytes
-decode Internal.ExpectWhatever _ = Ok ()
+handleResponse :: Expect a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result Error a
+handleResponse expect response =
+  case response of
+    Right okResponse ->
+      let bytes = HTTP.responseBody okResponse
+          bodyAsText = Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes
+      in
+      case expect of
+        Internal.ExpectJson ->
+          case Aeson.eitherDecode bytes of
+            Left err -> Err (Internal.BadBody (Text.fromList err))
+            Right x -> Ok x
+        Internal.ExpectText -> Ok bodyAsText
+        Internal.ExpectWhatever -> Ok ()
+        Internal.ExpectStringResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) bodyAsText)
+    Left exception ->
+      case expect of
+        Internal.ExpectStringResponse mkResult ->
+          mkResult <|
+            case exception of
+              HTTP.HttpExceptionRequest _ content ->
+                case content of
+                  HTTP.StatusCodeException res bytes ->
+                    let bodyAsText = Data.Text.Encoding.decodeUtf8 bytes
+                    in Internal.BadStatus_ ( mkMetadata res) bodyAsText
+                  HTTP.ResponseTimeout ->
+                    Internal.Timeout_
+                  HTTP.ConnectionTimeout ->
+                    Internal.NetworkError_ "ConnectionTimeout"
+                  HTTP.ConnectionFailure err ->
+                    Internal.NetworkError_ (Text.fromList (Exception.displayException err))
+                  err ->
+                    Internal.NetworkError_ (Text.fromList (show err))
+              HTTP.InvalidUrlException _ message ->
+                Internal.BadUrl_ (Text.fromList message)
+        _ ->
+          case exception of
+            HTTP.HttpExceptionRequest _ content ->
+              case content of
+                HTTP.StatusCodeException res _ ->
+                  let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
+                  in Err (Internal.BadStatus (statusCode res))
+                HTTP.ResponseTimeout ->
+                  Err Internal.Timeout
+                HTTP.ConnectionTimeout ->
+                  Err (Internal.NetworkError "ConnectionTimeout")
+                HTTP.ConnectionFailure err ->
+                  Err (Internal.NetworkError (Text.fromList (Exception.displayException err)))
+                err ->
+                  Err (Internal.NetworkError (Text.fromList (show err)))
+            HTTP.InvalidUrlException _ message ->
+              Err (Internal.BadUrl (Text.fromList message))
+   
 
-handleResponse :: Expect x a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result x a
-handleResponse Internal.ExpectWhatever _ = Ok ()  
-handleResponse (Internal.ExpectStringResponse f) (Right settings) = f (mkResponse settings)
-
-mkResponse :: HTTP.Response Data.ByteString.Lazy.ByteString -> Internal.Response body
-mkResponse response =
-  Internal.Timeout_
-
-mkMetadata :: HTTP.Response Data.ByteString.Lazy.ByteString -> Internal.Metadata
+mkMetadata :: HTTP.Response a -> Internal.Metadata
 mkMetadata response = Internal.Metadata
-  { Internal.metadataUrl = ""
-  -- , Internal.metadataStatusCode = (fromIntegral << Status.statusCode << HTTP.responseStatus) response
-  , Internal.metadataStatusCode = 200
+  { Internal.metadataStatusCode = (fromIntegral << Status.statusCode << HTTP.responseStatus) response
   , Internal.metadataStatusText = ""
   -- , Internal.metadataHeaders = Dict.fromList <| HTTP.responseHeaders response
   , Internal.metadataHeaders = Dict.empty
@@ -266,23 +303,23 @@ mkMetadata response = Internal.Metadata
 
 -- |
 -- Expect the response body to be JSON.
-expectJson :: Aeson.FromJSON a => Expect Error a
+expectJson :: Aeson.FromJSON a => Expect a
 expectJson = Internal.ExpectJson
 
 -- |
 -- Expect the response body to be a `Text`.
-expectText :: Expect Error Text
+expectText :: Expect Text
 expectText = Internal.ExpectText
 
 -- |
 -- Expect the response body to be whatever. It does not matter. Ignore it!
-expectWhatever :: Expect Error ()
+expectWhatever :: Expect ()
 expectWhatever = Internal.ExpectWhatever
 
 -- |
 -- Expect a `Response` with a `Text` body.
-expectTextResponse :: (Internal.Response Text -> Result x a) -> Expect x a
-expectTextResponse f = Internal.ExpectStringResponse f
+expectTextResponse :: (Internal.Response Text -> Result Error a) -> Expect a
+expectTextResponse f = Internal.ExpectTextResponse f
 
 -- |
 type Error = Internal.Error

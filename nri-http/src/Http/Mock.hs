@@ -27,21 +27,22 @@ import qualified GHC.Stack as Stack
 import qualified Http.Internal as Internal
 import qualified Platform
 import qualified Task
+import qualified Type.Reflection
 import qualified Prelude
 
 -- | A stub for a single request type. If your test body can perform multiple
 -- different kinds of http requests, you'll want one of these per request type.
-data Stub x a where
+data Stub a where
   Stub ::
-    (Dynamic.Typeable expect) =>
-    (Internal.Request x expect -> Task x (a, expect)) ->
-    Stub x a
+    ( Dynamic.Typeable expect ) =>
+    (Internal.Request expect -> Task Internal.Error (a, expect)) ->
+    Stub a
 
 -- | Create a 'Stub'.
 mkStub ::
-  (Dynamic.Typeable expect) =>
-  (Internal.Request x expect -> Task x (a, expect)) ->
-  Stub x a
+  ( Dynamic.Typeable expect ) =>
+  (Internal.Request expect -> Task Internal.Error (a, expect)) ->
+  Stub a
 mkStub = Stub
 
 -- | Stub out http requests in a bit of code. You can use this if you don't
@@ -67,40 +68,34 @@ mkStub = Stub
 -- >     |> Expect.equal ["example.com/one", "example.com/two"]
 stub ::
   ( Stack.HasCallStack,
-    Dynamic.Typeable x,
     Dynamic.Typeable a
   ) =>
-  (List (Stub x a)) ->
-  x ->
-  ((Internal.Request x a -> Task x a) -> Expect.Expectation) ->
+  (List (Stub a)) ->
+  (Internal.Handler -> Expect.Expectation) ->
   Expect.Expectation' (List a)
-stub responders error stubbedTestBody = do
+stub responders stubbedTestBody = do
   logRef <- Expect.fromIO (Data.IORef.newIORef [])
   doAnything <- Expect.fromIO Platform.doAnythingHandler
   let mockHandler =
-        ( \req -> do
-            (log, res) <- tryRespond responders error req
-            Data.IORef.modifyIORef' logRef (\prev -> log : prev)
-              |> map Ok
-              |> Platform.doAnything doAnything
-            Prelude.pure res
-        )
+        Internal.Handler
+          ( \req -> do
+              (log, res) <- tryRespond responders req
+              Data.IORef.modifyIORef' logRef (\prev -> log : prev)
+                |> map Ok
+                |> Platform.doAnything doAnything
+              Prelude.pure res
+          )
+          (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
+          (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
   Expect.around (\f -> f mockHandler) (Stack.withFrozenCallStack stubbedTestBody)
   Expect.fromIO (Data.IORef.readIORef logRef)
     |> map List.reverse
-
--- stub responders stubbedTestBody = stub responders (\req -> Internal.NetworkError
---                       (  "Http request was made with expected return type "
---                           ++ printType req
---                           ++ ", but I don't know how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
---                       )
---                   ) stubbedTestBody
 
 -- | Read the body of the request as text. Useful to check what data got
 -- submitted inside a 'stub' function.
 --
 -- This will return 'Nothing' if the body cannot be parsed as UTF8 text.
-getTextBody :: Internal.Request x expect -> Maybe Text
+getTextBody :: Internal.Request expect -> Maybe Text
 getTextBody req =
   Data.Text.Encoding.decodeUtf8' (getBytesBody req)
     |> eitherToMaybe
@@ -109,7 +104,7 @@ getTextBody req =
 -- submitted inside a 'stub' function.
 --
 -- This will return an error if parsing the JSON body fails.
-getJsonBody :: Aeson.FromJSON a => Internal.Request x expect -> Result Text a
+getJsonBody :: Aeson.FromJSON a => Internal.Request expect -> Result Text a
 getJsonBody req =
   case Aeson.eitherDecodeStrict (getBytesBody req) of
     Prelude.Left err -> Err (Text.fromList err)
@@ -117,7 +112,7 @@ getJsonBody req =
 
 -- | Read the body of the request as bytes. Useful to check what data got
 -- submitted inside a 'stub' function.
-getBytesBody :: Internal.Request x expect -> ByteString
+getBytesBody :: Internal.Request expect -> ByteString
 getBytesBody req =
   Internal.body req
     |> Internal.bodyContents
@@ -128,7 +123,7 @@ getBytesBody req =
 --
 -- This will return 'Nothing' if no header with that name was set on the
 -- request.
-getHeader :: Text -> Internal.Request x expect -> Maybe Text
+getHeader :: Text -> Internal.Request expect -> Maybe Text
 getHeader name req =
   Internal.headers req
     |> List.map Internal.unHeader
@@ -143,15 +138,23 @@ eitherToMaybe either =
 
 tryRespond ::
   ( Dynamic.Typeable expect,
-    Dynamic.Typeable x,
     Dynamic.Typeable a
   ) =>
-  List (Stub x a) ->
-  x ->
-  Internal.Request x expect ->
-  Task x (a, expect)
-tryRespond [] err _ = Task.fail err
-tryRespond (Stub respond : rest) err req =
+  List (Stub a) ->
+  Internal.Request expect ->
+  Task Internal.Error (a, expect)
+tryRespond [] req = Task.fail (Internal.NetworkError
+                      (  "Http request was made with expected return type "
+                          ++ printType req
+                          ++ ", but I don't know how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
+                      )
+                  )
+tryRespond (Stub respond : rest) req =
   Dynamic.dynApply (Dynamic.toDyn respond) (Dynamic.toDyn req)
     |> Maybe.andThen Dynamic.fromDynamic
-    |> Maybe.withDefault (tryRespond rest err req)
+    |> Maybe.withDefault (tryRespond rest req)
+
+printType :: Dynamic.Typeable expect => proxy expect -> Text
+printType expect =
+  Type.Reflection.someTypeRep expect
+    |> Debug.toString
