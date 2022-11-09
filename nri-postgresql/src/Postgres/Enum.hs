@@ -183,7 +183,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.fail <| "The following values of type " ++ quote hsTypeString ++ " are not mapped to values of pg enum type " ++ quote (Text.toList databaseTypeName) ++ ": " ++ Prelude.show hsOnlyValues
 
       (pgOnlyValues, _) -> 
-        Prelude.fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ Prelude.show pgOnlyValues1
+        Prelude.fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ Prelude.show pgOnlyValues
 
   -- Validation passed! Let's generate some instances
   let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList databaseTypeName))
