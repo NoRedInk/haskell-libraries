@@ -30,11 +30,12 @@ module Http
     expectJson,
     expectText,
     expectWhatever,
-    expectTextResponse,
-    expectBytesResponse,
 
     -- * Elaborate Expectations
-    Internal.Response,
+    expectTextResponse,
+    expectBytesResponse,
+    Internal.Response (..),
+    Internal.Metadata (..),
 
     -- * Use with external libraries
     withThirdParty,
