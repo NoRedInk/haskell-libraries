@@ -49,7 +49,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
-import qualified Data.CaseInsensitive
+import qualified Data.CaseInsensitive as CI
 import qualified Data.Dynamic as Dynamic
 import Data.String (fromString)
 import qualified Data.Text.Encoding
@@ -302,10 +302,19 @@ mkMetadata response =
               |> Status.statusMessage
               |> Data.Text.Encoding.decodeUtf8,
           Internal.metadataHeaders =
-            response
-              |> HTTP.responseHeaders
-              |> List.map (Tuple.mapBoth (Data.CaseInsensitive.original >> Data.Text.Encoding.decodeUtf8) (Data.Text.Encoding.decodeUtf8))
-              |> Dict.fromList
+            List.foldl
+              ( \(name, valueBS) ->
+                  let value = Data.Text.Encoding.decodeUtf8 valueBS
+                   in Dict.update
+                        (Data.Text.Encoding.decodeUtf8 <| CI.original name)
+                        ( \current ->
+                            Just <| case current of
+                              Just current_ -> current_ ++ ", " ++ value
+                              Nothing -> value
+                        )
+              )
+              Dict.empty
+              (HTTP.responseHeaders response)
         }
 
 -- |
