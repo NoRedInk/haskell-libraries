@@ -1,5 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS -Wno-orphans #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
+module Postgres.Enum (
+  generatePGEnum
+) where
 
 module Postgres.Enum where
 
