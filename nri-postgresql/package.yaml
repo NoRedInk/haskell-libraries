@@ -72,3 +72,5 @@ tests:
       - -fno-warn-type-defaults
     default-extensions:
       - ExtendedDefaultRules
+    dependencies:
+      - th-test-utils

@@ -15,6 +15,7 @@ import Database.PostgreSQL.Typed.Dynamic (pgDecodeRep, PGRepType, PGRep)
 import Database.PostgreSQL.Typed.Types (PGType, PGVal, PGParameter, pgEncode, PGColumn, pgDecode)
 import qualified Set
 import qualified Prelude 
+import qualified Control.Exception 
 
 quote :: Prelude.String -> Prelude.String
 quote t = "\"" ++ t ++ "\""
@@ -117,8 +118,9 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
   dbConnectDecls <- useTPGDatabase pgDatabase
 
-  (pgEnumValues :: List Text) <-
-    TH.runIO <| withTPGConnection (\connection -> do 
+  -- Note: We make sure to capture IO errors and re-throw them below in the Q monad so that our test framework can capture them
+  (maybePGEnumValues :: Prelude.Either Control.Exception.IOException (List Text)) <-
+    TH.runIO <| Control.Exception.try <| withTPGConnection (\connection -> do 
       -- Check if the databaseTypeName exists on the PG database and is an enum
       -- See https://www.postgresql.org/docs/current/catalog-pg-type.html
       typeType <-
@@ -176,6 +178,13 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         vs -> 
           Prelude.pure vs
     )
+
+  (pgEnumValues :: List Text) <-
+    case maybePGEnumValues of 
+      Prelude.Left error -> 
+        Prelude.fail (Prelude.show error)
+      Prelude.Right vals ->
+        Prelude.pure vals
 
   let pgValuesSet = Set.fromList pgEnumValues
   let mappingValuesSet = Set.fromList (List.map Tuple.second mapping) 
