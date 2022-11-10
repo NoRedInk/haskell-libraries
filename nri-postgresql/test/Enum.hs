@@ -14,15 +14,18 @@ import qualified Language.Haskell.TH as TH
 import qualified Expect
 import Language.Haskell.TH.TestUtils as THTest
 import qualified Prelude
+import qualified Postgres
 
 {- Set up an enum type on the database at compile time to test with -}
 Postgres.TH.useNRIDatabase
 
 [Core.pgSQL| CREATE TYPE test_enum as ENUM ('value_1', 'value_2') |]
+[Core.pgSQL| CREATE TABLE test_table (enum_col test_enum NOT NULL) |]
 
 data TestEnum
   = Value1
   | Value2
+  deriving (Eq, Show)
 
 data TestNotEnum
   = NotValue Int
@@ -86,10 +89,67 @@ generateFailureTests =
       expectCompileFailure (generatePGEnum ''OversizedEnum "test_enum" [('OversizedValue1, "value_1"), ('OversizedValue2, "value_2")] )
   ] 
 
+queryTests :: Postgres.Connection -> Test
+queryTests rawConnection = 
+  let expectSuccess :: Result Postgres.Error [row] -> Task Postgres.Error [row]
+      expectSuccess result = 
+        case result of 
+          Ok rows -> Task.succeed rows
+          Err err -> Task.fail err
 
-tests :: Test
-tests = 
+      -- | I'm seeing flaky results with regards to `test_table` and `test_enum` existing on the db 
+      -- at the point the test is run.  Let's just drop them and re-create in each test. Since the 
+      -- compilers see's them being created at the top level above this will all typecheck.
+      withContext :: (Postgres.Connection -> Task Postgres.Error a) -> Task Postgres.Error a
+      withContext todo =
+         Postgres.inTestTransaction rawConnection (\connection -> do
+          _ <- Postgres.doQuery connection [Postgres.sql| DROP TABLE test_table |] expectSuccess
+          _ <- Postgres.doQuery connection [Postgres.sql| DROP TYPE test_enum |] expectSuccess
+          _ <- Postgres.doQuery connection [Postgres.sql| CREATE TYPE test_enum as ENUM ('value_1', 'value_2') |] expectSuccess
+          _ <- Postgres.doQuery connection [Postgres.sql| CREATE TABLE test_table (enum_col test_enum NOT NULL) |] expectSuccess
+          todo connection
+         )
+
+  in
+  describe "Query Tests"
+  [ Test.test "Insert into column" <| \_ -> do
+      _ <- withContext (\connection ->
+            Postgres.doQuery
+              connection
+              [Postgres.sql|
+                INSERT INTO test_table (enum_col)
+                VALUES (${Value1})
+              |]
+              expectSuccess
+          ) |> Expect.succeeds
+
+      Expect.pass
+  , Test.test "Select from column" <| \_ -> do 
+      rows <- withContext (\connection -> do
+            _ <- Postgres.doQuery
+              connection
+              [Postgres.sql|
+                INSERT INTO test_table (enum_col)
+                VALUES (${Value1}), (${Value2})
+              |]
+              expectSuccess
+            
+            Postgres.doQuery
+              connection
+              [Postgres.sql|
+                SELECT enum_col
+                FROM test_table
+              |]
+              expectSuccess
+          ) |> Expect.succeeds
+      
+      Expect.equal rows [Value1, Value2]
+  ]
+
+tests :: Postgres.Connection -> Test
+tests connection = 
   describe
     "Postgres.Enum"
     [ generateFailureTests
+    , queryTests connection
     ]

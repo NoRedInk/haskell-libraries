@@ -30,5 +30,5 @@ tests postgres =
       QueryParserSpec.tests,
       TimeSpec.tests,
       ObservabilitySpec.tests postgres,
-      Enum.tests
+      Enum.tests postgres
     ]
