@@ -1,10 +1,33 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
+-- | Provides a functionality for generating a bridge between a Haskell type and a Postgres enum type using Template Haskell.
+--
+-- Image that we have an `animal_type` defined on our Postgres database:
+-- 
+-- > CREATE TYPE animal_type AS ENUM ('cat', 'dog', 'snake')
+--
+-- Then we can define an equivalent type in Haskell like so: 
+-- 
+-- > {-# LANGUAGE TemplateHaskell #-}
+-- > {-# LANGUAGE TypeFamilies #-}
+-- > {-# OPTIONS -Wno-orphans #-}
+-- >
+-- > import Postgres.Enum
+-- >
+-- > data AnimalType
+-- >   = Cat
+-- >   | Dog
+-- >   | Snake
+-- >
+-- > $(generatePGEnum ''AnimalType "animal_type" 
+-- >    [ ('Cat, "cat")
+-- >    , ('Dog, "dog")
+-- >    , ('Snake, "snake")
+-- >    ]
+-- >  )
 module Postgres.Enum (
   generatePGEnum
 ) where
-
-module Postgres.Enum where
 
 import qualified Environment
 import qualified Postgres.Settings
@@ -34,31 +57,15 @@ unexpectedValue :: Prelude.String -> a
 unexpectedValue value = 
   Prelude.error <| "Unexpected enum value " ++ quote value ++ " encountered. Perhaps your database is out of sync with your compiled executabe?"
 
-{- Generate instances to connect a Haskell enum type to a postgres ENUM datatype. 
-
-```
-data DisplayElementType
-  = Labeled
-  | Blank
-  deriving (Eq, Show, Ord)
-
-$(generatePGEnum ''DisplayElementType "display_element_type" 
-    [ ('Labeled, "labeled")
-    , ('Blank, "blank")
-    ]
-  )
-```
-
-Note: You will need to enable the `TemplateHaskell` and `TypeFamilies` extensions and disable the orphan instances warning in the module you call `generatePGEnum` from.  
-Add the following to the top of your file:
-
-```
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS -Wno-orphans #-}
-```
--}
-generatePGEnum :: TH.Name -> Text -> [(TH.Name, Text)] -> TH.Q [TH.Dec]
+-- | Generate the bridge to allow converting back and forth between the given Haskell data type and Postgres enum type.
+-- 
+-- This is intended to be used in a TemplateHaskell splice and will generate the `PGType`, `PGParameter`, `PGColumn`, and `PGRep` instances.
+--
+-- `generatePGEnum` will check at compile time that our mapping is one-to-one between the Haskell datatype and Postgres enum type.
+generatePGEnum :: TH.Name           -- ^ The name of the Haskell data type
+               -> Text              -- ^ The name of the Postgres enum type
+               -> [(TH.Name, Text)] -- ^ A list of mappings between constructors of the datatype and enum values from Postgres
+               -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
   let hsTypeString = Prelude.show hsTypeName
 
