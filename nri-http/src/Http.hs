@@ -67,7 +67,7 @@ import qualified Network.HTTP.Types.Status as Status
 import qualified Network.URI
 import qualified Platform
 import qualified Task
-import Prelude (Either (Left, Right), IO, fromIntegral, pure, show)
+import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
 -- | Create a 'Handler' for making HTTP requests.
 handler :: Conduit.Acquire Handler
@@ -240,57 +240,57 @@ handleResponse expect response =
     Left exception ->
       case expect of
         Internal.ExpectTextResponse mkResult ->
-          mkResult
-            <| case exception of
-              HTTP.HttpExceptionRequest _ content ->
-                case content of
-                  HTTP.StatusCodeException res bytes ->
-                    let bodyAsText = Data.Text.Encoding.decodeUtf8 bytes
-                     in Internal.BadStatus_ (mkMetadata res) bodyAsText
-                  HTTP.ResponseTimeout ->
-                    Internal.Timeout_
-                  HTTP.ConnectionTimeout ->
-                    Internal.NetworkError_ "ConnectionTimeout"
-                  HTTP.ConnectionFailure err ->
-                    Internal.NetworkError_ (Text.fromList (Exception.displayException err))
-                  err ->
-                    Internal.NetworkError_ (Text.fromList (show err))
-              HTTP.InvalidUrlException _ message ->
-                Internal.BadUrl_ (Text.fromList message)
+          exception
+            |> exceptionToResponse Data.Text.Encoding.decodeUtf8
+            |> mkResult
         Internal.ExpectBytesResponse mkResult ->
-          mkResult
-            <| case exception of
-              HTTP.HttpExceptionRequest _ content ->
-                case content of
-                  HTTP.StatusCodeException res bytes ->
-                    Internal.BadStatus_ (mkMetadata res) bytes
-                  HTTP.ResponseTimeout ->
-                    Internal.Timeout_
-                  HTTP.ConnectionTimeout ->
-                    Internal.NetworkError_ "ConnectionTimeout"
-                  HTTP.ConnectionFailure err ->
-                    Internal.NetworkError_ (Text.fromList (Exception.displayException err))
-                  err ->
-                    Internal.NetworkError_ (Text.fromList (show err))
-              HTTP.InvalidUrlException _ message ->
-                Internal.BadUrl_ (Text.fromList message)
+          exception
+            |> exceptionToResponse identity
+            |> mkResult
         _ ->
-          case exception of
-            HTTP.HttpExceptionRequest _ content ->
-              case content of
-                HTTP.StatusCodeException res _ ->
-                  let statusCode = fromIntegral << Status.statusCode << HTTP.responseStatus
-                   in Err (Internal.BadStatus (statusCode res))
-                HTTP.ResponseTimeout ->
-                  Err Internal.Timeout
-                HTTP.ConnectionTimeout ->
-                  Err (Internal.NetworkError "ConnectionTimeout")
-                HTTP.ConnectionFailure err ->
-                  Err (Internal.NetworkError (Text.fromList (Exception.displayException err)))
-                err ->
-                  Err (Internal.NetworkError (Text.fromList (show err)))
-            HTTP.InvalidUrlException _ message ->
-              Err (Internal.BadUrl (Text.fromList message))
+          Err (exceptionToError exception)
+
+exceptionToError :: HTTP.HttpException -> Error
+exceptionToError exception =
+  case exception of
+    HTTP.InvalidUrlException _ message ->
+      Internal.BadUrl (Text.fromList message)
+    HTTP.HttpExceptionRequest _ content ->
+      case content of
+        HTTP.StatusCodeException res _ ->
+          res
+            |> HTTP.responseStatus
+            |> Status.statusCode
+            |> fromIntegral
+            |> Internal.BadStatus
+        HTTP.ResponseTimeout ->
+          Internal.Timeout
+        HTTP.ConnectionTimeout ->
+          Internal.NetworkError "ConnectionTimeout"
+        HTTP.ConnectionFailure err ->
+          Exception.displayException err
+            |> Text.fromList
+            |> Internal.NetworkError
+        err ->
+          Internal.NetworkError (Debug.toString err)
+
+exceptionToResponse :: (ByteString -> a) -> HTTP.HttpException -> Internal.Response a
+exceptionToResponse toBody exception =
+  case exception of
+    HTTP.InvalidUrlException _ message ->
+      Internal.BadUrl_ (Text.fromList message)
+    HTTP.HttpExceptionRequest _ content ->
+      case content of
+        HTTP.StatusCodeException res bytes ->
+          Internal.BadStatus_ (mkMetadata res) (toBody bytes)
+        HTTP.ResponseTimeout ->
+          Internal.Timeout_
+        HTTP.ConnectionTimeout ->
+          Internal.NetworkError_ "ConnectionTimeout"
+        HTTP.ConnectionFailure err ->
+          Internal.NetworkError_ (Text.fromList (Exception.displayException err))
+        err ->
+          Internal.NetworkError_ (Debug.toString err)
 
 mkMetadata :: HTTP.Response a -> Internal.Metadata
 mkMetadata response =
