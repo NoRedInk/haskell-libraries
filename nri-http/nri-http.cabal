@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           nri-http
-version:        0.1.0.4
+version:        0.1.1.0
 synopsis:       Make Elm style HTTP requests
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-http#readme>.
 category:       Web
