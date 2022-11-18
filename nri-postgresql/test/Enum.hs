@@ -38,7 +38,7 @@ data OversizedEnum
   | OversizedValue2
   | OversizedValue3
 
-$(generatePGEnum ''TestEnum "test_enum"
+$(generatePGEnum ''TestEnum "public.test_enum"
     [ ('Value1, "value_1")
     , ('Value2, "value_2")
     ]

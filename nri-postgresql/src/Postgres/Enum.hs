@@ -4,7 +4,7 @@
 --
 -- Image that we have an `animal_type` defined on our Postgres database:
 -- 
--- > CREATE TYPE animal_type AS ENUM ('cat', 'dog', 'snake')
+-- > CREATE TYPE schema_name.animal_type AS ENUM ('cat', 'dog', 'snake')
 --
 -- Then we can define an equivalent type in Haskell like so: 
 -- 
@@ -19,12 +19,15 @@
 -- >   | Dog
 -- >   | Snake
 -- >
--- > $(generatePGEnum ''AnimalType "animal_type" 
+-- > $(generatePGEnum ''AnimalType "schema_name.animal_type" 
 -- >    [ ('Cat, "cat")
 -- >    , ('Dog, "dog")
 -- >    , ('Snake, "snake")
 -- >    ]
 -- >  )
+--
+-- Note: Having the same type name in different schema's might cause overlapping instances in different modules! 
+-- (It's not our fault, this is how postgresql-typed works 🤷‍♂️)
 module Postgres.Enum (
   generatePGEnum
 ) where
@@ -63,7 +66,7 @@ unexpectedValue value =
 --
 -- `generatePGEnum` will check at compile time that our mapping is one-to-one between the Haskell datatype and Postgres enum type.
 generatePGEnum :: TH.Name           -- ^ The name of the Haskell data type
-               -> Text              -- ^ The name of the Postgres enum type
+               -> Text              -- ^ The name of the Postgres enum type (requires a schema)
                -> [(TH.Name, Text)] -- ^ A list of mappings between constructors of the datatype and enum values from Postgres
                -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
@@ -121,6 +124,17 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
       (hsOnlyCons, _) -> 
         Prelude.fail <| "The following constructors are not present in the mapping: " ++ Prelude.show hsOnlyCons
 
+  (type_schema_name, type_enum_name) <-
+        case Text.split "." databaseTypeName of 
+          [schema, enum] ->
+            Prelude.pure (schema, enum)
+
+          [_] -> 
+            Prelude.fail <| "A schema is required for the database enum name (it might be \"public\" if you didn't explicitly set one."
+
+          _ ->
+            Prelude.fail <| "Invalid database enum name \"" ++ (Prelude.show databaseTypeName) ++ "\""
+
   pgDatabase <-
     TH.runIO <| do 
       nriSettings <- Environment.decode Postgres.Settings.decoder
@@ -137,7 +151,8 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         pgSimpleQuery connection (BSL.fromChunks
           [ "SELECT typtype"
           , " FROM pg_catalog.pg_type"
-          , " WHERE typname = '", Encoding.encodeUtf8 databaseTypeName, "'"
+          , " JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace"
+          , " WHERE pg_type.typname = '", Encoding.encodeUtf8 type_enum_name, "'", " AND pg_namespace.nspname = '", Encoding.encodeUtf8 type_schema_name, "'"
           ])
           |> Prelude.fmap (\(_, rows) ->
                 rows
@@ -211,7 +226,9 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         Prelude.fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ Prelude.show pgOnlyValues
 
   -- Validation passed! Let's generate some instances
-  let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList databaseTypeName))
+  -- NOTE: We'd like to use the full "schema.type_name" as the type-level string for our instances, but that's not how postgresql-typed works.  
+  -- It just strips the schema off
+  let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList type_enum_name))
 
   variable <- TH.newName "x"
 
