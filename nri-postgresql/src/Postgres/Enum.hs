@@ -67,7 +67,7 @@ unexpectedValue value =
 --
 -- `generatePGEnum` will check at compile time that our mapping is one-to-one between the Haskell datatype and Postgres enum type.
 generatePGEnum :: TH.Name           -- ^ The name of the Haskell data type
-               -> Text              -- ^ The name of the Postgres enum type (requires a schema)
+               -> Text              -- ^ The name of the Postgres enum type (optionally can have a schema)
                -> [(TH.Name, Text)] -- ^ A list of mappings between constructors of the datatype and enum values from Postgres
                -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
@@ -130,8 +130,8 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
           [schema, enum] ->
             pure (schema, enum)
 
-          [_] -> 
-            fail <| "A schema is required for the database enum name (it might be \"public\" if you didn't explicitly set one."
+          [enum] ->
+            pure ("public", enum)
 
           _ ->
             fail <| "Invalid database enum name \"" ++ (show databaseTypeName) ++ "\""
