@@ -242,12 +242,17 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
   -- Note: Most of these instance definitions borrowed from https://hackage.haskell.org/package/postgresql-typed-0.6.2.1/docs/src/Database.PostgreSQL.Typed.Enum.html
 
-  -- See definition of PGParameter below
+  -- case x of 
+  --   Labeled -> "labeled"
+  --   Blank -> "blank"
   let hsToPg = TH.CaseE (TH.VarE varX) (mapping |> List.map (\(conName, pgValue) -> 
                   TH.Match (TH.ConP conName []) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) [] 
                 ))
 
-  -- See definition of PGColumn below
+  --  case x of 
+  --    "labeled" -> Labeled
+  --    "blank" -> Blank
+  --    _ -> unexpectedValue (Prelude.show x)
   let pgToHs = TH.CaseE (TH.VarE varX) ((mapping |> List.map (\(conName, pgValue) ->
                   TH.Match (TH.LitP <| TH.StringL <| Text.toList pgValue) (TH.NormalB <| TH.ConE conName) []
                 )) ++ [TH.Match TH.WildP (TH.NormalB <| TH.AppE (TH.VarE 'unexpectedValue) (TH.AppE (TH.VarE 'show) (TH.VarE varX))) [] ] )
