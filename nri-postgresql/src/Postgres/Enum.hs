@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | Provides a functionality for generating a bridge between a Haskell type and a Postgres enum type using Template Haskell.
 --
@@ -226,51 +226,43 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ show pgOnlyValues
 
   -- Validation passed! Let's generate some instances
+
+  -- e.g. "display_element_type" (the type level string)
   -- NOTE: We'd like to use the full "schema.type_name" as the type-level string for our instances, but that's not how postgresql-typed works.  
   -- It just strips the schema off
-  let pgTypeString = TH.LitT (TH.StrTyLit (Text.toList type_enum_name))
+  let pgTypeString = pure <| TH.LitT (TH.StrTyLit (Text.toList type_enum_name))
 
-  variable <- TH.newName "x"
+  -- e.g. "DisplayElementType"
+  let hsType = pure (TH.ConT hsTypeName)
+
+  varX <- TH.newName "x"
+  let varXPattern = pure (TH.VarP varX)
 
   -- Note: Most of these instance definitions borrowed from https://hackage.haskell.org/package/postgresql-typed-0.6.2.1/docs/src/Database.PostgreSQL.Typed.Enum.html
 
   -- See definition of PGParameter below
-  let hsToPg = TH.CaseE (TH.VarE variable) (mapping |> List.map (\(conName, pgValue) -> 
+  let hsToPg = TH.CaseE (TH.VarE varX) (mapping |> List.map (\(conName, pgValue) -> 
                   TH.Match (TH.ConP conName []) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) [] 
                 ))
 
   -- See definition of PGColumn below
-  let pgToHs = TH.CaseE (TH.VarE variable) ((mapping |> List.map (\(conName, pgValue) ->
+  let pgToHs = TH.CaseE (TH.VarE varX) ((mapping |> List.map (\(conName, pgValue) ->
                   TH.Match (TH.LitP <| TH.StringL <| Text.toList pgValue) (TH.NormalB <| TH.ConE conName) []
-                )) ++ [TH.Match TH.WildP (TH.NormalB <| TH.AppE (TH.VarE 'unexpectedValue) (TH.AppE (TH.VarE 'Prelude.show) (TH.VarE variable))) [] ] )
+                )) ++ [TH.Match TH.WildP (TH.NormalB <| TH.AppE (TH.VarE 'unexpectedValue) (TH.AppE (TH.VarE 'show) (TH.VarE varX))) [] ] )
+  
+  [d|
+    instance PGType $pgTypeString where
+      type PGVal $pgTypeString = $hsType
 
-  Prelude.pure <|
-    dbConnectDecls
-    ++
-    [ -- instance PGType "display_element_type" where
-      --   PGVal "display_element_type" = DisplayElementType 
-      TH.InstanceD Nothing [] (TH.ConT ''PGType `TH.AppT` pgTypeString) 
-        [ TH.TySynInstD <| TH.TySynEqn Nothing (TH.AppT (TH.ConT ''PGVal) pgTypeString) (TH.ConT hsTypeName) ] 
+    instance PGParameter $pgTypeString $hsType where
+      pgEncode _ $varXPattern = 
+        $(pure hsToPg)
 
-      -- instance PGParameter "display_element_type" DisplayElementType where
-      --   pgEncode _ x = 
-      --     case x of 
-      --       Labeled -> "labeled"
-      --       Blank -> "blank"
-    , TH.InstanceD Nothing [] (TH.ConT ''PGParameter `TH.AppT` pgTypeString `TH.AppT` (TH.ConT hsTypeName))
-        [ TH.FunD 'pgEncode [ TH.Clause [TH.WildP, TH.VarP variable] (TH.NormalB hsToPg) [] ] ]
+    instance PGColumn $pgTypeString $hsType where
+      pgDecode _ $varXPattern =
+        $(pure pgToHs)
 
-      -- instance PGColumn "display_element_type" DisplayElementType where
-      --   pgDecode _ x = 
-      --     case x of 
-      --       "labeled" -> Labeled
-      --       "blank" -> Blank
-      --       _ -> unexpectedValue (Prelude.show x)
-    , TH.InstanceD Nothing [] (TH.ConT ''PGColumn `TH.AppT` pgTypeString `TH.AppT` (TH.ConT hsTypeName))
-        [ TH.FunD 'pgDecode [ TH.Clause [TH.WildP, TH.VarP variable] (TH.NormalB pgToHs) [] ] ]
-
-      -- instance PGRep DisplayElementType where
-      --   PGRepType DisplayElementType = "display_element_type"
-    , TH.InstanceD Nothing [] (TH.ConT ''PGRep `TH.AppT` (TH.ConT hsTypeName))
-        [ TH.TySynInstD <| TH.TySynEqn Nothing ((TH.ConT ''PGRepType) `TH.AppT` (TH.ConT hsTypeName)) pgTypeString ] 
-    ]
+    instance PGRep $hsType where
+      type PGRepType $hsType = $pgTypeString
+    |]
+    |> fmap (dbConnectDecls ++)
