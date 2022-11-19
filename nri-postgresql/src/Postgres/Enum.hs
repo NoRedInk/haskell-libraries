@@ -38,6 +38,7 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.List (group)
 import qualified Data.Text.Encoding as Encoding
 import qualified Language.Haskell.TH as TH
+import Database.PostgreSQL.Typed.Array (PGArray, PGArrayType, PGElemType)
 import Database.PostgreSQL.Typed.Protocol (pgSimpleQuery)
 import Database.PostgreSQL.Typed.TH (withTPGConnection, useTPGDatabase)
 import Database.PostgreSQL.Typed.Dynamic (pgDecodeRep, PGRepType, PGRep)
@@ -231,6 +232,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
   -- NOTE: We'd like to use the full "schema.type_name" as the type-level string for our instances, but that's not how postgresql-typed works.  
   -- It just strips the schema off
   let pgTypeString = pure <| TH.LitT (TH.StrTyLit (Text.toList type_enum_name))
+  let pgArrayTypeString = pure <| TH.LitT (TH.StrTyLit (Text.toList type_enum_name ++ "[]"))
 
   -- e.g. "DisplayElementType"
   let hsType = pure (TH.ConT hsTypeName)
@@ -264,5 +266,11 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
     instance PGRep $hsType where
       type PGRepType $hsType = $pgTypeString
+
+    instance PGType $pgArrayTypeString where
+      type PGVal $pgArrayTypeString = PGArray $hsType
+
+    instance PGArrayType $pgArrayTypeString where
+      type PGElemType $pgArrayTypeString = $pgTypeString
     |]
     |> fmap (dbConnectDecls ++)
