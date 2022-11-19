@@ -43,10 +43,10 @@ import Database.PostgreSQL.Typed.TH (withTPGConnection, useTPGDatabase)
 import Database.PostgreSQL.Typed.Dynamic (pgDecodeRep, PGRepType, PGRep)
 import Database.PostgreSQL.Typed.Types (PGType, PGVal, PGParameter, pgEncode, PGColumn, pgDecode)
 import qualified Set
-import qualified Prelude 
+import Prelude (pure, fail, Either(..), String, show, error, traverse)
 import qualified Control.Exception 
 
-quote :: Prelude.String -> Prelude.String
+quote :: String -> String
 quote t = "\"" ++ t ++ "\""
 
 findDuplicates :: (Ord a) => List a -> List a
@@ -56,9 +56,9 @@ findDuplicates list =
     |> group
     |> List.filterMap (List.drop 1 >> List.head)
 
-unexpectedValue :: Prelude.String -> a
+unexpectedValue :: String -> a
 unexpectedValue value = 
-  Prelude.error <| "Unexpected enum value " ++ quote value ++ " encountered. Perhaps your database is out of sync with your compiled executabe?"
+  error <| "Unexpected enum value " ++ quote value ++ " encountered. Perhaps your database is out of sync with your compiled executabe?"
 
 -- | Generate the bridge to allow converting back and forth between the given Haskell data type and Postgres enum type.
 -- 
@@ -70,7 +70,7 @@ generatePGEnum :: TH.Name           -- ^ The name of the Haskell data type
                -> [(TH.Name, Text)] -- ^ A list of mappings between constructors of the datatype and enum values from Postgres
                -> TH.Q [TH.Dec]
 generatePGEnum hsTypeName databaseTypeName mapping = do 
-  let hsTypeString = Prelude.show hsTypeName
+  let hsTypeString = show hsTypeName
 
   info <- TH.reify hsTypeName
 
@@ -78,37 +78,37 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
     case info of 
       TH.TyConI (TH.DataD _ _ _ _ constructors _) ->
         constructors
-          |> Prelude.traverse (\con -> case con of 
+          |> traverse (\con -> case con of 
                 TH.NormalC name [] ->
-                  Prelude.pure name
+                  pure name
 
                 TH.NormalC name _ ->
-                  Prelude.fail <| "Constructor " ++ quote (Prelude.show name) ++ " cannot have any arguments in order to be mapped to an enum."
+                  fail <| "Constructor " ++ quote (show name) ++ " cannot have any arguments in order to be mapped to an enum."
 
                 _ -> 
-                  Prelude.fail <| "Data type " ++ quote hsTypeString ++ " must contain only simple constructors with no arguments."
+                  fail <| "Data type " ++ quote hsTypeString ++ " must contain only simple constructors with no arguments."
               )
 
       _ ->
-        Prelude.fail <| "The datatype name " ++ quote hsTypeString ++ " must be a data declaration."
+        fail <| "The datatype name " ++ quote hsTypeString ++ " must be a data declaration."
 
   -- Check for duplicate values specified in the mapping
   _ <- 
     case findDuplicates (List.map Tuple.second mapping) of 
       [] -> 
-        Prelude.pure () 
+        pure () 
 
       duplicates ->
-        Prelude.fail <| "The following values in the mapping are duplicated: " ++ Prelude.show duplicates
+        fail <| "The following values in the mapping are duplicated: " ++ show duplicates
 
   -- Check for duplicate constructor names specified in the mapping
   _ <-
     case findDuplicates (List.map Tuple.first mapping) of
       [] -> 
-        Prelude.pure ()
+        pure ()
 
       duplicates ->
-        Prelude.fail <| "The following constructors in the mapping are duplicated: " ++ Prelude.show duplicates
+        fail <| "The following constructors in the mapping are duplicated: " ++ show duplicates
 
   let hsConSet = Set.fromList conNames
   let mappingConSet = Set.fromList (List.map Tuple.first mapping)
@@ -116,34 +116,34 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
   _ <- 
     case (Set.toList (Set.diff hsConSet mappingConSet), Set.toList (Set.diff mappingConSet hsConSet)) of 
       ([], []) -> 
-        Prelude.pure ()
+        pure ()
 
       ([], mappingOnlyCons) ->
-        Prelude.fail <| "The following names in the mapping are not constructors from the data type " ++ quote hsTypeString ++ ": " ++ Prelude.show mappingOnlyCons
+        fail <| "The following names in the mapping are not constructors from the data type " ++ quote hsTypeString ++ ": " ++ show mappingOnlyCons
 
       (hsOnlyCons, _) -> 
-        Prelude.fail <| "The following constructors are not present in the mapping: " ++ Prelude.show hsOnlyCons
+        fail <| "The following constructors are not present in the mapping: " ++ show hsOnlyCons
 
   (type_schema_name, type_enum_name) <-
         case Text.split "." databaseTypeName of 
           [schema, enum] ->
-            Prelude.pure (schema, enum)
+            pure (schema, enum)
 
           [_] -> 
-            Prelude.fail <| "A schema is required for the database enum name (it might be \"public\" if you didn't explicitly set one."
+            fail <| "A schema is required for the database enum name (it might be \"public\" if you didn't explicitly set one."
 
           _ ->
-            Prelude.fail <| "Invalid database enum name \"" ++ (Prelude.show databaseTypeName) ++ "\""
+            fail <| "Invalid database enum name \"" ++ (show databaseTypeName) ++ "\""
 
   pgDatabase <-
     TH.runIO <| do 
       nriSettings <- Environment.decode Postgres.Settings.decoder
-      Prelude.pure (Postgres.Settings.toPGDatabase nriSettings)
+      pure (Postgres.Settings.toPGDatabase nriSettings)
 
   dbConnectDecls <- useTPGDatabase pgDatabase
 
   -- Note: We make sure to capture IO errors and re-throw them below in the Q monad so that our test framework can capture them
-  (maybePGEnumValues :: Prelude.Either Control.Exception.IOException (List Text)) <-
+  (maybePGEnumValues :: Either Control.Exception.IOException (List Text)) <-
     TH.runIO <| Control.Exception.try <| withTPGConnection (\connection -> do 
       -- Check if the databaseTypeName exists on the PG database and is an enum
       -- See https://www.postgresql.org/docs/current/catalog-pg-type.html
@@ -154,7 +154,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
           , " JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace"
           , " WHERE pg_type.typname = '", Encoding.encodeUtf8 type_enum_name, "'", " AND pg_namespace.nspname = '", Encoding.encodeUtf8 type_schema_name, "'"
           ])
-          |> Prelude.fmap (\(_, rows) ->
+          |> fmap (\(_, rows) ->
                 rows
                   |> List.filterMap (\cols ->
                       case cols of 
@@ -168,14 +168,14 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
       _ <- case typeType of 
         [] -> 
-          Prelude.fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " does not exist on the database.")
+          fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " does not exist on the database.")
         
         -- 'e' means enum type
         ['e'] -> 
-          Prelude.pure ()
+          pure ()
         
         _ -> 
-          Prelude.fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " is not an enum type.")
+          fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " is not an enum type.")
 
       enumLabels <- 
         pgSimpleQuery connection (BSL.fromChunks
@@ -184,7 +184,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
           , " WHERE enumtypid = '", Encoding.encodeUtf8 databaseTypeName, "'::regtype"
           , " ORDER BY enumsortorder"
           ])
-          |> Prelude.fmap (\(_, rows) ->
+          |> fmap (\(_, rows) ->
                 rows
                   |> List.filterMap (\cols ->
                       case cols of 
@@ -198,18 +198,18 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
         
       case enumLabels of 
         [] -> 
-          Prelude.fail ("Enum type " ++ quote (Text.toList databaseTypeName) ++ " does not contain any values.")
+          fail ("Enum type " ++ quote (Text.toList databaseTypeName) ++ " does not contain any values.")
 
         vs -> 
-          Prelude.pure vs
+          pure vs
     )
 
   (pgEnumValues :: List Text) <-
     case maybePGEnumValues of 
-      Prelude.Left error -> 
-        Prelude.fail (Prelude.show error)
-      Prelude.Right vals ->
-        Prelude.pure vals
+      Left err -> 
+        fail (show err)
+      Right vals ->
+        pure vals
 
   let pgValuesSet = Set.fromList pgEnumValues
   let mappingValuesSet = Set.fromList (List.map Tuple.second mapping) 
@@ -217,13 +217,13 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
   _ <- 
     case (Set.toList (Set.diff pgValuesSet mappingValuesSet), Set.toList (Set.diff mappingValuesSet pgValuesSet)) of 
       ([], []) -> 
-        Prelude.pure ()
+        pure ()
 
       ([], hsOnlyValues) ->
-        Prelude.fail <| "The following values of type " ++ quote hsTypeString ++ " are not mapped to values of pg enum type " ++ quote (Text.toList databaseTypeName) ++ ": " ++ Prelude.show hsOnlyValues
+        fail <| "The following values of type " ++ quote hsTypeString ++ " are not mapped to values of pg enum type " ++ quote (Text.toList databaseTypeName) ++ ": " ++ show hsOnlyValues
 
       (pgOnlyValues, _) -> 
-        Prelude.fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ Prelude.show pgOnlyValues
+        fail <| "The following values from the pg enum type " ++ quote (Text.toList databaseTypeName) ++ " are not mapped to values of " ++ quote hsTypeString ++ ": " ++ show pgOnlyValues
 
   -- Validation passed! Let's generate some instances
   -- NOTE: We'd like to use the full "schema.type_name" as the type-level string for our instances, but that's not how postgresql-typed works.  
