@@ -231,7 +231,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
   -- e.g. "display_element_type" (the type level string)
   -- NOTE: We'd like to use the full "schema.type_name" as the type-level string for our instances, but that's not how postgresql-typed works.  
   -- It just strips the schema off
-  let pgTypeString = pure <| TH.LitT (TH.StrTyLit (Text.toList type_enum_name))
+  let pgTypeString = pure <| TH.LitT (TH.StrTyLit (Text.toList databaseTypeName))
   let pgArrayTypeString = pure <| TH.LitT (TH.StrTyLit (Text.toList type_enum_name ++ "[]"))
 
   -- e.g. "DisplayElementType"

@@ -39,7 +39,7 @@ data OversizedEnum
   | OversizedValue2
   | OversizedValue3
 
-$(generatePGEnum ''TestEnum "public.test_enum"
+$(generatePGEnum ''TestEnum "test_enum"
     [ ('Value1, "value_1")
     , ('Value2, "value_2")
     ]
@@ -160,7 +160,7 @@ queryTests rawConnection =
               expectSuccess
           ) |> Expect.succeeds 
 
-      Expect.equal rows [[Value1], [Value1, Value2]]
+      Expect.equal rows [[Just Value1], [Just Value1, Just Value2]]
   ]
 
 tests :: Postgres.Connection -> Test
