@@ -17,13 +17,13 @@ import Prelude (IO)
 
 -- | A handler for making HTTP requests.
 data Handler = Handler
-  { handlerRequest :: forall expect. Dynamic.Typeable expect => Request expect -> Task Error expect,
-    handlerWithThirdParty :: forall a e. (HTTP.Manager -> Task e a) -> Task e a,
+  { handlerRequest :: forall e expect. (Dynamic.Typeable expect, Dynamic.Typeable e) => Request e expect -> Task e expect,
+    handlerWithThirdParty :: forall e a. (HTTP.Manager -> Task e a) -> Task e a,
     handlerWithThirdPartyIO :: forall a. Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
   }
 
 -- | A custom request.
-data Request a = Request
+data Request x a = Request
   { -- | The request method, like @"GET"@ or @"PUT"@.
     method :: Text,
     -- | A list of request headers.
@@ -35,7 +35,7 @@ data Request a = Request
     -- | The amount of microseconds you're willing to wait before giving up.
     timeout :: Maybe Int,
     -- | The type of response you expect back from the request.
-    expect :: Expect a
+    expect :: Expect x a
   }
 
 -- | An HTTP header for configuration requests.
@@ -50,12 +50,12 @@ data Body = Body
 
 -- |
 -- Logic for interpreting a response body.
-data Expect a where
-  ExpectJson :: Aeson.FromJSON a => Expect a
-  ExpectText :: Expect Text
-  ExpectWhatever :: Expect ()
-  ExpectTextResponse :: (Response Text -> Result Error a) -> Expect a
-  ExpectBytesResponse :: (Response Data.ByteString.ByteString -> Result Error a) -> Expect a
+data Expect x a where
+  ExpectJson :: Aeson.FromJSON a => Expect Error a
+  ExpectText :: Expect Error Text
+  ExpectWhatever :: Expect Error ()
+  ExpectTextResponse :: (Response Text -> Result x a) -> Expect x a
+  ExpectBytesResponse :: (Response Data.ByteString.ByteString -> Result x a) -> Expect x a
 
 -- | A 'Request' can fail in a couple of ways:
 --

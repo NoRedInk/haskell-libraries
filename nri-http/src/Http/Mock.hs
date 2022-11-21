@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -35,14 +36,14 @@ import qualified Prelude
 -- different kinds of http requests, you'll want one of these per request type.
 data Stub a where
   Stub ::
-    Dynamic.Typeable expect =>
-    (Internal.Request expect -> Task Internal.Error (a, expect)) ->
+    (Dynamic.Typeable e, Dynamic.Typeable expect) =>
+    (Internal.Request e expect -> Task e (a, expect)) ->
     Stub a
 
 -- | Create a 'Stub'.
 mkStub ::
-  Dynamic.Typeable expect =>
-  (Internal.Request expect -> Task Internal.Error (a, expect)) ->
+  (Dynamic.Typeable e, Dynamic.Typeable expect) =>
+  (Internal.Request e expect -> Task e (a, expect)) ->
   Stub a
 mkStub = Stub
 
@@ -80,16 +81,7 @@ stub responders stubbedTestBody = do
   let mockHandler =
         Internal.Handler
           ( \req -> do
-              (log, res) <-
-                tryRespond
-                  responders
-                  ( Internal.NetworkError
-                      ( "Http request was made with expected return type "
-                          ++ printType req
-                          ++ ", but I don't how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
-                      )
-                  )
-                  req
+              (log, res) <- tryRespond responders req
               Data.IORef.modifyIORef' logRef (\prev -> log : prev)
                 |> map Ok
                 |> Platform.doAnything doAnything
@@ -105,7 +97,7 @@ stub responders stubbedTestBody = do
 -- submitted inside a 'stub' function.
 --
 -- This will return 'Nothing' if the body cannot be parsed as UTF8 text.
-getTextBody :: Internal.Request expect -> Maybe Text
+getTextBody :: Internal.Request Internal.Error expect -> Maybe Text
 getTextBody req =
   Data.Text.Encoding.decodeUtf8' (getBytesBody req)
     |> eitherToMaybe
@@ -114,7 +106,7 @@ getTextBody req =
 -- submitted inside a 'stub' function.
 --
 -- This will return an error if parsing the JSON body fails.
-getJsonBody :: Aeson.FromJSON a => Internal.Request expect -> Result Text a
+getJsonBody :: Aeson.FromJSON a => Internal.Request Internal.Error expect -> Result Text a
 getJsonBody req =
   case Aeson.eitherDecodeStrict (getBytesBody req) of
     Prelude.Left err -> Err (Text.fromList err)
@@ -122,7 +114,7 @@ getJsonBody req =
 
 -- | Read the body of the request as bytes. Useful to check what data got
 -- submitted inside a 'stub' function.
-getBytesBody :: Internal.Request expect -> ByteString
+getBytesBody :: Internal.Request Internal.Error expect -> ByteString
 getBytesBody req =
   Internal.body req
     |> Internal.bodyContents
@@ -133,7 +125,7 @@ getBytesBody req =
 --
 -- This will return 'Nothing' if no header with that name was set on the
 -- request.
-getHeader :: Text -> Internal.Request expect -> Maybe Text
+getHeader :: Text -> Internal.Request Internal.Error expect -> Maybe Text
 getHeader name req =
   Internal.headers req
     |> List.map Internal.unHeader
@@ -148,17 +140,36 @@ eitherToMaybe either =
 
 tryRespond ::
   ( Dynamic.Typeable expect,
-    Dynamic.Typeable a
+    Dynamic.Typeable a,
+    Dynamic.Typeable e
   ) =>
   List (Stub a) ->
-  Internal.Error ->
-  Internal.Request expect ->
-  Task Internal.Error (a, expect)
-tryRespond [] err _ = Task.fail err
-tryRespond (Stub respond : rest) err req =
+  Internal.Request e expect ->
+  Task e (a, expect)
+tryRespond [] req =
+  let msg =
+        "Http request was made with expected return type "
+          ++ printType req
+          ++ ", but I don't how to create a mock response of this type. Please add a `mkStub` entry for this type in the test."
+      handleCustomResponse :: (Internal.Response s -> Result e expect) -> Task e (a, expect)
+      handleCustomResponse f = case f (Internal.NetworkError_ msg) of
+        Err err -> Task.fail err
+        Ok _ -> Debug.todo "Since we manually craft the Response as an Error, this case will not run."
+   in case Internal.expect req of
+        Internal.ExpectJson ->
+          Task.fail (Internal.NetworkError msg)
+        Internal.ExpectText ->
+          Task.fail (Internal.NetworkError msg)
+        Internal.ExpectWhatever ->
+          Task.fail (Internal.NetworkError msg)
+        Internal.ExpectTextResponse f ->
+          handleCustomResponse f
+        Internal.ExpectBytesResponse f ->
+          handleCustomResponse f
+tryRespond (Stub respond : rest) req =
   Dynamic.dynApply (Dynamic.toDyn respond) (Dynamic.toDyn req)
     |> Maybe.andThen Dynamic.fromDynamic
-    |> Maybe.withDefault (tryRespond rest err req)
+    |> Maybe.withDefault (tryRespond rest req)
 
 printType :: Dynamic.Typeable expect => proxy expect -> Text
 printType expect =
