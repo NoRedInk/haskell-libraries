@@ -21,6 +21,7 @@ Postgres.TH.useNRIDatabase
 
 [Core.pgSQL| CREATE TYPE test_enum as ENUM ('value_1', 'value_2') |]
 [Core.pgSQL| CREATE TABLE test_table (enum_col test_enum NOT NULL) |]
+[Core.pgSQL| CREATE TABLE test_table2 (enum_array_col test_enum[] NOT NULL) |]
 
 data TestEnum
   = Value1
@@ -104,9 +105,11 @@ queryTests rawConnection =
       withContext todo =
          Postgres.inTestTransaction rawConnection (\connection -> do
           _ <- Postgres.doQuery connection [Postgres.sql| DROP TABLE test_table |] expectSuccess
+          _ <- Postgres.doQuery connection [Postgres.sql| DROP TABLE test_table2 |] expectSuccess
           _ <- Postgres.doQuery connection [Postgres.sql| DROP TYPE test_enum |] expectSuccess
           _ <- Postgres.doQuery connection [Postgres.sql| CREATE TYPE test_enum as ENUM ('value_1', 'value_2') |] expectSuccess
           _ <- Postgres.doQuery connection [Postgres.sql| CREATE TABLE test_table (enum_col test_enum NOT NULL) |] expectSuccess
+          _ <- Postgres.doQuery connection [Postgres.sql| CREATE TABLE test_table2 (enum_array_col test_enum[] NOT NULL) |] expectSuccess
           todo connection
          )
 
@@ -144,6 +147,20 @@ queryTests rawConnection =
           ) |> Expect.succeeds
       
       Expect.equal rows [Value1, Value2]
+    , Test.test "Enum array test" <| \_ -> do
+      rows <- withContext (\connection -> do 
+            Postgres.doQuery
+              connection
+              [Postgres.sql|
+                INSERT INTO test_table2 (enum_array_col)
+                VALUES (ARRAY[${Value1}] :: test_enum[])
+                     , (ARRAY[${Value1}, ${Value2}] :: test_enum[])
+                RETURNING enum_array_col
+              |]
+              expectSuccess
+          ) |> Expect.succeeds 
+
+      Expect.equal rows [[Just Value1], [Just Value1, Just Value2]]
   ]
 
 tests :: Postgres.Connection -> Test
