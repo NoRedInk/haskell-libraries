@@ -108,7 +108,7 @@ _withThirdPartyIO manager log library = do
 -- QUICKS
 
 -- | Create a @GET@ request.
-get :: (Dynamic.Typeable a) => Handler -> Text -> Expect a -> Task Error a
+get :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Expect x a -> Task x a
 get handler' url expect =
   request
     handler'
@@ -122,7 +122,7 @@ get handler' url expect =
       }
 
 -- | Create a @POST@ request.
-post :: (Dynamic.Typeable a) => Handler -> Text -> Body -> Expect a -> Task Error a
+post :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Body -> Expect x a -> Task x a
 post handler' url body expect =
   request
     handler'
@@ -187,13 +187,15 @@ bytesBody mimeType bytes =
 
 -- | Create a custom request.
 request ::
-  (Dynamic.Typeable expect) =>
+  ( Dynamic.Typeable x,
+    Dynamic.Typeable expect
+  ) =>
   Handler ->
-  Internal.Request expect ->
-  Task Error expect
+  Internal.Request x expect ->
+  Task x expect
 request Internal.Handler {Internal.handlerRequest} settings = handlerRequest settings
 
-_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request expect -> Task Error expect
+_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request x expect -> Task x expect
 _request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
@@ -222,7 +224,7 @@ _request doAnythingHandler manager settings = do
         HTTP.httpLbs finalRequest requestManager
     pure <| handleResponse (Internal.expect settings) response
 
-handleResponse :: Expect a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result Error a
+handleResponse :: Expect x a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result x a
 handleResponse expect response =
   case response of
     Right okResponse ->
@@ -247,7 +249,11 @@ handleResponse expect response =
           exception
             |> exceptionToResponse identity
             |> mkResult
-        _ ->
+        Internal.ExpectJson ->
+          Err (exceptionToError exception)
+        Internal.ExpectText ->
+          Err (exceptionToError exception)
+        Internal.ExpectWhatever ->
           Err (exceptionToError exception)
 
 exceptionToError :: HTTP.HttpException -> Error
@@ -319,27 +325,27 @@ mkMetadata response =
 
 -- |
 -- Expect the response body to be JSON.
-expectJson :: Aeson.FromJSON a => Expect a
+expectJson :: Aeson.FromJSON a => Expect Error a
 expectJson = Internal.ExpectJson
 
 -- |
 -- Expect the response body to be a `Text`.
-expectText :: Expect Text
+expectText :: Expect Error Text
 expectText = Internal.ExpectText
 
 -- |
 -- Expect the response body to be whatever. It does not matter. Ignore it!
-expectWhatever :: Expect ()
+expectWhatever :: Expect Error ()
 expectWhatever = Internal.ExpectWhatever
 
 -- |
 -- Expect a `Response` with a `Text` body.
-expectTextResponse :: (Internal.Response Text -> Result Error a) -> Expect a
+expectTextResponse :: (Internal.Response Text -> Result x a) -> Expect x a
 expectTextResponse = Internal.ExpectTextResponse
 
 -- |
 -- Expect a `Response` with a `ByteString` body
-expectBytesResponse :: (Internal.Response ByteString -> Result Error a) -> Expect a
+expectBytesResponse :: (Internal.Response ByteString -> Result x a) -> Expect x a
 expectBytesResponse = Internal.ExpectBytesResponse
 
 -- |
