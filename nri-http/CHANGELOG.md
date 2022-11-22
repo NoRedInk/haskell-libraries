@@ -1,3 +1,7 @@
+# 0.2.0.0
+
+- Use custom errors.
+
 # 0.1.1.0
 
 - Add `expectTextResponse` and `expectBytesResponse`.
