@@ -58,7 +58,7 @@ tests =
           (constant "12" Status.ok200)
           ( \http url -> do
               err <-
-                Http.get http url (Http.expectJson :: Http.Expect Http.Error Text)
+                Http.get http url (Http.expectJson :: Http.Expect Text)
                   |> Expect.fails
               err
                 |> Expect.equal (Http.BadBody "Error in $: parsing Text failed, expected String, but encountered Number")

@@ -11,10 +11,11 @@ module Http
     get,
     post,
     request,
-    Internal.Request (..),
+    Internal.Request' (..),
+    Internal.Request,
     Internal.Error (..),
 
-    -- * Header,
+    -- * Header
     Internal.Header,
     header,
 
@@ -32,6 +33,7 @@ module Http
     expectWhatever,
 
     -- * Elaborate Expectations
+    Expect',
     expectTextResponse,
     expectBytesResponse,
     Internal.Response (..),
@@ -56,7 +58,7 @@ import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import qualified Dict
-import Http.Internal (Body, Expect, Handler)
+import Http.Internal (Body, Expect, Handler, Expect')
 import qualified Http.Internal as Internal
 import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe
@@ -108,7 +110,7 @@ _withThirdPartyIO manager log library = do
 -- QUICKS
 
 -- | Create a @GET@ request.
-get :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Expect x a -> Task x a
+get :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Expect' x a -> Task x a
 get handler' url expect =
   request
     handler'
@@ -122,7 +124,7 @@ get handler' url expect =
       }
 
 -- | Create a @POST@ request.
-post :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Body -> Expect x a -> Task x a
+post :: (Dynamic.Typeable x, Dynamic.Typeable a) => Handler -> Text -> Body -> Expect' x a -> Task x a
 post handler' url body expect =
   request
     handler'
@@ -191,11 +193,11 @@ request ::
     Dynamic.Typeable expect
   ) =>
   Handler ->
-  Internal.Request x expect ->
+  Internal.Request' x expect ->
   Task x expect
 request Internal.Handler {Internal.handlerRequest} settings = handlerRequest settings
 
-_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request x expect -> Task x expect
+_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request' x expect -> Task x expect
 _request doAnythingHandler manager settings = do
   requestManager <- prepareManagerForRequest manager
   Platform.doAnything doAnythingHandler <| do
@@ -224,7 +226,7 @@ _request doAnythingHandler manager settings = do
         HTTP.httpLbs finalRequest requestManager
     pure <| handleResponse (Internal.expect settings) response
 
-handleResponse :: Expect x a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result x a
+handleResponse :: Expect' x a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result x a
 handleResponse expect response =
   case response of
     Right okResponse ->
@@ -325,27 +327,27 @@ mkMetadata response =
 
 -- |
 -- Expect the response body to be JSON.
-expectJson :: Aeson.FromJSON a => Expect Error a
+expectJson :: Aeson.FromJSON a => Expect a
 expectJson = Internal.ExpectJson
 
 -- |
 -- Expect the response body to be a `Text`.
-expectText :: Expect Error Text
+expectText :: Expect Text
 expectText = Internal.ExpectText
 
 -- |
 -- Expect the response body to be whatever. It does not matter. Ignore it!
-expectWhatever :: Expect Error ()
+expectWhatever :: Expect ()
 expectWhatever = Internal.ExpectWhatever
 
 -- |
 -- Expect a `Response` with a `Text` body.
-expectTextResponse :: (Internal.Response Text -> Result x a) -> Expect x a
+expectTextResponse :: (Internal.Response Text -> Result x a) -> Expect' x a
 expectTextResponse = Internal.ExpectTextResponse
 
 -- |
 -- Expect a `Response` with a `ByteString` body
-expectBytesResponse :: (Internal.Response ByteString -> Result x a) -> Expect x a
+expectBytesResponse :: (Internal.Response ByteString -> Result x a) -> Expect' x a
 expectBytesResponse = Internal.ExpectBytesResponse
 
 -- |

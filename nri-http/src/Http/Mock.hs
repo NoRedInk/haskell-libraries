@@ -37,13 +37,13 @@ import qualified Prelude
 data Stub a where
   Stub ::
     (Dynamic.Typeable e, Dynamic.Typeable expect) =>
-    (Internal.Request e expect -> Task e (a, expect)) ->
+    (Internal.Request' e expect -> Task e (a, expect)) ->
     Stub a
 
 -- | Create a 'Stub'.
 mkStub ::
   (Dynamic.Typeable e, Dynamic.Typeable expect) =>
-  (Internal.Request e expect -> Task e (a, expect)) ->
+  (Internal.Request' e expect -> Task e (a, expect)) ->
   Stub a
 mkStub = Stub
 
@@ -97,7 +97,7 @@ stub responders stubbedTestBody = do
 -- submitted inside a 'stub' function.
 --
 -- This will return 'Nothing' if the body cannot be parsed as UTF8 text.
-getTextBody :: Internal.Request Internal.Error expect -> Maybe Text
+getTextBody :: Internal.Request expect -> Maybe Text
 getTextBody req =
   Data.Text.Encoding.decodeUtf8' (getBytesBody req)
     |> eitherToMaybe
@@ -106,7 +106,7 @@ getTextBody req =
 -- submitted inside a 'stub' function.
 --
 -- This will return an error if parsing the JSON body fails.
-getJsonBody :: Aeson.FromJSON a => Internal.Request Internal.Error expect -> Result Text a
+getJsonBody :: Aeson.FromJSON a => Internal.Request expect -> Result Text a
 getJsonBody req =
   case Aeson.eitherDecodeStrict (getBytesBody req) of
     Prelude.Left err -> Err (Text.fromList err)
@@ -114,7 +114,7 @@ getJsonBody req =
 
 -- | Read the body of the request as bytes. Useful to check what data got
 -- submitted inside a 'stub' function.
-getBytesBody :: Internal.Request Internal.Error expect -> ByteString
+getBytesBody :: Internal.Request expect -> ByteString
 getBytesBody req =
   Internal.body req
     |> Internal.bodyContents
@@ -125,7 +125,7 @@ getBytesBody req =
 --
 -- This will return 'Nothing' if no header with that name was set on the
 -- request.
-getHeader :: Text -> Internal.Request Internal.Error expect -> Maybe Text
+getHeader :: Text -> Internal.Request expect -> Maybe Text
 getHeader name req =
   Internal.headers req
     |> List.map Internal.unHeader
@@ -140,11 +140,11 @@ eitherToMaybe either =
 
 tryRespond ::
   ( Dynamic.Typeable expect,
-    Dynamic.Typeable a,
-    Dynamic.Typeable e
+    Dynamic.Typeable e,
+    Dynamic.Typeable a
   ) =>
   List (Stub a) ->
-  Internal.Request e expect ->
+  Internal.Request' e expect ->
   Task e (a, expect)
 tryRespond [] req =
   let msg =
