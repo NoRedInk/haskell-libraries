@@ -16,6 +16,7 @@ import qualified GHC.Clock
 import qualified Kafka.Consumer as Consumer
 import qualified Kafka.Internal as Kafka
 import qualified Kafka.Metadata
+import qualified Kafka.Stats as Stats
 import qualified Kafka.Worker.Analytics as Analytics
 import qualified Kafka.Worker.Fetcher as Fetcher
 import qualified Kafka.Worker.Partition as Partition
@@ -177,9 +178,9 @@ data OffsetSource where
     OffsetSource
 
 -- | Starts the kafka worker handling messages.
-process :: Settings.Settings -> Text -> TopicSubscription -> Prelude.IO ()
-process settings groupIdText topicSubscriptions = do
-  processWithoutShutdownEnsurance settings (Consumer.ConsumerGroupId groupIdText) topicSubscriptions
+process :: Settings.Settings -> Text -> TopicSubscription -> Maybe Stats.StatsCallback -> Prelude.IO ()
+process settings groupIdText topicSubscriptions maybeStatsCallback = do
+  processWithoutShutdownEnsurance settings (Consumer.ConsumerGroupId groupIdText) topicSubscriptions maybeStatsCallback
   -- Start an ensurance policy to make sure we exit in 5 seconds. We've seen
   -- cases where our graceful shutdown seems to hang, resulting in a worker
   -- that's not doing anything. We should try to fix those failures, but for the
@@ -198,14 +199,14 @@ process settings groupIdText topicSubscriptions = do
 -- | Like `process`, but doesn't exit the current process by itself. This risks
 -- leaving zombie processes when used in production but is safer in tests, where
 -- the worker shares the OS process with other test code and the test runner.
-processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Prelude.IO ()
-processWithoutShutdownEnsurance settings groupId topicSubscriptions = do
+processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Maybe Stats.StatsCallback -> Prelude.IO ()
+processWithoutShutdownEnsurance settings groupId topicSubscriptions maybeStatsCallback = do
   let TopicSubscription {onMessage, topic, offsetSource, commitToKafkaAsWell} = topicSubscriptions
   state <- initState
   onQuitSignal (Stopping.stopTakingRequests (stopping state) "Received stop signal")
   Conduit.withAcquire (Observability.handler (Settings.observability settings)) <| \observabilityHandler -> do
     Exception.bracketWithError
-      (createConsumer settings groupId observabilityHandler offsetSource commitToKafkaAsWell onMessage topic state)
+      (createConsumer settings groupId observabilityHandler offsetSource commitToKafkaAsWell onMessage maybeStatsCallback topic state)
       (cleanUp observabilityHandler (rebalanceInfo state) (stopping state))
       (runThreads settings state)
 
@@ -232,6 +233,7 @@ createConsumer ::
   OffsetSource ->
   CommitToKafkaAsWell ->
   Partition.MessageCallback ->
+  Maybe Stats.StatsCallback ->
   Kafka.Topic ->
   State ->
   Prelude.IO Consumer.KafkaConsumer
@@ -240,13 +242,15 @@ createConsumer
     { Settings.brokerAddresses,
       Settings.logLevel,
       Settings.maxPollIntervalMs,
-      Settings.onProcessMessageSkip
+      Settings.onProcessMessageSkip,
+      Settings.statisticsIntervalMs
     }
   groupId
   observability
   offsetSource
   commitToKafkaAsWell
   callback
+  maybeStatsCallback
   topic
   state = do
     let rebalance =
@@ -267,8 +271,19 @@ createConsumer
             ++ Consumer.compression Consumer.Snappy
             ++ Consumer.extraProps
               ( Dict.fromList
-                  [("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs))]
+                  [ ("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs)),
+                    ("statistics.interval.ms", Text.fromInt (Settings.unStatisticsIntervalMs statisticsIntervalMs))
+                  ]
               )
+            ++ case maybeStatsCallback of
+              Nothing -> Prelude.mempty
+              Just statsCallback ->
+                Consumer.setCallback
+                  ( Consumer.statsCallback <| \content -> do
+                      log <- Platform.silentHandler
+                      _ <- Task.attempt log (statsCallback (Stats.decode content))
+                      Prelude.pure ()
+                  )
     let subscription' =
           Consumer.topics [Consumer.TopicName (Kafka.unTopic topic)]
             ++ Consumer.offsetReset Consumer.Earliest

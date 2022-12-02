@@ -5,6 +5,7 @@ module Kafka.Worker.Settings
     MaxMsgsPerPartitionBufferedLocally (..),
     MaxPollIntervalMs (..),
     SkipOrNot (..),
+    StatisticsIntervalMs (..),
   )
 where
 
@@ -33,7 +34,11 @@ data Settings = Settings
     maxPollIntervalMs :: MaxPollIntervalMs,
     -- | This option provides us the possibility to skip messages on failure.
     -- Useful for testing Kafka worker. DoNotSkip is a reasonable default!
-    onProcessMessageSkip :: SkipOrNot
+    onProcessMessageSkip :: SkipOrNot,
+    -- | librdkafka statistics emit interval. The application also needs to
+    -- register a stats callback using rd_kafka_conf_set_stats_cb(). The
+    -- granularity is 1000ms. A value of 0 disables statistics.
+    statisticsIntervalMs :: StatisticsIntervalMs
   }
 
 -- | This option provides us the possibility to skip messages on failure.
@@ -50,6 +55,8 @@ newtype MaxMsgsPerPartitionBufferedLocally = MaxMsgsPerPartitionBufferedLocally 
 
 -- | Time between polling
 newtype MaxPollIntervalMs = MaxPollIntervalMs {unMaxPollIntervalMs :: Int}
+
+newtype StatisticsIntervalMs = StatisticsIntervalMs {unStatisticsIntervalMs :: Int}
 
 -- | decodes Settings from environmental variables
 -- Also consumes Observability env variables (see nri-observability)
@@ -74,6 +81,7 @@ decoder =
     |> andMap decoderPollBatchSize
     |> andMap decoderMaxPollIntervalMs
     |> andMap decoderOnProcessMessageFailure
+    |> andMap decoderStatisticsIntervalMs
 
 decoderPollingTimeout :: Environment.Decoder Consumer.Timeout
 decoderPollingTimeout =
@@ -149,3 +157,13 @@ decoderOnProcessMessageFailure =
               else Ok DoNotSkip
         )
     )
+
+decoderStatisticsIntervalMs :: Environment.Decoder StatisticsIntervalMs
+decoderStatisticsIntervalMs =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "KAFKA_STATISTICS_INTERVAL_MS",
+        Environment.description = "librdkafka statistics emit interval. The application also needs to register a stats callback using rd_kafka_conf_set_stats_cb(). The granularity is 1000ms. A value of 0 disables statistics.",
+        Environment.defaultValue = "0"
+      }
+    (map StatisticsIntervalMs Environment.int)

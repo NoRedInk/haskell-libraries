@@ -73,6 +73,7 @@ spawnWorker handler' topic callback =
                   |> Platform.doAnything (doAnything handler')
             )
         )
+        Nothing
         |> Async.race_ (returnWhenTerminating handler')
         |> Async.async
     Async.link async

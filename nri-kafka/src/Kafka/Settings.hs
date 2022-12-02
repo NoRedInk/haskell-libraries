@@ -5,12 +5,14 @@ module Kafka.Settings
     BatchNumMessages,
     unBatchNumMessages,
     exampleBatchNumMessages,
+    StatisticsIntervalMs (..),
   )
 where
 
 import qualified Environment
 import qualified Kafka.Producer
 import qualified Kafka.Settings.Internal as Internal
+import qualified Prelude
 
 -- | Settings required to write to Kafka
 data Settings = Settings
@@ -21,11 +23,17 @@ data Settings = Settings
     -- | Message delivery timeout. See hw-kafka's documentation for more info
     deliveryTimeout :: Kafka.Producer.Timeout,
     -- | Number of messages to batch together before sending to Kafka.
-    batchNumMessages :: BatchNumMessages
+    batchNumMessages :: BatchNumMessages,
+    -- | librdkafka statistics emit interval. The application also needs to
+    -- register a stats callback using rd_kafka_conf_set_stats_cb(). The
+    -- granularity is 1000ms. A value of 0 disables statistics.
+    statisticsIntervalMs :: StatisticsIntervalMs
   }
 
 -- | Number of messages to batch together before sending to Kafka.
 newtype BatchNumMessages = BatchNumMessages {unBatchNumMessages :: Int}
+
+newtype StatisticsIntervalMs = StatisticsIntervalMs {unStatisticsIntervalMs :: Int}
 
 -- |  example BatchNumMessages to use in tests
 exampleBatchNumMessages :: BatchNumMessages
@@ -38,12 +46,12 @@ exampleBatchNumMessages = BatchNumMessages 1
 -- KAFKA_BATCH_SIZE=10000
 decoder :: Environment.Decoder Settings
 decoder =
-  map4
-    Settings
-    Internal.decoderBrokerAddresses
-    Internal.decoderKafkaLogLevel
-    decoderDeliveryTimeout
-    decoderBatchNumMessages
+  Prelude.pure Settings
+    |> andMap Internal.decoderBrokerAddresses
+    |> andMap Internal.decoderKafkaLogLevel
+    |> andMap decoderDeliveryTimeout
+    |> andMap decoderBatchNumMessages
+    |> andMap decoderStatisticsIntervalMs
 
 decoderDeliveryTimeout :: Environment.Decoder Kafka.Producer.Timeout
 decoderDeliveryTimeout =
@@ -64,3 +72,13 @@ decoderBatchNumMessages =
         Environment.defaultValue = "10000"
       }
     (map BatchNumMessages Environment.int)
+
+decoderStatisticsIntervalMs :: Environment.Decoder StatisticsIntervalMs
+decoderStatisticsIntervalMs =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "KAFKA_STATISTICS_INTERVAL_MS",
+        Environment.description = "librdkafka statistics emit interval. The application also needs to register a stats callback using rd_kafka_conf_set_stats_cb(). The granularity is 1000ms. A value of 0 disables statistics.",
+        Environment.defaultValue = "0"
+      }
+    (map StatisticsIntervalMs Environment.int)
