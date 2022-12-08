@@ -208,6 +208,16 @@ doRawQuery query =
       Database.Redis.incrby (toB key) (fromIntegral amount)
         |> PreparedQuery
         |> map (Ok << fromIntegral)
+    Internal.Keys key ->
+      Database.Redis.keys (toB key)
+        |> PreparedQuery
+        |> map
+          ( Prelude.traverse
+              ( \byteKey -> case Data.Text.Encoding.decodeUtf8' byteKey of
+                  Prelude.Right textKey -> Ok textKey
+                  Prelude.Left _ -> Err (Internal.LibraryError "key exists but not parsable text")
+              )
+          )
     Internal.Lrange key lower upper ->
       Database.Redis.lrange (toB key) (fromIntegral lower) (fromIntegral upper)
         |> PreparedQuery

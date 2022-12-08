@@ -261,7 +261,17 @@ queryTests redisHandler =
           |> Redis.query redisHandler
           |> Expect.succeeds
       field2
-        |> Expect.equal (Just "val2")
+        |> Expect.equal (Just "val2"),
+    Test.test "set and keys" <| \() -> do
+      Redis.set api "keys-1" "hello!" |> Redis.query testNS |> Expect.succeeds
+      Redis.set api "keys-2" "hello!" |> Redis.query testNS |> Expect.succeeds
+      result <- Redis.keys api "keys-*" |> Redis.query testNS |> Expect.succeeds
+      result
+        |> List.sort
+        |> Expect.equal
+          [ "tests:testNamespace:keys-1",
+            "tests:testNamespace:keys-2"
+          ]
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler

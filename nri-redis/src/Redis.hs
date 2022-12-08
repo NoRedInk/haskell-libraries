@@ -26,6 +26,7 @@ module Redis
     expire,
     get,
     getset,
+    keys,
     mget,
     mset,
     ping,
@@ -91,6 +92,10 @@ data Api key a = Api
     --
     -- https://redis.io/commands/getset
     getset :: key -> a -> Internal.Query (Maybe a),
+    -- | Returns a list of keys
+    --
+    -- https://redis.io/commands/keys/
+    keys :: Text -> Internal.Query (List Text),
     -- | Returns the values of all specified keys. For every key that does not hold
     -- a string value or does not exist, no value is returned. Because of this, the
     -- operation never fails.
@@ -163,6 +168,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       expire = \key secs -> Internal.Expire (toKey key) secs,
       get = \key -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Get (toKey key)),
       getset = \key value -> Internal.WithResult (Prelude.traverse codecDecoder) (Internal.Getset (toKey key) (codecEncoder value)),
+      keys = \q -> Internal.Keys q,
       mget = \keys ->
         NonEmpty.map toKey keys
           |> Internal.Mget

@@ -282,6 +282,12 @@ doQuery query hm =
                   ( HM.insert key (encodeInt (x + amount)) hm,
                     Ok (x + amount)
                   )
+    Internal.Keys q ->
+      ( hm,
+        HM.keys hm
+          |> List.filter (Text.contains (Text.replace "*" "" q))
+          |> Ok
+      )
     Internal.Lrange key lower' upper' ->
       ( hm,
         case HM.lookup key hm of

@@ -87,6 +87,7 @@ cmds query'' =
     Hsetnx key field _ -> [unwords ["HSETNX", key, field, "*****"]]
     Incr key -> [unwords ["INCR", key]]
     Incrby key amount -> [unwords ["INCRBY", key, Text.fromInt amount]]
+    Keys q -> [unwords ["KEYS", q]]
     Lrange key lower upper -> [unwords ["LRANGE", key, Text.fromInt lower, Text.fromInt upper]]
     Mget keys -> [unwords ("MGET" : NonEmpty.toList keys)]
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) (NonEmpty.toList pairs))]
@@ -123,6 +124,7 @@ data Query a where
   Hsetnx :: Text -> Text -> ByteString -> Query Bool
   Incr :: Text -> Query Int
   Incrby :: Text -> Int -> Query Int
+  Keys :: Text -> Query (List Text)
   Lrange :: Text -> Int -> Int -> Query [ByteString]
   Mget :: NonEmpty Text -> Query [Maybe ByteString]
   Mset :: NonEmpty (Text, ByteString) -> Query ()
@@ -238,6 +240,7 @@ mapKeys fn query' =
     Hdel key fields -> Task.map (\newKeys -> Hdel newKeys fields) (fn key)
     Incr key -> Task.map Incr (fn key)
     Incrby key amount -> Task.map (\newKeys -> Incrby newKeys amount) (fn key)
+    Keys key -> Task.map Keys (fn key)
     Expire key secs -> Task.map (\newKeys -> Expire newKeys secs) (fn key)
     Lrange key lower upper -> Task.map (\newKeys -> Lrange newKeys lower upper) (fn key)
     Rpush key vals -> Task.map (\newKeys -> Rpush newKeys vals) (fn key)
@@ -283,6 +286,7 @@ keysTouchedByQuery query' =
     Hsetnx key _ _ -> Set.singleton key
     Incr key -> Set.singleton key
     Incrby key _ -> Set.singleton key
+    Keys key -> Set.singleton key
     Lrange key _ _ -> Set.singleton key
     Mget keys -> Set.fromList (NonEmpty.toList keys)
     Mset assocs -> Set.fromList (NonEmpty.toList (NonEmpty.map Tuple.first assocs))
