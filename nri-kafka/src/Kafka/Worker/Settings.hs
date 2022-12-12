@@ -11,6 +11,7 @@ where
 import qualified Environment
 import qualified Kafka.Consumer as Consumer
 import qualified Kafka.Settings.Internal as Internal
+import Kafka.Types (KafkaCompressionCodec (..))
 import qualified Observability
 import qualified Prelude
 
@@ -33,7 +34,9 @@ data Settings = Settings
     maxPollIntervalMs :: MaxPollIntervalMs,
     -- | This option provides us the possibility to skip messages on failure.
     -- Useful for testing Kafka worker. DoNotSkip is a reasonable default!
-    onProcessMessageSkip :: SkipOrNot
+    onProcessMessageSkip :: SkipOrNot,
+    -- | Compression codec used for topics
+    compressionCodec :: KafkaCompressionCodec
   }
 
 -- | This option provides us the possibility to skip messages on failure.
@@ -74,6 +77,7 @@ decoder =
     |> andMap decoderPollBatchSize
     |> andMap decoderMaxPollIntervalMs
     |> andMap decoderOnProcessMessageFailure
+    |> andMap decodeCompressionCodec
 
 decoderPollingTimeout :: Environment.Decoder Consumer.Timeout
 decoderPollingTimeout =
@@ -147,5 +151,25 @@ decoderOnProcessMessageFailure =
             if int >= 1
               then Ok Skip
               else Ok DoNotSkip
+        )
+    )
+
+decodeCompressionCodec :: Environment.Decoder KafkaCompressionCodec
+decodeCompressionCodec =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "KAFKA_COMPRESSION_CODEC",
+        Environment.description = "Compression codec used for topics. Supported values are: NoCopmression, Gzip, Snappy and Lz4",
+        Environment.defaultValue = "Snappy"
+      }
+    ( Environment.custom
+        Environment.text
+        ( \text ->
+            case text of
+              "NoCompression" -> Ok NoCompression
+              "Gzip" -> Ok Gzip
+              "Snappy" -> Ok Snappy
+              "Lz4" -> Ok Lz4
+              _ -> Err ("Unrecognized compression codec: " ++ text)
         )
     )

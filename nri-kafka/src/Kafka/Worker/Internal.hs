@@ -240,7 +240,8 @@ createConsumer
     { Settings.brokerAddresses,
       Settings.logLevel,
       Settings.maxPollIntervalMs,
-      Settings.onProcessMessageSkip
+      Settings.onProcessMessageSkip,
+      Settings.compressionCodec
     }
   groupId
   observability
@@ -264,7 +265,7 @@ createConsumer
             ++ Consumer.noAutoCommit
             ++ Consumer.logLevel logLevel
             ++ Consumer.setCallback (Consumer.rebalanceCallback rebalance)
-            ++ Consumer.compression Consumer.Snappy
+            ++ Consumer.compression compressionCodec
             ++ Consumer.extraProps
               ( Dict.fromList
                   [("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs))]
