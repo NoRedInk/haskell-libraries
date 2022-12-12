@@ -86,13 +86,13 @@ stopWorker (Worker async) =
 
 -- | creates a test handler
 testHandler :: Settings.Settings -> Prelude.IO TestHandler
-testHandler Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages} = do
+testHandler Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages, Settings.compressionCodec} = do
   doAnything <- Platform.doAnythingHandler
   let properties =
         Producer.brokersList brokerAddresses
           ++ Producer.sendTimeout deliveryTimeout
           ++ Producer.logLevel logLevel
-          ++ Producer.compression Producer.Snappy
+          ++ Producer.compression compressionCodec
           ++ Producer.extraProps
             ( Dict.fromList
                 [ ( "batch.num.messages",
