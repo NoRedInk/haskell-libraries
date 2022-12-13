@@ -29,6 +29,7 @@ module Environment
     filePath,
     networkURI,
     secret,
+    oneOf,
     custom,
 
     -- * Decoders
@@ -154,6 +155,34 @@ networkURI =
     case Network.URI.parseURI (Data.Text.unpack str) of
       Nothing -> Err "Oh no! We have a valid Network.URI.URI but can't seem to parse it as a Network.URI.URI."
       Just uri' -> Ok uri' {Network.URI.uriPath = ""}
+
+-- | Create a parser for custom types.
+--
+-- > data Environment = Development | Production
+-- >
+-- > environment :: Parser Environment
+-- > environment =
+-- >     oneOf text [
+-- >         ( "development", Development),
+-- >         ( "production", Production)
+-- >     ]
+oneOf :: (Show a, Ord a) => Parser a -> List (a, b) -> Parser b
+oneOf toValue options =
+  custom toValue <| \str ->
+    case Dict.fromList options
+      |> Dict.get str of
+      Nothing ->
+        [ "Unknown option:",
+          Debug.toString str,
+          "(",
+          options
+            |> List.map (Tuple.first >> Debug.toString)
+            |> Text.join ", ",
+          ")"
+        ]
+          |> Text.join " "
+          |> Err
+      Just x -> Ok x
 
 -- | Create a parser for custom types. Build on the back of one of the primitve
 -- parsers from this module.
