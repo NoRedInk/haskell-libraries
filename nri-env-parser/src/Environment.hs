@@ -29,6 +29,7 @@ module Environment
     filePath,
     networkURI,
     secret,
+    enum,
     custom,
 
     -- * Decoders
@@ -53,6 +54,7 @@ module Environment
   )
 where
 
+import qualified Data.List
 import qualified Data.Text
 import qualified Debug
 import qualified Dict
@@ -154,6 +156,33 @@ networkURI =
     case Network.URI.parseURI (Data.Text.unpack str) of
       Nothing -> Err "Oh no! We have a valid Network.URI.URI but can't seem to parse it as a Network.URI.URI."
       Just uri' -> Ok uri' {Network.URI.uriPath = ""}
+
+-- | Create a parser for custom types.
+--
+-- > data Environment = Development | Production
+-- >
+-- > environment :: Parser Environment
+-- > environment =
+-- >     enum [
+-- >         ( "development", Development),
+-- >         ( "production", Production)
+-- >     ]
+enum :: List (Text, a) -> Parser a
+enum options =
+  custom text <| \v ->
+    case Data.List.find (\(k, _) -> k == v) options of
+      Just (_, x) -> Ok x
+      Nothing ->
+        [ "Unknown option:",
+          v,
+          "(",
+          options
+            |> List.map (Tuple.first)
+            |> Text.join ", ",
+          ")"
+        ]
+          |> Text.join " "
+          |> Err
 
 -- | Create a parser for custom types. Build on the back of one of the primitve
 -- parsers from this module.

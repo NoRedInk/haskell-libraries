@@ -8,6 +8,9 @@ nri-env-parser/nri-env-parser.cabal: nri-env-parser/package.yaml
 ghcid-nri-env-parser: nri-env-parser/nri-env-parser.cabal
 	cd nri-env-parser && ghcid
 
+ghcid-nri-env-parser-test: nri-env-parser/nri-env-parser.cabal
+	cd nri-env-parser && ghcid --command "cabal repl nri-env-parser:test:tests" --test Main.main
+
 nri-http/nri-http.cabal: nri-http/package.yaml
 	hpack nri-http
 
