@@ -1,7 +1,9 @@
 module Kafka.Settings.Internal
   ( Kafka.Types.KafkaLogLevel (..),
+    Kafka.Types.KafkaCompressionCodec (..),
     decoderBrokerAddresses,
     decoderKafkaLogLevel,
+    decoderCompressionCodec,
   )
 where
 
@@ -40,3 +42,23 @@ kafkaLogLevelFromText text =
     "Info" -> Kafka.Types.KafkaLogInfo
     "Debug" -> Kafka.Types.KafkaLogDebug
     _ -> Kafka.Types.KafkaLogDebug
+
+decoderCompressionCodec :: Environment.Decoder Kafka.Types.KafkaCompressionCodec
+decoderCompressionCodec =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "KAFKA_COMPRESSION_CODEC",
+        Environment.description = "Compression codec used for topics. Supported values are: NoCopmression, Gzip, Snappy and Lz4",
+        Environment.defaultValue = "Snappy"
+      }
+    ( Environment.custom
+        Environment.text
+        ( \text ->
+            case text of
+              "NoCompression" -> Ok Kafka.Types.NoCompression
+              "Gzip" -> Ok Kafka.Types.Gzip
+              "Snappy" -> Ok Kafka.Types.Snappy
+              "Lz4" -> Ok Kafka.Types.Lz4
+              _ -> Err ("Unrecognized compression codec: " ++ text)
+        )
+    )
