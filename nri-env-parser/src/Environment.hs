@@ -54,6 +54,7 @@ module Environment
   )
 where
 
+import qualified Data.List
 import qualified Data.Text
 import qualified Debug
 import qualified Dict
@@ -166,14 +167,13 @@ networkURI =
 -- >         ( "development", Development),
 -- >         ( "production", Production)
 -- >     ]
-oneOf :: (Show a, Ord a) => Parser a -> List (a, b) -> Parser b
+oneOf :: (Eq a, Show a) => Parser a -> List (a, b) -> Parser b
 oneOf toValue options =
-  custom toValue <| \str ->
-    case Dict.fromList options
-      |> Dict.get str of
+  custom toValue <| \v ->
+    case Data.List.find (\(k, _) -> k == v) options of
       Nothing ->
         [ "Unknown option:",
-          Debug.toString str,
+          Debug.toString v,
           "(",
           options
             |> List.map (Tuple.first >> Debug.toString)
@@ -182,7 +182,7 @@ oneOf toValue options =
         ]
           |> Text.join " "
           |> Err
-      Just x -> Ok x
+      Just (_, x) -> Ok x
 
 -- | Create a parser for custom types. Build on the back of one of the primitve
 -- parsers from this module.
