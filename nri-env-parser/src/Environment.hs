@@ -29,7 +29,7 @@ module Environment
     filePath,
     networkURI,
     secret,
-    oneOf,
+    enum,
     custom,
 
     -- * Decoders
@@ -163,26 +163,26 @@ networkURI =
 -- >
 -- > environment :: Parser Environment
 -- > environment =
--- >     oneOf text [
+-- >     enum [
 -- >         ( "development", Development),
 -- >         ( "production", Production)
 -- >     ]
-oneOf :: (Eq a, Show a) => Parser a -> List (a, b) -> Parser b
-oneOf toValue options =
-  custom toValue <| \v ->
+enum :: List (Text, a) -> Parser a
+enum options =
+  custom text <| \v ->
     case Data.List.find (\(k, _) -> k == v) options of
+      Just (_, x) -> Ok x
       Nothing ->
         [ "Unknown option:",
-          Debug.toString v,
+          v,
           "(",
           options
-            |> List.map (Tuple.first >> Debug.toString)
+            |> List.map (Tuple.first)
             |> Text.join ", ",
           ")"
         ]
           |> Text.join " "
           |> Err
-      Just (_, x) -> Ok x
 
 -- | Create a parser for custom types. Build on the back of one of the primitve
 -- parsers from this module.

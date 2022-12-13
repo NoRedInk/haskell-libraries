@@ -20,7 +20,7 @@ tests =
   describe
     "Environment"
     [ describe
-        "oneOf"
+        "enum"
         [ test "should decode to the correct value"
             <| \() ->
               Environment.decodePairs
@@ -30,8 +30,7 @@ tests =
                         Environment.description = "test",
                         Environment.defaultValue = "A"
                       }
-                    ( Environment.oneOf
-                        Environment.text
+                    ( Environment.enum
                         [ ("A", A),
                           ("B", B)
                         ]
@@ -48,51 +47,14 @@ tests =
                         Environment.description = "test",
                         Environment.defaultValue = "A"
                       }
-                    ( Environment.oneOf
-                        Environment.text
+                    ( Environment.enum
                         [ ("A", A),
                           ("B", B)
                         ]
                     )
                 )
                 (Dict.singleton "TEST" "C")
-                |> Expect.equal (Err "Parsing TEST failed: Unknown option: \"C\" ( \"A\", \"B\" )"),
-          test "should use the parser to parse into the type of the key"
-            <| \() ->
-              Environment.decodePairs
-                ( Environment.variable
-                    Environment.Variable
-                      { Environment.name = "TEST",
-                        Environment.description = "test",
-                        Environment.defaultValue = "0"
-                      }
-                    ( Environment.oneOf
-                        Environment.int
-                        [ (0, A),
-                          (1, B)
-                        ]
-                    )
-                )
-                (Dict.singleton "TEST" "1")
-                |> Expect.equal (Ok B),
-          test "should fail if the parser fails"
-            <| \() ->
-              Environment.decodePairs
-                ( Environment.variable
-                    Environment.Variable
-                      { Environment.name = "TEST",
-                        Environment.description = "test",
-                        Environment.defaultValue = "0"
-                      }
-                    ( Environment.oneOf
-                        Environment.int
-                        [ (0, A),
-                          (1, B)
-                        ]
-                    )
-                )
-                (Dict.singleton "TEST" "A")
-                |> Expect.equal (Err "Parsing TEST failed: Could not parse as integer: A"),
+                |> Expect.equal (Err "Parsing TEST failed: Unknown option: C ( A, B )"),
           test "should use the default value if the key is not present"
             <| \() ->
               Environment.decodePairs
@@ -100,12 +62,11 @@ tests =
                     Environment.Variable
                       { Environment.name = "TEST",
                         Environment.description = "test",
-                        Environment.defaultValue = "1"
+                        Environment.defaultValue = "B"
                       }
-                    ( Environment.oneOf
-                        Environment.int
-                        [ (0, A),
-                          (1, B)
+                    ( Environment.enum
+                        [ ("A", A),
+                          ("B", B)
                         ]
                     )
                 )
