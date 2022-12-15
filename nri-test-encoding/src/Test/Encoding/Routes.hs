@@ -29,6 +29,7 @@ import Servant.API
     Header',
     QueryFlag,
     QueryParam',
+    QueryParams,
     Raw,
     ReqBody',
     Summary,
@@ -253,6 +254,27 @@ instance
             route
               { queryParams =
                   ( Text.fromList (symbolVal (Proxy :: Proxy key)),
+                    SomeType (Proxy :: Proxy value)
+                  ) :
+                  queryParams route
+              }
+        )
+
+instance
+  ( KnownSymbol key,
+    Typeable.Typeable value,
+    Examples.HasExamples value,
+    IsApi a
+  ) =>
+  IsApi (QueryParams key value :> a)
+  where
+  crawl _ =
+    crawl (Proxy :: Proxy a)
+      |> List.map
+        ( \route ->
+            route
+              { queryParams =
+                  ( Text.fromList (symbolVal (Proxy :: Proxy key)) ++ "[]",
                     SomeType (Proxy :: Proxy value)
                   ) :
                   queryParams route
