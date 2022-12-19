@@ -21,7 +21,7 @@ module Postgres
     inTestTransaction,
     -- Reexposing useful postgresql-typed types
     PGTypes.PGColumn (pgDecode),
-    PGTypes.PGParameter (pgEncode)
+    PGTypes.PGParameter (pgEncode),
   )
 where
 
@@ -171,6 +171,10 @@ fromPGError c pgError =
         |> Query.UniqueViolation
     "57014" ->
       Query.Timeout (Time.milliseconds (Connection.timeout c))
+    "23503" ->
+      Exception.displayException pgError
+        |> Text.fromList
+        |> Query.UniqueViolation
     _ ->
       Exception.displayException pgError
         |> Text.fromList

@@ -12,11 +12,13 @@ import Prelude (Show (show))
 data Error
   = Timeout Float
   | UniqueViolation Text
+  | ForeignKeyConstraintViolation Text
   | Other Text [Log.Context]
 
 instance Show Error where
   show (Timeout interval) = "Query timed out after " ++ Text.toList (Text.fromFloat interval) ++ " milliseconds"
   show (UniqueViolation err) = "Query violated uniqueness constraint: " ++ Text.toList err
+  show (ForeignKeyConstraintViolation err) = "Query violated foreign key violation constraint: " ++ Text.toList err
   show (Other msg _) = "Query failed with unexpected error: " ++ Text.toList msg
 
 instance Exception.Exception Error
