@@ -174,7 +174,7 @@ fromPGError c pgError =
     "23503" ->
       Exception.displayException pgError
         |> Text.fromList
-        |> Query.UniqueViolation
+        |> Query.ForeignKeyConstraintViolation
     _ ->
       Exception.displayException pgError
         |> Text.fromList
