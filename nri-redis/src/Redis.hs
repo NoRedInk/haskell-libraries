@@ -35,6 +35,7 @@ module Redis
 
     -- * Running Redis queries
     Internal.query,
+    Internal.extendExpire,
     Internal.transaction,
     Internal.Query,
     Internal.Error (..),

@@ -40,6 +40,7 @@ handlerIO = do
   doAnything <- Platform.doAnythingHandler
   Internal.Handler
     { Internal.doQuery = doQuery' modelRef doAnything,
+      Internal.doExtendExpire = identity,
       Internal.doTransaction = doQuery' modelRef doAnything,
       Internal.namespace = "tests",
       Internal.maxKeySize = Settings.NoMaxKeySize

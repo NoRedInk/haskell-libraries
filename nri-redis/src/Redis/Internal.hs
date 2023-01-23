@@ -12,6 +12,7 @@ module Redis.Internal
     sequence,
     query,
     transaction,
+    extendExpire,
     -- internal tools
     traceQuery,
     maybesToDict,
@@ -185,10 +186,15 @@ sequence =
 -- | The redis handler allows applications to run scoped IO
 data Handler = Handler
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
+    doExtendExpire :: Stack.HasCallStack => forall a. Query a -> Query a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     namespace :: Text,
     maxKeySize :: Settings.MaxKeySize
   }
+
+-- | Update expire after running the query.
+extendExpire :: Stack.HasCallStack => Handler -> Query a -> Query a
+extendExpire handler = Stack.withFrozenCallStack (doExtendExpire handler)
 
 -- | Run a 'Query'.
 -- Note: A 'Query' in this library can consist of one or more queries in sequence.
