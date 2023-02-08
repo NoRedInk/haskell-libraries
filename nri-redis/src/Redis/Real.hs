@@ -67,14 +67,21 @@ timeoutAfterMilliseconds milliseconds handler' =
 
 defaultExpiryKeysAfterSeconds :: Int -> Internal.HandlerAutoExtendExpire -> Internal.HandlerAutoExtendExpire
 defaultExpiryKeysAfterSeconds secs handler' =
-  handler'
-    { Internal.doExtendExpire = \query' ->
+  let wrapWithExpire :: Internal.Query a -> Internal.Query a
+      wrapWithExpire query' =
         Internal.keysTouchedByQuery query'
           |> Set.toList
           |> List.map (\key -> Internal.Expire key secs)
           |> Internal.sequence
           |> Internal.map2 (\res _ -> res) query'
-    }
+   in handler'
+        { Internal.doQuery = \query' ->
+            wrapWithExpire query'
+              |> Stack.withFrozenCallStack (Internal.doQuery handler'),
+          Internal.doTransaction = \query' ->
+            wrapWithExpire query'
+              |> Stack.withFrozenCallStack (Internal.doTransaction handler')
+        }
 
 acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler' x, Connection)
 acquireHandler namespace settings = do
@@ -95,8 +102,7 @@ acquireHandler namespace settings = do
   anything <- Platform.doAnythingHandler
   pure
     ( Internal.Handler'
-        { Internal.doExtendExpire = identity,
-          Internal.doQuery = \query ->
+        { Internal.doQuery = \query ->
             let PreparedQuery {redisCtx} = doRawQuery query
              in Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything redisCtx,
           Internal.doTransaction = \query ->

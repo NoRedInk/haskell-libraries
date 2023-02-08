@@ -42,8 +42,7 @@ handlerIO = do
     { Internal.doQuery = doQuery' modelRef doAnything,
       Internal.doTransaction = doQuery' modelRef doAnything,
       Internal.namespace = "tests",
-      Internal.maxKeySize = Settings.NoMaxKeySize,
-      Internal.doExtendExpire = identity
+      Internal.maxKeySize = Settings.NoMaxKeySize
     }
     |> Prelude.pure
   where

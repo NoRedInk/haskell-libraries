@@ -190,7 +190,6 @@ data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
 
 data Handler' (x :: HasAutoExtendExpire) = Handler'
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
-    doExtendExpire :: Stack.HasCallStack => forall a. Query a -> Query a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     namespace :: Text,
     maxKeySize :: Settings.MaxKeySize
