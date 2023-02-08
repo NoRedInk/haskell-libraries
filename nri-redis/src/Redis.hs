@@ -9,7 +9,10 @@
 module Redis
   ( -- * Creating a redis handler
     Real.handler,
+    Real.handlerAutoExtendExpire,
     Internal.Handler,
+    Internal.HandlerAutoExtendExpire,
+    Internal.Handler',
     Settings.Settings (..),
     Settings.decoder,
     Settings.decoderWithEnvVarPrefix,
@@ -35,7 +38,6 @@ module Redis
 
     -- * Running Redis queries
     Internal.query,
-    Internal.extendExpire,
     Internal.transaction,
     Internal.Query,
     Internal.Error (..),

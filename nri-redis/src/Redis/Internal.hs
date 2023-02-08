@@ -1,9 +1,13 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Redis.Internal
   ( Error (..),
-    Handler (..),
+    Handler,
+    Handler' (..),
+    HandlerAutoExtendExpire,
+    HasAutoExtendExpire (..),
     Query (..),
     cmds,
     map,
@@ -12,7 +16,6 @@ module Redis.Internal
     sequence,
     query,
     transaction,
-    extendExpire,
     -- internal tools
     traceQuery,
     maybesToDict,
@@ -183,8 +186,9 @@ sequence :: List (Query a) -> Query (List a)
 sequence =
   List.foldr (map2 (:)) (Pure [])
 
--- | The redis handler allows applications to run scoped IO
-data Handler = Handler
+data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
+
+data Handler' (x :: HasAutoExtendExpire) = Handler'
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doExtendExpire :: Stack.HasCallStack => forall a. Query a -> Query a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
@@ -192,15 +196,16 @@ data Handler = Handler
     maxKeySize :: Settings.MaxKeySize
   }
 
--- | Update expire after running the query.
-extendExpire :: Stack.HasCallStack => Handler -> Query a -> Query a
-extendExpire handler = Stack.withFrozenCallStack (doExtendExpire handler)
+-- | The redis handler allows applications to run scoped IO
+type Handler = Handler' 'NoAutoExtendExpire
+
+type HandlerAutoExtendExpire = Handler' 'AutoExtendExpire
 
 -- | Run a 'Query'.
 -- Note: A 'Query' in this library can consist of one or more queries in sequence.
 -- if a 'Query' contains multiple queries, it may make more sense, if possible
 -- to run them using 'transaction'
-query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
+query :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -212,7 +217,7 @@ query handler query' =
 --
 -- In redis terms, this is wrappping the 'Query' in `MULTI` and `EXEC
 -- see redis transaction semantics here: https://redis.io/topics/transactions
-transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
+transaction :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -255,7 +260,7 @@ mapKeys fn query' =
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
 
-ensureMaxKeySize :: Handler -> Query a -> Task Error (Query a)
+ensureMaxKeySize :: Handler' x -> Query a -> Task Error (Query a)
 ensureMaxKeySize handler query' =
   case maxKeySize handler of
     Settings.NoMaxKeySize -> Task.succeed query'
