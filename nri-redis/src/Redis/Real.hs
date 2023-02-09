@@ -8,6 +8,7 @@ module Redis.Real
 where
 
 import qualified Control.Exception.Safe as Exception
+import Control.Monad.IO.Class (liftIO)
 import qualified Data.Acquire
 import qualified Data.ByteString
 import qualified Data.List.NonEmpty as NonEmpty
@@ -48,11 +49,23 @@ handlerAutoExtendExpire namespace settings = do
                timeoutAfterMilliseconds (toFloat milliseconds) handler'
        )
     |> ( \handler' -> case Settings.defaultExpiry settings of
-           Settings.NoDefaultExpiry -> handler'
+           Settings.NoDefaultExpiry ->
+             -- We create the handler as part of starting the application. Throwing
+             -- means that if there's a problem with the settings the application will
+             -- fail immediately upon start. It won't result in runtime errors during
+             -- operation.
+             [ "Setting up an auto extend expire handler for",
+               "redis failed. Auto extending the expire of keys only works if",
+               "there is a setting for `REDIS_DEFAULT_EXPIRY_SECONDS`."
+             ]
+               |> Text.join " "
+               |> Text.toList
+               |> Exception.throwString
            Settings.ExpireKeysAfterSeconds secs ->
              defaultExpiryKeysAfterSeconds secs handler'
+               |> Prelude.pure
        )
-    |> Prelude.pure
+    |> liftIO
 
 timeoutAfterMilliseconds :: Float -> Internal.Handler' x -> Internal.Handler' x
 timeoutAfterMilliseconds milliseconds handler' =
