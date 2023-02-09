@@ -186,8 +186,13 @@ sequence :: List (Query a) -> Query (List a)
 sequence =
   List.foldr (map2 (:)) (Pure [])
 
+-- | We use this to parametrize the handler. It specifies if the handler has
+-- the auto extend expire feater enabled or not.
 data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
 
+-- | The redis handler allows applications to run scoped IO
+-- A handler that can only be parametrized by a value of this kind.
+-- Meaning that we use the values of the type parameter at a type level.
 data Handler' (x :: HasAutoExtendExpire) = Handler'
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
@@ -195,9 +200,16 @@ data Handler' (x :: HasAutoExtendExpire) = Handler'
     maxKeySize :: Settings.MaxKeySize
   }
 
--- | The redis handler allows applications to run scoped IO
+-- | This is a type alias of a handler parametrized by a value that indicates
+-- that the auto extend feature is disabled.
+-- Note: The tick in front of NoAutoExtendExpire is not necessary, but good
+-- practice to indicate that we are lifting a value to the type level.
 type Handler = Handler' 'NoAutoExtendExpire
 
+-- | This is a type alias of a handler parametrized by a value that indicates
+-- that the auto extend feature is enabled.
+-- Note: The tick in front of AutoExtendExpire is not necessary, but good
+-- practice to indicate that we are lifting a value to the type level.
 type HandlerAutoExtendExpire = Handler' 'AutoExtendExpire
 
 -- | Run a 'Query'.
