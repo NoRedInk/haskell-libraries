@@ -3,10 +3,12 @@
 
 module Redis.Real
   ( handler,
+    handlerAutoExtendExpire,
   )
 where
 
 import qualified Control.Exception.Safe as Exception
+import Control.Monad.IO.Class (liftIO)
 import qualified Data.Acquire
 import qualified Data.ByteString
 import qualified Data.List.NonEmpty as NonEmpty
@@ -25,13 +27,23 @@ import qualified Prelude
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings = do
   (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
+  _ <- case Settings.defaultExpiry settings of
+    Settings.NoDefaultExpiry -> pure ()
+    Settings.ExpireKeysAfterSeconds _ ->
+      -- We create the handler as part of starting the application. Throwing
+      -- means that if there's a problem with the settings the application will
+      -- fail immediately upon start. It won't result in runtime errors during
+      -- operation.
+      [ "The `REDIS_DEFAULT_EXPIRY_SECONDS` setting only applies when",
+        "the redis handler is set up using the `handlerAutoExtendExpire` function.",
+        "function.",
+        "Consider removing the setting if the behavior is undesirable or switch to the mentioned handler function."
+      ]
+        |> Text.join " "
+        |> Text.toList
+        |> Exception.throwString
+        |> liftIO
   namespacedHandler
-    |> ( \handler' ->
-           case Settings.defaultExpiry settings of
-             Settings.NoDefaultExpiry -> handler'
-             Settings.ExpireKeysAfterSeconds secs ->
-               defaultExpiryKeysAfterSeconds secs handler'
-       )
     |> ( \handler' ->
            case Settings.queryTimeout settings of
              Settings.NoQueryTimeout -> handler'
@@ -40,7 +52,38 @@ handler namespace settings = do
        )
     |> Prelude.pure
 
-timeoutAfterMilliseconds :: Float -> Internal.Handler -> Internal.Handler
+-- | Produce a namespaced handler for Redis access.
+-- This will ensure that we extend all keys accessed by a query by a configured default time (see Settings.defaultExpiry)
+handlerAutoExtendExpire :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.HandlerAutoExtendExpire
+handlerAutoExtendExpire namespace settings = do
+  (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
+  namespacedHandler
+    |> ( \handler' ->
+           case Settings.queryTimeout settings of
+             Settings.NoQueryTimeout -> handler'
+             Settings.TimeoutQueryAfterMilliseconds milliseconds ->
+               timeoutAfterMilliseconds (toFloat milliseconds) handler'
+       )
+    |> ( \handler' -> case Settings.defaultExpiry settings of
+           Settings.NoDefaultExpiry ->
+             -- We create the handler as part of starting the application. Throwing
+             -- means that if there's a problem with the settings the application will
+             -- fail immediately upon start. It won't result in runtime errors during
+             -- operation.
+             [ "Setting up an auto extend expire handler for",
+               "redis failed. Auto extending the expire of keys only works if",
+               "there is a setting for `REDIS_DEFAULT_EXPIRY_SECONDS`."
+             ]
+               |> Text.join " "
+               |> Text.toList
+               |> Exception.throwString
+           Settings.ExpireKeysAfterSeconds secs ->
+             defaultExpiryKeysAfterSeconds secs handler'
+               |> Prelude.pure
+       )
+    |> liftIO
+
+timeoutAfterMilliseconds :: Float -> Internal.Handler' x -> Internal.Handler' x
 timeoutAfterMilliseconds milliseconds handler' =
   handler'
     { Internal.doQuery =
@@ -51,7 +94,7 @@ timeoutAfterMilliseconds milliseconds handler' =
           >> Task.timeout milliseconds Internal.TimeoutError
     }
 
-defaultExpiryKeysAfterSeconds :: Int -> Internal.Handler -> Internal.Handler
+defaultExpiryKeysAfterSeconds :: Int -> Internal.HandlerAutoExtendExpire -> Internal.HandlerAutoExtendExpire
 defaultExpiryKeysAfterSeconds secs handler' =
   let wrapWithExpire :: Internal.Query a -> Internal.Query a
       wrapWithExpire query' =
@@ -69,7 +112,7 @@ defaultExpiryKeysAfterSeconds secs handler' =
               |> Stack.withFrozenCallStack (Internal.doTransaction handler')
         }
 
-acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler, Connection)
+acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler' x, Connection)
 acquireHandler namespace settings = do
   connection <- do
     let connectionInfo = Settings.connectionInfo settings
@@ -87,7 +130,7 @@ acquireHandler namespace settings = do
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
   pure
-    ( Internal.Handler
+    ( Internal.Handler'
         { Internal.doQuery = \query ->
             let PreparedQuery {redisCtx} = doRawQuery query
              in Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything redisCtx,
@@ -269,7 +312,7 @@ doRawQuery query =
                 redisCtx
             )
 
-releaseHandler :: (Internal.Handler, Connection) -> IO ()
+releaseHandler :: (Internal.Handler' x, Connection) -> IO ()
 releaseHandler (_, Connection {connectionHedis}) = Database.Redis.disconnect connectionHedis
 
 data Connection = Connection
