@@ -43,11 +43,12 @@ spanForTask task =
           |> map constantValuesForVariableFields
 
 tests :: TestHandlers -> Test.Test
-tests TestHandlers {realHandler, mockHandler} =
+tests TestHandlers {realHandler, mockHandler, autoExtendExpireHandler} =
   Test.describe
     "Redis Library"
     [ Test.describe "query tests using mock handler" (queryTests mockHandler),
       Test.describe "query tests using real handler" (queryTests realHandler),
+      Test.describe "query tests using auto extend expire handler" (queryTests autoExtendExpireHandler),
       Test.describe "observability tests" (observabilityTests realHandler)
     ]
 
@@ -59,7 +60,7 @@ tests TestHandlers {realHandler, mockHandler} =
 -- value "test/Main.hs". If it points to one of the src files of the redis
 -- library it means stack frames for redis query in bugsnag, newrelic, etc will
 -- not point to the application code making the query!
-observabilityTests :: Redis.Handler -> List Test.Test
+observabilityTests :: Redis.Handler' x -> List Test.Test
 observabilityTests handler =
   [ Test.test "Redis.query reports the span data we expect" <| \() -> do
       span <-
@@ -119,7 +120,7 @@ observabilityTests handler =
         |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-transaction"
   ]
 
-queryTests :: Redis.Handler -> List Test.Test
+queryTests :: Redis.Handler' x -> List Test.Test
 queryTests redisHandler =
   [ Test.test "get and set" <| \() -> do
       Redis.set api "bob" "hello!" |> Redis.query testNS |> Expect.succeeds
@@ -268,17 +269,19 @@ queryTests redisHandler =
 
 data TestHandlers = TestHandlers
   { mockHandler :: Redis.Handler,
+    autoExtendExpireHandler :: Redis.HandlerAutoExtendExpire,
     realHandler :: Redis.Handler
   }
 
 getHandlers :: Conduit.Acquire TestHandlers
 getHandlers = do
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
-  let realHandler = Real.handler "tests" settings {Settings.defaultExpiry = Settings.ExpireKeysAfterSeconds 1}
+  autoExtendExpireHandler <- Real.handlerAutoExtendExpire "tests-auto-extend-expire" settings {Settings.defaultExpiry = Settings.ExpireKeysAfterSeconds 1}
+  realHandler <- Real.handler "tests" settings {Settings.defaultExpiry = Settings.NoDefaultExpiry}
   mockHandler <- Conduit.liftIO <| Mock.handlerIO
-  NriPrelude.map (TestHandlers mockHandler) realHandler
+  Prelude.pure TestHandlers {autoExtendExpireHandler, realHandler, mockHandler}
 
-addNamespace :: Text -> Redis.Handler -> Redis.Handler
+addNamespace :: Text -> Redis.Handler' x -> Redis.Handler' x
 addNamespace namespace handler' =
   handler' {Internal.namespace = Internal.namespace handler' ++ ":" ++ namespace}
 
