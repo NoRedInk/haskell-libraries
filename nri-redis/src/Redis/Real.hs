@@ -27,22 +27,6 @@ import qualified Prelude
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings = do
   (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
-  _ <- case Settings.defaultExpiry settings of
-    Settings.NoDefaultExpiry -> pure ()
-    Settings.ExpireKeysAfterSeconds _ ->
-      -- We create the handler as part of starting the application. Throwing
-      -- means that if there's a problem with the settings the application will
-      -- fail immediately upon start. It won't result in runtime errors during
-      -- operation.
-      [ "The `REDIS_DEFAULT_EXPIRY_SECONDS` setting only applies when",
-        "the redis handler is set up using the `handlerAutoExtendExpire` function.",
-        "function.",
-        "Consider removing the setting if the behavior is undesirable or switch to the mentioned handler function."
-      ]
-        |> Text.join " "
-        |> Text.toList
-        |> Exception.throwString
-        |> liftIO
   namespacedHandler
     |> ( \handler' ->
            case Settings.queryTimeout settings of
