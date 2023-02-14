@@ -35,11 +35,13 @@ module Task
     concurrently,
     parallel,
     background,
+    backgroundPool,
   )
 where
 
 import Basics
 import qualified Control.Concurrent.Async as Async
+import qualified Control.Concurrent.Async.Pool as Async.Pool
 import qualified Internal.Shortcut as Shortcut
 import List (List)
 import qualified List
@@ -220,6 +222,15 @@ background task =
     ( \handler -> do
         _ <- Async.async (Internal._run task handler)
         Prelude.pure <| Ok ()
+    )
+
+backgroundPool :: Int -> Task Never a -> Task x ()
+backgroundPool poolSize task =
+  Internal.Task
+    ( \handler ->
+        Async.Pool.withTaskGroup (Prelude.fromIntegral poolSize) <| \g -> do
+          _ <- Async.Pool.async g (Internal._run task handler)
+          Prelude.pure <| Ok ()
     )
 
 -- | Recover from a failure in a task. If the given task fails, we use the

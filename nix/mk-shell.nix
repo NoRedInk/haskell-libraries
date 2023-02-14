@@ -6,11 +6,12 @@ let
     with pkgs.haskell.lib;
     overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
   # It is still necessary to run `hpack --force` into packages home dirs
-  haskell-language-server = pkgs.haskellPackages.haskell-language-server.override {
-    hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
-      ormolu = (workaround140774 pkgs.haskellPackages.ormolu);
+  haskell-language-server =
+    pkgs.haskellPackages.haskell-language-server.override {
+      hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
+        ormolu = (workaround140774 pkgs.haskellPackages.ormolu);
+      };
     };
-  };
 
 in pkgs.mkShell {
   buildInputs = [
@@ -19,6 +20,7 @@ in pkgs.mkShell {
         aeson
         aeson-pretty
         async
+        async-pool
         auto-update
         base
         brick
