@@ -10,7 +10,7 @@ module Redis.List
   ( -- * Creating a redis handler
     Real.handler,
     Real.handlerAutoExtendExpire,
-    Internal.Handler,
+    Internal.HandlerNoAutoExtendExpire,
     Internal.HandlerAutoExtendExpire,
     Settings.Settings (..),
     Settings.decoder,

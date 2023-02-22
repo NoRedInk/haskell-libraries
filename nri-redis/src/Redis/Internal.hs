@@ -4,7 +4,7 @@
 
 module Redis.Internal
   ( Error (..),
-    Handler,
+    HandlerNoAutoExtendExpire,
     Handler' (..),
     HandlerAutoExtendExpire,
     HasAutoExtendExpire (..),
@@ -204,7 +204,7 @@ data Handler' (x :: HasAutoExtendExpire) = Handler'
 -- that the auto extend feature is disabled.
 -- Note: The tick in front of NoAutoExtendExpire is not necessary, but good
 -- practice to indicate that we are lifting a value to the type level.
-type Handler = Handler' 'NoAutoExtendExpire
+type HandlerNoAutoExtendExpire = Handler' 'NoAutoExtendExpire
 
 -- | This is a type alias of a handler parametrized by a value that indicates
 -- that the auto extend feature is enabled.

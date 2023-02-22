@@ -268,9 +268,9 @@ queryTests redisHandler =
     testNS = addNamespace "testNamespace" redisHandler
 
 data TestHandlers = TestHandlers
-  { mockHandler :: Redis.Handler,
+  { mockHandler :: Redis.HandlerNoAutoExtendExpire,
     autoExtendExpireHandler :: Redis.HandlerAutoExtendExpire,
-    realHandler :: Redis.Handler
+    realHandler :: Redis.HandlerNoAutoExtendExpire
   }
 
 getHandlers :: Conduit.Acquire TestHandlers
