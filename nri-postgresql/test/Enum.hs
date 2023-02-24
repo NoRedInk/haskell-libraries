@@ -7,7 +7,6 @@ module Enum where
 
 import Test (Test, describe)
 import qualified Test
-import qualified Database.PostgreSQL.Typed as Core
 import Postgres.Enum (generatePGEnum)
 import qualified Postgres.TH
 import qualified Language.Haskell.TH as TH
@@ -18,10 +17,6 @@ import qualified Postgres
 
 {- Set up an enum type on the database at compile time to test with -}
 Postgres.TH.useNRIDatabase
-
-[Core.pgSQL| CREATE TYPE test_enum as ENUM ('value_1', 'value_2') |]
-[Core.pgSQL| CREATE TABLE test_table (enum_col test_enum NOT NULL) |]
-[Core.pgSQL| CREATE TABLE test_table2 (enum_array_col test_enum[] NOT NULL) |]
 
 data TestEnum
   = Value1
@@ -100,7 +95,7 @@ queryTests rawConnection =
 
       -- | I'm seeing flaky results with regards to `test_table` and `test_enum` existing on the db 
       -- at the point the test is run.  Let's just drop them and re-create in each test. Since the 
-      -- compilers see's them being created at the top level above this will all typecheck.
+      -- compilers see's them being created in ./run-tests.sh above this will all typecheck.
       withContext :: (Postgres.Connection -> Task Postgres.Error a) -> Task Postgres.Error a
       withContext todo =
          Postgres.inTestTransaction rawConnection (\connection -> do
