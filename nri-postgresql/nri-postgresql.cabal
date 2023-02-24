@@ -90,6 +90,7 @@ test-suite tests
       Postgres.Test
       Postgres.TH
       Postgres.Time
+      ConflictTest
       Enum
       ObservabilitySpec
       PostgresSettingsSpec

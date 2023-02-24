@@ -13,6 +13,7 @@ import Test (Test, describe, run)
 import qualified TimeSpec
 import qualified Enum
 import qualified Prelude
+import qualified ConflictTest
 
 -- `Test.run` exits after finishing, so run other tests first.
 main :: Prelude.IO ()
@@ -30,5 +31,6 @@ tests postgres =
       QueryParserSpec.tests,
       TimeSpec.tests,
       ObservabilitySpec.tests postgres,
-      Enum.tests postgres
+      Enum.tests postgres,
+      ConflictTest.tests postgres
     ]

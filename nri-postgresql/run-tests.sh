@@ -23,6 +23,8 @@ psql -c "CREATE TYPE test_enum as ENUM ('value_1', 'value_2')"
 psql -c "CREATE TABLE test_table (enum_col test_enum NOT NULL)"
 psql -c "CREATE TABLE test_table2 (enum_array_col test_enum[] NOT NULL)"
 
+## Setup for test/Test.hs
+psql -c "CREATE TABLE constraints_table (user_id int PRIMARY KEY)"
 
 cabal build
 cabal test
