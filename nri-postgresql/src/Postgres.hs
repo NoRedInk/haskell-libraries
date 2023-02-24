@@ -89,7 +89,7 @@ inTestTransaction conn func =
       --
       end :: Platform.Succeeded -> PGConnection -> Task x ()
       end _ c =
-        rollbackAllSafe conn c
+        doIO conn <| pgRollbackAll c
       --
       setSingle :: PGConnection -> Connection
       setSingle c =
