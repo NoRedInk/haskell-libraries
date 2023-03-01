@@ -17,9 +17,9 @@ export PGPORT=5432
 export PGDATABASE=testdb
 
 ## Setup for test/Enum.hs
-psql -c "CREATE TYPE test_enum as ENUM ('value_1', 'value_2')"
-psql -c "CREATE TABLE test_table (enum_col test_enum NOT NULL)"
-psql -c "CREATE TABLE test_table2 (enum_array_col test_enum[] NOT NULL)"
+psql -c "CREATE TYPE test_enum as ENUM ('value_1', 'value_2')" || true
+psql -c "CREATE TABLE test_table (enum_col test_enum NOT NULL)" || true
+psql -c "CREATE TABLE test_table2 (enum_array_col test_enum[] NOT NULL)" || true
 
 ## Setup for test/Test.hs
-psql -c "CREATE TABLE constraints_table (user_id int PRIMARY KEY)"
+psql -c "CREATE TABLE constraints_table (user_id int PRIMARY KEY)" || true
