@@ -56,6 +56,12 @@ nri-postgresql/nri-postgresql.cabal: nri-postgresql/package.yaml
 ghcid-nri-postgresql: nri-postgresql/nri-postgresql.cabal
 	cd nri-postgresql && ghcid
 
+setup-postgresql:
+	cd nri-postgresql && ./setup-postgres.sh
+
+ghcid-nri-postgresql-test: setup-postgresql nri-postgresql/nri-postgresql.cabal
+	cd nri-postgresql && ghcid --command "PGDATABASE=testdb PGPORT=5432 PGHOST=localhost cabal repl nri-postgresql:test:tests" --test Main.main
+
 nri-redis/nri-redis.cabal: nri-redis/package.yaml
 	hpack nri-redis
 

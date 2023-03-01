@@ -58,7 +58,7 @@ import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import qualified Dict
-import Http.Internal (Body, Expect, Handler, Expect')
+import Http.Internal (Body, Expect, Expect', Handler)
 import qualified Http.Internal as Internal
 import qualified Log.HttpRequest as HttpRequest
 import qualified Maybe

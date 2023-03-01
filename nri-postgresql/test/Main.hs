@@ -3,7 +3,9 @@ module Main
   )
 where
 
+import qualified ConflictTest
 import qualified Data.Acquire as Acquire
+import qualified Enum
 import qualified Environment
 import qualified ObservabilitySpec
 import qualified Postgres
@@ -11,7 +13,6 @@ import qualified PostgresSettingsSpec
 import qualified QueryParserSpec
 import Test (Test, describe, run)
 import qualified TimeSpec
-import qualified Enum
 import qualified Prelude
 
 -- `Test.run` exits after finishing, so run other tests first.
@@ -30,5 +31,6 @@ tests postgres =
       QueryParserSpec.tests,
       TimeSpec.tests,
       ObservabilitySpec.tests postgres,
-      Enum.tests postgres
+      Enum.tests postgres,
+      ConflictTest.tests postgres
     ]
