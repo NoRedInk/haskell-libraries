@@ -1,8 +1,10 @@
 module TaskSpec (tests) where
 
+import qualified Control.Exception.Safe as Exception
 import qualified Expect
 import qualified List
 import NriPrelude
+import qualified Platform
 import qualified Process
 import qualified Task
 import Test (Test, describe, test)
@@ -15,6 +17,17 @@ tests =
   describe
     "Task"
     [ describe
+        "sequence"
+        [ test "actually runs in sequence" <| \() -> do
+            doAnything <- Expect.fromIO Platform.doAnythingHandler
+            let shouldNeverRun = \x -> Platform.doAnything doAnything (Exception.throwString x)
+            failure <-
+              [Task.succeed 1, Task.fail "a", shouldNeverRun "b"]
+                |> Task.sequence
+                |> Expect.fails
+            Expect.equal failure "a"
+        ],
+      describe
         "parallel"
         [ test "returns the right values" <| \() -> do
             let results = [1, 2, 3]
