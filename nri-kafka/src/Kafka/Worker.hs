@@ -24,6 +24,7 @@ module Kafka.Worker
     Internal.TopicSubscription,
     Internal.subscription,
     Internal.subscriptionManageOwnOffsets,
+    Internal.receiveRawMessages,
     Internal.PartitionOffset (..),
     Partition.SeekCmd (..),
     Internal.CommitToKafkaAsWell (..),
