@@ -48,6 +48,20 @@ tests =
             Expect.equal "a" failure
         ],
       describe
+        "map3"
+        [ test "only runs until the first task fails" <| \() -> do
+            doAnything <- Expect.fromIO Platform.doAnythingHandler
+            let shouldNeverRun = \x -> Platform.doAnything doAnything (Exception.throwString x)
+            failure <-
+              Task.map3
+                (\a b c -> (a, b, c))
+                (Task.succeed 1)
+                (Task.fail "c")
+                (shouldNeverRun "d")
+                |> Expect.fails
+            Expect.equal "c" failure
+        ],
+      describe
         "parallel"
         [ test "returns the right values" <| \() -> do
             let results = [1, 2, 3]
