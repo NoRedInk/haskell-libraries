@@ -11,6 +11,7 @@ import Test (Test, describe, test)
 import Test.Internal (Failure)
 import qualified Tuple
 import Prelude ((*>))
+import qualified Prelude
 
 tests :: Test
 tests =
@@ -25,7 +26,13 @@ tests =
               [Task.succeed 1, Task.fail "a", shouldNeverRun "b"]
                 |> Task.sequence
                 |> Expect.fails
-            Expect.equal failure "a"
+            Expect.equal "a" failure
+            -- Prelude.sequence also runs things in sequence.
+            failure2 <-
+              [Task.succeed 1, Task.fail "a", shouldNeverRun "b"]
+                |> Prelude.sequence
+                |> Expect.fails
+            Expect.equal "a" failure2
         ],
       describe
         "parallel"
