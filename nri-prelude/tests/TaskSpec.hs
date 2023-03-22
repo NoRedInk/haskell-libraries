@@ -35,6 +35,19 @@ tests =
             Expect.equal "a" failure2
         ],
       describe
+        "map2"
+        [ test "only runs first task if that fails" <| \() -> do
+            doAnything <- Expect.fromIO Platform.doAnythingHandler
+            let shouldNeverRun = \x -> Platform.doAnything doAnything (Exception.throwString x)
+            failure <-
+              Task.map2
+                Tuple.pair
+                (Task.fail "a")
+                (shouldNeverRun "b")
+                |> Expect.fails
+            Expect.equal "a" failure
+        ],
+      describe
         "parallel"
         [ test "returns the right values" <| \() -> do
             let results = [1, 2, 3]
