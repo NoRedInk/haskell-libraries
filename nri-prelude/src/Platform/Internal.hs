@@ -68,18 +68,19 @@ instance Applicative (Task a) where
 
   (<*>) func task =
     Task <| \key ->
-      let onResult resultFunc resultTask =
-            case (resultFunc, resultTask) of
-              (Ok func_, Ok task_) ->
-                Ok (func_ task_)
-              (Err x, _) ->
-                Err x
-              (_, Err x) ->
-                Err x
-       in do
-            func_ <- _run func key
-            task_ <- _run task key
-            pure (onResult func_ task_)
+      do
+        func_ <- _run func key
+        case func_ of
+          Err x ->
+            Prelude.pure (Err x)
+          Ok okFunc ->
+            do
+              task_ <- _run task key
+              case task_ of
+                Err x ->
+                  Prelude.pure (Err x)
+                Ok okTask ->
+                  Prelude.pure (Ok (okFunc okTask))
 
 instance Monad (Task a) where
   task >>= func =

@@ -42,7 +42,6 @@ import Basics
 import qualified Control.Concurrent.Async as Async
 import qualified Internal.Shortcut as Shortcut
 import List (List)
-import qualified List
 import Maybe (Maybe (..))
 import Platform.Internal (Task)
 import qualified Platform.Internal as Internal
@@ -184,8 +183,7 @@ andThen =
 --
 -- > sequence [ succeed 1, succeed 2 ] == succeed [ 1, 2 ]
 sequence :: List (Task x a) -> Task x (List a)
-sequence tasks =
-  List.foldr (Shortcut.map2 (:)) (succeed []) tasks
+sequence = Prelude.sequence
 
 -- | Start with a list of tasks, and turn them into a single task that returns a
 -- list. The tasks will be run in parallel and if any task fails the whole
