@@ -258,7 +258,7 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
           ( mapping
               |> List.map
                 ( \(conName, pgValue) ->
-                    TH.Match (TH.ConP conName []) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) []
+                    TH.Match (TH.ConP conName [] []) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) []
                 )
           )
 
