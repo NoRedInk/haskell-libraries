@@ -85,7 +85,7 @@ api =
             |> Internal.run
               ( Internal.Some
                   [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 6)),
-                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 11))
+                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 8))
                   ]
               )
             |> Expect.succeeds
