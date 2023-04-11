@@ -10,7 +10,9 @@ import qualified Control.Exception as Exception
 import qualified Data.ByteString as BS
 import qualified GHC.Stack as Stack
 import qualified List
+import qualified Maybe
 import NriPrelude
+import qualified Platform.Internal
 import qualified System.IO
 import qualified Test.Internal as Internal
 import Test.Reporter.Internal (black, green, grey, red, yellow)
@@ -34,11 +36,24 @@ renderReport results =
   case results of
     Internal.AllPassed passed ->
       let amountPassed = List.length passed
+          startTime =
+            passed
+              |> List.map (Internal.body >> Platform.Internal.started)
+              |> List.minimum
+              |> Maybe.withDefault 0
+          finishTime =
+            passed
+              |> List.map (Internal.body >> Platform.Internal.finished)
+              |> List.maximum
+              |> Maybe.withDefault 0
+          elapsedMilliseconds =
+            finishTime - startTime |> Prelude.fromIntegral |> (\t -> Prelude.div t 1000)
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
-              "\n"
+              "\n",
+              black <| chunk <| "TIME ELAPSED: " ++ Text.fromInt elapsedMilliseconds
             ]
     Internal.OnlysPassed passed skipped ->
       let amountPassed = List.length passed
