@@ -47,7 +47,7 @@ renderReport results =
               |> List.maximum
               |> Maybe.withDefault 0
           elapsedMilliseconds =
-            finishTime - startTime |> Prelude.fromIntegral |> (\t -> Prelude.div t 1000)
+            finishTime - startTime |> Prelude.fromIntegral |> (`Prelude.div` 1000)
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
