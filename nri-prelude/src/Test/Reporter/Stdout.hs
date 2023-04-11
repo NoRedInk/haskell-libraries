@@ -36,22 +36,11 @@ renderReport results =
   case results of
     Internal.AllPassed passed ->
       let amountPassed = List.length passed
-          startTime =
-            passed
-              |> List.map (Internal.body >> Platform.Internal.started)
-              |> List.minimum
-              |> Maybe.withDefault 0
-          finishTime =
-            passed
-              |> List.map (Internal.body >> Platform.Internal.finished)
-              |> List.maximum
-              |> Maybe.withDefault 0
-          elapsedMilliseconds =
-            finishTime - startTime |> Prelude.fromIntegral |> (`Prelude.div` 1000)
+          elapsed = elapsedMilliseconds (List.map Internal.body passed)
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
-              black <| chunk <| "Duration: " ++ Text.fromInt elapsedMilliseconds ++ " ms",
+              black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
               "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
@@ -109,6 +98,7 @@ renderReport results =
       let amountPassed = List.length passed
       let amountFailed = List.length failed
       let amountSkipped = List.length skipped
+      let elapsed = elapsedMilliseconds (List.map Internal.body passed ++ List.map (Internal.body >> Tuple.first) failed)
       let failures = List.map (map Tuple.second) failed
       srcLocs <- Prelude.traverse Test.Reporter.Internal.readSrcLoc failures
       let failuresSrcs = List.map renderFailureInFile srcLocs
@@ -125,6 +115,8 @@ renderReport results =
                 failures,
             [ red (Text.Colour.underline "TEST RUN FAILED"),
               "\n\n",
+              black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
+              "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
             ],
@@ -191,3 +183,17 @@ testFailure test =
           ++ "This is a bug.\n\n"
           ++ "If you have some time to report the bug it would be much appreciated!\n"
           ++ "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
+
+elapsedMilliseconds :: List Platform.Internal.TracingSpan -> Int
+elapsedMilliseconds spans =
+  let startTime =
+        spans
+          |> List.map Platform.Internal.started
+          |> List.minimum
+          |> Maybe.withDefault 0
+      finishTime =
+        spans
+          |> List.map Platform.Internal.finished
+          |> List.maximum
+          |> Maybe.withDefault 0
+   in finishTime - startTime |> Prelude.fromIntegral |> (`Prelude.div` 1000)

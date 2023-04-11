@@ -224,9 +224,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Text.lines
-          |> List.filter (\line -> line |> Text.contains "Duration: " |> not)
-          |> Text.join "\n"
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-all-passed",
       test "onlys passed" <| \_ -> do
         contents <-
@@ -286,6 +284,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed",
       test "tests failed (actually running)" <| \_ -> do
         let suite =
@@ -326,6 +325,7 @@ stdoutReporter =
                 Test.Reporter.Stdout.report handle result
             )
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc"
     ]
 
@@ -467,3 +467,10 @@ mockException :: Exception.SomeException
 mockException =
   Exception.StringException "exception" (GHC.Exts.fromList [])
     |> Exception.toException
+
+withoutDurationLine :: Text -> Text
+withoutDurationLine text =
+  text
+    |> Text.lines
+    |> List.filter (\line -> line |> Text.contains "Duration: " |> not)
+    |> Text.join "\n"
