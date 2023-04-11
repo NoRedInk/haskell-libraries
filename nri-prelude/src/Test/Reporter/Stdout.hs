@@ -48,6 +48,7 @@ renderReport results =
     Internal.OnlysPassed passed skipped ->
       let amountPassed = List.length passed
           amountSkipped = List.length skipped
+          elapsed = elapsedMilliseconds (List.map Internal.body passed)
        in Prelude.pure
             <| List.concat
               [ List.concatMap
@@ -62,6 +63,8 @@ renderReport results =
                 [ yellow (Text.Colour.underline ("TEST RUN INCOMPLETE")),
                   yellow " because there is an `only` in your tests.",
                   "\n\n",
+                  black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
+                  "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
                   black (chunk <| "Skipped:   " ++ Text.fromInt amountSkipped),
@@ -71,6 +74,7 @@ renderReport results =
     Internal.PassedWithSkipped passed skipped ->
       let amountPassed = List.length passed
           amountSkipped = List.length skipped
+          elapsed = elapsedMilliseconds (List.map Internal.body passed)
        in Prelude.pure
             <| List.concat
               [ List.concatMap
@@ -88,6 +92,8 @@ renderReport results =
                         n -> " because " ++ Text.fromInt n ++ " tests were skipped"
                     ),
                   "\n\n",
+                  black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
+                  "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
                   black (chunk <| "Skipped:   " ++ Text.fromInt amountSkipped),

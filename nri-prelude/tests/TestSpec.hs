@@ -240,6 +240,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-onlys-passed",
       test "passed with skipped" <| \_ -> do
         contents <-
@@ -255,6 +256,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-passed-with-skipped",
       test "no tests in suite" <| \_ -> do
         contents <-
@@ -264,6 +266,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-no-tests-in-suite",
       test "tests failed" <| \_ -> do
         contents <-
@@ -472,5 +475,5 @@ withoutDurationLine :: Text -> Text
 withoutDurationLine text =
   text
     |> Text.lines
-    |> List.filter (\line -> line |> Text.contains "Duration: " |> not)
+    |> List.filter (\line -> line |> Text.startsWith "Duration: " |> not)
     |> Text.join "\n"
