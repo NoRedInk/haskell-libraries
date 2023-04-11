@@ -13,6 +13,7 @@ import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
 import qualified Platform.Internal
+import qualified List
 import qualified System.IO
 import qualified Task
 import Test (Test, describe, fuzz, fuzz2, fuzz3, only, skip, test, todo)
@@ -223,6 +224,9 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
+          |> Text.lines
+          |> List.filter (\line -> line |> Text.contains "Duration: " |> not)
+          |> Text.join "\n"
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-all-passed",
       test "onlys passed" <| \_ -> do
         contents <-

@@ -51,9 +51,10 @@ renderReport results =
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
-              black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
+              black <| chunk <| "Duration: " ++ Text.fromInt elapsedMilliseconds ++ " ms",
               "\n",
-              black <| chunk <| "TIME ELAPSED: " ++ Text.fromInt elapsedMilliseconds
+              black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
+              "\n"
             ]
     Internal.OnlysPassed passed skipped ->
       let amountPassed = List.length passed
