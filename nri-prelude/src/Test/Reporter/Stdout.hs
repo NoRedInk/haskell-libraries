@@ -35,8 +35,7 @@ renderReport results =
   case results of
     Internal.AllPassed passed ->
       let amountPassed = List.length passed
-          spans = List.map Internal.body passed
-          elapsed = elapsedMilliseconds spans
+          elapsed = elapsedMilliseconds passed []
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
@@ -48,7 +47,7 @@ renderReport results =
     Internal.OnlysPassed passed skipped ->
       let amountPassed = List.length passed
           amountSkipped = List.length skipped
-          elapsed = elapsedMilliseconds (List.map Internal.body passed)
+          elapsed = elapsedMilliseconds passed []
        in Prelude.pure
             <| List.concat
               [ List.concatMap
@@ -74,8 +73,7 @@ renderReport results =
     Internal.PassedWithSkipped passed skipped ->
       let amountPassed = List.length passed
           amountSkipped = List.length skipped
-          spans = List.map Internal.body passed
-          elapsed = elapsedMilliseconds spans
+          elapsed = elapsedMilliseconds passed []
        in Prelude.pure
             <| List.concat
               [ List.concatMap
@@ -106,9 +104,7 @@ renderReport results =
       let amountFailed = List.length failed
       let amountSkipped = List.length skipped
       let failures = List.map (map (\(Internal.FailedSpan _ failure) -> failure)) failed
-      let passedSpans = List.map Internal.body passed
-      let failedSpans = failed |> List.map Internal.body |> List.map (\(Internal.FailedSpan span _) -> span)
-      let elapsed = elapsedMilliseconds (passedSpans ++ failedSpans)
+      let elapsed = elapsedMilliseconds passed failed
       srcLocs <- Prelude.traverse Test.Reporter.Internal.readSrcLoc failures
       let failuresSrcs = List.map renderFailureInFile srcLocs
       Prelude.pure
@@ -191,9 +187,12 @@ testFailure test =
           ++ "If you have some time to report the bug it would be much appreciated!\n"
           ++ "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
 
-elapsedMilliseconds :: List Platform.Internal.TracingSpan -> Int
-elapsedMilliseconds spans =
-  let startTime =
+elapsedMilliseconds :: List (Internal.SingleTest Platform.Internal.TracingSpan) -> List (Internal.SingleTest Internal.FailedSpan) -> Int
+elapsedMilliseconds passed failed =
+  let passedSpans = List.map Internal.body passed
+      failedSpans = failed |> List.map Internal.body |> List.map (\(Internal.FailedSpan span _) -> span)
+      spans = passedSpans ++ failedSpans
+      startTime =
         spans
           |> List.map Platform.Internal.started
           |> List.minimum
