@@ -42,7 +42,6 @@ import Basics
 import qualified Control.Concurrent.Async as Async
 import qualified Internal.Shortcut as Shortcut
 import List (List)
-import qualified List
 import Maybe (Maybe (..))
 import Platform.Internal (Task)
 import qualified Platform.Internal as Internal
@@ -184,8 +183,7 @@ andThen =
 --
 -- > sequence [ succeed 1, succeed 2 ] == succeed [ 1, 2 ]
 sequence :: List (Task x a) -> Task x (List a)
-sequence tasks =
-  List.foldr (Shortcut.map2 (:)) (succeed []) tasks
+sequence = Prelude.sequence
 
 -- | Start with a list of tasks, and turn them into a single task that returns a
 -- list. The tasks will be run in parallel and if any task fails the whole
@@ -213,18 +211,12 @@ concurrently taskA taskB =
         Prelude.pure <| Shortcut.map2 (,) resultA resultB
     )
 
--- | Given a task and a callback, execute the task in a greenthread
--- and sends its result to callback.
--- Always returns @OK ()@
-background :: forall x a . Task x a -> (Result x a -> Task x a) -> Task x ()
-background task callback =
+-- | Given a task, execute the task in a greenthread.
+background :: Task Never a -> Task x ()
+background task =
   Internal.Task
     ( \handler -> do
-        let runBackgroundTask :: Task x a -> IO (Result x a)
-            runBackgroundTask greenTask = do
-              result <- Internal._run greenTask handler
-              Internal._run (callback result) handler
-        _ <- Async.async (runBackgroundTask task)
+        _ <- Async.async (Internal._run task handler)
         Prelude.pure <| Ok ()
     )
 

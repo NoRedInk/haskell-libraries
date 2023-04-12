@@ -10,6 +10,7 @@ import Control.Applicative ((<|>))
 import qualified Control.AutoUpdate as AutoUpdate
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Exception.Safe as Exception
+import qualified Control.Monad
 import Data.Aeson ((.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encoding as Aeson.Encoding
@@ -66,20 +67,7 @@ instance Applicative (Task a) where
   pure a =
     Task (\_ -> Prelude.pure (Ok a))
 
-  (<*>) func task =
-    Task <| \key ->
-      let onResult resultFunc resultTask =
-            case (resultFunc, resultTask) of
-              (Ok func_, Ok task_) ->
-                Ok (func_ task_)
-              (Err x, _) ->
-                Err x
-              (_, Err x) ->
-                Err x
-       in do
-            func_ <- _run func key
-            task_ <- _run task key
-            pure (onResult func_ task_)
+  (<*>) func task = Control.Monad.ap func task
 
 instance Monad (Task a) where
   task >>= func =

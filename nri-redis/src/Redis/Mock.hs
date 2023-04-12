@@ -27,18 +27,18 @@ import qualified Prelude
 
 -- | This functions returns a task that you can run in each test to retrieve a
 -- fresh mock handler
-handler :: Expect.Expectation' Internal.Handler
+handler :: Expect.Expectation' (Internal.Handler' x)
 handler =
   handlerIO
     |> Expect.fromIO
 
 -- | It's better to use handler and create a new mock handler for each test.
 -- Tests run in parallel which means that they all share the same hashmap.
-handlerIO :: IO Internal.Handler
+handlerIO :: IO (Internal.Handler' x)
 handlerIO = do
   modelRef <- init
   doAnything <- Platform.doAnythingHandler
-  Internal.Handler
+  Internal.Handler'
     { Internal.doQuery = doQuery' modelRef doAnything,
       Internal.doTransaction = doQuery' modelRef doAnything,
       Internal.namespace = "tests",

@@ -57,6 +57,7 @@ ghc-options:
 library:
   exposed-modules:
   - Postgres
+  - Postgres.Enum
   - Postgres.Test
   source-dirs: src
 tests:
@@ -71,3 +72,5 @@ tests:
       - -fno-warn-type-defaults
     default-extensions:
       - ExtendedDefaultRules
+    dependencies:
+      - th-test-utils

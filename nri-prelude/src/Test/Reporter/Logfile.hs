@@ -62,11 +62,13 @@ spansAndNamespaces results =
     Internal.PassedWithSkipped tests _ -> List.map bodyAndDescribes tests
     Internal.TestsFailed passed _ failed ->
       List.map bodyAndDescribes passed
-        ++ List.map (Tuple.mapSecond Tuple.first << bodyAndDescribes) failed
+        ++ List.map (bodyAndDescribes >> failedSpan) failed
     Internal.NoTestsInSuite -> []
   where
     bodyAndDescribes :: Internal.SingleTest body -> ([Text], body)
     bodyAndDescribes test = (Internal.describes test, Internal.body test)
+    failedSpan :: ([Text], Internal.FailedSpan) -> ([Text], Platform.TracingSpan)
+    failedSpan (text, (Internal.FailedSpan span _)) = (text, span)
 
 groupIntoNamespaces :: [([Text], Platform.TracingSpan)] -> [Platform.TracingSpan]
 groupIntoNamespaces namespacedSpans =

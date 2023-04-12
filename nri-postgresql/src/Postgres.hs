@@ -89,7 +89,7 @@ inTestTransaction conn func =
       --
       end :: Platform.Succeeded -> PGConnection -> Task x ()
       end _ c =
-        rollbackAllSafe conn c
+        doIO conn <| pgRollbackAll c
       --
       setSingle :: PGConnection -> Connection
       setSingle c =
@@ -171,6 +171,10 @@ fromPGError c pgError =
         |> Query.UniqueViolation
     "57014" ->
       Query.Timeout (Time.milliseconds (Connection.timeout c))
+    "23503" ->
+      Exception.displayException pgError
+        |> Text.fromList
+        |> Query.ForeignKeyConstraintViolation
     _ ->
       Exception.displayException pgError
         |> Text.fromList

@@ -1,7 +1,9 @@
 module Kafka.Settings.Internal
   ( Kafka.Types.KafkaLogLevel (..),
+    Kafka.Types.KafkaCompressionCodec (..),
     decoderBrokerAddresses,
     decoderKafkaLogLevel,
+    decoderCompressionCodec,
   )
 where
 
@@ -26,17 +28,30 @@ decoderKafkaLogLevel =
         Environment.description = "Kafka log level",
         Environment.defaultValue = "Debug"
       }
-    (map kafkaLogLevelFromText Environment.text)
+    ( Environment.enum
+        [ ("Emerg", Kafka.Types.KafkaLogEmerg),
+          ("Alert", Kafka.Types.KafkaLogAlert),
+          ("Crit", Kafka.Types.KafkaLogCrit),
+          ("Err", Kafka.Types.KafkaLogErr),
+          ("Warning", Kafka.Types.KafkaLogWarning),
+          ("Notice", Kafka.Types.KafkaLogNotice),
+          ("Info", Kafka.Types.KafkaLogInfo),
+          ("Debug", Kafka.Types.KafkaLogDebug)
+        ]
+    )
 
-kafkaLogLevelFromText :: Text -> Kafka.Types.KafkaLogLevel
-kafkaLogLevelFromText text =
-  case text of
-    "Emerg" -> Kafka.Types.KafkaLogEmerg
-    "Alert" -> Kafka.Types.KafkaLogAlert
-    "Crit" -> Kafka.Types.KafkaLogCrit
-    "Err" -> Kafka.Types.KafkaLogErr
-    "Warning" -> Kafka.Types.KafkaLogWarning
-    "Notice" -> Kafka.Types.KafkaLogNotice
-    "Info" -> Kafka.Types.KafkaLogInfo
-    "Debug" -> Kafka.Types.KafkaLogDebug
-    _ -> Kafka.Types.KafkaLogDebug
+decoderCompressionCodec :: Environment.Decoder Kafka.Types.KafkaCompressionCodec
+decoderCompressionCodec =
+  Environment.variable
+    Environment.Variable
+      { Environment.name = "KAFKA_COMPRESSION_CODEC",
+        Environment.description = "Compression codec used for topics. Supported values are: NoCopmression, Gzip, Snappy and Lz4",
+        Environment.defaultValue = "Snappy"
+      }
+    ( Environment.enum
+        [ ("NoCompression", Kafka.Types.NoCompression),
+          ("Gzip", Kafka.Types.Gzip),
+          ("Snappy", Kafka.Types.Snappy),
+          ("Lz4", Kafka.Types.Lz4)
+        ]
+    )

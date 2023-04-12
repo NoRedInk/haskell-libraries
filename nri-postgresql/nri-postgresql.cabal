@@ -30,6 +30,7 @@ source-repository head
 library
   exposed-modules:
       Postgres
+      Postgres.Enum
       Postgres.Test
   other-modules:
       Postgres.Connection
@@ -37,6 +38,7 @@ library
       Postgres.Query
       Postgres.QueryParser
       Postgres.Settings
+      Postgres.TH
       Postgres.Time
       Paths_nri_postgresql
   hs-source-dirs:
@@ -80,12 +82,16 @@ test-suite tests
   other-modules:
       Postgres
       Postgres.Connection
+      Postgres.Enum
       Postgres.Error
       Postgres.Query
       Postgres.QueryParser
       Postgres.Settings
       Postgres.Test
+      Postgres.TH
       Postgres.Time
+      ConflictTest
+      Enum
       ObservabilitySpec
       PostgresSettingsSpec
       QueryParserSpec
@@ -125,5 +131,6 @@ test-suite tests
     , safe-exceptions >=0.1.7.0 && <1.3
     , template-haskell >=2.15.0.0 && <2.19
     , text >=1.2.3.1 && <2.1
+    , th-test-utils
     , time >=1.8.0.2 && <2
   default-language: Haskell2010

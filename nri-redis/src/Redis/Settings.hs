@@ -46,6 +46,7 @@ data Settings = Settings
 data MaxKeySize = NoMaxKeySize | MaxKeySize Int
 
 data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
+  deriving (Show)
 
 data QueryTimeout = NoQueryTimeout | TimeoutQueryAfterMilliseconds Int
 

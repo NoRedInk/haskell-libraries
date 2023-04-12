@@ -8,6 +8,9 @@ nri-env-parser/nri-env-parser.cabal: nri-env-parser/package.yaml
 ghcid-nri-env-parser: nri-env-parser/nri-env-parser.cabal
 	cd nri-env-parser && ghcid
 
+ghcid-nri-env-parser-test: nri-env-parser/nri-env-parser.cabal
+	cd nri-env-parser && ghcid --command "cabal repl nri-env-parser:test:tests" --test Main.main
+
 nri-http/nri-http.cabal: nri-http/package.yaml
 	hpack nri-http
 
@@ -52,6 +55,12 @@ nri-postgresql/nri-postgresql.cabal: nri-postgresql/package.yaml
 
 ghcid-nri-postgresql: nri-postgresql/nri-postgresql.cabal
 	cd nri-postgresql && ghcid
+
+setup-postgresql:
+	cd nri-postgresql && ./setup-postgres.sh
+
+ghcid-nri-postgresql-test: setup-postgresql nri-postgresql/nri-postgresql.cabal
+	cd nri-postgresql && ghcid --command "PGDATABASE=testdb PGPORT=5432 PGHOST=localhost cabal repl nri-postgresql:test:tests" --test Main.main
 
 nri-redis/nri-redis.cabal: nri-redis/package.yaml
 	hpack nri-redis

@@ -114,7 +114,7 @@ tests =
       test "Http.Mock.stub" <| \_ -> do
         urlsAccessed <-
           Http.Mock.stub
-            [Http.Mock.mkStub (\req -> Task.succeed (Http.url req, "Response!" :: Text))]
+            [Http.Mock.mkStub (\req -> Task.succeed (Http.url req, "Response!") :: Task Http.Error (Text, Text))]
             ( \http ->
                 Expect.succeeds <| do
                   _ <- Http.get http "example.com/one" Http.expectText
@@ -122,8 +122,50 @@ tests =
                   Task.succeed ()
             )
         urlsAccessed
-          |> Expect.equal ["example.com/one", "example.com/two"]
+          |> Expect.equal ["example.com/one", "example.com/two"],
+      test "Using expectTextResponse, metadata returns the correct status" <| \() ->
+        withServer
+          (constant "Some text" Status.ok200)
+          ( \http url -> do
+              res <-
+                Http.get http url (Http.expectTextResponse Ok)
+                  |> Expect.succeeds
+              case res of
+                Http.GoodStatus_ metadata body -> do
+                  Expect.equal 200 (Http.metadataStatusCode metadata)
+                  Expect.equal "OK" (Http.metadataStatusText metadata)
+                  Expect.equal "Some text" body
+                other ->
+                  Expect.fail <| "Unexpected response: " ++ (Text.fromList <| Prelude.show other)
+          ),
+      test "Using expectBytesResponse, we can read the body when the request is not successful" <| \() ->
+        withServer
+          (constant "This is a bad request" Status.badRequest400)
+          ( \http url -> do
+              res <-
+                Http.get http url (Http.expectBytesResponse Ok)
+                  |> Expect.succeeds
+              case res of
+                Http.BadStatus_ metadata body -> do
+                  Expect.equal 400 (Http.metadataStatusCode metadata)
+                  Expect.equal "Bad Request" (Http.metadataStatusText metadata)
+                  Expect.equal "This is a bad request" body
+                other ->
+                  Expect.fail <| "Unexpected response: " ++ (Text.fromList <| Prelude.show other)
+          ),
+      test "We can use a custom error type" <| \() ->
+        withServer
+          (constant "This is a bad request" Status.badRequest400)
+          ( \http url -> do
+              res <-
+                Http.get http url (Http.expectTextResponse (\_ -> Err CustomResponseError)) |> Expect.fails
+              case res of
+                CustomResponseError ->
+                  Expect.pass
+          )
     ]
+
+data CustomResponseError = CustomResponseError
 
 -- # Wai applications to test against
 -- WAI NOT?

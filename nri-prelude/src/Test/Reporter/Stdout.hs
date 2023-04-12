@@ -21,7 +21,6 @@ import qualified Text
 import Text.Colour (chunk)
 import qualified Text.Colour
 import qualified Text.Colour.Capabilities.FromEnv
-import qualified Tuple
 import qualified Prelude
 
 report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
@@ -36,7 +35,8 @@ renderReport results =
   case results of
     Internal.AllPassed passed ->
       let amountPassed = List.length passed
-          elapsed = elapsedMilliseconds (List.map Internal.body passed)
+          spans = List.map Internal.body passed
+          elapsed = elapsedMilliseconds spans
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
@@ -74,7 +74,8 @@ renderReport results =
     Internal.PassedWithSkipped passed skipped ->
       let amountPassed = List.length passed
           amountSkipped = List.length skipped
-          elapsed = elapsedMilliseconds (List.map Internal.body passed)
+          spans = List.map Internal.body passed
+          elapsed = elapsedMilliseconds spans
        in Prelude.pure
             <| List.concat
               [ List.concatMap
@@ -104,8 +105,10 @@ renderReport results =
       let amountPassed = List.length passed
       let amountFailed = List.length failed
       let amountSkipped = List.length skipped
-      let elapsed = elapsedMilliseconds (List.map Internal.body passed ++ List.map (Internal.body >> Tuple.first) failed)
-      let failures = List.map (map Tuple.second) failed
+      let failures = List.map (map (\(Internal.FailedSpan _ failure) -> failure)) failed
+      let passedSpans = List.map Internal.body passed
+      let failedSpans = failed |> List.map Internal.body |> List.map (\(Internal.FailedSpan span _) -> span)
+      let elapsed = elapsedMilliseconds (passedSpans ++ failedSpans)
       srcLocs <- Prelude.traverse Test.Reporter.Internal.readSrcLoc failures
       let failuresSrcs = List.map renderFailureInFile srcLocs
       Prelude.pure
@@ -149,11 +152,9 @@ renderFailureInFile maybeSrcLoc =
 
 prettyPath :: (Text.Colour.Chunk -> Text.Colour.Chunk) -> Internal.SingleTest a -> List Text.Colour.Chunk
 prettyPath style test =
-  List.concat
-    [ case Internal.loc test of
-        Nothing -> []
-        Just loc ->
-          [ grey
+  let loc = Internal.loc test
+   in List.concat
+        [ [ grey
               <| chunk
                 ( "↓ "
                     ++ Text.fromList (Stack.srcLocFile loc)
@@ -162,16 +163,16 @@ prettyPath style test =
                     ++ "\n"
                 )
           ],
-      [ grey
-          ( chunk
-              <| Prelude.foldMap
-                (\text -> "↓ " ++ text ++ "\n")
-                (Internal.describes test)
-          ),
-        style (chunk ("✗ " ++ Internal.name test)),
-        "\n"
-      ]
-    ]
+          [ grey
+              ( chunk
+                  <| Prelude.foldMap
+                    (\text -> "↓ " ++ text ++ "\n")
+                    (Internal.describes test)
+              ),
+            style (chunk ("✗ " ++ Internal.name test)),
+            "\n"
+          ]
+        ]
 
 testFailure :: Internal.SingleTest Internal.Failure -> Text.Colour.Chunk
 testFailure test =

@@ -1,0 +1,17 @@
+↓ tests/TestSpec.hs:373
+↓ suite loc
+✗ test fail
+
+Expectation failed at tests/TestSpec.hs:373
+  371:               describe
+  372:                 "suite loc"
+✗ 373:                 [ test "test fail" (\_ -> Expect.fail "fail"),
+  374:                   test "test equal" (\_ -> Expect.equal True True),
+  375:                   test "test notEqual" (\_ -> Expect.notEqual True False)
+
+fail
+
+[4mTEST RUN FAILED[m
+
+Passed:    1
+Failed:    1

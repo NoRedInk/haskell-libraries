@@ -1,9 +1,13 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Redis.Internal
   ( Error (..),
-    Handler (..),
+    Handler,
+    Handler' (..),
+    HandlerAutoExtendExpire,
+    HasAutoExtendExpire (..),
     Query (..),
     cmds,
     map,
@@ -182,19 +186,37 @@ sequence :: List (Query a) -> Query (List a)
 sequence =
   List.foldr (map2 (:)) (Pure [])
 
+-- | We use this to parametrize the handler. It specifies if the handler has
+-- the auto extend expire feater enabled or not.
+data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
+
 -- | The redis handler allows applications to run scoped IO
-data Handler = Handler
+-- A handler that can only be parametrized by a value of this kind.
+-- Meaning that we use the values of the type parameter at a type level.
+data Handler' (x :: HasAutoExtendExpire) = Handler'
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     namespace :: Text,
     maxKeySize :: Settings.MaxKeySize
   }
 
+-- | This is a type alias of a handler parametrized by a value that indicates
+-- that the auto extend feature is disabled.
+-- Note: The tick in front of NoAutoExtendExpire is not necessary, but good
+-- practice to indicate that we are lifting a value to the type level.
+type Handler = Handler' 'NoAutoExtendExpire
+
+-- | This is a type alias of a handler parametrized by a value that indicates
+-- that the auto extend feature is enabled.
+-- Note: The tick in front of AutoExtendExpire is not necessary, but good
+-- practice to indicate that we are lifting a value to the type level.
+type HandlerAutoExtendExpire = Handler' 'AutoExtendExpire
+
 -- | Run a 'Query'.
 -- Note: A 'Query' in this library can consist of one or more queries in sequence.
 -- if a 'Query' contains multiple queries, it may make more sense, if possible
 -- to run them using 'transaction'
-query :: Stack.HasCallStack => Handler -> Query a -> Task Error a
+query :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -206,7 +228,7 @@ query handler query' =
 --
 -- In redis terms, this is wrappping the 'Query' in `MULTI` and `EXEC
 -- see redis transaction semantics here: https://redis.io/topics/transactions
-transaction :: Stack.HasCallStack => Handler -> Query a -> Task Error a
+transaction :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -249,7 +271,7 @@ mapKeys fn query' =
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
 
-ensureMaxKeySize :: Handler -> Query a -> Task Error (Query a)
+ensureMaxKeySize :: Handler' x -> Query a -> Task Error (Query a)
 ensureMaxKeySize handler query' =
   case maxKeySize handler of
     Settings.NoMaxKeySize -> Task.succeed query'

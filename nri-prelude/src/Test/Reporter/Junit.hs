@@ -23,7 +23,6 @@ import qualified Test.Reporter.Internal
 import qualified Text
 import qualified Text.Colour
 import qualified Text.XML.JUnit as JUnit
-import qualified Tuple
 import qualified Prelude
 
 report :: FilePath.FilePath -> Internal.SuiteResult -> Prelude.IO ()
@@ -50,7 +49,7 @@ testResults result =
         )
     Internal.TestsFailed passed skipped failed -> do
       srcLocs <-
-        List.map (map Tuple.second) failed
+        List.map (map (\(Internal.FailedSpan _ failure) -> failure)) failed
           |> Prelude.traverse Test.Reporter.Internal.readSrcLoc
       let renderedFailed = List.map2 renderFailed failed srcLocs
       Prelude.pure
@@ -72,12 +71,12 @@ renderSkipped test =
     |> JUnit.inSuite (suiteName test)
 
 renderFailed ::
-  Internal.SingleTest (Platform.TracingSpan, Internal.Failure) ->
+  Internal.SingleTest Internal.FailedSpan ->
   Maybe (Stack.SrcLoc, BS.ByteString) ->
   JUnit.TestSuite
 renderFailed test maybeSrcLoc =
   case Internal.body test of
-    (tracingSpan, Internal.FailedAssertion msg _) ->
+    Internal.FailedSpan tracingSpan (Internal.FailedAssertion msg _) ->
       let msg' = case maybeSrcLoc of
             Nothing -> msg
             Just (loc, src) ->
@@ -87,32 +86,23 @@ renderFailed test maybeSrcLoc =
                 |> (\srcStr -> srcStr ++ "\n" ++ msg)
        in JUnit.failed (Internal.name test)
             |> JUnit.stderr msg'
-            |> ( case stackFrame test of
-                   Nothing -> identity
-                   Just frame -> JUnit.failureStackTrace [frame]
-               )
+            |> JUnit.failureStackTrace [stackFrame test]
             |> JUnit.time (duration tracingSpan)
             |> JUnit.inSuite (suiteName test)
-    (tracingSpan, Internal.ThrewException err) ->
+    Internal.FailedSpan tracingSpan (Internal.ThrewException err) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test threw an exception."
         |> JUnit.stderr (Data.Text.pack (Exception.displayException err))
-        |> ( case stackFrame test of
-               Nothing -> identity
-               Just frame -> JUnit.errorStackTrace [frame]
-           )
+        |> JUnit.errorStackTrace [stackFrame test]
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
-    (tracingSpan, Internal.TookTooLong) ->
+    Internal.FailedSpan tracingSpan (Internal.TookTooLong) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage "This test timed out."
-        |> ( case stackFrame test of
-               Nothing -> identity
-               Just frame -> JUnit.errorStackTrace [frame]
-           )
+        |> JUnit.errorStackTrace [stackFrame test]
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
-    (tracingSpan, Internal.TestRunnerMessedUp msg) ->
+    Internal.FailedSpan tracingSpan (Internal.TestRunnerMessedUp msg) ->
       JUnit.errored (Internal.name test)
         |> JUnit.errorMessage
           ( Text.join
@@ -125,10 +115,7 @@ renderFailed test maybeSrcLoc =
                 "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
               ]
           )
-        |> ( case stackFrame test of
-               Nothing -> identity
-               Just frame -> JUnit.errorStackTrace [frame]
-           )
+        |> JUnit.errorStackTrace [stackFrame test]
         |> JUnit.time (duration tracingSpan)
         |> JUnit.inSuite (suiteName test)
 
@@ -137,17 +124,14 @@ suiteName test =
   Internal.describes test
     |> Text.join " - "
 
-stackFrame :: Internal.SingleTest a -> Maybe Text
+stackFrame :: Internal.SingleTest a -> Text
 stackFrame test =
-  Internal.loc test
-    |> map
-      ( \loc ->
-          Data.Text.pack
-            ( Stack.srcLocFile loc
-                ++ ":"
-                ++ Prelude.show (Stack.srcLocStartLine loc)
-            )
-      )
+  let loc = Internal.loc test
+   in Data.Text.pack
+        ( Stack.srcLocFile loc
+            ++ ":"
+            ++ Prelude.show (Stack.srcLocStartLine loc)
+        )
 
 duration :: Platform.TracingSpan -> Float
 duration test =

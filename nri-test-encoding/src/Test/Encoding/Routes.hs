@@ -19,6 +19,7 @@ import qualified Data.Typeable as Typeable
 import qualified Debug
 import qualified Examples
 import qualified Expect
+import qualified GHC.Stack as Stack
 import GHC.TypeLits (KnownSymbol, symbolVal)
 import qualified List
 import NriPrelude
@@ -28,6 +29,7 @@ import Servant.API
     Header',
     QueryFlag,
     QueryParam',
+    QueryParams,
     Raw,
     ReqBody',
     Summary,
@@ -47,8 +49,17 @@ import qualified Text
 --   describe
 --     "Spec.ApiEncoding"
 --     (TestEncoding.tests (Proxy :: Proxy Routes.Routes))
-tests :: forall routes. IsApi (ToServantApi routes) => Proxy routes -> List Test
-tests _ =
+tests :: forall routes. (IsApi (ToServantApi routes), Stack.HasCallStack) => Proxy routes -> List Test
+tests proxy =
+  -- We need to freeze the call stack before proceeding.
+  -- If we don't, the callstack for these generated tests would point to haskell-libraries code
+  -- and not client code.
+  -- This didn't matter that much until we had the ability to specify `--files tests/BlaSpec.hs`
+  -- If we don't fix this, we can't ever `--files tests/SomeApiSpec.hs`
+  Stack.withFrozenCallStack frozenTests proxy
+
+frozenTests :: forall routes. (IsApi (ToServantApi routes), Stack.HasCallStack) => Proxy routes -> List Test
+frozenTests _ =
   let routes = crawl (Proxy :: Proxy (ToServantApi routes))
    in [ test "route types haven't changed" <| \() ->
           routes
@@ -236,17 +247,39 @@ instance
   ) =>
   IsApi (QueryParam' x key value :> a)
   where
-  crawl _ = crawl (Proxy :: Proxy a)
-    |> List.map
-      ( \route ->
-          route
+  crawl _ =
+    crawl (Proxy :: Proxy a)
+      |> List.map
+        ( \route ->
+            route
               { queryParams =
                   ( Text.fromList (symbolVal (Proxy :: Proxy key)),
                     SomeType (Proxy :: Proxy value)
                   ) :
                   queryParams route
               }
-      )
+        )
+
+instance
+  ( KnownSymbol key,
+    Typeable.Typeable value,
+    Examples.HasExamples value,
+    IsApi a
+  ) =>
+  IsApi (QueryParams key value :> a)
+  where
+  crawl _ =
+    crawl (Proxy :: Proxy a)
+      |> List.map
+        ( \route ->
+            route
+              { queryParams =
+                  ( Text.fromList (symbolVal (Proxy :: Proxy key)) ++ "[]",
+                    SomeType (Proxy :: Proxy value)
+                  ) :
+                  queryParams route
+              }
+        )
 
 instance (Typeable.Typeable body, Examples.HasExamples body, IsApi a) => IsApi (ReqBody' x encodings body :> a) where
   crawl _ =

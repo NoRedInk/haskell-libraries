@@ -21,7 +21,9 @@ data Settings = Settings
     -- | Message delivery timeout. See hw-kafka's documentation for more info
     deliveryTimeout :: Kafka.Producer.Timeout,
     -- | Number of messages to batch together before sending to Kafka.
-    batchNumMessages :: BatchNumMessages
+    batchNumMessages :: BatchNumMessages,
+    -- | Compression codec used for topics
+    compressionCodec :: Internal.KafkaCompressionCodec
   }
 
 -- | Number of messages to batch together before sending to Kafka.
@@ -38,12 +40,13 @@ exampleBatchNumMessages = BatchNumMessages 1
 -- KAFKA_BATCH_SIZE=10000
 decoder :: Environment.Decoder Settings
 decoder =
-  map4
+  map5
     Settings
     Internal.decoderBrokerAddresses
     Internal.decoderKafkaLogLevel
     decoderDeliveryTimeout
     decoderBatchNumMessages
+    Internal.decoderCompressionCodec
 
 decoderDeliveryTimeout :: Environment.Decoder Kafka.Producer.Timeout
 decoderDeliveryTimeout =

@@ -14,6 +14,7 @@ import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.IO.Class
 import qualified Data.Either
 import qualified Data.IORef as IORef
+import Data.List (isSuffixOf)
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Hedgehog
@@ -27,28 +28,44 @@ import NriPrelude
 import Platform (TracingSpan)
 import qualified Platform
 import qualified Platform.Internal
+import qualified Set
+import System.FilePath (FilePath)
 import qualified Task
 import qualified Tuple
 import qualified Prelude
+
+data Request = All | Some [SubsetOfTests]
+  deriving (Eq, Show)
+
+data SubsetOfTests = SubsetOfTests {requestedPath :: FilePath, lineOfCode :: Maybe Int}
+  deriving (Eq, Show)
 
 data SingleTest a = SingleTest
   { describes :: [Text],
     name :: Text,
     label :: Label,
-    loc :: Maybe Stack.SrcLoc,
+    -- This is used for serializing execution of grouped tests (e.g. database tests)
+    group :: Group,
+    loc :: Stack.SrcLoc,
     body :: a
   }
-  deriving (Prelude.Functor)
+  deriving (Show, Prelude.Functor)
 
 data Label = None | Skip | Only | Todo
-  deriving (Eq, Ord)
+  deriving (Show, Eq, Ord)
+
+data Group = Grouped (Set.Set GroupKey) | Ungrouped
+  deriving (Show, Eq, Ord)
+
+newtype GroupKey = GroupKey {unGroupkey :: Text}
+  deriving (Show, Eq, Ord)
 
 data TestResult
   = Succeeded
   | Failed Failure
 
 data Failure
-  = FailedAssertion Text (Maybe Stack.SrcLoc)
+  = FailedAssertion Text Stack.SrcLoc
   | ThrewException Exception.SomeException
   | TookTooLong
   | TestRunnerMessedUp Text
@@ -60,10 +77,17 @@ data SuiteResult
   = AllPassed [SingleTest TracingSpan]
   | OnlysPassed [SingleTest TracingSpan] [SingleTest NotRan]
   | PassedWithSkipped [SingleTest TracingSpan] [SingleTest NotRan]
-  | TestsFailed [SingleTest TracingSpan] [SingleTest NotRan] [SingleTest (TracingSpan, Failure)]
+  | TestsFailed [SingleTest TracingSpan] [SingleTest NotRan] [SingleTest FailedSpan]
   | NoTestsInSuite
+  deriving (Show)
 
 data NotRan = NotRan
+  deriving (Show)
+
+data FailedSpan = FailedSpan TracingSpan Failure
+
+instance Show FailedSpan where
+  show (FailedSpan span failure) = Prelude.show failure ++ ": " ++ Prelude.show span
 
 -- | A test which has yet to be evaluated. When evaluated, it produces one
 -- or more 'Expect.Expectation's.
@@ -134,7 +158,8 @@ todo name =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = Todo,
           body = Expectation (Task.succeed ())
         }
@@ -155,11 +180,27 @@ test name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body = handleUnexpectedErrors (expectation ())
         }
     ]
+
+-- | Serializes the execution of 'Test' based on a certain grouping
+--
+-- > serialize "mysql" <| todo "some db stuff!"
+serialize :: Text -> Test -> Test
+serialize groupKey (Test tests) =
+  tests
+    |> List.map
+      ( \singleTest ->
+          let groupKeys = case group singleTest of
+                Ungrouped -> Set.empty
+                Grouped keys -> keys
+           in singleTest {group = Grouped (Set.insert (GroupKey groupKey) groupKeys)}
+      )
+    |> Test
 
 -- | Take a function that produces a test, and calls it several (usually 100)
 -- times, using a randomly-generated input from a 'Fuzzer' each time. This
@@ -176,7 +217,8 @@ fuzz fuzzer name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body = fuzzBody fuzzer expectation
         }
@@ -189,7 +231,8 @@ fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body =
             fuzzBody
@@ -205,7 +248,8 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
     [ SingleTest
         { describes = [],
           name = name,
-          loc = Stack.withFrozenCallStack getFrame,
+          loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
           label = None,
           body =
             fuzzBody
@@ -339,8 +383,8 @@ only :: Test -> Test
 only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
-run :: Test -> Task e SuiteResult
-run (Test all) = do
+run :: Request -> Test -> Task e SuiteResult
+run request (Test all) = do
   let grouped = groupBy label all
   let skipped = Dict.get Skip grouped |> Maybe.withDefault []
   let todos = Dict.get Todo grouped |> Maybe.withDefault []
@@ -357,14 +401,23 @@ run (Test all) = do
           |> List.partition (doRun << Tuple.first)
           |> Tuple.mapBoth (List.concatMap Tuple.second) (List.concatMap Tuple.second)
   let notToRun = List.map (\test' -> test' {body = NotRan}) notToRun'
-  results <- Task.parallel (List.map runSingle toRun)
+  results <-
+    ( case request of
+        All -> toRun
+        Some tests -> List.filter (subset tests) toRun
+      )
+      |> groupBy runStrategy
+      |> Dict.toList
+      |> List.map runGroup
+      |> Task.parallel
+      |> Task.map List.concat
   let (failed, passed) =
         results
           |> List.map
             ( \test' ->
                 case body test' of
                   (tracingSpan, Failed failure) ->
-                    Prelude.Left test' {body = (tracingSpan, failure)}
+                    Prelude.Left test' {body = FailedSpan tracingSpan failure}
                   (tracingSpan, Succeeded) ->
                     Prelude.Right test' {body = tracingSpan}
             )
@@ -383,6 +436,30 @@ run (Test all) = do
     Summary {noneSkipped = False} -> PassedWithSkipped passed notToRun
     Summary {} -> AllPassed passed
 
+data RunStrategy = Parallel | Sequence deriving (Eq, Ord)
+
+runStrategy :: SingleTest exp -> RunStrategy
+runStrategy singleTest =
+  case group singleTest of
+    Grouped _ -> Sequence
+    Ungrouped -> Parallel
+
+subset :: List SubsetOfTests -> SingleTest expectation -> Bool
+subset subsets singleTest =
+  case (subsets, loc singleTest) of
+    ([], _) -> False -- Should never happen, we should have a NonEmpty SubsetOfTests tbh
+    (SubsetOfTests {requestedPath, lineOfCode} : rest, Stack.SrcLoc {Stack.srcLocFile, Stack.srcLocStartLine, Stack.srcLocEndLine}) ->
+      -- isSuffixOf allows us to write --files=quiz-engine-http/spec/Smth/DerpSpec.hs
+      if srcLocFile `isSuffixOf` requestedPath
+        then case lineOfCode of
+          Nothing -> True
+          Just requestedLoc' ->
+            let requestedLoc = Prelude.fromIntegral requestedLoc'
+             in if srcLocStartLine <= requestedLoc && requestedLoc <= srcLocEndLine
+                  then True
+                  else subset rest singleTest
+        else subset rest singleTest
+
 data Summary = Summary
   { noTests :: Bool,
     allPassed :: Bool,
@@ -397,6 +474,14 @@ handleUnexpectedErrors (Expectation task') =
     |> Task.timeout 10_000 TookTooLong
     |> Task.onError Task.fail
     |> Expectation
+
+runGroup :: (RunStrategy, List (SingleTest Expectation)) -> Task e (List (SingleTest (TracingSpan, TestResult)))
+runGroup (groupped, tests) =
+  List.map runSingle tests
+    |> ( case groupped of
+           Sequence -> Task.sequence
+           Parallel -> Task.parallel
+       )
 
 runSingle :: SingleTest Expectation -> Task e (SingleTest (TracingSpan, TestResult))
 runSingle test' =
@@ -425,7 +510,7 @@ runSingle test' =
         let span =
               span'
                 { Platform.Internal.summary = Just (name test'),
-                  Platform.Internal.frame = map (\loc -> ("", loc)) (loc test'),
+                  Platform.Internal.frame = Just ("", loc test'),
                   Platform.Internal.succeeded = case testRest of
                     Succeeded -> Platform.Internal.Succeeded
                     Failed failure ->
@@ -450,12 +535,17 @@ onException f (Platform.Internal.Task run') =
           |> Exception.handleAny (Task.attempt log << f)
     )
 
-getFrame :: Stack.HasCallStack => Maybe Stack.SrcLoc
-getFrame =
-  Stack.callStack
-    |> Stack.getCallStack
-    |> List.head
-    |> map Tuple.second
+getFrame :: Stack.HasCallStack => Text -> Stack.SrcLoc
+getFrame testName =
+  case Stack.callStack |> Stack.getCallStack |> List.head of
+    Just (_, srcLoc) ->
+      srcLoc
+    Nothing ->
+      ( "Oops! We can't find the source location for this test: " ++ testName ++ "\n"
+          ++ "This indicates a bug in our Test module in nri-prelude.\n"
+      )
+        |> TestRunnerMessedUp
+        |> Exception.impureThrow
 
 groupBy :: Ord key => (a -> key) -> [a] -> Dict.Dict key [a]
 groupBy key xs =
@@ -490,7 +580,7 @@ pass name a = Stack.withFrozenCallStack traceExpectation name (Task.succeed a)
 
 failAssertion :: Stack.HasCallStack => Text -> Text -> Expectation' a
 failAssertion name err =
-  FailedAssertion err (Stack.withFrozenCallStack getFrame)
+  FailedAssertion err (Stack.withFrozenCallStack getFrame name)
     |> Task.fail
     |> Stack.withFrozenCallStack traceExpectation name
 

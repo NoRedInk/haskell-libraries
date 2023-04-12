@@ -33,7 +33,9 @@ data Settings = Settings
     maxPollIntervalMs :: MaxPollIntervalMs,
     -- | This option provides us the possibility to skip messages on failure.
     -- Useful for testing Kafka worker. DoNotSkip is a reasonable default!
-    onProcessMessageSkip :: SkipOrNot
+    onProcessMessageSkip :: SkipOrNot,
+    -- | Compression codec used for topics
+    compressionCodec :: Internal.KafkaCompressionCodec
   }
 
 -- | This option provides us the possibility to skip messages on failure.
@@ -74,6 +76,7 @@ decoder =
     |> andMap decoderPollBatchSize
     |> andMap decoderMaxPollIntervalMs
     |> andMap decoderOnProcessMessageFailure
+    |> andMap Internal.decoderCompressionCodec
 
 decoderPollingTimeout :: Environment.Decoder Consumer.Timeout
 decoderPollingTimeout =

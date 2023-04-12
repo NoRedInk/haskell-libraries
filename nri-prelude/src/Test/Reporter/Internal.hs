@@ -19,7 +19,7 @@ extraLinesOnFailure = 2
 readSrcLoc :: Internal.SingleTest Internal.Failure -> Prelude.IO (Maybe (Stack.SrcLoc, BS.ByteString))
 readSrcLoc test =
   case Internal.body test of
-    Internal.FailedAssertion _ (Just loc) -> do
+    Internal.FailedAssertion _ loc -> do
       cwd <- System.Directory.getCurrentDirectory
       let path = cwd </> Stack.srcLocFile loc
       exists <- System.Directory.doesFileExist path

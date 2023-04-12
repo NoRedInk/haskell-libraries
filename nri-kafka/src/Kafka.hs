@@ -216,12 +216,12 @@ doSTM doAnything stm =
     |> Platform.doAnything doAnything
 
 mkProducer :: Settings.Settings -> Prelude.IO Producer.KafkaProducer
-mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages} = do
+mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout, Settings.logLevel, Settings.batchNumMessages, Settings.compressionCodec} = do
   let properties =
         Producer.brokersList brokerAddresses
           ++ Producer.sendTimeout deliveryTimeout
           ++ Producer.logLevel logLevel
-          ++ Producer.compression Producer.Snappy
+          ++ Producer.compression compressionCodec
           ++ Producer.extraProps
             ( Dict.fromList
                 [ ( "batch.num.messages",

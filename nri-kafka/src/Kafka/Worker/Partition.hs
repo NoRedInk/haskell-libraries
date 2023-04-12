@@ -10,6 +10,7 @@ module Kafka.Worker.Partition
     MessageCallback (..),
     SeekCmd (..),
     CommitOffsets (..),
+    MessageFormat (..),
     -- just exported for tests
     microSecondsDelayForAttempt,
     OnStartup (OnStartup),
@@ -107,6 +108,11 @@ data CommitOffsets
     -- out of date.
     ElsewhereButToKafkaAsWell Int
 
+-- | Expected format of the messages.
+data MessageFormat
+  = WithMetadata
+  | Raw
+
 -- | A thread that processes messages for a particular partition. Cleans itself
 -- up if it ever runs out.
 --
@@ -139,6 +145,7 @@ data CommitOffsets
 -- such a scheme. As we run this code we'll gather data that can help us decide.
 spawnWorkerThread ::
   Settings.SkipOrNot ->
+  MessageFormat ->
   CommitOffsets ->
   Observability.Handler ->
   Analytics.Analytics ->
@@ -148,7 +155,7 @@ spawnWorkerThread ::
   OnStartup ->
   OnCleanup ->
   Prelude.IO ()
-spawnWorkerThread skipOrNot commitOffsets observabilityHandler analytics stopping consumer callback (OnStartup onStartup) (OnCleanup onCleanup) = do
+spawnWorkerThread skipOrNot messageFormat commitOffsets observabilityHandler analytics stopping consumer callback (OnStartup onStartup) (OnCleanup onCleanup) = do
   -- Synchronously create the queue that will come to contain messages for the
   -- partition. This way we'll be able to start receiving messages for this
   -- partition as soon as this function returns, even if the processing thread
@@ -161,7 +168,7 @@ spawnWorkerThread skipOrNot commitOffsets observabilityHandler analytics stoppin
         ElsewhereButToKafkaAsWell offset -> AwaitingSeekTo offset
   onStartup partition
   Exception.finally
-    (processMsgLoop skipOrNot commitOffsets observabilityHandler State {analytics, stopping, partition} consumer callback)
+    (processMsgLoop skipOrNot messageFormat commitOffsets observabilityHandler State {analytics, stopping, partition} consumer callback)
     onCleanup
     |> Async.async
     -- If the async process spawned here throws an exception, rethrow it
@@ -182,13 +189,14 @@ spawnWorkerThread skipOrNot commitOffsets observabilityHandler analytics stoppin
 
 processMsgLoop ::
   Settings.SkipOrNot ->
+  MessageFormat ->
   CommitOffsets ->
   Observability.Handler ->
   State ->
   Consumer.KafkaConsumer ->
   MessageCallback ->
   Prelude.IO ()
-processMsgLoop skipOrNot commitOffsets observabilityHandler state consumer callback@(MessageCallback runCallback) = do
+processMsgLoop skipOrNot messageFormat commitOffsets observabilityHandler state consumer callback@(MessageCallback runCallback) = do
   -- # Get the next message from the queue.
   peekResponse <- peekRecord state
   case peekResponse of
@@ -255,7 +263,7 @@ processMsgLoop skipOrNot commitOffsets observabilityHandler state consumer callb
             -- at least we'll have nice context in logs!
             Platform.setTracingSpanDetailsIO log details
             handleFailures log <| do
-              msg <- decodeMessage record
+              msg <- decodeMessage messageFormat record
               runCallback record {Consumer.crKey = (), Consumer.crValue = ()} msg
                 |> Task.mapError WorkerCallbackFailed
                 |> Task.onError
@@ -270,6 +278,7 @@ processMsgLoop skipOrNot commitOffsets observabilityHandler state consumer callb
       -- # Loop for the next message
       processMsgLoop
         skipOrNot
+        messageFormat
         commitOffsets
         observabilityHandler
         state
@@ -374,25 +383,37 @@ getTracingDetails analytics (ProcessAttemptsCount processAttempt) record = do
 millisToSecs :: Consumer.Millis -> Clock.UTCTime
 millisToSecs (Consumer.Millis millis) = fromPosix (millis // 1000)
 
-decodeMessage :: (Aeson.FromJSON msg) => ConsumerRecord -> Task (WorkerError e) msg
-decodeMessage record = do
-  let eitherMsg =
+decodeMessage :: (Aeson.FromJSON msg) => MessageFormat -> ConsumerRecord -> Task (WorkerError e) msg
+decodeMessage messageFormat record = do
+  let json =
         Consumer.crValue record
           -- We'll accept the absence of a message if the worker expects a message
           -- of type `()`. The default JSON encoding for `()` is "[]".
           |> Maybe.withDefault "[]"
-          |> Aeson.eitherDecodeStrict
-  case eitherMsg of
-    Prelude.Left err ->
-      Task.fail (MsgDecodingFailed (Text.fromList err))
-    Prelude.Right msgWithMetaData ->
-      case Internal.value msgWithMetaData of
-        (Internal.Encodable value) ->
-          case Aeson.fromJSON (Aeson.toJSON value) of
-            Aeson.Error err ->
-              Task.fail (MsgDecodingFailed (Text.fromList err))
-            Aeson.Success msg ->
-              Task.succeed msg
+
+      parseMessage ::
+        forall msg a e.
+        (Aeson.FromJSON a) =>
+        (a -> Task (WorkerError e) msg) ->
+        Task (WorkerError e) msg
+      parseMessage = \fn ->
+        case json |> Aeson.eitherDecodeStrict of
+          Prelude.Left err ->
+            Task.fail (MsgDecodingFailed (Text.fromList err))
+          Prelude.Right m -> fn m
+
+  case messageFormat of
+    WithMetadata ->
+      parseMessage <| \msgWithMetaData ->
+        case Internal.value msgWithMetaData of
+          (Internal.Encodable value) ->
+            case Aeson.fromJSON (Aeson.toJSON value) of
+              Aeson.Error err ->
+                Task.fail (MsgDecodingFailed (Text.fromList err))
+              Aeson.Success msg ->
+                Task.succeed msg
+    Raw ->
+      parseMessage Task.succeed
 
 commitRecord ::
   Platform.DoAnythingHandler ->

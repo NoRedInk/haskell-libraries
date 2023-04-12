@@ -3,7 +3,9 @@ module Main
   )
 where
 
+import qualified ConflictTest
 import qualified Data.Acquire as Acquire
+import qualified Enum
 import qualified Environment
 import qualified ObservabilitySpec
 import qualified Postgres
@@ -28,5 +30,7 @@ tests postgres =
     [ PostgresSettingsSpec.tests,
       QueryParserSpec.tests,
       TimeSpec.tests,
-      ObservabilitySpec.tests postgres
+      ObservabilitySpec.tests postgres,
+      Enum.tests postgres,
+      ConflictTest.tests postgres
     ]
