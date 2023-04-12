@@ -15,7 +15,6 @@ import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
 import qualified Platform.Internal
-import qualified List
 import qualified System.IO
 import qualified Task
 import Test (Test, describe, fuzz, fuzz2, fuzz3, only, serialize, skip, test, todo)
@@ -25,6 +24,7 @@ import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Text
 import qualified Prelude
+import qualified List
 
 tests :: Test
 tests =
@@ -250,21 +250,20 @@ stdoutReporter =
           withTempFile
             ( \_ handle ->
                 Internal.AllPassed
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 0 10),
+                    mockTest "test 2" (mockTracingSpanWithTimes 1 12)
                   ]
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-all-passed",
       test "onlys passed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
                 Internal.OnlysPassed
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 0 10),
+                    mockTest "test 2" (mockTracingSpanWithTimes 1 13)
                   ]
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
@@ -272,15 +271,14 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-onlys-passed",
       test "passed with skipped" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
                 Internal.PassedWithSkipped
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 0 10),
+                    mockTest "test 2" (mockTracingSpanWithTimes 1 9)
                   ]
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
@@ -288,7 +286,6 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-passed-with-skipped",
       test "no tests in suite" <| \_ -> do
         contents <-
@@ -298,28 +295,26 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-no-tests-in-suite",
       test "tests failed" <| \_ -> do
         contents <-
           withTempFile
             ( \_ handle ->
                 Internal.TestsFailed
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 1 2),
+                    mockTest "test 2" (mockTracingSpanWithTimes 3 6)
                   ]
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (Internal.FailedSpan mockTracingSpan (Internal.FailedAssertion "assertion error" mockSrcLoc)),
-                    mockTest "test 6" (Internal.FailedSpan mockTracingSpan (Internal.ThrewException mockException)),
-                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan Internal.TookTooLong),
-                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan (Internal.TestRunnerMessedUp "sorry"))
+                  [ mockTest "test 5" (Internal.FailedSpan (mockTracingSpanWithTimes 1 12) (Internal.FailedAssertion "assertion error" mockSrcLoc)),
+                    mockTest "test 6" (Internal.FailedSpan (mockTracingSpanWithTimes 1 13) (Internal.ThrewException mockException)),
+                    mockTest "test 7" (Internal.FailedSpan (mockTracingSpanWithTimes 1 14) Internal.TookTooLong),
+                    mockTest "test 7" (Internal.FailedSpan (mockTracingSpanWithTimes 1 18) (Internal.TestRunnerMessedUp "sorry"))
                   ]
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed",
       test "tests failed (actually running)" <| \_ -> do
         let suite =
@@ -529,10 +524,14 @@ mockTest name body =
 
 mockTracingSpan :: Platform.Internal.TracingSpan
 mockTracingSpan =
+  mockTracingSpanWithTimes 0 0
+
+mockTracingSpanWithTimes :: Int -> Int -> Platform.Internal.TracingSpan
+mockTracingSpanWithTimes startedMs finishedMs =
   Platform.Internal.TracingSpan
     { Platform.Internal.name = "name",
-      Platform.Internal.started = Platform.Internal.MonotonicTime 0,
-      Platform.Internal.finished = Platform.Internal.MonotonicTime 0,
+      Platform.Internal.started = Platform.Internal.MonotonicTime (1000 * Prelude.fromIntegral startedMs),
+      Platform.Internal.finished = Platform.Internal.MonotonicTime (1000 * Prelude.fromIntegral finishedMs),
       Platform.Internal.frame = Nothing,
       Platform.Internal.details = Nothing,
       Platform.Internal.summary = Nothing,

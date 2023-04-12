@@ -1,26 +1,26 @@
-↓ tests/TestSpec.hs:328
+↓ tests/TestSpec.hs:323
 ↓ suite loc
 ✗ test fail
 
-Expectation failed at tests/TestSpec.hs:328
-  326:               describe
-  327:                 "suite loc"
-✗ 328:                 [ test "test fail" (\_ -> Expect.fail "fail"),
-  329:                   test "test equal" (\_ -> Expect.equal True False),
-  330:                   test "test notEqual" (\_ -> Expect.notEqual True True),
+Expectation failed at tests/TestSpec.hs:323
+  321:               describe
+  322:                 "suite loc"
+✗ 323:                 [ test "test fail" (\_ -> Expect.fail "fail"),
+  324:                   test "test equal" (\_ -> Expect.equal True False),
+  325:                   test "test notEqual" (\_ -> Expect.notEqual True True),
 
 fail
 
-↓ tests/TestSpec.hs:329
+↓ tests/TestSpec.hs:324
 ↓ suite loc
 ✗ test equal
 
-Expectation failed at tests/TestSpec.hs:329
-  327:                 "suite loc"
-  328:                 [ test "test fail" (\_ -> Expect.fail "fail"),
-✗ 329:                   test "test equal" (\_ -> Expect.equal True False),
-  330:                   test "test notEqual" (\_ -> Expect.notEqual True True),
-  331:                   test
+Expectation failed at tests/TestSpec.hs:324
+  322:                 "suite loc"
+  323:                 [ test "test fail" (\_ -> Expect.fail "fail"),
+✗ 324:                   test "test equal" (\_ -> Expect.equal True False),
+  325:                   test "test notEqual" (\_ -> Expect.notEqual True True),
+  326:                   test
 
 ▼▼▼▼
 False
@@ -30,16 +30,16 @@ False
 True
 ▲▲▲
 
-↓ tests/TestSpec.hs:330
+↓ tests/TestSpec.hs:325
 ↓ suite loc
 ✗ test notEqual
 
-Expectation failed at tests/TestSpec.hs:330
-  328:                 [ test "test fail" (\_ -> Expect.fail "fail"),
-  329:                   test "test equal" (\_ -> Expect.equal True False),
-✗ 330:                   test "test notEqual" (\_ -> Expect.notEqual True True),
-  331:                   test
-  332:                     "test all"
+Expectation failed at tests/TestSpec.hs:325
+  323:                 [ test "test fail" (\_ -> Expect.fail "fail"),
+  324:                   test "test equal" (\_ -> Expect.equal True False),
+✗ 325:                   test "test notEqual" (\_ -> Expect.notEqual True True),
+  326:                   test
+  327:                     "test all"
 
 True
 ╷
@@ -47,16 +47,16 @@ True
 ╵
 True
 
-↓ tests/TestSpec.hs:331
+↓ tests/TestSpec.hs:326
 ↓ suite loc
 ✗ test all
 
-Expectation failed at tests/TestSpec.hs:336
-  334:                         True
-  335:                           |> Expect.all
-✗ 336:                             [ Expect.equal False
-  337:                             ]
-  338:                     ),
+Expectation failed at tests/TestSpec.hs:331
+  329:                         True
+  330:                           |> Expect.all
+✗ 331:                             [ Expect.equal False
+  332:                             ]
+  333:                     ),
 
 ▼▼▼
 True
@@ -66,16 +66,16 @@ True
 False
 ▲▲▲▲
 
-↓ tests/TestSpec.hs:339
+↓ tests/TestSpec.hs:334
 ↓ suite loc
 ✗ test lessThan
 
-Expectation failed at tests/TestSpec.hs:339
-  337:                             ]
-  338:                     ),
-✗ 339:                   test "test lessThan" (\_ -> Expect.lessThan 1 (2 :: Int)),
-  340:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
-  341:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+Expectation failed at tests/TestSpec.hs:334
+  332:                             ]
+  333:                     ),
+✗ 334:                   test "test lessThan" (\_ -> Expect.lessThan 1 (2 :: Int)),
+  335:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
+  336:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
 
 ▼
 2
@@ -85,16 +85,16 @@ Expectation failed at tests/TestSpec.hs:339
 1
 ▲
 
-↓ tests/TestSpec.hs:340
+↓ tests/TestSpec.hs:335
 ↓ suite loc
 ✗ test astMost
 
-Expectation failed at tests/TestSpec.hs:340
-  338:                     ),
-  339:                   test "test lessThan" (\_ -> Expect.lessThan 1 (2 :: Int)),
-✗ 340:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
-  341:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
-  342:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
+Expectation failed at tests/TestSpec.hs:335
+  333:                     ),
+  334:                   test "test lessThan" (\_ -> Expect.lessThan 1 (2 :: Int)),
+✗ 335:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
+  336:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+  337:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
 
 ▼
 2
@@ -104,16 +104,16 @@ Expectation failed at tests/TestSpec.hs:340
 1
 ▲
 
-↓ tests/TestSpec.hs:341
+↓ tests/TestSpec.hs:336
 ↓ suite loc
 ✗ test greatherThan
 
-Expectation failed at tests/TestSpec.hs:341
-  339:                   test "test lessThan" (\_ -> Expect.lessThan 1 (2 :: Int)),
-  340:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
-✗ 341:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
-  342:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
-  343:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
+Expectation failed at tests/TestSpec.hs:336
+  334:                   test "test lessThan" (\_ -> Expect.lessThan 1 (2 :: Int)),
+  335:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
+✗ 336:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+  337:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  338:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
 
 ▼
 1
@@ -123,16 +123,16 @@ Expectation failed at tests/TestSpec.hs:341
 2
 ▲
 
-↓ tests/TestSpec.hs:342
+↓ tests/TestSpec.hs:337
 ↓ suite loc
 ✗ test atLeast
 
-Expectation failed at tests/TestSpec.hs:342
-  340:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
-  341:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
-✗ 342:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
-  343:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
-  344:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
+Expectation failed at tests/TestSpec.hs:337
+  335:                   test "test astMost" (\_ -> Expect.atMost 1 (2 :: Int)),
+  336:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+✗ 337:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  338:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
+  339:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
 
 ▼
 1
@@ -142,16 +142,16 @@ Expectation failed at tests/TestSpec.hs:342
 2
 ▲
 
-↓ tests/TestSpec.hs:343
+↓ tests/TestSpec.hs:338
 ↓ suite loc
 ✗ test within
 
-Expectation failed at tests/TestSpec.hs:343
-  341:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
-  342:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
-✗ 343:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
-  344:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
-  345:                   test "test true" (\_ -> Expect.true False),
+Expectation failed at tests/TestSpec.hs:338
+  336:                   test "test greatherThan" (\_ -> Expect.greaterThan 2 (1 :: Int)),
+  337:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
+✗ 338:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
+  339:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
+  340:                   test "test true" (\_ -> Expect.true False),
 
 ▼
 2.0
@@ -161,16 +161,16 @@ Expectation failed at tests/TestSpec.hs:343
 1.0
 ▲
 
-↓ tests/TestSpec.hs:344
+↓ tests/TestSpec.hs:339
 ↓ suite loc
 ✗ test notWithin
 
-Expectation failed at tests/TestSpec.hs:344
-  342:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
-  343:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
-✗ 344:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
-  345:                   test "test true" (\_ -> Expect.true False),
-  346:                   test "test false" (\_ -> Expect.false True),
+Expectation failed at tests/TestSpec.hs:339
+  337:                   test "test atLeast" (\_ -> Expect.atLeast 2 (1 :: Int)),
+  338:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
+✗ 339:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
+  340:                   test "test true" (\_ -> Expect.true False),
+  341:                   test "test false" (\_ -> Expect.false True),
 
 1.0
 ╷
@@ -178,94 +178,94 @@ Expectation failed at tests/TestSpec.hs:344
 ╵
 1.0
 
-↓ tests/TestSpec.hs:345
+↓ tests/TestSpec.hs:340
 ↓ suite loc
 ✗ test true
 
-Expectation failed at tests/TestSpec.hs:345
-  343:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
-  344:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
-✗ 345:                   test "test true" (\_ -> Expect.true False),
-  346:                   test "test false" (\_ -> Expect.false True),
-  347:                   test "test ok" (\_ -> Expect.ok (Err ())),
+Expectation failed at tests/TestSpec.hs:340
+  338:                   test "test within" (\_ -> Expect.within (Expect.Absolute 0.1) 1 2),
+  339:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
+✗ 340:                   test "test true" (\_ -> Expect.true False),
+  341:                   test "test false" (\_ -> Expect.false True),
+  342:                   test "test ok" (\_ -> Expect.ok (Err ())),
 
 I expected a True but got False
 
-↓ tests/TestSpec.hs:346
+↓ tests/TestSpec.hs:341
 ↓ suite loc
 ✗ test false
 
-Expectation failed at tests/TestSpec.hs:346
-  344:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
-  345:                   test "test true" (\_ -> Expect.true False),
-✗ 346:                   test "test false" (\_ -> Expect.false True),
-  347:                   test "test ok" (\_ -> Expect.ok (Err ())),
-  348:                   test "test err" (\_ -> Expect.err (Ok ())),
+Expectation failed at tests/TestSpec.hs:341
+  339:                   test "test notWithin" (\_ -> Expect.notWithin (Expect.Relative 0.1) 1 1),
+  340:                   test "test true" (\_ -> Expect.true False),
+✗ 341:                   test "test false" (\_ -> Expect.false True),
+  342:                   test "test ok" (\_ -> Expect.ok (Err ())),
+  343:                   test "test err" (\_ -> Expect.err (Ok ())),
 
 I expected a False but got True
 
-↓ tests/TestSpec.hs:347
+↓ tests/TestSpec.hs:342
 ↓ suite loc
 ✗ test ok
 
-Expectation failed at tests/TestSpec.hs:347
-  345:                   test "test true" (\_ -> Expect.true False),
-  346:                   test "test false" (\_ -> Expect.false True),
-✗ 347:                   test "test ok" (\_ -> Expect.ok (Err ())),
-  348:                   test "test err" (\_ -> Expect.err (Ok ())),
-  349:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
+Expectation failed at tests/TestSpec.hs:342
+  340:                   test "test true" (\_ -> Expect.true False),
+  341:                   test "test false" (\_ -> Expect.false True),
+✗ 342:                   test "test ok" (\_ -> Expect.ok (Err ())),
+  343:                   test "test err" (\_ -> Expect.err (Ok ())),
+  344:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
 
 I expected a Ok but got Err (())
 
-↓ tests/TestSpec.hs:348
+↓ tests/TestSpec.hs:343
 ↓ suite loc
 ✗ test err
 
-Expectation failed at tests/TestSpec.hs:348
-  346:                   test "test false" (\_ -> Expect.false True),
-  347:                   test "test ok" (\_ -> Expect.ok (Err ())),
-✗ 348:                   test "test err" (\_ -> Expect.err (Ok ())),
-  349:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
-  350:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
+Expectation failed at tests/TestSpec.hs:343
+  341:                   test "test false" (\_ -> Expect.false True),
+  342:                   test "test ok" (\_ -> Expect.ok (Err ())),
+✗ 343:                   test "test err" (\_ -> Expect.err (Ok ())),
+  344:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
+  345:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
 
 I expected a Err but got Ok (())
 
-↓ tests/TestSpec.hs:349
+↓ tests/TestSpec.hs:344
 ↓ suite loc
 ✗ test succeeds
 
-Expectation failed at tests/TestSpec.hs:349
-  347:                   test "test ok" (\_ -> Expect.ok (Err ())),
-  348:                   test "test err" (\_ -> Expect.err (Ok ())),
-✗ 349:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
-  350:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
-  351:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+Expectation failed at tests/TestSpec.hs:344
+  342:                   test "test ok" (\_ -> Expect.ok (Err ())),
+  343:                   test "test err" (\_ -> Expect.err (Ok ())),
+✗ 344:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
+  345:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
+  346:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
 
 "oops"
 
-↓ tests/TestSpec.hs:350
+↓ tests/TestSpec.hs:345
 ↓ suite loc
 ✗ test fails
 
-Expectation failed at tests/TestSpec.hs:350
-  348:                   test "test err" (\_ -> Expect.err (Ok ())),
-  349:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
-✗ 350:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
-  351:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
-  352:                 ]
+Expectation failed at tests/TestSpec.hs:345
+  343:                   test "test err" (\_ -> Expect.err (Ok ())),
+  344:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
+✗ 345:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
+  346:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+  347:                 ]
 
 "Expected failure but succeeded with \"oops\""
 
-↓ tests/TestSpec.hs:351
+↓ tests/TestSpec.hs:346
 ↓ suite loc
 ✗ test andCheck
 
-Expectation failed at tests/TestSpec.hs:351
-  349:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
-  350:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
-✗ 351:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
-  352:                 ]
-  353:         contents <-
+Expectation failed at tests/TestSpec.hs:346
+  344:                   test "test succeeds" (\_ -> Expect.succeeds (Task.fail "oops")),
+  345:                   test "test fails" (\_ -> Expect.fails (Task.succeed "oops")),
+✗ 346:                   test "test andCheck" (\_ -> Task.succeed (1 :: Int) |> Expect.andCheck (Expect.equal 2) |> map (\_ -> ()))
+  347:                 ]
+  348:         contents <-
 
 ▼
 1

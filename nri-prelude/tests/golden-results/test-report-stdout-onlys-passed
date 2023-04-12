@@ -16,5 +16,6 @@ I failed the test, because it's easy to forget to remove `Test.only`.
 
 [4mTEST RUN INCOMPLETE[m because there is an `only` in your tests.
 
+Duration:  13 ms
 Passed:    2
 Skipped:   2

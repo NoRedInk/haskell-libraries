@@ -39,7 +39,7 @@ renderReport results =
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
-              black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
+              black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
               "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
@@ -62,7 +62,7 @@ renderReport results =
                 [ yellow (Text.Colour.underline ("TEST RUN INCOMPLETE")),
                   yellow " because there is an `only` in your tests.",
                   "\n\n",
-                  black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
+                  black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
                   "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
@@ -91,7 +91,7 @@ renderReport results =
                         n -> " because " ++ Text.fromInt n ++ " tests were skipped"
                     ),
                   "\n\n",
-                  black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
+                  black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
                   "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
@@ -120,7 +120,7 @@ renderReport results =
                 failures,
             [ red (Text.Colour.underline "TEST RUN FAILED"),
               "\n\n",
-              black <| chunk <| "Duration: " ++ Text.fromInt elapsed ++ " ms",
+              black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
               "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
