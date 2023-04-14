@@ -3,6 +3,7 @@ module Kafka.Worker.Stopping
     stopReason,
     stopTakingRequests,
     runUnlessStopping,
+    waitUntilStopping,
     Stopping,
   )
 where
@@ -27,9 +28,9 @@ stopTakingRequests (Stopping stopping) reason = do
     |> map (\_ -> ())
 
 runUnlessStopping :: Stopping -> a -> Prelude.IO a -> Prelude.IO a
-runUnlessStopping (Stopping stopping) stoppingVal action =
+runUnlessStopping stopping stoppingVal action =
   Async.race
-    (MVar.readMVar stopping |> map (\_ -> ()))
+    (waitUntilStopping stopping)
     action
     |> map
       ( \either ->
@@ -37,3 +38,7 @@ runUnlessStopping (Stopping stopping) stoppingVal action =
             Prelude.Left () -> stoppingVal
             Prelude.Right r -> r
       )
+
+waitUntilStopping :: Stopping -> Prelude.IO ()
+waitUntilStopping (Stopping stopping) =
+  MVar.readMVar stopping |> map (\_ -> ())

@@ -188,29 +188,32 @@ data OffsetSource where
 -- | Starts the kafka worker handling messages.
 process :: Settings.Settings -> Text -> TopicSubscription -> Prelude.IO ()
 process settings groupIdText topicSubscriptions = do
-  processWithoutShutdownEnsurance settings (Consumer.ConsumerGroupId groupIdText) topicSubscriptions
-  -- Start an ensurance policy to make sure we exit in 5 seconds. We've seen
-  -- cases where our graceful shutdown seems to hang, resulting in a worker
-  -- that's not doing anything. We should try to fix those failures, but for the
-  -- ones that remain this is our fallback.
-  --
-  -- Running it using `Async.async` makes it so we won't wait for this thread to
-  -- complete. If the regular shutdown completes before this thread is done we
-  -- will exit early.
-  _ <-
-    Async.async <| do
-      Control.Concurrent.threadDelay 5_000_000 {- 5 seconds -}
-      Prelude.putStrLn "Something is holding up shutdown. Going to die ungracefully now."
-      System.Posix.Process.exitImmediately (System.Exit.ExitFailure 1)
-  Prelude.pure ()
+  state <- initState
+  Async.race_
+    ( do
+        Stopping.waitUntilStopping (stopping state)
+
+        -- Start an ensurance policy to make sure we exit in 5 seconds. We've seen
+        -- cases where our graceful shutdown seems to hang, resulting in a worker
+        -- that's not doing anything. We should try to fix those failures, but for the
+        -- ones that remain this is our fallback.
+        Control.Concurrent.threadDelay 5_000_000 {- 5 seconds -}
+        Prelude.putStrLn "Something is holding up shutdown. Going to die ungracefully now."
+        System.Posix.Process.exitImmediately (System.Exit.ExitFailure 1)
+    )
+    (process' state settings (Consumer.ConsumerGroupId groupIdText) topicSubscriptions)
 
 -- | Like `process`, but doesn't exit the current process by itself. This risks
 -- leaving zombie processes when used in production but is safer in tests, where
 -- the worker shares the OS process with other test code and the test runner.
 processWithoutShutdownEnsurance :: Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Prelude.IO ()
 processWithoutShutdownEnsurance settings groupId topicSubscriptions = do
-  let TopicSubscription {onMessage, topic, offsetSource, commitToKafkaAsWell, messageFormat} = topicSubscriptions
   state <- initState
+  process' state settings groupId topicSubscriptions
+
+process' :: State -> Settings.Settings -> Consumer.ConsumerGroupId -> TopicSubscription -> Prelude.IO ()
+process' state settings groupId topicSubscriptions = do
+  let TopicSubscription {onMessage, topic, offsetSource, commitToKafkaAsWell, messageFormat} = topicSubscriptions
   onQuitSignal (Stopping.stopTakingRequests (stopping state) "Received stop signal")
   Conduit.withAcquire (Observability.handler (Settings.observability settings)) <| \observabilityHandler -> do
     Exception.bracketWithError
