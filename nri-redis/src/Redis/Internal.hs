@@ -9,6 +9,8 @@ module Redis.Internal
     HandlerAutoExtendExpire,
     HasAutoExtendExpire (..),
     Query (..),
+    Database.Redis.Cursor,
+    Database.Redis.cursor0,
     cmds,
     map,
     map2,
@@ -96,6 +98,7 @@ cmds query'' =
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) (NonEmpty.toList pairs))]
     Ping -> ["PING"]
     Rpush key vals -> [unwords ("RPUSH" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
+    Scan cursor maybeMatch maybeCount -> [scanCmd cursor maybeMatch maybeCount]
     Set key _ -> [unwords ["SET", key, "*****"]]
     Setex key seconds _ -> [unwords ["SETEX", key, Text.fromInt seconds, "*****"]]
     Setnx key _ -> [unwords ["SETNX", key, "*****"]]
@@ -106,6 +109,20 @@ cmds query'' =
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
     WithResult _ x -> cmds x
+  where
+    scanCmd :: Database.Redis.Cursor -> Maybe Text -> Maybe Int -> Text
+    scanCmd cursor maybeMatch maybeCount =
+      let cursorWord =
+            Text.fromList (Prelude.show cursor)
+          matchWords =
+            case maybeMatch of
+              Nothing -> []
+              Just keyPattern -> ["MATCH", keyPattern]
+          countWords =
+            case maybeCount of
+              Nothing -> []
+              Just c -> ["COUNT", Text.fromInt c]
+       in unwords ("SCAN" : cursorWord : matchWords ++ countWords)
 
 unwords :: [Text] -> Text
 unwords = Text.join " "
@@ -132,6 +149,7 @@ data Query a where
   Mset :: NonEmpty (Text, ByteString) -> Query ()
   Ping :: Query Database.Redis.Status
   Rpush :: Text -> NonEmpty ByteString -> Query Int
+  Scan :: Database.Redis.Cursor -> Maybe Text -> Maybe Int -> Query (Database.Redis.Cursor, [Text])
   Set :: Text -> ByteString -> Query ()
   Setex :: Text -> Int -> ByteString -> Query ()
   Setnx :: Text -> ByteString -> Query Bool
@@ -263,6 +281,7 @@ mapKeys fn query' =
     Expire key secs -> Task.map (\newKeys -> Expire newKeys secs) (fn key)
     Lrange key lower upper -> Task.map (\newKeys -> Lrange newKeys lower upper) (fn key)
     Rpush key vals -> Task.map (\newKeys -> Rpush newKeys vals) (fn key)
+    Scan {} -> Task.succeed query'
     Sadd key vals -> Task.map (\newKeys -> Sadd newKeys vals) (fn key)
     Scard key -> Task.map Scard (fn key)
     Srem key vals -> Task.map (\newKeys -> Srem newKeys vals) (fn key)
@@ -311,6 +330,7 @@ keysTouchedByQuery query' =
     Ping -> Set.empty
     Pure _ -> Set.empty
     Rpush key _ -> Set.singleton key
+    Scan {} -> Set.empty
     Set key _ -> Set.singleton key
     Setex key _ _ -> Set.singleton key
     Setnx key _ -> Set.singleton key

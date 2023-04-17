@@ -21,6 +21,7 @@ import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Text
+import qualified Text.Regex.PCRE.Light as Regex
 import qualified Tuple
 import Prelude (IO, pure)
 import qualified Prelude
@@ -333,6 +334,55 @@ doQuery query hm =
               ( hm,
                 Err wrongTypeErr
               )
+    Internal.Scan opaqueCursor maybeMatch maybeCount ->
+      let size =
+            Prelude.fromIntegral (HM.size hm)
+          maxMatches =
+            Maybe.withDefault size maybeCount
+
+          loop :: Regex.Regex -> List Text -> List Text -> Int -> Int -> (Int, List Text)
+          loop regex keys matchedKeys numMatched cursor =
+            if numMatched == maxMatches
+              then (cursor, matchedKeys)
+              else case keys of
+                [] -> (cursor, matchedKeys)
+                currentKey : remainingKeys ->
+                  let (newMatchedKeys, newNumMatched) =
+                        if matchesRegex regex currentKey
+                          then (currentKey : matchedKeys, numMatched + 1)
+                          else (matchedKeys, numMatched)
+                   in loop regex remainingKeys newMatchedKeys newNumMatched (cursor + 1)
+
+          scanResult :: Result Internal.Error (Database.Redis.Cursor, [Text])
+          scanResult = do
+            oldCursorValue <-
+              -- Cursor is an opaque newtype of ByteString. Can't deconstruct, so cheat using `Show`.
+              case opaqueCursor |> Prelude.show |> Text.fromList |> Text.filter Char.isDigit |> Text.toInt of
+                Just cursor -> Ok cursor
+                Nothing -> Err (Internal.RedisError "INVALID CURSOR could not be parsed as an integer")
+            regex <-
+              regexFromGlobStylePattern (Maybe.withDefault "*" maybeMatch)
+            let keysToSearch =
+                  HM.keys hm |> List.drop oldCursorValue
+            let (newCursorValue, matchedKeys) =
+                  loop regex keysToSearch [] 0 oldCursorValue
+            newCursor <-
+              if newCursorValue < size
+                then
+                  let -- Cursor is opaque. To construct it, pretend we received it as a ByteString over the wire.
+                      decoded =
+                        newCursorValue
+                          |> Text.fromInt
+                          |> TE.encodeUtf8
+                          |> Just
+                          |> Database.Redis.Bulk
+                          |> Database.Redis.decode
+                   in case decoded of
+                        Prelude.Right ok -> Ok ok
+                        Prelude.Left _ -> Err (Internal.RedisError ("INVALID CURSOR could not encode " ++ Text.fromInt newCursorValue))
+                else Ok Database.Redis.cursor0
+            Ok (newCursor, matchedKeys)
+       in (hm, scanResult)
     Internal.Set key value ->
       ( HM.insert key (RedisByteString value) hm,
         Ok ()
@@ -402,3 +452,26 @@ doQuery query hm =
 
 wrongTypeErr :: Internal.Error
 wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"
+
+-- https://redis.io/commands/keys/
+--    h?llo matches hello, hallo and hxllo
+--    h*llo matches hllo and heeeello
+--    h[ae]llo matches hello and hallo, but not hillo
+--    h[^e]llo matches hallo, hbllo, ... but not hello
+--    h[a-b]llo matches hallo and hbllo
+regexFromGlobStylePattern :: Text -> Result Internal.Error Regex.Regex
+regexFromGlobStylePattern globStylePattern =
+  let regexBytes =
+        globStylePattern
+          |> Text.replace "?" "."
+          |> Text.replace "*" ".*"
+          |> TE.encodeUtf8
+   in case Regex.compileM regexBytes [] of
+        Prelude.Right regex -> Ok regex
+        Prelude.Left errChars -> Err <| Internal.RedisError <| "INVALID MATCH PATTERN" ++ Text.fromList errChars
+
+matchesRegex :: Regex.Regex -> Text -> Bool
+matchesRegex regex text =
+  case Regex.match regex (TE.encodeUtf8 text) [] of
+    Just _ -> True
+    Nothing -> False
