@@ -454,7 +454,7 @@ regexFromGlobStylePattern globStylePattern =
           |> TE.encodeUtf8
    in case Regex.compileM regexBytes [] of
         Prelude.Right regex -> Ok regex
-        Prelude.Left errChars -> Err <| Internal.RedisError <| "INVALID MATCH PATTERN" ++ Text.fromList errChars
+        Prelude.Left errChars -> Err <| Internal.LibraryError <| "INVALID MATCH PATTERN" ++ Text.fromList errChars
 
 matchesRegex :: Regex.Regex -> Text -> Bool
 matchesRegex regex text =
@@ -467,7 +467,7 @@ decodeCursor :: Database.Redis.Cursor -> Result Internal.Error Int
 decodeCursor opaqueCursor =
   case opaqueCursor |> Prelude.show |> Text.fromList |> Text.filter Char.isDigit |> Text.toInt of
     Just cursor -> Ok cursor
-    Nothing -> Err (Internal.RedisError "INVALID CURSOR could not be parsed as an integer")
+    Nothing -> Err (Internal.LibraryError "INVALID CURSOR could not be parsed as an integer")
 
 -- Cursor is opaque. To construct it, pretend we received it as a ByteString over the wire.
 encodeCursor :: Int -> Result Internal.Error Database.Redis.Cursor
@@ -481,4 +481,4 @@ encodeCursor newCursorValue =
           |> Database.Redis.decode
    in case decoded of
         Prelude.Right ok -> Ok ok
-        Prelude.Left _ -> Err (Internal.RedisError ("INVALID CURSOR could not encode " ++ Text.fromInt newCursorValue))
+        Prelude.Left _ -> Err (Internal.LibraryError ("INVALID CURSOR could not encode " ++ Text.fromInt newCursorValue))
