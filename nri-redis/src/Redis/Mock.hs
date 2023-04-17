@@ -356,10 +356,7 @@ doQuery query hm =
           scanResult :: Result Internal.Error (Database.Redis.Cursor, [Text])
           scanResult = do
             oldCursorValue <-
-              -- Cursor is an opaque newtype of ByteString. Can't deconstruct, so cheat using `Show`.
-              case opaqueCursor |> Prelude.show |> Text.fromList |> Text.filter Char.isDigit |> Text.toInt of
-                Just cursor -> Ok cursor
-                Nothing -> Err (Internal.RedisError "INVALID CURSOR could not be parsed as an integer")
+              decodeCursor opaqueCursor
             regex <-
               regexFromGlobStylePattern (Maybe.withDefault "*" maybeMatch)
             let keysToSearch =
@@ -368,18 +365,7 @@ doQuery query hm =
                   loop regex keysToSearch [] 0 oldCursorValue
             newCursor <-
               if newCursorValue < size
-                then
-                  let -- Cursor is opaque. To construct it, pretend we received it as a ByteString over the wire.
-                      decoded =
-                        newCursorValue
-                          |> Text.fromInt
-                          |> TE.encodeUtf8
-                          |> Just
-                          |> Database.Redis.Bulk
-                          |> Database.Redis.decode
-                   in case decoded of
-                        Prelude.Right ok -> Ok ok
-                        Prelude.Left _ -> Err (Internal.RedisError ("INVALID CURSOR could not encode " ++ Text.fromInt newCursorValue))
+                then encodeCursor newCursorValue
                 else Ok Database.Redis.cursor0
             Ok (newCursor, matchedKeys)
        in (hm, scanResult)
@@ -475,3 +461,24 @@ matchesRegex regex text =
   case Regex.match regex (TE.encodeUtf8 text) [] of
     Just _ -> True
     Nothing -> False
+
+-- Cursor is an opaque newtype of ByteString. Can't deconstruct, so cheat using `Show`.
+decodeCursor :: Database.Redis.Cursor -> Result Internal.Error Int
+decodeCursor opaqueCursor =
+  case opaqueCursor |> Prelude.show |> Text.fromList |> Text.filter Char.isDigit |> Text.toInt of
+    Just cursor -> Ok cursor
+    Nothing -> Err (Internal.RedisError "INVALID CURSOR could not be parsed as an integer")
+
+-- Cursor is opaque. To construct it, pretend we received it as a ByteString over the wire.
+encodeCursor :: Int -> Result Internal.Error Database.Redis.Cursor
+encodeCursor newCursorValue =
+  let decoded =
+        newCursorValue
+          |> Text.fromInt
+          |> TE.encodeUtf8
+          |> Just
+          |> Database.Redis.Bulk
+          |> Database.Redis.decode
+   in case decoded of
+        Prelude.Right ok -> Ok ok
+        Prelude.Left _ -> Err (Internal.RedisError ("INVALID CURSOR could not encode " ++ Text.fromInt newCursorValue))
