@@ -7,6 +7,7 @@ module Redis.Mock
   )
 where
 
+import qualified Array
 import Data.ByteString (ByteString)
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
@@ -56,8 +57,12 @@ handlerIO = do
 -- will store a single value of this type, and redis commands will modify it.
 data Model = Model
   { hash :: HM.HashMap Text RedisType,
-    scanState :: HM.HashMap Text ()
+    scans :: Scans
   }
+
+type Scans = Array.Array (HM.HashMap Text ())
+
+newtype ScanId = ScanId {unScanId :: Int}
 
 -- | Redis supports a small number of types and most of its commands expect a
 -- particular type in the keys the command is used on.
@@ -106,7 +111,7 @@ init =
   newIORef
     Model
       { hash = HM.empty,
-        scanState = HM.empty
+        scans = Array.initialize 1 (always HM.empty)
       }
 
 doQuery :: Internal.Query a -> Model -> (Model, Result Internal.Error a)
@@ -336,41 +341,64 @@ doQuery query model =
                   ( model,
                     Err wrongTypeErr
                   )
-        Internal.Scan opaqueCursor maybeMatch maybeCount ->
-          let size =
-                Prelude.fromIntegral (HM.size hm)
-              maxMatches =
-                Maybe.withDefault size maybeCount
+        Internal.Scan prevCursor maybeMatch maybeCount ->
+          let count =
+                Maybe.withDefault 10 maybeCount
 
-              loop :: Regex.Regex -> List Text -> List Text -> Int -> Int -> (Int, List Text)
-              loop regex keys matchedKeys numMatched cursor =
-                if numMatched == maxMatches
-                  then (cursor, matchedKeys)
+              -- Do the scan in roughly the same way the Redis docs describe, stopping when enough matches have been found
+              doScan :: Regex.Regex -> List Text -> HM.HashMap Text () -> List Text -> Int -> (HM.HashMap Text (), List Text)
+              doScan regex keys scannedKeys matchedKeys numMatched =
+                if numMatched == count
+                  then (scannedKeys, matchedKeys)
                   else case keys of
-                    [] -> (cursor, matchedKeys)
+                    [] -> (scannedKeys, matchedKeys)
                     currentKey : remainingKeys ->
                       let (newMatchedKeys, newNumMatched) =
                             if matchesRegex regex currentKey
                               then (currentKey : matchedKeys, numMatched + 1)
                               else (matchedKeys, numMatched)
-                       in loop regex remainingKeys newMatchedKeys newNumMatched (cursor + 1)
+                          newScannedKeys =
+                            HM.insert currentKey () scannedKeys
+                       in doScan regex remainingKeys newScannedKeys newMatchedKeys newNumMatched
 
-              scanResult :: Result Internal.Error (Database.Redis.Cursor, [Text])
-              scanResult = do
-                oldCursorValue <-
-                  decodeCursor opaqueCursor
-                regex <-
+              prevScans =
+                scans model
+              currentScanId =
+                ScanId (Array.length prevScans)
+
+              result :: Result Internal.Error (Scans, Database.Redis.Cursor, [Text])
+              result = do
+                prevScannedKeys <-
+                  if prevCursor == Database.Redis.cursor0
+                    then Ok HM.empty
+                    else do
+                      id <- decodeCursor prevCursor
+                      Result.fromMaybe
+                        (Internal.LibraryError ("Mock scan state not found for cursor " ++ Text.fromInt (unScanId id)))
+                        (Array.get (unScanId id) prevScans)
+                matchRegex <-
                   regexFromGlobStylePattern (Maybe.withDefault "*" maybeMatch)
                 let keysToSearch =
-                      HM.keys hm |> List.drop oldCursorValue
-                let (newCursorValue, matchedKeys) =
-                      loop regex keysToSearch [] 0 oldCursorValue
+                      HM.difference hm prevScannedKeys
+                        |> HM.keys
+                let (scannedKeys, matchedKeys) =
+                      doScan matchRegex keysToSearch prevScannedKeys [] 0
+                let newScans =
+                      Array.push scannedKeys prevScans
                 newCursor <-
-                  if newCursorValue < size
-                    then encodeCursor newCursorValue
-                    else Ok Database.Redis.cursor0
-                Ok (newCursor, matchedKeys)
-           in (model {- TODO -}, scanResult)
+                  if HM.size scannedKeys == HM.size hm
+                    then Ok Database.Redis.cursor0
+                    else encodeCursor currentScanId
+                Ok (newScans, newCursor, matchedKeys)
+           in case result of
+                Ok (newScans, newCursor, matchedKeys) ->
+                  ( model {scans = newScans},
+                    Ok (newCursor, matchedKeys)
+                  )
+                Err err ->
+                  ( model,
+                    Err err
+                  )
         Internal.Set key value ->
           ( updateHash <| HM.insert key (RedisByteString value) hm,
             Ok ()
@@ -468,22 +496,21 @@ matchesRegex regex text =
     Nothing -> False
 
 -- Cursor is an opaque newtype of ByteString. Can't deconstruct, so cheat using `Show`.
-decodeCursor :: Database.Redis.Cursor -> Result Internal.Error Int
+decodeCursor :: Database.Redis.Cursor -> Result Internal.Error ScanId
 decodeCursor opaqueCursor =
   case opaqueCursor |> Prelude.show |> Text.fromList |> Text.filter Char.isDigit |> Text.toInt of
-    Just cursor -> Ok cursor
-    Nothing -> Err (Internal.LibraryError "INVALID CURSOR could not be parsed as an integer")
+    Just id -> Ok (ScanId id)
+    Nothing -> Err (Internal.LibraryError "Mock Cursor could not be parsed as an integer")
 
 -- Cursor is opaque. To construct it, pretend we received it as a ByteString over the wire.
-encodeCursor :: Int -> Result Internal.Error Database.Redis.Cursor
-encodeCursor newCursorValue =
+encodeCursor :: ScanId -> Result Internal.Error Database.Redis.Cursor
+encodeCursor (ScanId id) =
   let decoded =
-        newCursorValue
-          |> Text.fromInt
+        Text.fromInt id
           |> TE.encodeUtf8
           |> Just
           |> Database.Redis.Bulk
           |> Database.Redis.decode
    in case decoded of
         Prelude.Right ok -> Ok ok
-        Prelude.Left _ -> Err (Internal.LibraryError ("INVALID CURSOR could not encode " ++ Text.fromInt newCursorValue))
+        Prelude.Left _ -> Err (Internal.LibraryError ("Failed to encode Mock cursor: " ++ Text.fromInt id))
