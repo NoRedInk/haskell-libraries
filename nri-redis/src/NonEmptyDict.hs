@@ -31,12 +31,12 @@ toDict :: Ord k => NonEmptyDict k v -> Dict k v
 toDict (NonEmptyDict (k, v) dict) =
   Dict.insert k v dict
 
--- | creates a 'Dict' from a 'NonEmptyDict'
+-- | creates a 'NonEmpty' list from a 'NonEmptyDict'
 toNonEmptyList :: NonEmptyDict k v -> NonEmpty (k, v)
 toNonEmptyList (NonEmptyDict kv dict) =
   kv :| Dict.toList dict
 
--- | creates a `Dict` from a key, value, and dict
+-- | creates a `NonEmptyDict` from a key, value, and dict
 init :: Ord k => k -> v -> Dict.Dict k v -> NonEmptyDict k v
 init key val dict =
   NonEmptyDict (key, val) (Dict.remove key dict)
