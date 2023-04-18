@@ -262,10 +262,55 @@ queryTests redisHandler =
           |> Redis.query redisHandler
           |> Expect.succeeds
       field2
-        |> Expect.equal (Just "val2")
+        |> Expect.equal (Just "val2"),
+    Test.test "scan iterates over all matching keys in batches" <| \() -> do
+      let firstKey = "scanTest::key1"
+      let firstValue = "value 1"
+      let nonEmptyDict =
+            NonEmptyDict.init firstKey firstValue
+              <| Dict.fromList
+                [ ("scanTest::key2", "value 2"),
+                  ("scanTest::key3", "value 3"),
+                  ("scanTest::key4", "value 4")
+                ]
+      let expectedKeys =
+            NonEmptyDict.toDict nonEmptyDict
+              |> Dict.toList
+              |> List.map (\(k, _) -> Internal.namespace testNS ++ ":" ++ k)
+      Redis.mset api nonEmptyDict
+        |> Redis.query testNS
+        |> Expect.succeeds
+      let updateAcc = \k acc -> Task.succeed (Dict.insert k () acc)
+      actualDict <-
+        scanFold testNS (Just "scanTest::*") (Just 2) updateAcc Dict.empty
+          |> Expect.succeeds
+      actualDict
+        |> Dict.toList
+        |> List.map Tuple.first
+        |> Expect.equal expectedKeys,
+    Test.test "scan works correctly when deleting keys" <| \() -> Expect.fail "TODO"
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
+
+scanFold :: Redis.Handler' x -> Maybe Text -> Maybe Int -> (Text -> a -> Task Redis.Error a) -> a -> Task Redis.Error a
+scanFold redisHandler maybeMatch maybeCount updateAcc acc0 =
+  let go accumulator cursor = do
+        (nextCursor, foundKeys) <-
+          Redis.scan api cursor maybeMatch maybeCount
+            |> Redis.query redisHandler
+        nextAccumulator <-
+          List.foldl
+            ( \k accTask -> do
+                acc <- accTask
+                updateAcc k acc
+            )
+            (Task.succeed accumulator)
+            foundKeys
+        if nextCursor == Redis.cursor0
+          then Task.succeed nextAccumulator
+          else go nextAccumulator nextCursor
+   in go acc0 Redis.cursor0
 
 data TestHandlers = TestHandlers
   { mockHandler :: Redis.Handler,
