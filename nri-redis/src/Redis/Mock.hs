@@ -62,8 +62,6 @@ data Model = Model
 
 type Scans = Array.Array (HM.HashMap Text ())
 
-newtype ScanId = ScanId {unScanId :: Int}
-
 -- | Redis supports a small number of types and most of its commands expect a
 -- particular type in the keys the command is used on.
 --
@@ -363,8 +361,8 @@ doQuery query model =
 
               prevScans =
                 scans model
-              currentScanId =
-                ScanId (Array.length prevScans)
+              currentScanIndex =
+                Array.length prevScans
 
               result :: Result Internal.Error (Scans, Database.Redis.Cursor, [Text])
               result = do
@@ -372,10 +370,10 @@ doQuery query model =
                   if prevCursor == Database.Redis.cursor0
                     then Ok HM.empty
                     else do
-                      id <- decodeCursor prevCursor
+                      index <- decodeCursor prevCursor
                       Result.fromMaybe
-                        (Internal.LibraryError ("Mock scan state not found for cursor " ++ Text.fromInt (unScanId id)))
-                        (Array.get (unScanId id) prevScans)
+                        (Internal.LibraryError ("Mock scan state not found for cursor " ++ Text.fromInt index))
+                        (Array.get index prevScans)
                 matchRegex <-
                   regexFromGlobStylePattern (Maybe.withDefault "*" maybeMatch)
                 let keysToSearch =
@@ -391,7 +389,7 @@ doQuery query model =
                     newCursor <-
                       if HM.size scannedKeys == HM.size hm
                         then Ok Database.Redis.cursor0
-                        else encodeCursor currentScanId
+                        else encodeCursor currentScanIndex
                     Ok (newScans, newCursor, matchedKeys)
            in case result of
                 Ok (newScans, newCursor, matchedKeys) ->
@@ -499,21 +497,21 @@ matchesRegex regex text =
     Nothing -> False
 
 -- Cursor is an opaque newtype of ByteString. Can't deconstruct, so cheat using `Show`.
-decodeCursor :: Database.Redis.Cursor -> Result Internal.Error ScanId
+decodeCursor :: Database.Redis.Cursor -> Result Internal.Error Int
 decodeCursor opaqueCursor =
   case opaqueCursor |> Prelude.show |> Text.fromList |> Text.filter Char.isDigit |> Text.toInt of
-    Just id -> Ok (ScanId id)
+    Just scanIndex -> Ok scanIndex
     Nothing -> Err (Internal.LibraryError "Mock Cursor could not be parsed as an integer")
 
 -- Cursor is opaque. To construct it, pretend we received it as a ByteString over the wire.
-encodeCursor :: ScanId -> Result Internal.Error Database.Redis.Cursor
-encodeCursor (ScanId id) =
+encodeCursor :: Int -> Result Internal.Error Database.Redis.Cursor
+encodeCursor scanIndex =
   let decoded =
-        Text.fromInt id
+        Text.fromInt scanIndex
           |> TE.encodeUtf8
           |> Just
           |> Database.Redis.Bulk
           |> Database.Redis.decode
    in case decoded of
         Prelude.Right ok -> Ok ok
-        Prelude.Left _ -> Err (Internal.LibraryError ("Failed to encode Mock cursor: " ++ Text.fromInt id))
+        Prelude.Left _ -> Err (Internal.LibraryError ("Failed to encode Mock cursor: " ++ Text.fromInt scanIndex))
