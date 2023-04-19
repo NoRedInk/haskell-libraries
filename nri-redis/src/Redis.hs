@@ -32,7 +32,6 @@ module Redis
     mget,
     mset,
     ping,
-    scan,
     set,
     setex,
     setnx,
@@ -41,8 +40,6 @@ module Redis
     Internal.query,
     Internal.transaction,
     Internal.Query,
-    Internal.Cursor,
-    Internal.cursor0,
     Internal.Error (..),
     Internal.map,
     Internal.map2,
@@ -120,12 +117,6 @@ data Api key a = Api
     --
     -- https://redis.io/commands/ping
     ping :: Internal.Query (),
-    -- | You should probably use `foldWithScan` instead of this function.
-    -- Incrementally iterate over the keys in the database, using a chain of queries,
-    -- and a Cursor that Redis uses to keep track of progress.
-    --
-    -- https://redis.io/commands/scan
-    scan :: Internal.Cursor -> Maybe Text -> Maybe Int -> Internal.Query (Internal.Cursor, [Text]),
     -- | Set key to hold the string value. If key already holds a value, it is
     -- overwritten, regardless of its type. Any previous time to live associated
     -- with the key is discarded on successful SET operation.
@@ -186,7 +177,6 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
           |> map (\(k, v) -> (toKey k, codecEncoder v))
           |> Internal.Mset,
       ping = Internal.Ping |> map (\_ -> ()),
-      scan = Internal.Scan,
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setex = \key seconds value -> Internal.Setex (toKey key) seconds (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value)
