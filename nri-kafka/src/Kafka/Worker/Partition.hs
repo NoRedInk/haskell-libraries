@@ -203,16 +203,6 @@ processMsgLoop skipOrNot messageFormat commitOffsets observabilityHandler state 
     StopThread ->
       Prelude.pure ()
     (NextMsg processAttempts record) -> do
-      case processAttempts of
-        (ProcessAttemptsCount 0) -> Prelude.pure ()
-        (ProcessAttemptsCount attempts) ->
-          -- Wait a bit if this is a retry, to prevent putting a lot of retry
-          -- stress on downstream systems or generating huge numbers of error
-          -- messages.
-          microSecondsDelayForAttempt attempts
-            |> Prelude.fromIntegral
-            |> Control.Concurrent.threadDelay
-
       doAnything <- Platform.doAnythingHandler
       let commit processResult =
             case processResult of
@@ -447,24 +437,41 @@ peekRecord state =
   Stopping.runUnlessStopping
     (stopping state)
     StopThread
-    ( STM.atomically
-        <| do
-          let (Partition partition') = partition state
-          backlog' <- TVar.readTVar partition'
-          case backlog' of
-            AwaitingSeekTo _ ->
-              STM.retry
-            Stopping -> do
-              Prelude.pure StopThread
-            Assigned Seq.Empty ->
-              STM.retry
-            Assigned ((processAttemptsCount, first) Seq.:<| rest) -> do
-              -- Bump the retry count so that the next time we read this message, we
-              -- know we've read it before.
-              TVar.writeTVar
-                partition'
-                (Assigned ((processAttemptsCount + 1, first) Seq.:<| rest))
-              Prelude.pure (NextMsg processAttemptsCount first)
+    ( do
+        next <-
+          STM.atomically
+            <| do
+              let (Partition partition') = partition state
+              backlog' <- TVar.readTVar partition'
+              case backlog' of
+                AwaitingSeekTo _ ->
+                  STM.retry
+                Stopping -> do
+                  Prelude.pure Nothing
+                Assigned Seq.Empty ->
+                  STM.retry
+                Assigned ((processAttemptsCount, first) Seq.:<| rest) -> do
+                  -- Bump the retry count so that the next time we read this message, we
+                  -- know we've read it before.
+                  TVar.writeTVar
+                    partition'
+                    (Assigned ((processAttemptsCount + 1, first) Seq.:<| rest))
+                  Prelude.pure <| Just (processAttemptsCount, first)
+
+        case next of
+          Nothing -> Prelude.pure StopThread
+          Just (processAttempts, record) -> do
+            case processAttempts of
+              (ProcessAttemptsCount 0) -> Prelude.pure ()
+              (ProcessAttemptsCount attempts) ->
+                -- Wait a bit if this is a retry, to prevent putting a lot of retry
+                -- stress on downstream systems or generating huge numbers of error
+                -- messages.
+                microSecondsDelayForAttempt attempts
+                  |> Prelude.fromIntegral
+                  |> Control.Concurrent.threadDelay
+
+            Prelude.pure (NextMsg processAttempts record)
     )
 
 awaitingSeekTo :: Partition -> Int -> Prelude.IO ()
