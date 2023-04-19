@@ -275,8 +275,7 @@ queryTests redisHandler =
                 ]
       let expectedKeys =
             NonEmptyDict.toDict nonEmptyDict
-              |> Dict.toList
-              |> List.map (\(k, _) -> Internal.namespace testNS ++ ":" ++ k)
+              |> Dict.keys
       Redis.mset api nonEmptyDict
         |> Redis.query testNS
         |> Expect.succeeds
@@ -285,8 +284,7 @@ queryTests redisHandler =
         scanFold testNS (Just "scanTest::*") (Just 2) updateAcc Dict.empty
           |> Expect.succeeds
       actualDict
-        |> Dict.toList
-        |> List.map Tuple.first
+        |> Dict.keys
         |> Expect.equal expectedKeys,
     Test.test "scan works correctly when deleting keys" <| \() -> Expect.fail "TODO"
   ]

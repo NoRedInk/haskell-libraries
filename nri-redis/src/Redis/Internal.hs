@@ -253,7 +253,9 @@ transaction handler query' =
     |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler))
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
-namespaceQuery prefix query' = mapKeys (\key -> Task.succeed (prefix ++ key)) query'
+namespaceQuery prefix query' =
+  mapKeys (\key -> Task.succeed (prefix ++ key)) query'
+    |> Task.map (mapReturnedKeys (Text.dropLeft (Text.length prefix)))
 
 mapKeys :: (Text -> Task err Text) -> Query a -> Task err (Query a)
 mapKeys fn query' =
@@ -292,6 +294,43 @@ mapKeys fn query' =
     Pure x -> Task.succeed (Pure x)
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
+
+mapReturnedKeys :: (Text -> Text) -> Query a -> Query a
+mapReturnedKeys fn query' =
+  case query' of
+    Exists key -> Exists key
+    Ping -> Ping
+    Get key -> Get key
+    Set key value -> Set key value
+    Setex key seconds value -> Setex key seconds value
+    Setnx key value -> Setnx key value
+    Getset key value -> Getset key value
+    Mget keys -> Mget keys
+    Mset assocs -> Mset assocs
+    Del keys -> Del keys
+    Hgetall key -> Hgetall key
+    Hkeys key -> Hkeys key
+    Hmget key fields -> Hmget key fields
+    Hget key field -> Hget key field
+    Hset key field val -> Hset key field val
+    Hsetnx key field val -> Hsetnx key field val
+    Hmset key vals -> Hmset key vals
+    Hdel key fields -> Hdel key fields
+    Incr key -> Incr key
+    Incrby key amount -> Incrby key amount
+    Expire key secs -> Expire key secs
+    Lrange key lower upper -> Lrange key lower upper
+    Rpush key vals -> Rpush key vals
+    Scan cursor maybeMatch maybeCount ->
+      Scan cursor maybeMatch maybeCount
+        |> map (\(nextCursor, keys) -> (nextCursor, List.map fn keys))
+    Sadd key vals -> Sadd key vals
+    Scard key -> Scard key
+    Srem key vals -> Srem key vals
+    Smembers key -> Smembers key
+    Pure x -> Pure x
+    Apply f x -> Apply (mapReturnedKeys fn f) (mapReturnedKeys fn x)
+    WithResult f q -> (WithResult f) (mapReturnedKeys fn q)
 
 ensureMaxKeySize :: Handler' x -> Query a -> Task Error (Query a)
 ensureMaxKeySize handler query' =
