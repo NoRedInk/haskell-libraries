@@ -381,15 +381,18 @@ doQuery query model =
                 let keysToSearch =
                       HM.difference hm prevScannedKeys
                         |> HM.keys
-                let (scannedKeys, matchedKeys) =
-                      doScan matchRegex keysToSearch prevScannedKeys [] 0
-                let newScans =
-                      Array.push scannedKeys prevScans
-                newCursor <-
-                  if HM.size scannedKeys == HM.size hm
-                    then Ok Database.Redis.cursor0
-                    else encodeCursor currentScanId
-                Ok (newScans, newCursor, matchedKeys)
+                if List.isEmpty keysToSearch
+                  then Ok (prevScans, Database.Redis.cursor0, [])
+                  else do
+                    let (scannedKeys, matchedKeys) =
+                          doScan matchRegex keysToSearch prevScannedKeys [] 0
+                    let newScans =
+                          Array.push scannedKeys prevScans
+                    newCursor <-
+                      if HM.size scannedKeys == HM.size hm
+                        then Ok Database.Redis.cursor0
+                        else encodeCursor currentScanId
+                    Ok (newScans, newCursor, matchedKeys)
            in case result of
                 Ok (newScans, newCursor, matchedKeys) ->
                   ( model {scans = newScans},
