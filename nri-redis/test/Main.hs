@@ -16,6 +16,7 @@ import qualified Redis.List
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
+import qualified Set
 import qualified Task
 import qualified Test
 import qualified Prelude
@@ -262,7 +263,63 @@ queryTests redisHandler =
           |> Redis.query redisHandler
           |> Expect.succeeds
       field2
-        |> Expect.equal (Just "val2")
+        |> Expect.equal (Just "val2"),
+    Test.test "scan iterates over all matching keys in batches" <| \() -> do
+      let firstKey = "scanTest::key1"
+      let firstValue = "value 1"
+      let nonEmptyDict =
+            NonEmptyDict.init firstKey firstValue
+              <| Dict.fromList
+                [ ("scanTest::key2", "value 2"),
+                  ("scanTest::key3", "value 3"),
+                  ("scanTest::key4", "value 4")
+                ]
+      let expectedKeys =
+            NonEmptyDict.toDict nonEmptyDict
+              |> Dict.keys
+      Redis.mset api nonEmptyDict
+        |> Redis.query testNS
+        |> Expect.succeeds
+      let processBatch = \batchKeys acc ->
+            Task.succeed (List.foldl Set.insert acc batchKeys)
+      keySet <-
+        Redis.foldWithScan testNS (Just "scanTest::*") (Just 2) processBatch Set.empty
+          |> Expect.succeeds
+      keySet
+        |> Set.toList
+        |> Expect.equal expectedKeys,
+    Test.test "scan works correctly when deleting keys" <| \() -> do
+      let firstKey = "scanDeleteTest::key1"
+      let firstValue = "value 1"
+      let nonEmptyDict =
+            NonEmptyDict.init firstKey firstValue
+              <| Dict.fromList
+                [ ("scanDeleteTest::key2", "value 2"),
+                  ("scanDeleteTest::key3", "value 3"),
+                  ("scanDeleteTest::key4", "value 4")
+                ]
+      let expectedKeys =
+            NonEmptyDict.toDict nonEmptyDict
+              |> Dict.keys
+      Redis.mset api nonEmptyDict
+        |> Redis.query testNS
+        |> Expect.succeeds
+      let processBatch = \batchKeys (accDeleted, accKeys) ->
+            case batchKeys of
+              [] -> Task.succeed (accDeleted, accKeys)
+              first : rest -> do
+                nDel <-
+                  Redis.del api (first :| rest)
+                    |> Redis.query testNS
+                Task.succeed (accDeleted + nDel, List.foldl Set.insert accKeys batchKeys)
+      (totalDeleted, keySet) <-
+        Redis.foldWithScan testNS (Just "scanDeleteTest::*") (Just 2) processBatch (0, Set.empty)
+          |> Expect.succeeds
+      totalDeleted
+        |> Expect.equal (List.length expectedKeys)
+      keySet
+        |> Set.toList
+        |> Expect.equal expectedKeys
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler

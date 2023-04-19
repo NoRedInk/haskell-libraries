@@ -45,6 +45,7 @@ module Redis
     Internal.map2,
     Internal.map3,
     Internal.sequence,
+    Internal.foldWithScan,
   )
 where
 

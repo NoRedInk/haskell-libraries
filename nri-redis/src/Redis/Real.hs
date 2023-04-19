@@ -257,6 +257,20 @@ doRawQuery query =
       Database.Redis.rpush (toB key) (NonEmpty.toList vals)
         |> PreparedQuery
         |> map (Ok << fromIntegral)
+    Internal.Scan cursor maybeMatch maybeCount ->
+      Database.Redis.ScanOpts (map toB maybeMatch) (map fromIntegral maybeCount)
+        |> Database.Redis.scanOpts cursor
+        |> PreparedQuery
+        |> map
+          ( \(nextCursor, byteKeys) ->
+              byteKeys
+                |> Prelude.traverse
+                  ( \byteKey -> case Data.Text.Encoding.decodeUtf8' byteKey of
+                      Prelude.Right textKey -> Ok textKey
+                      Prelude.Left _ -> Err (Internal.LibraryError "key exists but not parsable text")
+                  )
+                |> map (\textKeys -> (nextCursor, textKeys))
+          )
     Internal.Set key val ->
       Database.Redis.set (toB key) val
         |> PreparedQuery

@@ -71,6 +71,7 @@ library
     , nri-env-parser >=0.1.0.0 && <0.2
     , nri-observability >=0.1.0 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
+    , pcre-light >=0.4.1.0 && <0.4.2
     , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
     , text >=1.2.3.1 && <2.1
@@ -124,6 +125,7 @@ test-suite tests
     , nri-env-parser >=0.1.0.0 && <0.2
     , nri-observability >=0.1.0 && <0.2
     , nri-prelude >=0.1.0.0 && <0.7
+    , pcre-light >=0.4.1.0 && <0.4.2
     , resourcet >=1.2.0 && <1.3
     , safe-exceptions >=0.1.7.0 && <1.3
     , text >=1.2.3.1 && <2.1

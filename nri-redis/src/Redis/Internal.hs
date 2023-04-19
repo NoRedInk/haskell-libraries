@@ -9,6 +9,8 @@ module Redis.Internal
     HandlerAutoExtendExpire,
     HasAutoExtendExpire (..),
     Query (..),
+    Database.Redis.Cursor,
+    Database.Redis.cursor0,
     cmds,
     map,
     map2,
@@ -16,6 +18,7 @@ module Redis.Internal
     sequence,
     query,
     transaction,
+    foldWithScan,
     -- internal tools
     traceQuery,
     maybesToDict,
@@ -96,6 +99,7 @@ cmds query'' =
     Mset pairs -> [unwords ("MSET" : List.concatMap (\(key, _) -> [key, "*****"]) (NonEmpty.toList pairs))]
     Ping -> ["PING"]
     Rpush key vals -> [unwords ("RPUSH" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
+    Scan cursor maybeMatch maybeCount -> [scanCmd cursor maybeMatch maybeCount]
     Set key _ -> [unwords ["SET", key, "*****"]]
     Setex key seconds _ -> [unwords ["SETEX", key, Text.fromInt seconds, "*****"]]
     Setnx key _ -> [unwords ["SETNX", key, "*****"]]
@@ -106,6 +110,20 @@ cmds query'' =
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
     WithResult _ x -> cmds x
+  where
+    scanCmd :: Database.Redis.Cursor -> Maybe Text -> Maybe Int -> Text
+    scanCmd cursor maybeMatch maybeCount =
+      let cursorWord =
+            Text.fromList (Prelude.show cursor)
+          matchWords =
+            case maybeMatch of
+              Nothing -> []
+              Just keyPattern -> ["MATCH", keyPattern]
+          countWords =
+            case maybeCount of
+              Nothing -> []
+              Just c -> ["COUNT", Text.fromInt c]
+       in unwords ("SCAN" : cursorWord : matchWords ++ countWords)
 
 unwords :: [Text] -> Text
 unwords = Text.join " "
@@ -132,6 +150,7 @@ data Query a where
   Mset :: NonEmpty (Text, ByteString) -> Query ()
   Ping :: Query Database.Redis.Status
   Rpush :: Text -> NonEmpty ByteString -> Query Int
+  Scan :: Database.Redis.Cursor -> Maybe Text -> Maybe Int -> Query (Database.Redis.Cursor, [Text])
   Set :: Text -> ByteString -> Query ()
   Setex :: Text -> Int -> ByteString -> Query ()
   Setnx :: Text -> ByteString -> Query Bool
@@ -235,7 +254,9 @@ transaction handler query' =
     |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler))
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
-namespaceQuery prefix query' = mapKeys (\key -> Task.succeed (prefix ++ key)) query'
+namespaceQuery prefix query' =
+  mapKeys (\key -> Task.succeed (prefix ++ key)) query'
+    |> Task.map (mapReturnedKeys (Text.dropLeft (Text.length prefix)))
 
 mapKeys :: (Text -> Task err Text) -> Query a -> Task err (Query a)
 mapKeys fn query' =
@@ -252,24 +273,65 @@ mapKeys fn query' =
     Del keys -> Task.map Del (Prelude.traverse (fn) keys)
     Hgetall key -> Task.map Hgetall (fn key)
     Hkeys key -> Task.map Hkeys (fn key)
-    Hmget key fields -> Task.map (\newKeys -> Hmget newKeys fields) (fn key)
-    Hget key field -> Task.map (\newKeys -> Hget newKeys field) (fn key)
-    Hset key field val -> Task.map (\newKeys -> Hset newKeys field val) (fn key)
-    Hsetnx key field val -> Task.map (\newKeys -> Hsetnx newKeys field val) (fn key)
-    Hmset key vals -> Task.map (\newKeys -> Hmset newKeys vals) (fn key)
-    Hdel key fields -> Task.map (\newKeys -> Hdel newKeys fields) (fn key)
+    Hmget key fields -> Task.map (\newKey -> Hmget newKey fields) (fn key)
+    Hget key field -> Task.map (\newKey -> Hget newKey field) (fn key)
+    Hset key field val -> Task.map (\newKey -> Hset newKey field val) (fn key)
+    Hsetnx key field val -> Task.map (\newKey -> Hsetnx newKey field val) (fn key)
+    Hmset key vals -> Task.map (\newKey -> Hmset newKey vals) (fn key)
+    Hdel key fields -> Task.map (\newKey -> Hdel newKey fields) (fn key)
     Incr key -> Task.map Incr (fn key)
-    Incrby key amount -> Task.map (\newKeys -> Incrby newKeys amount) (fn key)
-    Expire key secs -> Task.map (\newKeys -> Expire newKeys secs) (fn key)
-    Lrange key lower upper -> Task.map (\newKeys -> Lrange newKeys lower upper) (fn key)
-    Rpush key vals -> Task.map (\newKeys -> Rpush newKeys vals) (fn key)
-    Sadd key vals -> Task.map (\newKeys -> Sadd newKeys vals) (fn key)
+    Incrby key amount -> Task.map (\newKey -> Incrby newKey amount) (fn key)
+    Expire key secs -> Task.map (\newKey -> Expire newKey secs) (fn key)
+    Lrange key lower upper -> Task.map (\newKey -> Lrange newKey lower upper) (fn key)
+    Rpush key vals -> Task.map (\newKey -> Rpush newKey vals) (fn key)
+    Scan cursor maybeMatch maybeCount ->
+      case maybeMatch of
+        Just match -> Task.map (\newMatch -> Scan cursor (Just newMatch) maybeCount) (fn match)
+        Nothing -> Task.succeed (Scan cursor Nothing maybeCount)
+    Sadd key vals -> Task.map (\newKey -> Sadd newKey vals) (fn key)
     Scard key -> Task.map Scard (fn key)
-    Srem key vals -> Task.map (\newKeys -> Srem newKeys vals) (fn key)
+    Srem key vals -> Task.map (\newKey -> Srem newKey vals) (fn key)
     Smembers key -> Task.map Smembers (fn key)
     Pure x -> Task.succeed (Pure x)
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
+
+mapReturnedKeys :: (Text -> Text) -> Query a -> Query a
+mapReturnedKeys fn query' =
+  case query' of
+    Exists key -> Exists key
+    Ping -> Ping
+    Get key -> Get key
+    Set key value -> Set key value
+    Setex key seconds value -> Setex key seconds value
+    Setnx key value -> Setnx key value
+    Getset key value -> Getset key value
+    Mget keys -> Mget keys
+    Mset assocs -> Mset assocs
+    Del keys -> Del keys
+    Hgetall key -> Hgetall key
+    Hkeys key -> Hkeys key
+    Hmget key fields -> Hmget key fields
+    Hget key field -> Hget key field
+    Hset key field val -> Hset key field val
+    Hsetnx key field val -> Hsetnx key field val
+    Hmset key vals -> Hmset key vals
+    Hdel key fields -> Hdel key fields
+    Incr key -> Incr key
+    Incrby key amount -> Incrby key amount
+    Expire key secs -> Expire key secs
+    Lrange key lower upper -> Lrange key lower upper
+    Rpush key vals -> Rpush key vals
+    Scan cursor maybeMatch maybeCount ->
+      Scan cursor maybeMatch maybeCount
+        |> map (\(nextCursor, keys) -> (nextCursor, List.map fn keys))
+    Sadd key vals -> Sadd key vals
+    Scard key -> Scard key
+    Srem key vals -> Srem key vals
+    Smembers key -> Smembers key
+    Pure x -> Pure x
+    Apply f x -> Apply (mapReturnedKeys fn f) (mapReturnedKeys fn x)
+    WithResult f q -> (WithResult f) (mapReturnedKeys fn q)
 
 ensureMaxKeySize :: Handler' x -> Query a -> Task Error (Query a)
 ensureMaxKeySize handler query' =
@@ -311,6 +373,7 @@ keysTouchedByQuery query' =
     Ping -> Set.empty
     Pure _ -> Set.empty
     Rpush key _ -> Set.singleton key
+    Scan {} -> Set.empty
     Set key _ -> Set.singleton key
     Setex key _ _ -> Set.singleton key
     Setnx key _ -> Set.singleton key
@@ -354,3 +417,21 @@ traceQuery commands host port task =
                   )
             )
         )
+
+-- | Use SCAN command to find keys matching a pattern, and "fold" over them in batches, producing a result value.
+-- keyMatchPattern       A glob-like pattern to match keys, see https://redis.io/commands/keys/
+-- approxCountPerBatch   A hint for the batch size you want to process at once. Only approximate.
+-- processKeyBatch       Function to process one batch of keys (provided as plain Text without namespace prefix)
+-- initAccumulator       Initial value for the fold accumulator
+foldWithScan :: Handler' x -> Maybe Text -> Maybe Int -> ([Text] -> a -> Task Error a) -> a -> Task Error a
+foldWithScan handler keyMatchPattern approxCountPerBatch processKeyBatch initAccumulator =
+  let go accumulator cursor = do
+        (nextCursor, keyBatch) <-
+          Scan cursor keyMatchPattern approxCountPerBatch
+            |> query handler
+        nextAccumulator <-
+          processKeyBatch keyBatch accumulator
+        if nextCursor == Database.Redis.cursor0
+          then Task.succeed nextAccumulator
+          else go nextAccumulator nextCursor
+   in go initAccumulator Database.Redis.cursor0
