@@ -18,6 +18,7 @@ module Redis.Internal
     sequence,
     query,
     transaction,
+    foldWithScan,
     -- internal tools
     traceQuery,
     maybesToDict,
@@ -416,3 +417,21 @@ traceQuery commands host port task =
                   )
             )
         )
+
+-- | Use SCAN command to find keys matching a pattern, and "fold" over them in batches, producing a result value.
+-- keyMatchPattern       A glob-like pattern to match keys, see https://redis.io/commands/keys/
+-- approxCountPerBatch   A hint for the batch size you want to process at once. Only approximate.
+-- processKeyBatch       Function to process one batch of keys (provided as plain Text without namespace prefix)
+-- initAccumulator       Initial value for the fold accumulator
+foldWithScan :: Handler' x -> Maybe Text -> Maybe Int -> ([Text] -> a -> Task Error a) -> a -> Task Error a
+foldWithScan handler keyMatchPattern approxCountPerBatch processKeyBatch initAccumulator =
+  let go accumulator cursor = do
+        (nextCursor, keyBatch) <-
+          Scan cursor keyMatchPattern approxCountPerBatch
+            |> query handler
+        nextAccumulator <-
+          processKeyBatch keyBatch accumulator
+        if nextCursor == Database.Redis.cursor0
+          then Task.succeed nextAccumulator
+          else go nextAccumulator nextCursor
+   in go initAccumulator Database.Redis.cursor0

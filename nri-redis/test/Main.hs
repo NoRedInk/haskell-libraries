@@ -283,7 +283,7 @@ queryTests redisHandler =
       let processBatch = \batchKeys acc ->
             Task.succeed (List.foldl Set.insert acc batchKeys)
       keySet <-
-        scanFold testNS (Just "scanTest::*") (Just 2) processBatch Set.empty
+        Redis.foldWithScan testNS (Just "scanTest::*") (Just 2) processBatch Set.empty
           |> Expect.succeeds
       keySet
         |> Set.toList
@@ -313,7 +313,7 @@ queryTests redisHandler =
                     |> Redis.query testNS
                 Task.succeed (accDeleted + nDel, List.foldl Set.insert accKeys batchKeys)
       (totalDeleted, keySet) <-
-        scanFold testNS (Just "scanDeleteTest::*") (Just 2) processBatch (0, Set.empty)
+        Redis.foldWithScan testNS (Just "scanDeleteTest::*") (Just 2) processBatch (0, Set.empty)
           |> Expect.succeeds
       totalDeleted
         |> Expect.equal (List.length expectedKeys)
@@ -323,20 +323,6 @@ queryTests redisHandler =
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
-
--- Use SCAN to fold over keys matching a given pattern, accumulating a result value
-scanFold :: Redis.Handler' x -> Maybe Text -> Maybe Int -> ([Text] -> a -> Task Redis.Error a) -> a -> Task Redis.Error a
-scanFold redisHandler maybeMatch maybeCount processBatch acc0 =
-  let go accumulator cursor = do
-        (nextCursor, foundKeys) <-
-          Redis.scan api cursor maybeMatch maybeCount
-            |> Redis.query redisHandler
-        nextAccumulator <-
-          processBatch foundKeys accumulator
-        if nextCursor == Redis.cursor0
-          then Task.succeed nextAccumulator
-          else go nextAccumulator nextCursor
-   in go acc0 Redis.cursor0
 
 data TestHandlers = TestHandlers
   { mockHandler :: Redis.Handler,

@@ -48,6 +48,7 @@ module Redis
     Internal.map2,
     Internal.map3,
     Internal.sequence,
+    Internal.foldWithScan,
   )
 where
 
@@ -119,9 +120,9 @@ data Api key a = Api
     --
     -- https://redis.io/commands/ping
     ping :: Internal.Query (),
-    -- | Incrementally iterate over the keys in the database, using a chain of queries,
-    -- and a Cursor that Redis uses to keep track of progress. A given key may be
-    -- returned multiple times, and it is up to the application to handle this.
+    -- | You should probably use `foldWithScan` instead of this function.
+    -- Incrementally iterate over the keys in the database, using a chain of queries,
+    -- and a Cursor that Redis uses to keep track of progress.
     --
     -- https://redis.io/commands/scan
     scan :: Internal.Cursor -> Maybe Text -> Maybe Int -> Internal.Query (Internal.Cursor, [Text]),
