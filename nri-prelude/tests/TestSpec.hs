@@ -251,7 +251,7 @@ stdoutReporter =
             ( \_ handle ->
                 Internal.AllPassed
                   [ mockTest "test 1" (mockTracingSpanWithTimes 0 10),
-                    mockTest "test 2" (mockTracingSpanWithTimes 1 12)
+                    mockTest "test 2" (mockTracingSpanWithTimes 1 1234)
                   ]
                   |> Test.Reporter.Stdout.report handle
             )
