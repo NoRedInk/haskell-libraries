@@ -22,6 +22,7 @@ import Text.Colour (chunk)
 import qualified Text.Colour
 import qualified Text.Colour.Capabilities.FromEnv
 import qualified Prelude
+import qualified Numeric
 
 report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
 report handle results = do
@@ -32,14 +33,15 @@ report handle results = do
 
 renderReport :: Internal.SuiteResult -> Prelude.IO (List (Text.Colour.Chunk))
 renderReport results =
+  let elapsed = formatElapsedDuration results
+  in
   case results of
     Internal.AllPassed passed ->
       let amountPassed = List.length passed
-          elapsed = elapsedMilliseconds passed []
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
-              black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
+              black <| chunk <| "Duration:  " ++ elapsed,
               "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
@@ -47,7 +49,6 @@ renderReport results =
     Internal.OnlysPassed passed skipped ->
       let amountPassed = List.length passed
           amountSkipped = List.length skipped
-          elapsed = elapsedMilliseconds passed []
        in Prelude.pure
             <| List.concat
               [ List.concatMap
@@ -62,7 +63,7 @@ renderReport results =
                 [ yellow (Text.Colour.underline ("TEST RUN INCOMPLETE")),
                   yellow " because there is an `only` in your tests.",
                   "\n\n",
-                  black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
+                  black <| chunk <| "Duration:  " ++  elapsed,
                   "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
@@ -73,7 +74,6 @@ renderReport results =
     Internal.PassedWithSkipped passed skipped ->
       let amountPassed = List.length passed
           amountSkipped = List.length skipped
-          elapsed = elapsedMilliseconds passed []
        in Prelude.pure
             <| List.concat
               [ List.concatMap
@@ -91,7 +91,7 @@ renderReport results =
                         n -> " because " ++ Text.fromInt n ++ " tests were skipped"
                     ),
                   "\n\n",
-                  black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
+                  black <| chunk <| "Duration:  " ++ elapsed,
                   "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
@@ -104,7 +104,6 @@ renderReport results =
       let amountFailed = List.length failed
       let amountSkipped = List.length skipped
       let failures = List.map (map (\(Internal.FailedSpan _ failure) -> failure)) failed
-      let elapsed = elapsedMilliseconds passed failed
       srcLocs <- Prelude.traverse Test.Reporter.Internal.readSrcLoc failures
       let failuresSrcs = List.map renderFailureInFile srcLocs
       Prelude.pure
@@ -120,7 +119,7 @@ renderReport results =
                 failures,
             [ red (Text.Colour.underline "TEST RUN FAILED"),
               "\n\n",
-              black <| chunk <| "Duration:  " ++ Text.fromInt elapsed ++ " ms",
+              black <| chunk <| "Duration:  " ++ elapsed,
               "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
@@ -187,12 +186,13 @@ testFailure test =
           ++ "If you have some time to report the bug it would be much appreciated!\n"
           ++ "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
 
-elapsedMilliseconds :: List (Internal.SingleTest Platform.Internal.TracingSpan) -> List (Internal.SingleTest Internal.FailedSpan) -> Int
-elapsedMilliseconds passed failed =
-  let passedSpans = List.map Internal.body passed
-      failedSpans = failed |> List.map Internal.body |> List.map (\(Internal.FailedSpan span _) -> span)
-      spans = passedSpans ++ failedSpans
-      startTime =
+formatElapsedDuration :: Internal.SuiteResult -> Text
+formatElapsedDuration result =
+  result |> resultSpans |> elapsedMilliseconds |> formatElapsedMilliseconds
+
+elapsedMilliseconds :: List Platform.Internal.TracingSpan -> Float
+elapsedMilliseconds spans =
+  let startTime =
         spans
           |> List.map Platform.Internal.started
           |> List.minimum
@@ -202,4 +202,28 @@ elapsedMilliseconds passed failed =
           |> List.map Platform.Internal.finished
           |> List.maximum
           |> Maybe.withDefault 0
-   in finishTime - startTime |> Prelude.fromIntegral |> (`Prelude.div` 1000)
+   in finishTime - startTime |> Prelude.fromIntegral |> (/ 1000)
+
+resultSpans :: Internal.SuiteResult -> List Platform.Internal.TracingSpan
+resultSpans result =
+  case result of
+    Internal.AllPassed passed ->
+      List.map Internal.body passed
+    Internal.OnlysPassed passed _skipped ->
+      List.map Internal.body passed
+    Internal.PassedWithSkipped passed _skipped ->
+      List.map Internal.body passed
+    Internal.TestsFailed passed _skipped failed -> do
+      List.map Internal.body passed ++
+        (failed |> List.map Internal.body |> List.map (\(Internal.FailedSpan span _) -> span))
+    Internal.NoTestsInSuite ->
+      []
+
+-- and maybe add something like
+-- for rendering the elapsed time into a human readable format not only to ms
+formatElapsedMilliseconds :: Float -> Text
+formatElapsedMilliseconds ms =
+  if ms < 1000 then
+    Text.fromInt (round ms) ++ " ms"
+  else
+    Text.fromList (Numeric.showFFloat (Just 2) (ms / 1000) " s")
