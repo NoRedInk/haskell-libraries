@@ -904,4 +904,4 @@ newtype MonotonicTime = MonotonicTime
     -- constant moment in the past.
     inMicroseconds :: GHC.Word.Word64
   }
-  deriving (Prelude.Show, Prelude.Num, Prelude.Eq, Prelude.Ord, Aeson.ToJSON, Aeson.FromJSON)
+  deriving (Prelude.Show, Prelude.Enum, Prelude.Real, Prelude.Integral, Prelude.Num, Prelude.Eq, Prelude.Ord, Aeson.ToJSON, Aeson.FromJSON)

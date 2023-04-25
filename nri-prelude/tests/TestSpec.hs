@@ -24,6 +24,7 @@ import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Text
 import qualified Prelude
+import qualified List
 
 tests :: Test
 tests =
@@ -249,8 +250,8 @@ stdoutReporter =
           withTempFile
             ( \_ handle ->
                 Internal.AllPassed
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 0 10),
+                    mockTest "test 2" (mockTracingSpanWithTimes 1 1234)
                   ]
                   |> Test.Reporter.Stdout.report handle
             )
@@ -261,8 +262,8 @@ stdoutReporter =
           withTempFile
             ( \_ handle ->
                 Internal.OnlysPassed
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 0 10),
+                    mockTest "test 2" (mockTracingSpanWithTimes 1 13)
                   ]
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
@@ -276,8 +277,8 @@ stdoutReporter =
           withTempFile
             ( \_ handle ->
                 Internal.PassedWithSkipped
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 0 10),
+                    mockTest "test 2" (mockTracingSpanWithTimes 1 9)
                   ]
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
@@ -300,16 +301,16 @@ stdoutReporter =
           withTempFile
             ( \_ handle ->
                 Internal.TestsFailed
-                  [ mockTest "test 1" mockTracingSpan,
-                    mockTest "test 2" mockTracingSpan
+                  [ mockTest "test 1" (mockTracingSpanWithTimes 1 2),
+                    mockTest "test 2" (mockTracingSpanWithTimes 3 6)
                   ]
                   [ mockTest "test 3" Internal.NotRan,
                     mockTest "test 4" Internal.NotRan
                   ]
-                  [ mockTest "test 5" (Internal.FailedSpan mockTracingSpan (Internal.FailedAssertion "assertion error" mockSrcLoc)),
-                    mockTest "test 6" (Internal.FailedSpan mockTracingSpan (Internal.ThrewException mockException)),
-                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan Internal.TookTooLong),
-                    mockTest "test 7" (Internal.FailedSpan mockTracingSpan (Internal.TestRunnerMessedUp "sorry"))
+                  [ mockTest "test 5" (Internal.FailedSpan (mockTracingSpanWithTimes 1 12) (Internal.FailedAssertion "assertion error" mockSrcLoc)),
+                    mockTest "test 6" (Internal.FailedSpan (mockTracingSpanWithTimes 1 13) (Internal.ThrewException mockException)),
+                    mockTest "test 7" (Internal.FailedSpan (mockTracingSpanWithTimes 1 14) Internal.TookTooLong),
+                    mockTest "test 7" (Internal.FailedSpan (mockTracingSpanWithTimes 1 18) (Internal.TestRunnerMessedUp "sorry"))
                   ]
                   |> Test.Reporter.Stdout.report handle
             )
@@ -354,6 +355,7 @@ stdoutReporter =
                 Test.Reporter.Stdout.report handle result
             )
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc",
       test "tests failed (actually running) only run subset" <| \_ -> do
         let srcLoc =
@@ -385,6 +387,7 @@ stdoutReporter =
         Expect.true (Text.contains "Passed:    1" contents)
         Expect.true (Text.contains "Failed:    1" contents)
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-subset",
       test "tests failed (actually running) only run onefile" <| \_ -> do
         let suite =
@@ -406,6 +409,7 @@ stdoutReporter =
                 Test.Reporter.Stdout.report handle result
             )
         contents
+          |> withoutDurationLine
           |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-one-file"
     ]
 
@@ -520,10 +524,14 @@ mockTest name body =
 
 mockTracingSpan :: Platform.Internal.TracingSpan
 mockTracingSpan =
+  mockTracingSpanWithTimes 0 0
+
+mockTracingSpanWithTimes :: Int -> Int -> Platform.Internal.TracingSpan
+mockTracingSpanWithTimes startedMs finishedMs =
   Platform.Internal.TracingSpan
     { Platform.Internal.name = "name",
-      Platform.Internal.started = Platform.Internal.MonotonicTime 0,
-      Platform.Internal.finished = Platform.Internal.MonotonicTime 0,
+      Platform.Internal.started = Platform.Internal.MonotonicTime (1000 * Prelude.fromIntegral startedMs),
+      Platform.Internal.finished = Platform.Internal.MonotonicTime (1000 * Prelude.fromIntegral finishedMs),
       Platform.Internal.frame = Nothing,
       Platform.Internal.details = Nothing,
       Platform.Internal.summary = Nothing,
@@ -649,3 +657,10 @@ deadlockSuite mvar1 mvar2 =
         _ <- Expect.fromIO (MVar.takeMVar mvar2)
         Expect.pass
     ]
+
+withoutDurationLine :: Text -> Text
+withoutDurationLine text =
+  text
+    |> Text.lines
+    |> List.filter (\line -> line |> Text.startsWith "Duration: " |> not)
+    |> Text.join "\n"

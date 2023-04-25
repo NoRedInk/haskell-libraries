@@ -10,7 +10,9 @@ import qualified Control.Exception as Exception
 import qualified Data.ByteString as BS
 import qualified GHC.Stack as Stack
 import qualified List
+import qualified Maybe
 import NriPrelude
+import qualified Platform.Internal
 import qualified System.IO
 import qualified Test.Internal as Internal
 import Test.Reporter.Internal (black, green, grey, red, yellow)
@@ -20,6 +22,7 @@ import Text.Colour (chunk)
 import qualified Text.Colour
 import qualified Text.Colour.Capabilities.FromEnv
 import qualified Prelude
+import qualified Numeric
 
 report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
 report handle results = do
@@ -30,12 +33,16 @@ report handle results = do
 
 renderReport :: Internal.SuiteResult -> Prelude.IO (List (Text.Colour.Chunk))
 renderReport results =
+  let elapsed = formatElapsedDuration results
+  in
   case results of
     Internal.AllPassed passed ->
       let amountPassed = List.length passed
        in Prelude.pure
             [ green (Text.Colour.underline "TEST RUN PASSED"),
               "\n\n",
+              black <| chunk <| "Duration:  " ++ elapsed,
+              "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
             ]
@@ -56,6 +63,8 @@ renderReport results =
                 [ yellow (Text.Colour.underline ("TEST RUN INCOMPLETE")),
                   yellow " because there is an `only` in your tests.",
                   "\n\n",
+                  black <| chunk <| "Duration:  " ++  elapsed,
+                  "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
                   black (chunk <| "Skipped:   " ++ Text.fromInt amountSkipped),
@@ -82,6 +91,8 @@ renderReport results =
                         n -> " because " ++ Text.fromInt n ++ " tests were skipped"
                     ),
                   "\n\n",
+                  black <| chunk <| "Duration:  " ++ elapsed,
+                  "\n",
                   black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
                   "\n",
                   black (chunk <| "Skipped:   " ++ Text.fromInt amountSkipped),
@@ -108,6 +119,8 @@ renderReport results =
                 failures,
             [ red (Text.Colour.underline "TEST RUN FAILED"),
               "\n\n",
+              black <| chunk <| "Duration:  " ++ elapsed,
+              "\n",
               black (chunk <| "Passed:    " ++ Text.fromInt amountPassed),
               "\n"
             ],
@@ -172,3 +185,45 @@ testFailure test =
           ++ "This is a bug.\n\n"
           ++ "If you have some time to report the bug it would be much appreciated!\n"
           ++ "You can do so here: https://github.com/NoRedInk/haskell-libraries/issues"
+
+formatElapsedDuration :: Internal.SuiteResult -> Text
+formatElapsedDuration result =
+  result |> resultSpans |> elapsedMilliseconds |> formatElapsedMilliseconds
+
+elapsedMilliseconds :: List Platform.Internal.TracingSpan -> Float
+elapsedMilliseconds spans =
+  let startTime =
+        spans
+          |> List.map Platform.Internal.started
+          |> List.minimum
+          |> Maybe.withDefault 0
+      finishTime =
+        spans
+          |> List.map Platform.Internal.finished
+          |> List.maximum
+          |> Maybe.withDefault 0
+   in finishTime - startTime |> Prelude.fromIntegral |> (/ 1000)
+
+resultSpans :: Internal.SuiteResult -> List Platform.Internal.TracingSpan
+resultSpans result =
+  case result of
+    Internal.AllPassed passed ->
+      List.map Internal.body passed
+    Internal.OnlysPassed passed _skipped ->
+      List.map Internal.body passed
+    Internal.PassedWithSkipped passed _skipped ->
+      List.map Internal.body passed
+    Internal.TestsFailed passed _skipped failed -> do
+      List.map Internal.body passed ++
+        (failed |> List.map Internal.body |> List.map (\(Internal.FailedSpan span _) -> span))
+    Internal.NoTestsInSuite ->
+      []
+
+-- and maybe add something like
+-- for rendering the elapsed time into a human readable format not only to ms
+formatElapsedMilliseconds :: Float -> Text
+formatElapsedMilliseconds ms =
+  if ms < 1000 then
+    Text.fromInt (round ms) ++ " ms"
+  else
+    Text.fromList (Numeric.showFFloat (Just 2) (ms / 1000) " s")
