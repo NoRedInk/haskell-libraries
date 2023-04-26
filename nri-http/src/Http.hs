@@ -239,12 +239,12 @@ handleResponse expect response =
             Internal.ExpectText -> Ok (Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes)
             Internal.ExpectWhatever -> Ok ()
             Internal.ExpectTextResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) (Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes))
-            Internal.ExpectBytesResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) (Data.ByteString.Lazy.toStrict bytes))
+            Internal.ExpectBytesResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) (bytes))
     Left exception ->
       case expect of
         Internal.ExpectTextResponse mkResult ->
           exception
-            |> exceptionToResponse Data.Text.Encoding.decodeUtf8
+            |> exceptionToResponse (Data.Text.Lazy.toStrict << Data.Text.Lazy.Encoding.decodeUtf8)
             |> mkResult
         Internal.ExpectBytesResponse mkResult ->
           exception
@@ -281,7 +281,7 @@ exceptionToError exception =
         err ->
           Internal.NetworkError (Debug.toString err)
 
-exceptionToResponse :: (ByteString -> a) -> HTTP.HttpException -> Internal.Response a
+exceptionToResponse :: (Data.ByteString.Lazy.ByteString -> a) -> HTTP.HttpException -> Internal.Response a
 exceptionToResponse toBody exception =
   case exception of
     HTTP.InvalidUrlException _ message ->
@@ -289,7 +289,7 @@ exceptionToResponse toBody exception =
     HTTP.HttpExceptionRequest _ content ->
       case content of
         HTTP.StatusCodeException res bytes ->
-          Internal.BadStatus_ (mkMetadata res) (toBody bytes)
+          Internal.BadStatus_ (mkMetadata res) (toBody <| Data.ByteString.Lazy.fromStrict bytes)
         HTTP.ResponseTimeout ->
           Internal.Timeout_
         HTTP.ConnectionTimeout ->
@@ -346,7 +346,7 @@ expectTextResponse = Internal.ExpectTextResponse
 
 -- |
 -- Expect a `Response` with a `ByteString` body
-expectBytesResponse :: (Internal.Response ByteString -> Result x a) -> Expect' x a
+expectBytesResponse :: (Internal.Response Data.ByteString.Lazy.ByteString -> Result x a) -> Expect' x a
 expectBytesResponse = Internal.ExpectBytesResponse
 
 -- |
