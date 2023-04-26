@@ -1,3 +1,8 @@
+# 0.4.0.0
+
+- Avoid unnecessary buffer duplication.
+- `expectBytesResponse` receives a lazy `ByteString`.
+
 # 0.3.0.0
 
 - Add convenience types.
