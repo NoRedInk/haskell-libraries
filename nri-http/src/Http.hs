@@ -231,15 +231,14 @@ handleResponse expect response =
   case response of
     Right okResponse ->
       let bytes = HTTP.responseBody okResponse
-          bodyAsText = Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes
        in case expect of
             Internal.ExpectJson ->
               case Aeson.eitherDecode bytes of
                 Left err -> Err (Internal.BadBody (Text.fromList err))
                 Right x -> Ok x
-            Internal.ExpectText -> Ok bodyAsText
+            Internal.ExpectText -> Ok (Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes)
             Internal.ExpectWhatever -> Ok ()
-            Internal.ExpectTextResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) bodyAsText)
+            Internal.ExpectTextResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) (Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes))
             Internal.ExpectBytesResponse mkResult -> mkResult (Internal.GoodStatus_ (mkMetadata okResponse) (Data.ByteString.Lazy.toStrict bytes))
     Left exception ->
       case expect of
