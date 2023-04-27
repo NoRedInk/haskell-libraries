@@ -385,6 +385,13 @@ only :: Test -> Test
 only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
+-- | Convert an IO type to an expectation. Useful if you need to call a function
+-- in Haskell's base library or an external library in a test.
+fromIO :: Prelude.IO a -> Expectation' a
+fromIO io =
+  Platform.Internal.Task (\_ -> map Ok io)
+    |> Expectation
+
 run :: Request -> Test -> Task e SuiteResult
 run request (Test all) = do
   let grouped = groupBy label all
@@ -480,7 +487,6 @@ handleUnexpectedErrors (Expectation task') = do
 
 timeoutFromEnvOrDefault :: Prelude.Double -> Expectation' Prelude.Double
 timeoutFromEnvOrDefault defaultTimeout = do
-  let fromIO io = Expectation <| Platform.Internal.Task (\_log -> map Ok io)
   timeoutFromEnv <- fromIO <| System.Environment.lookupEnv "NRI_TEST_TIMEOUT"
   case Maybe.andThen readMaybe timeoutFromEnv of
     Just timeout -> Prelude.pure timeout
