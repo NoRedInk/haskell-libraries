@@ -29,8 +29,10 @@ import Platform (TracingSpan)
 import qualified Platform
 import qualified Platform.Internal
 import qualified Set
+import qualified System.Environment
 import System.FilePath (FilePath)
 import qualified Task
+import Text.Read (readMaybe)
 import qualified Tuple
 import qualified Prelude
 
@@ -383,6 +385,13 @@ only :: Test -> Test
 only (Test tests) =
   Test <| List.map (\test' -> test' {label = Only}) tests
 
+-- | Convert an IO type to an expectation. Useful if you need to call a function
+-- in Haskell's base library or an external library in a test.
+fromIO :: Prelude.IO a -> Expectation' a
+fromIO io =
+  Platform.Internal.Task (\_ -> map Ok io)
+    |> Expectation
+
 run :: Request -> Test -> Task e SuiteResult
 run request (Test all) = do
   let grouped = groupBy label all
@@ -468,12 +477,20 @@ data Summary = Summary
   }
 
 handleUnexpectedErrors :: Expectation -> Expectation
-handleUnexpectedErrors (Expectation task') =
+handleUnexpectedErrors (Expectation task') = do
+  timeout <- timeoutFromEnvOrDefault 10_000
   task'
     |> onException (Task.fail << ThrewException)
-    |> Task.timeout 10_000 TookTooLong
+    |> Task.timeout timeout TookTooLong
     |> Task.onError Task.fail
     |> Expectation
+
+timeoutFromEnvOrDefault :: Prelude.Double -> Expectation' Prelude.Double
+timeoutFromEnvOrDefault defaultTimeout = do
+  timeoutFromEnv <- fromIO <| System.Environment.lookupEnv "NRI_TEST_TIMEOUT"
+  case Maybe.andThen readMaybe timeoutFromEnv of
+    Just timeout -> Prelude.pure timeout
+    Nothing -> Prelude.pure defaultTimeout
 
 runGroup :: (RunStrategy, List (SingleTest Expectation)) -> Task e (List (SingleTest (TracingSpan, TestResult)))
 runGroup (groupped, tests) =

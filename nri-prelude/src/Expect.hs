@@ -55,7 +55,7 @@ module Expect
     andCheck,
 
     -- * Fancy Expectations
-    fromIO,
+    Internal.fromIO,
     Internal.Expectation',
     around,
   )
@@ -67,7 +67,6 @@ import qualified Debug
 import qualified GHC.Stack as Stack
 import qualified List
 import NriPrelude
-import qualified Platform.Internal
 import qualified Pretty.Diff as Diff
 import qualified System.Console.Terminal.Size as Terminal
 import qualified System.Directory as Directory
@@ -527,12 +526,12 @@ equalToContentsOf :: Stack.HasCallStack => Text -> Text -> Expectation
 equalToContentsOf filepath' actual = do
   let filepath = Data.Text.unpack filepath'
   exists <-
-    fromIO <| do
+    Internal.fromIO <| do
       Directory.createDirectoryIfMissing True (FilePath.takeDirectory filepath)
       Directory.doesFileExist filepath
   if exists
     then do
-      expected <- fromIO (Data.Text.IO.readFile filepath)
+      expected <- Internal.fromIO (Data.Text.IO.readFile filepath)
       Stack.withFrozenCallStack
         assert
         (==)
@@ -540,7 +539,7 @@ equalToContentsOf filepath' actual = do
         (UnescapedShow expected)
         (UnescapedShow actual)
     else do
-      fromIO (Data.Text.IO.writeFile filepath actual)
+      Internal.fromIO (Data.Text.IO.writeFile filepath actual)
       Stack.withFrozenCallStack
         Internal.pass
         ("Expect.equalToContentsOf " ++ filepath')
@@ -571,7 +570,7 @@ assert pred funcName expected actual =
   if pred expected actual
     then Stack.withFrozenCallStack Internal.pass funcName ()
     else do
-      window <- fromIO Terminal.size
+      window <- Internal.fromIO Terminal.size
       let terminalWidth = case window of
             Just Terminal.Window {Terminal.width} -> width - 4 -- indentation
             Nothing -> 80
@@ -590,13 +589,6 @@ assert pred funcName expected actual =
             }
           expectedText
           actualText
-
--- | Convert an IO type to an expectation. Useful if you need to call a function
--- in Haskell's base library or an external library in a test.
-fromIO :: Prelude.IO a -> Internal.Expectation' a
-fromIO io =
-  Platform.Internal.Task (\_ -> map Ok io)
-    |> Internal.Expectation
 
 -- | Used for making matchers
 -- expectOneItem :: Expectation' [a] -> Expectation' a
