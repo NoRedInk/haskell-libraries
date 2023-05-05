@@ -11,7 +11,7 @@ TracingSpan
             , srcLocFile = "test/Main.hs"
             , srcLocStartLine = 35
             , srcLocStartCol = 7
-            , srcLocEndLine = 34
+            , srcLocEndLine = 35
             , srcLocEndCol = 33
             }
         )
@@ -33,7 +33,7 @@ TracingSpan
                     , srcLocFile = "test/Main.hs"
                     , srcLocStartLine = 117
                     , srcLocStartCol = 9
-                    , srcLocEndLine = 116
+                    , srcLocEndLine = 117
                     , srcLocEndCol = 34
                     }
                 )

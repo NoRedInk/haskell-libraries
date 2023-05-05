@@ -51,21 +51,14 @@
     "details": null,
     "finished": 0,
     "frame": {
-<<<<<<< HEAD
-        "startLine": 428,
-        "endLine": 428,
-        "name": "report",
-        "endCol": 69,
-=======
         "endCol": 50,
-        "endLine": 424,
+        "endLine": 428,
         "file": "tests/TestSpec.hs",
->>>>>>> ca87ac0 (Regen golden tests)
         "module": "TestSpec",
         "name": "report",
         "package": "main",
         "startCol": 22,
-        "startLine": 424
+        "startLine": 428
     },
     "name": "test run",
     "started": 0,
