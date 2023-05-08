@@ -5,7 +5,6 @@ module Http.Internal where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString
 import qualified Data.ByteString.Lazy
 import qualified Data.Dynamic as Dynamic
 import Dict (Dict)
@@ -60,7 +59,7 @@ data Expect' x a where
   ExpectText :: Expect Text
   ExpectWhatever :: Expect ()
   ExpectTextResponse :: (Response Text -> Result x a) -> Expect' x a
-  ExpectBytesResponse :: (Response Data.ByteString.ByteString -> Result x a) -> Expect' x a
+  ExpectBytesResponse :: (Response Data.ByteString.Lazy.ByteString -> Result x a) -> Expect' x a
 
 -- | A 'Request' can fail in a couple of ways:
 --
