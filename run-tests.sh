@@ -2,7 +2,9 @@
 
 set -euxo pipefail
 
-(cd nri-postgresql && ./setup-postgres.sh)
+pushd nri-postgresql
+source setup-postgres.sh
+popd
 
 ## start redis
 mkdir -p ./_build/redis/data
