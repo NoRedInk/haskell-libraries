@@ -12,6 +12,7 @@ import qualified Expect
 import qualified Fuzz
 import qualified GHC.Exts
 import qualified GHC.Stack as Stack
+import qualified List
 import NriPrelude
 import qualified Platform
 import qualified Platform.Internal
@@ -24,7 +25,6 @@ import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Text
 import qualified Prelude
-import qualified List
 
 tests :: Test
 tests =
