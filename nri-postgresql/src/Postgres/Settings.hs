@@ -136,8 +136,8 @@ decoderWithPrefix :: Text -> Environment.Decoder Settings
 decoderWithPrefix prefix =
   pure Settings
     |> andMap (connectionDecoder prefix)
-    |> andMap poolDecoder
-    |> andMap queryTimeoutDecoder
+    |> andMap (poolDecoder prefix)
+    |> andMap (queryTimeoutDecoder prefix)
 
 connectionDecoder :: Text -> Environment.Decoder ConnectionSettings
 connectionDecoder prefix =
@@ -148,21 +148,22 @@ connectionDecoder prefix =
     |> andMap (pgPasswordDecoder prefix)
     |> andMap (pgPortDecoder prefix)
 
-poolDecoder :: Environment.Decoder PoolSettings
-poolDecoder =
+poolDecoder :: Text -> Environment.Decoder PoolSettings
+poolDecoder prefix =
   pure PoolSettings
-    |> andMap pgPoolSizeDecoder
-    |> andMap pgPoolMaxIdleTimeDecoder
-    |> andMap pgPoolStripesDecoder
+    |> andMap (pgPoolSizeDecoder prefix)
+    |> andMap (pgPoolMaxIdleTimeDecoder prefix)
+    |> andMap (pgPoolStripesDecoder prefix)
 
 newtype PgPort = PgPort {unPgPort :: Int}
   deriving (Eq, Show)
 
 pgPortDecoder :: Text -> Environment.Decoder PgPort
 pgPortDecoder prefix =
-  Environment.variable
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
-      { Environment.name = prefix ++ "PGPORT",
+      { Environment.name = "PGPORT",
         Environment.description = "The port postgres is running on.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgPort |> unPgPort |> show |> Text.fromList
@@ -174,9 +175,10 @@ newtype PgPassword = PgPassword {unPgPassword :: Log.Secret Text}
 
 pgPasswordDecoder :: Text -> Environment.Decoder PgPassword
 pgPasswordDecoder prefix =
-  Environment.variable
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
-      { Environment.name = prefix ++ "PGPASSWORD",
+      { Environment.name = "PGPASSWORD",
         Environment.description = "The postgres user password.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgPassword |> unPgPassword |> Log.unSecret
@@ -188,9 +190,10 @@ newtype PgHost = PgHost {unPgHost :: Text}
 
 pgHostDecoder :: Text -> Environment.Decoder PgHost
 pgHostDecoder prefix =
-  Environment.variable
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
-      { Environment.name = prefix ++ "PGHOST",
+      { Environment.name = "PGHOST",
         Environment.description = "The hostname of the postgres server to connect to.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgHost |> unPgHost
@@ -202,9 +205,10 @@ newtype PgUser = PgUser {unPgUser :: Text}
 
 pgUserDecoder :: Text -> Environment.Decoder PgUser
 pgUserDecoder prefix =
-  Environment.variable
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
-      { Environment.name = prefix ++ "PGUSER",
+      { Environment.name = "PGUSER",
         Environment.description = "The postgres user to connect with.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgUser |> unPgUser
@@ -216,9 +220,10 @@ newtype PgDatabase = PgDatabase {unPgDatabase :: Text}
 
 pgDatabaseDecoder :: Text -> Environment.Decoder PgDatabase
 pgDatabaseDecoder prefix =
-  Environment.variable
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
-      { Environment.name = prefix ++ "PGDATABASE",
+      { Environment.name = "PGDATABASE",
         Environment.description = "The postgres database to connect to.",
         Environment.defaultValue =
           defaultSettings |> pgConnection |> pgDatabase |> unPgDatabase
@@ -228,9 +233,10 @@ pgDatabaseDecoder prefix =
 newtype PgPoolStripes = PgPoolStripes {unPgPoolStripes :: Int}
   deriving (Eq, Show)
 
-pgPoolStripesDecoder :: Environment.Decoder PgPoolStripes
-pgPoolStripesDecoder =
-  Environment.variable
+pgPoolStripesDecoder :: Text -> Environment.Decoder PgPoolStripes
+pgPoolStripesDecoder prefix =
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
       { Environment.name = "PG_POOL_STRIPES",
         Environment.description = "The amount of sub-connection pools to create. Best refer to the resource-pool package for more info on this one. 1 is a good value for most applications.",
@@ -242,9 +248,10 @@ pgPoolStripesDecoder =
 newtype PgPoolMaxIdleTime = PgPoolMaxIdleTime {unPgPoolMaxIdleTime :: Data.Time.NominalDiffTime}
   deriving (Eq, Show)
 
-pgPoolMaxIdleTimeDecoder :: Environment.Decoder PgPoolMaxIdleTime
-pgPoolMaxIdleTimeDecoder =
-  Environment.variable
+pgPoolMaxIdleTimeDecoder :: Text -> Environment.Decoder PgPoolMaxIdleTime
+pgPoolMaxIdleTimeDecoder prefix =
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
       { Environment.name = "PG_POOL_MAX_IDLE_TIME",
         Environment.description = "The maximum time a database connection will be able remain idle until it is closed.",
@@ -262,9 +269,10 @@ fromNominalDiffTime = Prelude.round
 newtype PgPoolSize = PgPoolSize {unPgPoolSize :: Int}
   deriving (Eq, Show)
 
-pgPoolSizeDecoder :: Environment.Decoder PgPoolSize
-pgPoolSizeDecoder =
-  Environment.variable
+pgPoolSizeDecoder :: Text -> Environment.Decoder PgPoolSize
+pgPoolSizeDecoder prefix =
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
       { Environment.name = "PG_POOL_SIZE",
         Environment.description = "The size of the postgres connection pool. This is the maximum amount of parallel database connections the app will be able to use.",
@@ -319,9 +327,10 @@ toPGDatabase
       host = unPgHost pgHost
       port = unPgPort pgPort
 
-queryTimeoutDecoder :: Environment.Decoder Time.Interval
-queryTimeoutDecoder =
-  Environment.variable
+queryTimeoutDecoder :: Text -> Environment.Decoder Time.Interval
+queryTimeoutDecoder prefix =
+  Environment.variableWithOptionalPrefix
+    prefix
     Environment.Variable
       { Environment.name = "PG_QUERY_TIMEOUT_SECONDS",
         Environment.description = "The maximum time a query can run before it is cancelled.",
