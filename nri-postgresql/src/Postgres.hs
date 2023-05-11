@@ -11,6 +11,7 @@ module Postgres
     -- Settings
     Settings.Settings,
     Settings.decoder,
+    Settings.decoderWithPrefix,
     -- Querying
     Query.Query,
     Query.Error (..),
