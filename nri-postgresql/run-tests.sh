@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-./setup-postgres.sh
+source setup-postgres.sh
 
 cabal build
 cabal test
