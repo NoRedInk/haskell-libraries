@@ -55,9 +55,9 @@ TracingSpan
                             { srcLocPackage = "main"
                             , srcLocModule = "Postgres"
                             , srcLocFile = "src/Postgres.hs"
-                            , srcLocStartLine = 224
+                            , srcLocStartLine = 225
                             , srcLocStartCol = 9
-                            , srcLocEndLine = 224
+                            , srcLocEndLine = 225
                             , srcLocEndCol = 69
                             }
                         )
