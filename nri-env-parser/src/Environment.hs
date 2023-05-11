@@ -37,6 +37,7 @@ module Environment
     consumes,
     Variable (Variable, name, description, defaultValue),
     variable,
+    variableWithOptionalPrefix,
     either,
     decode,
     decodeDefaults,
@@ -279,6 +280,35 @@ variable var (Parser parse) =
                 |> Maybe.withDefault (defaultValue var)
          in parse value |> Result.mapError (pure << ParseError var)
     }
+
+-- | Produce a configuration from a single environment variable, with an optional prefix.
+--
+-- If the prefixed environment variable exists, it will be used. If only the
+-- unprefixed environment variable exists, it will serve as a fallback. If
+-- neither prefixed nor unprefixed variables exists, the defaultValue gets used.
+--
+-- > Data Settings = Settings
+-- >    { amountOfHats :: Int
+-- >    , furLined :: Bool
+-- >    }
+-- >
+-- > map2
+-- >  Settings
+-- >  (variable (Variable "HATS" "Amount of hats" "2") int)
+-- >  (variable (Variable "FUR_LINED" "Do hats have fur lining?" "False") boolean)
+variableWithOptionalPrefix :: Text -> Variable -> Parser a -> Decoder a
+variableWithOptionalPrefix prefix var (Parser parse) =
+  let orElse _ (Just v) = Just v
+      orElse v Nothing = v
+   in Decoder
+        { consumes = [var {name = prefix ++ name var}, var],
+          readFromEnvironment = \env ->
+            let value =
+                  Dict.get (prefix ++ name var) env
+                    |> orElse (Dict.get (name var) env)
+                    |> Maybe.withDefault (defaultValue var)
+             in parse value |> Result.mapError (pure << ParseError var)
+        }
 
 -- | If the first decoder fails, try the second.
 either :: Decoder a -> Decoder a -> Decoder a

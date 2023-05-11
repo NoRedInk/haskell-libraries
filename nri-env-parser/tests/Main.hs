@@ -72,5 +72,64 @@ tests =
                 )
                 (Dict.empty)
                 |> Expect.equal (Ok B)
+        ],
+      describe
+        "variableWithOptionalPrefix"
+        [ test "Should use the prefixed value if available"
+            <| \() ->
+              Environment.decodePairs
+                ( Environment.variableWithOptionalPrefix
+                    "PREFIX_"
+                    Environment.Variable
+                      { Environment.name = "TEST",
+                        Environment.description = "test",
+                        Environment.defaultValue = "default"
+                      }
+                    Environment.text
+                )
+                (Dict.singleton "PREFIX_TEST" "prefixed")
+                |> Expect.equal (Ok "prefixed"),
+          test "Should use the prefixed value if both prefixed and unprefixed are available"
+            <| \() ->
+              Environment.decodePairs
+                ( Environment.variableWithOptionalPrefix
+                    "PREFIX_"
+                    Environment.Variable
+                      { Environment.name = "TEST",
+                        Environment.description = "test",
+                        Environment.defaultValue = "default"
+                      }
+                    Environment.text
+                )
+                (Dict.fromList [("PREFIX_TEST", "prefixed"), ("TEST", "unprefixed")])
+                |> Expect.equal (Ok "prefixed"),
+          test "Should use the unprefixed value if only unprefixed is available"
+            <| \() ->
+              Environment.decodePairs
+                ( Environment.variableWithOptionalPrefix
+                    "PREFIX_"
+                    Environment.Variable
+                      { Environment.name = "TEST",
+                        Environment.description = "test",
+                        Environment.defaultValue = "default"
+                      }
+                    Environment.text
+                )
+                (Dict.singleton "TEST" "unprefixed")
+                |> Expect.equal (Ok "unprefixed"),
+          test "Should use the default value if prefixed nor unprefixed is available"
+            <| \() ->
+              Environment.decodePairs
+                ( Environment.variableWithOptionalPrefix
+                    "PREFIX_"
+                    Environment.Variable
+                      { Environment.name = "TEST",
+                        Environment.description = "test",
+                        Environment.defaultValue = "default"
+                      }
+                    Environment.text
+                )
+                Dict.empty
+                |> Expect.equal (Ok "default")
         ]
     ]
