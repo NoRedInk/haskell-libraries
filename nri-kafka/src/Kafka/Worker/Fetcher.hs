@@ -1,6 +1,7 @@
 module Kafka.Worker.Fetcher (pollingLoop) where
 
 import qualified Control.Concurrent
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString as ByteString
 import qualified Dict
@@ -23,10 +24,11 @@ pollingLoop ::
   EnqueueRecord ->
   Analytics.Analytics ->
   Consumer.KafkaConsumer ->
+  MVar.MVar () ->
   Prelude.IO ()
-pollingLoop settings enqueueRecord analytics consumer = do
+pollingLoop settings enqueueRecord analytics consumer consumerLock = do
   now <- nextPollingTimestamp
-  pollingLoop' settings enqueueRecord analytics consumer (pollTimeIsOld now)
+  pollingLoop' settings enqueueRecord analytics consumer consumerLock (pollTimeIsOld now)
 
 newtype LastPollingTimestamp = LastPollingTimestamp Float
 
@@ -46,6 +48,7 @@ pollingLoop' ::
   EnqueueRecord ->
   Analytics.Analytics ->
   Consumer.KafkaConsumer ->
+  MVar.MVar () ->
   LastPollingTimestamp ->
   Prelude.IO ()
 pollingLoop'
@@ -58,10 +61,11 @@ pollingLoop'
   enqueueRecord
   analytics
   consumer
+  consumerLock
   lastPollTimestamp = do
     -- we block here if we're actively revoking
     -- Check whether we need to shut down while long-polling for new messages.
-    eitherMsgs <- Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
+    eitherMsgs <- MVar.withMVar consumerLock <| \_ -> Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
     msgs <- Prelude.traverse handleKafkaError eitherMsgs
     assignment <-
       Consumer.assignment consumer
@@ -85,7 +89,7 @@ pollingLoop'
       |> seek consumer
     now <- nextPollingTimestamp
     throttle maxMsgsPerSecondPerPartition maxPollIntervalMs (List.length appendResults) analytics now lastPollTimestamp
-    pollingLoop' settings enqueueRecord analytics consumer (pollTimeIsOld now)
+    pollingLoop' settings enqueueRecord analytics consumer consumerLock (pollTimeIsOld now)
 
 getPartitionKey :: Consumer.ConsumerRecord k v -> (Consumer.TopicName, Consumer.PartitionId)
 getPartitionKey record =
