@@ -65,7 +65,17 @@ pollingLoop'
   lastPollTimestamp = do
     -- we block here if we're actively revoking
     -- Check whether we need to shut down while long-polling for new messages.
-    eitherMsgs <- MVar.withMVar consumerLock <| \_ -> Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
+    eitherMsgs <-
+      -- We use a lock to prevent running this concurrently with pause/resume calls, due to bugs in
+      -- librdkafka, fixed in 2.1.0, while hw-kafka is on 1.6. Search Worker/Internal.hs for
+      -- consumerLock for the other side of this.
+      --
+      -- The symptom is messages being skipped every once in a while in a slow consumer that has its
+      -- buffer filled up and had to pause/resume all the time.
+      --
+      -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
+      MVar.withMVar consumerLock
+        <| \_ -> Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
     msgs <- Prelude.traverse handleKafkaError eitherMsgs
     assignment <-
       Consumer.assignment consumer

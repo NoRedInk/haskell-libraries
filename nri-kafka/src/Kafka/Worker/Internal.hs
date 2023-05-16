@@ -590,6 +590,14 @@ pauseAndAnalyticsLoop ::
 pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state pausedPartitions = do
   desiredPausedPartitions <- pausedPartitionKeys maxBufferSize (partitions state)
   Analytics.updatePaused (Set.size desiredPausedPartitions) (analytics state)
+  -- We use a lock to prevent running this concurrently with pollMessageBatch calls, due to bugs in
+  -- librdkafka, fixed in 2.1.0, while hw-kafka is on 1.6. Search Worker/Fetcher.hs for consumerLock
+  -- for the other side of this.
+  --
+  -- The symptom is messages being skipped every once in a while in a slow consumer that has its
+  -- buffer filled up and has to pause/resume all the time.
+  --
+  -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
   MVar.withMVar consumerLock <| \_ -> do
     let newlyPaused = Set.diff desiredPausedPartitions pausedPartitions
     _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
