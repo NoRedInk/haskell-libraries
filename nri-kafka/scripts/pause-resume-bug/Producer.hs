@@ -24,6 +24,7 @@ main = do
             let msg =
                   Kafka.emptyMsg "pause-resume-bug"
                     |> Kafka.addPayload Message {id}
+                    |> Kafka.addKey "a-partition-key"
             Kafka.sendSync handler msg
         )
       |> Task.sequence
