@@ -1,6 +1,7 @@
 module Kafka.Worker.Fetcher (pollingLoop) where
 
 import qualified Control.Concurrent
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
 import qualified Data.ByteString as ByteString
 import qualified Dict
@@ -23,10 +24,11 @@ pollingLoop ::
   EnqueueRecord ->
   Analytics.Analytics ->
   Consumer.KafkaConsumer ->
+  MVar.MVar () ->
   Prelude.IO ()
-pollingLoop settings enqueueRecord analytics consumer = do
+pollingLoop settings enqueueRecord analytics consumer consumerLock = do
   now <- nextPollingTimestamp
-  pollingLoop' settings enqueueRecord analytics consumer (pollTimeIsOld now)
+  pollingLoop' settings enqueueRecord analytics consumer consumerLock (pollTimeIsOld now)
 
 newtype LastPollingTimestamp = LastPollingTimestamp Float
 
@@ -46,6 +48,7 @@ pollingLoop' ::
   EnqueueRecord ->
   Analytics.Analytics ->
   Consumer.KafkaConsumer ->
+  MVar.MVar () ->
   LastPollingTimestamp ->
   Prelude.IO ()
 pollingLoop'
@@ -58,10 +61,23 @@ pollingLoop'
   enqueueRecord
   analytics
   consumer
+  consumerLock
   lastPollTimestamp = do
     -- we block here if we're actively revoking
     -- Check whether we need to shut down while long-polling for new messages.
-    eitherMsgs <- Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
+    eitherMsgs <-
+      -- We use a lock to prevent running this concurrently with pause/resume calls, due to bugs in
+      -- librdkafka, fixed in 2.1.0, while hw-kafka is on 1.6. Search Worker/Internal.hs for
+      -- consumerLock for the other side of this.
+      --
+      -- The symptom is messages being skipped every once in a while in a slow consumer that has its
+      -- buffer filled up and had to pause/resume all the time.
+      --
+      -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
+      --
+      -- We have a small app to reproduce the bug. Check out scripts/pause-resume-bug/README.md
+      MVar.withMVar consumerLock
+        <| \_ -> Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
     msgs <- Prelude.traverse handleKafkaError eitherMsgs
     assignment <-
       Consumer.assignment consumer
@@ -85,7 +101,7 @@ pollingLoop'
       |> seek consumer
     now <- nextPollingTimestamp
     throttle maxMsgsPerSecondPerPartition maxPollIntervalMs (List.length appendResults) analytics now lastPollTimestamp
-    pollingLoop' settings enqueueRecord analytics consumer (pollTimeIsOld now)
+    pollingLoop' settings enqueueRecord analytics consumer consumerLock (pollTimeIsOld now)
 
 getPartitionKey :: Consumer.ConsumerRecord k v -> (Consumer.TopicName, Consumer.PartitionId)
 getPartitionKey record =

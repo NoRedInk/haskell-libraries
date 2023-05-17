@@ -46,6 +46,33 @@ tests:
       - -threaded
       - -rtsopts "-with-rtsopts=-N -T"
       - -fno-warn-type-defaults
+executables:
+  pause-resume-bug-producer:
+    source-dirs: scripts/pause-resume-bug
+    main: Producer
+    dependencies:
+      - nri-kafka
+    when:
+      - condition: flag(pause-resume-bug)
+        then:
+          buildable: true
+        else:
+          buildable: false
+  pause-resume-bug-consumer:
+    source-dirs: scripts/pause-resume-bug
+    main: Consumer
+    dependencies:
+      - nri-kafka
+    ghc-options:
+      - -threaded
+      - -rtsopts "-with-rtsopts=-N -T"
+      - -O2
+    when:
+      - condition: flag(pause-resume-bug)
+        then:
+          buildable: true
+        else:
+          buildable: false
 default-extensions:
   - DataKinds
   - DeriveGeneric
@@ -72,3 +99,7 @@ ghc-options:
   - -Wincomplete-uni-patterns
   - -fno-warn-type-defaults
   - -fplugin=NriPrelude.Plugin
+flags:
+  pause-resume-bug:
+    default: false
+    manual: false

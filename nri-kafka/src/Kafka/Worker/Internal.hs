@@ -5,6 +5,7 @@ module Kafka.Worker.Internal where
 import qualified Conduit
 import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
+import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TVar as TVar
 import qualified Control.Exception.Safe as Exception
@@ -547,12 +548,13 @@ runThreads ::
   Consumer.KafkaConsumer ->
   Prelude.IO ()
 runThreads settings state consumer = do
+  consumerLock <- MVar.newMVar ()
   Stopping.runUnlessStopping
     (stopping state)
     ()
     ( Async.race
-        (pauseAndAnalyticsLoop (Settings.maxMsgsPerPartitionBufferedLocally settings) consumer state Set.empty)
-        (Fetcher.pollingLoop settings (enqueueRecord (partitions state)) (analytics state) consumer)
+        (pauseAndAnalyticsLoop (Settings.maxMsgsPerPartitionBufferedLocally settings) consumer consumerLock state Set.empty)
+        (Fetcher.pollingLoop settings (enqueueRecord (partitions state)) (analytics state) consumer consumerLock)
         |> map (\_ -> ())
     )
 
@@ -581,18 +583,31 @@ enqueueRecord partitions record =
 pauseAndAnalyticsLoop ::
   Settings.MaxMsgsPerPartitionBufferedLocally ->
   Consumer.KafkaConsumer ->
+  MVar.MVar () ->
   State ->
   Set.Set PartitionKey ->
   Prelude.IO ()
-pauseAndAnalyticsLoop maxBufferSize consumer state pausedPartitions = do
+pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state pausedPartitions = do
   desiredPausedPartitions <- pausedPartitionKeys maxBufferSize (partitions state)
   Analytics.updatePaused (Set.size desiredPausedPartitions) (analytics state)
-  let newlyPaused = Set.diff desiredPausedPartitions pausedPartitions
-  _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
-  let newlyResumed = Set.diff pausedPartitions desiredPausedPartitions
-  _ <- Consumer.resumePartitions consumer (Set.toList newlyResumed)
+  -- We use a lock to prevent running this concurrently with pollMessageBatch calls, due to bugs in
+  -- librdkafka, fixed in 2.1.0, while hw-kafka is on 1.6. Search Worker/Fetcher.hs for consumerLock
+  -- for the other side of this.
+  --
+  -- The symptom is messages being skipped every once in a while in a slow consumer that has its
+  -- buffer filled up and has to pause/resume all the time.
+  --
+  -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
+  --
+  -- We have a small app to reproduce the bug. Check out scripts/pause-resume-bug/README.md
+  MVar.withMVar consumerLock <| \_ -> do
+    let newlyPaused = Set.diff desiredPausedPartitions pausedPartitions
+    _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
+    let newlyResumed = Set.diff pausedPartitions desiredPausedPartitions
+    _ <- Consumer.resumePartitions consumer (Set.toList newlyResumed)
+    Prelude.pure ()
   Control.Concurrent.threadDelay 1_000_000 {- 1 second -}
-  pauseAndAnalyticsLoop maxBufferSize consumer state desiredPausedPartitions
+  pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state desiredPausedPartitions
 
 pausedPartitionKeys :: Settings.MaxMsgsPerPartitionBufferedLocally -> AllPartitions -> Prelude.IO (Set.Set PartitionKey)
 pausedPartitionKeys (Settings.MaxMsgsPerPartitionBufferedLocally maxBufferSize) partitions = do
