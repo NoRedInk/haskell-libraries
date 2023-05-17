@@ -6,7 +6,8 @@ import qualified Environment
 import qualified Kafka.Worker as Kafka
 import Message
 import System.Environment (setEnv)
-import Prelude (IO, pure, putStrLn, show)
+import System.IO (hPutStrLn, stderr)
+import Prelude (IO, putStrLn, show)
 
 main :: IO ()
 main = do
@@ -29,18 +30,17 @@ main = do
 
             case (prevId, id msg) of
               (Nothing, _) ->
-                -- First message has been received
-                pure ()
+                putStrLn "First message has been received"
               (_, 1) ->
-                -- Producer has been restarted
-                pure ()
+                putStrLn "Producer has been restarted"
               (Just prev, curr)
                 | prev + 1 == curr ->
                   -- This is the expected behavior
-                  pure ()
+                  putStrLn "OK"
               (Just prev, curr) ->
                 -- This is the bug
-                putStrLn
+                hPutStrLn
+                  stderr
                   ( "ERROR: Expected ID "
                       ++ show (prev + 1)
                       ++ " but got "
