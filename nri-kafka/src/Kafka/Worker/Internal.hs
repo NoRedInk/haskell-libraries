@@ -598,6 +598,8 @@ pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state pausedPartitions
   -- buffer filled up and has to pause/resume all the time.
   --
   -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
+  --
+  -- We have a small app to reproduce the bug. Check out scripts/pause-resume-bug/README.md
   MVar.withMVar consumerLock <| \_ -> do
     let newlyPaused = Set.diff desiredPausedPartitions pausedPartitions
     _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
