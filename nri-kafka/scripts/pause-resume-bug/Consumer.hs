@@ -1,13 +1,14 @@
 module Consumer where
 
-import Control.Concurrent (threadDelay)
-import Control.Concurrent.MVar
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent.MVar (MVar, newEmptyMVar, newMVar, putMVar, tryTakeMVar, withMVar)
+import Control.Monad (void)
 import qualified Environment
 import qualified Kafka.Worker as Kafka
 import Message
 import System.Environment (setEnv)
-import System.IO (hPutStrLn, stderr)
-import Prelude (IO, putStrLn, show)
+import System.IO (Handle, hPutStrLn, stderr, stdout)
+import Prelude (IO, String, show)
 
 main :: IO ()
 main = do
@@ -23,23 +24,26 @@ main = do
   doAnythingHandler <- Platform.doAnythingHandler
   lastId <- newEmptyMVar
 
+  lock <- newMVar ()
+
   let processMsg (msg :: Message) =
         ( do
-            putStrLn ("ID " ++ show (id msg))
+            let msgId = ("ID(" ++ show (id msg) ++ ")")
             prevId <- tryTakeMVar lastId
 
             case (prevId, id msg) of
               (Nothing, _) ->
-                putStrLn "First message has been received"
+                printAtomic lock stdout (msgId ++ " First message has been received")
               (_, 1) ->
-                putStrLn "Producer has been restarted"
+                printAtomic lock stdout (msgId ++ " Producer has been restarted")
               (Just prev, curr)
                 | prev + 1 == curr ->
                   -- This is the expected behavior
-                  putStrLn "OK"
+                  printAtomic lock stdout (msgId ++ " OK")
               (Just prev, curr) ->
                 -- This is the bug
-                hPutStrLn
+                printAtomic
+                  lock
                   stderr
                   ( "ERROR: Expected ID "
                       ++ show (prev + 1)
@@ -55,3 +59,10 @@ main = do
   let subscription = Kafka.subscription "pause-resume-bug" processMsg
 
   Kafka.process settings "pause-resume-bug-consumer" subscription
+
+printAtomic :: MVar () -> Handle -> String -> IO ()
+printAtomic lock handle msg = do
+  (\_ -> hPutStrLn handle msg)
+    |> withMVar lock
+    |> forkIO
+    |> void
