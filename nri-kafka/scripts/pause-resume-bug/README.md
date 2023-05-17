@@ -20,4 +20,4 @@ At the same time, run this in another terminal:
 cabal run pause-resume-bug-producer -fpause-resume-bug
 ```
 
-If all works well, no "ERROR" should be printed out.
+If all works well, no "ERROR" should be printed out. If the bug is present, you should see the error infrequently e.g. 3 times for 300 messages.
