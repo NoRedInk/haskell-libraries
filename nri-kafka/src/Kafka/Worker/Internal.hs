@@ -9,6 +9,7 @@ import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TVar as TVar
 import qualified Control.Exception.Safe as Exception
+import Control.Monad (unless)
 import qualified Data.Aeson as Aeson
 import qualified Data.UUID
 import qualified Data.UUID.V4
@@ -590,6 +591,8 @@ pauseAndAnalyticsLoop ::
 pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state pausedPartitions = do
   desiredPausedPartitions <- pausedPartitionKeys maxBufferSize (partitions state)
   Analytics.updatePaused (Set.size desiredPausedPartitions) (analytics state)
+  let newlyPaused = Set.diff desiredPausedPartitions pausedPartitions
+  let newlyResumed = Set.diff pausedPartitions desiredPausedPartitions
   -- We use a lock to prevent running this concurrently with pollMessageBatch calls, due to bugs in
   -- librdkafka, fixed in 2.1.0, while hw-kafka is on 1.6. Search Worker/Fetcher.hs for consumerLock
   -- for the other side of this.
@@ -600,12 +603,12 @@ pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state pausedPartitions
   -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
   --
   -- We have a small app to reproduce the bug. Check out scripts/pause-resume-bug/README.md
-  MVar.withMVar consumerLock <| \_ -> do
-    let newlyPaused = Set.diff desiredPausedPartitions pausedPartitions
-    _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
-    let newlyResumed = Set.diff pausedPartitions desiredPausedPartitions
-    _ <- Consumer.resumePartitions consumer (Set.toList newlyResumed)
-    Prelude.pure ()
+  unless (Set.isEmpty newlyPaused && Set.isEmpty newlyResumed)
+    <| MVar.withMVar consumerLock
+    <| \_ -> do
+      _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
+      _ <- Consumer.resumePartitions consumer (Set.toList newlyResumed)
+      Prelude.pure ()
   Control.Concurrent.threadDelay 1_000_000 {- 1 second -}
   pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state desiredPausedPartitions
 
