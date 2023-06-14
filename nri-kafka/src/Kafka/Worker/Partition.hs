@@ -277,9 +277,8 @@ processMsgLoop skipOrNot messageFormat commitOffsets observabilityHandler state 
 
 microSecondsDelayForAttempt :: Int -> Int
 microSecondsDelayForAttempt attempts =
-  min
-    3_600_000_000 {- 1 hour in microseconds -}
-    ((10 Prelude.^ attempts) * 1000_000 {- 1 second in microseconds -})
+  -- Maximum delay is 2^10 seconds = 17 minutes
+  2 Prelude.^ (min attempts 10) * 1_000_000
 
 handleFailures ::
   Show e =>
