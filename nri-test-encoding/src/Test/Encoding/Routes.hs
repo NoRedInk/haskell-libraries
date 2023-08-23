@@ -10,7 +10,7 @@
 -- can then run a golden result test for each, meaning we encode each
 -- example value to JSON and check it matches a known-good encoding we
 -- have comitted to the repo.
-module Test.Encoding.Routes (tests, IsApi (..)) where
+module Test.Encoding.Routes (tests, tests', IsApi (..)) where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Proxy (Proxy (Proxy))
@@ -56,15 +56,31 @@ tests proxy =
   -- and not client code.
   -- This didn't matter that much until we had the ability to specify `--files tests/BlaSpec.hs`
   -- If we don't fix this, we can't ever `--files tests/SomeApiSpec.hs`
-  Stack.withFrozenCallStack frozenTests proxy
+  Stack.withFrozenCallStack frozenTests proxy "test/golden-results/route-types.json"
 
-frozenTests :: forall routes. (IsApi (ToServantApi routes), Stack.HasCallStack) => Proxy routes -> List Test
-frozenTests _ =
+-- | Creates tests for routes and custom types used in routes.
+-- The second argument is the path to a golden result file for the definied routes.
+--
+-- Example usage:
+--   describe
+--     "Spec.ApiEncoding"
+--     (TestEncoding.tests (Proxy :: Proxy Routes.Routes) "test/golden-results/my-route-types.json")
+tests' :: forall routes. (IsApi (ToServantApi routes), Stack.HasCallStack) => Proxy routes -> Text -> List Test
+tests' proxy goldenRouteTypesFile =
+  -- We need to freeze the call stack before proceeding.
+  -- If we don't, the callstack for these generated tests would point to haskell-libraries code
+  -- and not client code.
+  -- This didn't matter that much until we had the ability to specify `--files tests/BlaSpec.hs`
+  -- If we don't fix this, we can't ever `--files tests/SomeApiSpec.hs`
+  Stack.withFrozenCallStack frozenTests proxy goldenRouteTypesFile
+
+frozenTests :: forall routes. (IsApi (ToServantApi routes), Stack.HasCallStack) => Proxy routes -> Text -> List Test
+frozenTests _ goldenRouteTypesFile =
   let routes = crawl (Proxy :: Proxy (ToServantApi routes))
    in [ test "route types haven't changed" <| \() ->
           routes
             |> routesToText
-            |> Expect.equalToContentsOf "test/golden-results/route-types.json",
+            |> Expect.equalToContentsOf goldenRouteTypesFile,
         describe
           "encodings of custom types"
           ( routes
