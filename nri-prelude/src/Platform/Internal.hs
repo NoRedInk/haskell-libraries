@@ -131,11 +131,13 @@ data TracingSpan = TracingSpan
     -- | A short blurb describing the details of this span, for use in
     -- tooling for inspecting these spans.
     summary :: Maybe Text,
-    -- | Whether this tracingSpan succeeded. If any of the children of this
-    -- tracingSpan failed, so will this tracingSpan. This will create a
+    -- | Whether this tracingSpan succeeded.
+    succeeded :: Succeeded,
+    -- | Whether this tracingSpan or any of the children of this
+    -- tracingSpan failed. This will create a
     -- path to the tracingSpan closest to the failure from the root
     -- tracingSpan.
-    succeeded :: Succeeded,
+    containsFailures :: Bool,
     -- | The amount of bytes were allocated on the current thread while this
     -- span was running. This is a proxy for the amount of work done. If
     -- this number is low but the span took a long time to complete this
@@ -160,6 +162,7 @@ instance Aeson.ToJSON TracingSpan where
         "details" .= details span,
         "summary" .= summary span,
         "succeeded" .= succeeded span,
+        "containsFailures" .= containsFailures span,
         "allocated" .= allocated span,
         "children" .= children span
       ]
@@ -172,6 +175,7 @@ instance Aeson.ToJSON TracingSpan where
           ++ "details" .= details span
           ++ "summary" .= summary span
           ++ "succeeded" .= succeeded span
+          ++ "containsFailures" .= containsFailures span
           ++ "allocated" .= allocated span
           ++ "children" .= children span
       )
@@ -188,6 +192,7 @@ instance Aeson.FromJSON TracingSpan where
           details <- object .:? "details"
           summary <- object .:? "summary"
           succeeded <- object .: "succeeded"
+          containsFailures <- object .: "containsFailures"
           allocated <- object .: "allocated"
           children <- object .: "children"
           Prelude.pure
@@ -199,6 +204,7 @@ instance Aeson.FromJSON TracingSpan where
                 details,
                 summary,
                 succeeded,
+                containsFailures,
                 allocated,
                 children
               }
@@ -273,6 +279,7 @@ emptyTracingSpan =
       details = Nothing,
       summary = Nothing,
       succeeded = Succeeded,
+      containsFailures = False,
       allocated = 0,
       children = []
     }
@@ -591,7 +598,7 @@ mkHandler requestId clock onFinish onFinishRoot' name' = do
         markTracingSpanFailedIO =
           updateIORef
             tracingSpanRef
-            (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed}),
+            (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed, containsFailures = True}),
         finishTracingSpan = finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef >> andThen onFinish
       }
 
@@ -688,6 +695,7 @@ startTracingSpan clock name = do
         details = Nothing,
         summary = Nothing,
         succeeded = Succeeded,
+        containsFailures = False,
         allocated = 0,
         children = []
       }
@@ -701,20 +709,17 @@ finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef maybeExceptio
   pure
     tracingSpan'
       { finished,
-        -- Below we implement the rule that if any of the children of a
-        -- tracingSpan failed, that tracingSpan itself failed too. The reason
-        -- we have this rule is to make it easy to see if a request as a whole
-        -- failed (just check the 'succeeded' property of the root tracingSpan
-        -- to see if any errors occurred), and to make it easy to trace the
-        -- source of a problem from the root tracingSpan upward by following
-        -- the failing child tracingSpans.
         succeeded =
           succeeded tracingSpan'
             ++ case maybeException of
               Just exception -> FailedWith exception
+              Nothing -> Succeeded,
+        containsFailures =
+          containsFailures tracingSpan'
+            || case maybeException of
+              Just _ -> True
               Nothing ->
-                map Platform.Internal.succeeded (children tracingSpan')
-                  |> Prelude.mconcat,
+                List.any Platform.Internal.containsFailures (children tracingSpan'),
         -- The allocation counter counts down as it allocations bytest. We
         -- subtract in this order to get a positive number.
         allocated = allocationCounterStartVal - allocationCounterEndVal

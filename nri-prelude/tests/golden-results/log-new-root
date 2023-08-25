@@ -18,6 +18,7 @@
     , details = Just "{\"level\":\"Info\"}"
     , summary = Nothing
     , succeeded = Succeeded
+    , containsFailures = False
     , allocated = 0
     , children = []
     }
@@ -41,6 +42,7 @@
     , details = Just "{\"level\":\"Info\"}"
     , summary = Nothing
     , succeeded = Succeeded
+    , containsFailures = False
     , allocated = 0
     , children = []
     }
@@ -64,6 +66,7 @@
     , details = Just "{\"level\":\"Info\"}"
     , summary = Nothing
     , succeeded = Succeeded
+    , containsFailures = False
     , allocated = 0
     , children = []
     }
@@ -87,6 +90,7 @@
     , details = Just "{}"
     , summary = Just "foo"
     , succeeded = Succeeded
+    , containsFailures = False
     , allocated = 0
     , children =
         [ TracingSpan
@@ -109,6 +113,7 @@
             , details = Just "{\"level\":\"Info\",\"a number\":12}"
             , summary = Nothing
             , succeeded = Succeeded
+            , containsFailures = False
             , allocated = 0
             , children = []
             }

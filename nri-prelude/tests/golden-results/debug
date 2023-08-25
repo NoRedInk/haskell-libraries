@@ -18,6 +18,7 @@
     , details = Just "{\"level\":\"Debug\",\"button\":\"PRESS\"}"
     , summary = Nothing
     , succeeded = Succeeded
+    , containsFailures = False
     , allocated = 0
     , children = []
     }

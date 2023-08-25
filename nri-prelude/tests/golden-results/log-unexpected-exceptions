@@ -18,6 +18,7 @@
     , details = Just "{\"number\":825}"
     , summary = Just "outer span"
     , succeeded = FailedWith TestException
+    , containsFailures = True
     , allocated = 0
     , children =
         [ TracingSpan
@@ -40,6 +41,7 @@
             , details = Just "{\"word\":\"sabbatical\"}"
             , summary = Just "inner span"
             , succeeded = FailedWith TestException
+            , containsFailures = True
             , allocated = 0
             , children = []
             }

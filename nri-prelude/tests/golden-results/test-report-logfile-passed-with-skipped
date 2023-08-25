@@ -15,6 +15,7 @@
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "containsFailures": false,
                             "succeeded": "Succeeded",
                             "started": 0
                         },
@@ -26,6 +27,7 @@
                             "details": null,
                             "finished": 0,
                             "frame": null,
+                            "containsFailures": false,
                             "succeeded": "Succeeded",
                             "started": 0
                         }
@@ -35,6 +37,7 @@
                     "details": null,
                     "finished": 0,
                     "frame": null,
+                    "containsFailures": false,
                     "succeeded": "Succeeded",
                     "started": 0
                 }
@@ -44,6 +47,7 @@
             "details": null,
             "finished": 0,
             "frame": null,
+            "containsFailures": false,
             "succeeded": "Succeeded",
             "started": 0
         }
@@ -62,6 +66,7 @@
         "startCol": 22,
         "file": "tests/TestSpec.hs"
     },
+    "containsFailures": true,
     "succeeded": "Failed",
     "started": 0
 }
