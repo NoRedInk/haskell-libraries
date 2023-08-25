@@ -221,6 +221,7 @@ batchEventsHelper sharedTraceData parentSpanId (statsByName, spanIndex) span = d
           |> addField "duration_ms" (Prelude.fromIntegral duration / 1000)
           |> addField "allocated_bytes" (Platform.allocated span)
           |> addField "failed" isError
+          |> addField "contains_failures" (Platform.containsFailures span)
           |> addField "source_location" sourceLocation
           |> addDetails span
           |> addEndpoint

@@ -4,7 +4,6 @@ import qualified Control.Concurrent.MVar as MVar
 import Control.Monad.Catch (catchAll)
 import Data.Aeson as Aeson
 import qualified Expect
-import qualified List
 import qualified Log
 import NriPrelude
 import qualified Platform

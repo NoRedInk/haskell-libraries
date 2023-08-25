@@ -31,7 +31,8 @@ tests =
     [ test "encodes span marked as failed as an exception" <| \_ ->
         emptyTracingSpan
           { Platform.name = "root span",
-            Platform.succeeded = Platform.Failed
+            Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True
           }
           |> toBatchEvents
           |> encodesTo "honeycomb-failure-without-exception",
@@ -46,7 +47,8 @@ tests =
         emptyTracingSpan
           { Platform.name = "root span",
             Platform.succeeded =
-              Platform.FailedWith (Exception.SomeException (CustomException "something went wrong"))
+              Platform.FailedWith (Exception.SomeException (CustomException "something went wrong")),
+            Platform.containsFailures = True
           }
           |> toBatchEvents
           |> encodesTo "honeycomb-failure-with-exception",
@@ -54,6 +56,7 @@ tests =
         emptyTracingSpan
           { Platform.name = "Incoming HTTP Request",
             Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.details =
               HttpRequest.emptyDetails
                 { HttpRequest.httpVersion = Just "1",
@@ -74,6 +77,7 @@ tests =
         emptyTracingSpan
           { Platform.name = "Processing Kafka Message",
             Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.details =
               Kafka.emptyDetails
                 { Kafka.topic = Just "topic",
@@ -97,6 +101,7 @@ tests =
         emptyTracingSpan
           { Platform.name = "MySQL Query",
             Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.details =
               SqlQuery.emptyDetails
                 { SqlQuery.databaseType = Just SqlQuery.postgresql,
@@ -118,6 +123,7 @@ tests =
         emptyTracingSpan
           { Platform.name = "Make Redis Query",
             Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.details =
               RedisCommands.emptyDetails
                 { RedisCommands.host = Just "cache.noredink.com",
@@ -133,6 +139,7 @@ tests =
         emptyTracingSpan
           { Platform.name = "Making HTTP request",
             Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.details =
               HttpRequest.emptyDetails
                 { HttpRequest.host = Just "http://antsonline.com",
@@ -148,6 +155,7 @@ tests =
       test "renders log failures correctly" <| \_ ->
         emptyTracingSpan
           { Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.name = "log message",
             Platform.details =
               Log.LogContexts
@@ -163,6 +171,7 @@ tests =
       test "renders withContext failures correctly" <| \_ ->
         emptyTracingSpan
           { Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.name = "some context",
             Platform.details =
               Log.LogContexts
@@ -182,6 +191,7 @@ tests =
         emptyTracingSpan
           { Platform.name = "measure weather",
             Platform.succeeded = Platform.Failed,
+            Platform.containsFailures = True,
             Platform.details =
               CustomDetails "32 C"
                 |> Platform.toTracingSpanDetails
@@ -190,6 +200,7 @@ tests =
               [ emptyTracingSpan
                   { Platform.name = "measure humidity",
                     Platform.succeeded = Platform.Failed,
+                    Platform.containsFailures = True,
                     Platform.details =
                       CustomDetails "25 %"
                         |> Platform.toTracingSpanDetails
@@ -226,9 +237,11 @@ tests =
       test "de-noises nested log events at enrichment time" <| \_ ->
         emptyTracingSpan
           { Platform.name = "root span",
+            Platform.containsFailures = True,
             Platform.children =
               [ emptyTracingSpan
                   { Platform.succeeded = Platform.Failed,
+                    Platform.containsFailures = True,
                     Platform.name = "log message",
                     Platform.details =
                       Log.LogContexts
