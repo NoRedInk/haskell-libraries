@@ -18,6 +18,7 @@ TracingSpan
   , details = Nothing
   , summary = Just "mock-uri"
   , succeeded = Succeeded
+  , containsFailures = False
   , allocated = 0
   , children =
       [ TracingSpan
@@ -42,6 +43,7 @@ TracingSpan
                 "{\"method\":\"GET\",\"host\":\"mock-uri\",\"path\":\"/\",\"query string\":\"\",\"headers\":{}}"
           , summary = Just "mock-uri"
           , succeeded = Succeeded
+          , containsFailures = False
           , allocated = 0
           , children = []
           }
