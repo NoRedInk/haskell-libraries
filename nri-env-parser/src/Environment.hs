@@ -77,6 +77,7 @@ import Prelude
     IO,
     Integer,
     Integral,
+    Monad,
     Semigroup,
     fail,
     fromIntegral,
@@ -234,13 +235,27 @@ instance Applicative Decoder where
           (fr, xr) ->
             fr <*> xr
 
+instance Monad Decoder where
+  (Decoder consumes f) >>= toDecoder2 =
+    Decoder
+      { consumes = consumes,
+        readFromEnvironment = \env ->
+          andThen
+            ( \val ->
+                toDecoder2 val
+                  |> readFromEnvironment
+                  |> \f' -> f' env
+            )
+            (f env)
+      }
+
 -- | An environment variable with a description of what it is used for.
 data Variable = Variable
   { name :: Text,
     description :: Text,
     defaultValue :: Text
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 data ParseError = ParseError
   { failingVariable :: Variable,

@@ -73,6 +73,69 @@ tests =
                 (Dict.empty)
                 |> Expect.equal (Ok B)
         ],
+      let enumDecoder =
+            Environment.variable
+              Environment.Variable
+                { Environment.name = "TEST",
+                  Environment.description = "test",
+                  Environment.defaultValue = "B"
+                }
+              ( Environment.enum
+                  [ ("A", A),
+                    ("B", B)
+                  ]
+              )
+          variantA =
+            Environment.variable
+              Environment.Variable
+                { Environment.name = "VARIANT_A",
+                  Environment.description = "variant a",
+                  Environment.defaultValue = "variant_a"
+                }
+              Environment.text
+          variantB =
+            Environment.variable
+              Environment.Variable
+                { Environment.name = "VARIANT_B",
+                  Environment.description = "variant b",
+                  Environment.defaultValue = "variant_b"
+                }
+              Environment.text
+          decoder =
+            enumDecoder
+              |> andThen
+                ( \variant ->
+                    case variant of
+                      A -> variantA
+                      B -> variantB
+                )
+       in describe
+            "andThen"
+            [ test "consumes only tracks the initial variable" <| \() ->
+                Environment.consumes decoder
+                  |> Expect.equal
+                    [ Environment.Variable
+                        { Environment.name = "TEST",
+                          Environment.description = "test",
+                          Environment.defaultValue = "B"
+                        }
+                    ],
+              test "Uses the default values if none available" <| \() ->
+                Environment.decodePairs decoder Dict.empty
+                  |> Expect.equal (Ok "variant_b"),
+              test "Uses the default value for the inner decoder" <| \() ->
+                Environment.decodePairs decoder (Dict.singleton "TEST" "A")
+                  |> Expect.equal (Ok "variant_a"),
+              test "Uses the environment for the inner decoder" <| \() ->
+                Environment.decodePairs
+                  decoder
+                  ( Dict.fromList
+                      [ ("TEST", "A"),
+                        ("VARIANT_A", "foobar")
+                      ]
+                  )
+                  |> Expect.equal (Ok "foobar")
+            ],
       describe
         "variableWithOptionalPrefix"
         [ test "Should use the prefixed value if available"
