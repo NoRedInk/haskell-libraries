@@ -16,6 +16,7 @@
             "name": "root span",
             "source_location": null,
             "allocated_bytes": 0,
+            "contains_failures": false,
             "stats.count.some-span": 2,
             "http.headers": {
                 "Accept": "application/json"
@@ -42,6 +43,7 @@
             "name": "some-span",
             "source_location": null,
             "allocated_bytes": 0,
+            "contains_failures": false,
             "service_name": "some service",
             "endpoint": "GET /hats/:hat_id",
             "revision": "gitref",
@@ -61,6 +63,7 @@
             "name": "some-span",
             "source_location": null,
             "allocated_bytes": 0,
+            "contains_failures": false,
             "service_name": "some service",
             "endpoint": "GET /hats/:hat_id",
             "revision": "gitref",

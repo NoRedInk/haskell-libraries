@@ -37,6 +37,7 @@ module Platform
     Internal.details,
     Internal.summary,
     Internal.succeeded,
+    Internal.containsFailures,
     Internal.allocated,
     Internal.children,
     Internal.Succeeded (Succeeded, Failed, FailedWith),

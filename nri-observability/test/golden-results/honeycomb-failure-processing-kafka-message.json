@@ -18,6 +18,7 @@
             "name": "Processing Kafka Message",
             "source_location": null,
             "allocated_bytes": 0,
+            "contains_failures": true,
             "kafka.contents": [],
             "service_name": "some service",
             "endpoint": "GET /hats/:hat_id",

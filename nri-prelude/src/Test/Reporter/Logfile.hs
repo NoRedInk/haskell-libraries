@@ -44,6 +44,9 @@ report writeSpan results = do
             Platform.succeeded = case results of
               Internal.AllPassed _ -> Platform.Succeeded
               _ -> Platform.Failed,
+            Platform.containsFailures = case results of
+              Internal.AllPassed _ -> False
+              _ -> True,
             Platform.allocated = 0,
             Platform.children = testSpans
           }
@@ -94,6 +97,8 @@ groupIntoNamespaces namespacedSpans =
                         Platform.summary = Just namespace,
                         Platform.succeeded =
                           Prelude.mconcat (List.map Platform.succeeded spans'),
+                        Platform.containsFailures =
+                          List.any Platform.containsFailures spans',
                         Platform.allocated = 0,
                         Platform.children =
                           namespacedSpanGroup

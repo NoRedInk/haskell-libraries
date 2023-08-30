@@ -536,6 +536,7 @@ mockTracingSpanWithTimes startedMs finishedMs =
       Platform.Internal.details = Nothing,
       Platform.Internal.summary = Nothing,
       Platform.Internal.succeeded = Platform.Internal.Succeeded,
+      Platform.Internal.containsFailures = False,
       Platform.Internal.allocated = 1,
       Platform.Internal.children = []
     }

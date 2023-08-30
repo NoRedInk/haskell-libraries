@@ -18,6 +18,7 @@ TracingSpan
   , details = Nothing
   , summary = Nothing
   , succeeded = Succeeded
+  , containsFailures = False
   , allocated = 0
   , children =
       [ TracingSpan
@@ -42,6 +43,7 @@ TracingSpan
                 "{\"query\":\"Secret *****\",\"query template\":\"!SELECT 1::bigint\",\"sql operation\":\"UNKNOWN\",\"queried relation\":\"!SELECT 1::bigint\",\"database type\":\"PostgreSQL\",\"host\":\"/mock/db/path.sock\",\"database\":\"mock-db-name\",\"rows returned\":1}"
           , summary = Just "UNKNOWN !SELECT 1::bigint"
           , succeeded = Succeeded
+          , containsFailures = False
           , allocated = 0
           , children =
               [ TracingSpan
@@ -64,6 +66,7 @@ TracingSpan
                   , details = Just "{}"
                   , summary = Just "acquiring Postgres connection from pool"
                   , succeeded = Succeeded
+                  , containsFailures = False
                   , allocated = 0
                   , children = []
                   }

@@ -19,6 +19,7 @@
             "name": "MySQL Query",
             "source_location": null,
             "allocated_bytes": 0,
+            "contains_failures": true,
             "sql.database": "nri",
             "service_name": "some service",
             "endpoint": "GET /hats/:hat_id",

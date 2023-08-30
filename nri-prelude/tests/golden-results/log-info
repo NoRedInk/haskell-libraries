@@ -18,6 +18,7 @@
     , details = Just "{\"level\":\"Info\",\"a number\":12}"
     , summary = Nothing
     , succeeded = Succeeded
+    , containsFailures = False
     , allocated = 0
     , children = []
     }

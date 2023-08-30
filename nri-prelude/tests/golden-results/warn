@@ -18,6 +18,7 @@
     , details = Just "{\"level\":\"Warn\",\"modal\":\"SURPRISE!\"}"
     , summary = Nothing
     , succeeded = Failed
+    , containsFailures = True
     , allocated = 0
     , children = []
     }

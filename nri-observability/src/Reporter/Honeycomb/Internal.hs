@@ -221,6 +221,7 @@ batchEventsHelper sharedTraceData parentSpanId (statsByName, spanIndex) span = d
           |> addField "duration_ms" (Prelude.fromIntegral duration / 1000)
           |> addField "allocated_bytes" (Platform.allocated span)
           |> addField "failed" isError
+          |> addField "contains_failures" (Platform.containsFailures span)
           |> addField "source_location" sourceLocation
           |> addDetails span
           |> addEndpoint
@@ -507,13 +508,12 @@ handler settings = do
           --    is basing it off of time of day) so we sample less at low traffic
 
           (skipLogging, sampleRate) <-
-            case Platform.succeeded span of
-              Platform.Succeeded -> do
+            if Platform.containsFailures span
+              then Prelude.pure (False, 1)
+              else do
                 let probability = deriveSampleRate span settings
                 roll <- Random.randomRIO (0.0, 1.0)
                 Prelude.pure (roll > probability, round (1 / probability))
-              Platform.Failed -> Prelude.pure (False, 1)
-              Platform.FailedWith _ -> Prelude.pure (False, 1)
           uuid <- Data.UUID.V4.nextRandom
           if skipLogging
             then Prelude.pure SampledOut

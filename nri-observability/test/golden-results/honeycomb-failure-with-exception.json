@@ -11,6 +11,7 @@
             "name": "root span",
             "source_location": null,
             "allocated_bytes": 0,
+            "contains_failures": true,
             "service_name": "some service",
             "endpoint": "GET /hats/:hat_id",
             "revision": "gitref",

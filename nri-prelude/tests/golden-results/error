@@ -18,6 +18,7 @@
     , details = Just "{\"level\":\"Error\",\"house number\":5}"
     , summary = Nothing
     , succeeded = Failed
+    , containsFailures = True
     , allocated = 0
     , children = []
     }

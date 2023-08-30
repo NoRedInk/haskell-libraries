@@ -15,6 +15,7 @@
         "startCol": 22,
         "file": "tests/TestSpec.hs"
     },
+    "containsFailures": true,
     "succeeded": "Failed",
     "started": 0
 }
