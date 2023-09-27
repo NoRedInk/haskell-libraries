@@ -533,6 +533,23 @@ doQuery query model =
                  in Ok (find items)
               Just _ -> Err wrongTypeErr
           )
+        Internal.Zrevrank key member ->
+          ( model,
+            case HM.lookup key hm of
+              Nothing -> Ok Nothing
+              Just (RedisSortedSet sortedSet) ->
+                let find [] = Nothing
+                    find ((idx, v) : rest) = if v == member then Just idx else find rest
+
+                    items =
+                      sortedSet
+                        |> Dict.toList
+                        |> List.sortBy (\(val, score) -> (score, val))
+                        |> List.reverse
+                        |> List.indexedMap (\idx (val, _) -> (idx, val))
+                 in Ok (find items)
+              Just _ -> Err wrongTypeErr
+          )
 
 wrongTypeErr :: Internal.Error
 wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"

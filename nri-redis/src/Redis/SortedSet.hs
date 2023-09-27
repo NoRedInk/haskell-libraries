@@ -27,6 +27,7 @@ module Redis.SortedSet
     zadd,
     zrange,
     zrank,
+    zrevrank,
 
     -- * Running Redis queries
     Internal.query,
@@ -101,7 +102,13 @@ data Api key a = Api
     -- means that the member with the lowest score has rank 0.
     --
     -- https://redis.io/commands/zrank
-    zrank :: key -> a -> Internal.Query (Maybe Int)
+    zrank :: key -> a -> Internal.Query (Maybe Int),
+    -- | Returns the rank of member in the sorted set stored at key, with the
+    -- scores ordered from high to low. The rank (or index) is 0-based, which
+    -- means that the member with the highest score has rank 0.
+    --
+    -- https://redis.io/commands/zrevrank
+    zrevrank :: key -> a -> Internal.Query (Maybe Int)
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
@@ -142,5 +149,6 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       zrange = \key start stop ->
         Internal.Zrange (toKey key) start stop
           |> Internal.WithResult (Prelude.traverse codecDecoder),
-      zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member)
+      zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member),
+      zrevrank = \key member -> Internal.Zrevrank (toKey key) (codecEncoder member)
     }

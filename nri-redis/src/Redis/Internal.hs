@@ -110,6 +110,7 @@ cmds query'' =
     Zadd key vals -> [unwords ("ZADD" : key : List.concatMap (\(_, val) -> ["*****", Text.fromFloat val]) (Dict.toList vals))]
     Zrange key start stop -> [unwords ["ZRANGE", key, Text.fromInt start, Text.fromInt stop]]
     Zrank key _ -> [unwords ["ZRANK", key, "*****"]]
+    Zrevrank key _ -> [unwords ["ZREVRANK", key, "*****"]]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
     WithResult _ x -> cmds x
@@ -164,6 +165,7 @@ data Query a where
   Zadd :: Text -> Dict.Dict ByteString Float -> Query Int
   Zrange :: Text -> Int -> Int -> Query [ByteString]
   Zrank :: Text -> ByteString -> Query (Maybe Int)
+  Zrevrank :: Text -> ByteString -> Query (Maybe Int)
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a
@@ -301,6 +303,7 @@ mapKeys fn query' =
     Zadd key vals -> Task.map (\newKey -> Zadd newKey vals) (fn key)
     Zrange key start stop -> Task.map (\newKey -> Zrange newKey start stop) (fn key)
     Zrank key member -> Task.map (\newKey -> Zrank newKey member) (fn key)
+    Zrevrank key member -> Task.map (\newKey -> Zrevrank newKey member) (fn key)
     Pure x -> Task.succeed (Pure x)
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
@@ -341,6 +344,7 @@ mapReturnedKeys fn query' =
     Zadd key vals -> Zadd key vals
     Zrange key start stop -> Zrange key start stop
     Zrank key member -> Zrank key member
+    Zrevrank key member -> Zrevrank key member
     Pure x -> Pure x
     Apply f x -> Apply (mapReturnedKeys fn f) (mapReturnedKeys fn x)
     WithResult f q -> (WithResult f) (mapReturnedKeys fn q)
@@ -396,6 +400,7 @@ keysTouchedByQuery query' =
     Zadd key _ -> Set.singleton key
     Zrange key _ _ -> Set.singleton key
     Zrank key _ -> Set.singleton key
+    Zrevrank key _ -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
 
 maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a

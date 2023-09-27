@@ -317,6 +317,10 @@ doRawQuery query =
       Database.Redis.zrank (toB key) member
         |> PreparedQuery
         |> map (Ok << map Prelude.fromIntegral)
+    Internal.Zrevrank key member ->
+      Database.Redis.zrevrank (toB key) member
+        |> PreparedQuery
+        |> map (Ok << map Prelude.fromIntegral)
     Internal.WithResult f q ->
       let PreparedQuery redisCtx = doRawQuery q
        in PreparedQuery
