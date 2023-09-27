@@ -16,6 +16,7 @@ import qualified Redis.List
 import qualified Redis.Mock as Mock
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
+import qualified Redis.SortedSet
 import qualified Set
 import qualified Task
 import qualified Test
@@ -264,6 +265,15 @@ queryTests redisHandler =
           |> Expect.succeeds
       field2
         |> Expect.equal (Just "val2"),
+    Test.test "zadd returns count of stored values" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zadd-returns-count-of-stored-values" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      NonEmptyDict.init "foo" 1 Dict.empty
+        |> Redis.SortedSet.zadd sortedSetApi "zadd-returns-count-of-stored-values"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal 1),
     Test.test "scan iterates over all matching keys in batches" <| \() -> do
       let firstKey = "scanTest::key1"
       let firstValue = "value 1"
@@ -353,6 +363,9 @@ listApi = Redis.List.textApi identity
 
 counterApi :: Redis.Counter.Api Text
 counterApi = Redis.Counter.makeApi identity
+
+sortedSetApi :: Redis.SortedSet.Api Text Text
+sortedSetApi = Redis.SortedSet.textApi identity
 
 jsonApi' :: Redis.Api Text [Int]
 jsonApi' = Redis.jsonApi identity

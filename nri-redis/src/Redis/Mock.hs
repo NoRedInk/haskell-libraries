@@ -16,6 +16,7 @@ import qualified Data.List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding as TE
 import qualified Database.Redis
+import qualified Dict
 import qualified Expect
 import qualified List
 import qualified Platform
@@ -72,6 +73,7 @@ data RedisType
   | RedisHash (HM.HashMap Text ByteString)
   | RedisList [ByteString]
   | RedisSet (HS.HashSet ByteString)
+  | RedisSortedSet (Dict.Dict ByteString Float)
   deriving (Eq)
 
 expectByteString :: RedisType -> Result Internal.Error ByteString
@@ -81,6 +83,7 @@ expectByteString val =
     RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
     RedisSet _ -> Err wrongTypeErr
+    RedisSortedSet _ -> Err wrongTypeErr
 
 expectHash :: RedisType -> Result Internal.Error (HM.HashMap Text ByteString)
 expectHash val =
@@ -89,6 +92,7 @@ expectHash val =
     RedisHash hash -> Ok hash
     RedisList _ -> Err wrongTypeErr
     RedisSet _ -> Err wrongTypeErr
+    RedisSortedSet _ -> Err wrongTypeErr
 
 expectInt :: RedisType -> Result Internal.Error Int
 expectInt val =
@@ -103,6 +107,7 @@ expectInt val =
     RedisHash _ -> Err wrongTypeErr
     RedisList _ -> Err wrongTypeErr
     RedisSet _ -> Err wrongTypeErr
+    RedisSortedSet _ -> Err wrongTypeErr
 
 init :: IO (IORef Model)
 init =
@@ -469,6 +474,21 @@ doQuery query model =
               Just (RedisSet set) -> Ok (HS.toList set)
               Just _ -> Err wrongTypeErr
           )
+        Internal.Zadd key vals ->
+          case HM.lookup key hm of
+            Nothing ->
+              ( updateHash <| HM.insert key (RedisSortedSet vals) hm,
+                Ok (Prelude.fromIntegral (Dict.size vals))
+              )
+            Just (RedisSortedSet sortedSet) ->
+              let newSet = Dict.union sortedSet vals
+               in ( updateHash <| HM.insert key (RedisSortedSet newSet) hm,
+                    Ok (Prelude.fromIntegral (Dict.size newSet - Dict.size sortedSet))
+                  )
+            Just _ ->
+              ( model,
+                Err wrongTypeErr
+              )
 
 wrongTypeErr :: Internal.Error
 wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"
