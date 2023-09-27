@@ -274,6 +274,23 @@ queryTests redisHandler =
         |> Redis.SortedSet.zadd sortedSetApi "zadd-returns-count-of-stored-values"
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal 1),
+    Test.test "zrange works as expected" <| \() -> do
+      _ <- Redis.SortedSet.del sortedSetApi ("zrange-works" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <- NonEmptyDict.init  "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+        |> Redis.SortedSet.zadd sortedSetApi "zrange-works"
+        |> Redis.query redisHandler
+        |> Expect.succeeds
+      Redis.SortedSet.zrange sortedSetApi "zrange-works" 0 (-1)
+         |> Redis.query redisHandler
+         |> Expect.andCheck (Expect.equal ["one", "two", "three"])
+      Redis.SortedSet.zrange sortedSetApi "zrange-works" 2 3
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal [ "three" ])
+      Redis.SortedSet.zrange sortedSetApi "zrange-works" (-2) (-1)
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal ["two", "three"]),
     Test.test "scan iterates over all matching keys in batches" <| \() -> do
       let firstKey = "scanTest::key1"
       let firstValue = "value 1"

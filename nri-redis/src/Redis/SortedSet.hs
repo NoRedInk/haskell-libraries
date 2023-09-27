@@ -25,6 +25,7 @@ module Redis.SortedSet
     expire,
     ping,
     zadd,
+    zrange,
 
     -- * Running Redis queries
     Internal.query,
@@ -42,8 +43,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
--- import qualified Dict
--- import qualified Prelude
+import qualified Prelude
 import qualified Data.Map.Strict
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
@@ -78,7 +78,23 @@ data Api key a = Api
     -- ensure the correct ordering.
     --
     -- https://redis.io/commands/zadd
-    zadd :: key -> NonEmptyDict.NonEmptyDict a Float -> Internal.Query Int
+    zadd :: key -> NonEmptyDict.NonEmptyDict a Float -> Internal.Query Int,
+    -- | Returns the specified range of elements in the sorted set. The order of
+    -- elements is from the lowest to the highest score. Elements with the same
+    -- score are ordered lexicographically. The <start> and <stop> arguments
+    -- represent zero-based indexes, where 0 is the first element, 1 is the next
+    -- element, and so on. These arguments specify an inclusive range, so for
+    -- example, ZRANGE myzset 0 1 will return both the first and the second
+    -- element of the sorted set.
+    --
+    -- The indexes can also be negative numbers indicating offsets from the end
+    -- of the sorted set, with -1 being the last element of the sorted set, -2
+    -- the penultimate element, and so on.
+    --
+    -- Out of range indexes do not produce an error.
+    --
+    -- https://redis.io/commands/zrange
+    zrange :: key -> Int -> Int -> Internal.Query (List a)
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
@@ -108,12 +124,15 @@ makeApi ::
   Codec.Codec a ->
   (key -> Text) ->
   Api key a
-makeApi Codec.Codec {Codec.codecEncoder} toKey =
+makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
   Api
     { del = Internal.Del << NonEmpty.map toKey,
       exists = Internal.Exists << toKey,
       expire = \key secs -> Internal.Expire (toKey key) secs,
       ping = Internal.Ping |> map (\_ -> ()),
       zadd = \key vals ->
-        Internal.Zadd (toKey key) (Data.Map.Strict.mapKeys codecEncoder (NonEmptyDict.toDict vals))
+        Internal.Zadd (toKey key) (Data.Map.Strict.mapKeys codecEncoder (NonEmptyDict.toDict vals)),
+      zrange = \key start stop ->
+        Internal.Zrange (toKey key) start stop
+          |> Internal.WithResult (Prelude.traverse codecDecoder)
     }

@@ -489,6 +489,33 @@ doQuery query model =
               ( model,
                 Err wrongTypeErr
               )
+        Internal.Zrange key start stop ->
+          ( model,
+          case HM.lookup key hm of
+            Nothing -> Ok []
+            Just (RedisSortedSet sortedSet) ->
+              let items = sortedSet
+                    |> Dict.toList
+                    |> List.sortBy (\(val, score) -> (score, val))
+                    |> List.map Tuple.first
+                    |> Array.fromList
+
+                  -- `stop` is inclusive for zrange, whereas with slice it's
+                  -- exclusive
+                  --
+                  -- we attempt to normalize here, by appropriate modulo-math
+                  -- and offsetting by 1
+                  (sliceStart, sliceStop) =
+                    ( modBy (Array.length items) start
+                    , 1 + modBy (Array.length items + 1) stop
+                    )
+              in items
+                  |> Array.slice sliceStart sliceStop
+                  |> Array.toList
+                  |> Ok
+            Just _ ->
+              Err wrongTypeErr
+          )
 
 wrongTypeErr :: Internal.Error
 wrongTypeErr = Internal.RedisError "WRONGTYPE Operation against a key holding the wrong kind of value"

@@ -108,6 +108,7 @@ cmds query'' =
     Srem key vals -> [unwords ("SREM" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
     Smembers key -> [unwords ["SMEMBERS", key]]
     Zadd key vals -> [unwords ("ZADD" : key : List.concatMap (\(_, val) -> ["*****", Text.fromFloat val]) (Dict.toList vals))]
+    Zrange key start stop -> [unwords ["ZRANGE", key, Text.fromInt start, Text.fromInt stop]]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
     WithResult _ x -> cmds x
@@ -160,6 +161,7 @@ data Query a where
   Srem :: Text -> NonEmpty ByteString -> Query Int
   Smembers :: Text -> Query (List ByteString)
   Zadd :: Text -> Dict.Dict ByteString Float -> Query Int
+  Zrange :: Text -> Int -> Int -> Query [ByteString]
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
   Pure :: a -> Query a
@@ -295,6 +297,7 @@ mapKeys fn query' =
     Srem key vals -> Task.map (\newKey -> Srem newKey vals) (fn key)
     Smembers key -> Task.map Smembers (fn key)
     Zadd key vals -> Task.map (\newKey -> Zadd newKey vals) (fn key)
+    Zrange key start stop -> Task.map (\newKey -> Zrange newKey start stop) (fn key)
     Pure x -> Task.succeed (Pure x)
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
     WithResult f q -> Task.map (WithResult f) (mapKeys fn q)
@@ -333,6 +336,7 @@ mapReturnedKeys fn query' =
     Srem key vals -> Srem key vals
     Smembers key -> Smembers key
     Zadd key vals -> Zadd key vals
+    Zrange key start stop -> Zrange key start stop
     Pure x -> Pure x
     Apply f x -> Apply (mapReturnedKeys fn f) (mapReturnedKeys fn x)
     WithResult f q -> (WithResult f) (mapReturnedKeys fn q)
@@ -386,6 +390,7 @@ keysTouchedByQuery query' =
     Srem key _ -> Set.singleton key
     Smembers key -> Set.singleton key
     Zadd key _ -> Set.singleton key
+    Zrange key _ _ -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
 
 maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
