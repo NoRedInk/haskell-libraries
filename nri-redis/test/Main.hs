@@ -275,22 +275,52 @@ queryTests redisHandler =
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal 1),
     Test.test "zrange works as expected" <| \() -> do
-      _ <- Redis.SortedSet.del sortedSetApi ("zrange-works" :| [])
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zrange-works" :| [])
           |> Redis.query redisHandler
           |> Expect.succeeds
-      _ <- NonEmptyDict.init  "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
-        |> Redis.SortedSet.zadd sortedSetApi "zrange-works"
-        |> Redis.query redisHandler
-        |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zrange-works"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
       Redis.SortedSet.zrange sortedSetApi "zrange-works" 0 (-1)
-         |> Redis.query redisHandler
-         |> Expect.andCheck (Expect.equal ["one", "two", "three"])
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal ["one", "two", "three"])
       Redis.SortedSet.zrange sortedSetApi "zrange-works" 2 3
         |> Redis.query redisHandler
-        |> Expect.andCheck (Expect.equal [ "three" ])
+        |> Expect.andCheck (Expect.equal ["three"])
       Redis.SortedSet.zrange sortedSetApi "zrange-works" (-2) (-1)
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal ["two", "three"]),
+    Test.test "zrank works as expected" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zrank-works" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("twobis", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zrank-works"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      Redis.SortedSet.zrank sortedSetApi "zrank-works" "one"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal (Just 0))
+      Redis.SortedSet.zrank sortedSetApi "zrank-works" "two"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal (Just 1))
+      Redis.SortedSet.zrank sortedSetApi "zrank-works" "twobis"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal (Just 2))
+      Redis.SortedSet.zrank sortedSetApi "zrank-works" "three"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal (Just 3))
+      Redis.SortedSet.zrank sortedSetApi "zrank-works" "foobar"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal Nothing)
+      Redis.SortedSet.zrank sortedSetApi "zrank-works-nothing-stored" "foobar"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal Nothing),
     Test.test "scan iterates over all matching keys in batches" <| \() -> do
       let firstKey = "scanTest::key1"
       let firstValue = "value 1"

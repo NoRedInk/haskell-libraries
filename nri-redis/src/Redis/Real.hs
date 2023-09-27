@@ -307,11 +307,16 @@ doRawQuery query =
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
     Internal.Zrange key start stop ->
-      Database.Redis.zrange (toB key)
+      Database.Redis.zrange
+        (toB key)
         (Prelude.fromIntegral start)
         (Prelude.fromIntegral stop)
         |> PreparedQuery
         |> map Ok
+    Internal.Zrank key member ->
+      Database.Redis.zrank (toB key) member
+        |> PreparedQuery
+        |> map (Ok << map Prelude.fromIntegral)
     Internal.WithResult f q ->
       let PreparedQuery redisCtx = doRawQuery q
        in PreparedQuery

@@ -26,6 +26,7 @@ module Redis.SortedSet
     ping,
     zadd,
     zrange,
+    zrank,
 
     -- * Running Redis queries
     Internal.query,
@@ -43,13 +44,13 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Prelude
 import qualified Data.Map.Strict
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
 import qualified Redis.Real as Real
 import qualified Redis.Settings as Settings
+import qualified Prelude
 
 data Api key a = Api
   { -- | Removes the specified keys. A key is ignored if it does not exist.
@@ -94,7 +95,13 @@ data Api key a = Api
     -- Out of range indexes do not produce an error.
     --
     -- https://redis.io/commands/zrange
-    zrange :: key -> Int -> Int -> Internal.Query (List a)
+    zrange :: key -> Int -> Int -> Internal.Query (List a),
+    -- | Returns the rank of member in the sorted set stored at key, with the
+    -- scores ordered from low to high. The rank (or index) is 0-based, which
+    -- means that the member with the lowest score has rank 0.
+    --
+    -- https://redis.io/commands/zrank
+    zrank :: key -> a -> Internal.Query (Maybe Int)
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
@@ -134,5 +141,6 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
         Internal.Zadd (toKey key) (Data.Map.Strict.mapKeys codecEncoder (NonEmptyDict.toDict vals)),
       zrange = \key start stop ->
         Internal.Zrange (toKey key) start stop
-          |> Internal.WithResult (Prelude.traverse codecDecoder)
+          |> Internal.WithResult (Prelude.traverse codecDecoder),
+      zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member)
     }

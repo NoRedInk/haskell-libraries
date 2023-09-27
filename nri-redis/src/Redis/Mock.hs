@@ -491,30 +491,47 @@ doQuery query model =
               )
         Internal.Zrange key start stop ->
           ( model,
-          case HM.lookup key hm of
-            Nothing -> Ok []
-            Just (RedisSortedSet sortedSet) ->
-              let items = sortedSet
-                    |> Dict.toList
-                    |> List.sortBy (\(val, score) -> (score, val))
-                    |> List.map Tuple.first
-                    |> Array.fromList
+            case HM.lookup key hm of
+              Nothing -> Ok []
+              Just (RedisSortedSet sortedSet) ->
+                let items =
+                      sortedSet
+                        |> Dict.toList
+                        |> List.sortBy (\(val, score) -> (score, val))
+                        |> List.map Tuple.first
+                        |> Array.fromList
 
-                  -- `stop` is inclusive for zrange, whereas with slice it's
-                  -- exclusive
-                  --
-                  -- we attempt to normalize here, by appropriate modulo-math
-                  -- and offsetting by 1
-                  (sliceStart, sliceStop) =
-                    ( modBy (Array.length items) start
-                    , 1 + modBy (Array.length items + 1) stop
-                    )
-              in items
-                  |> Array.slice sliceStart sliceStop
-                  |> Array.toList
-                  |> Ok
-            Just _ ->
-              Err wrongTypeErr
+                    -- `stop` is inclusive for zrange, whereas with slice it's
+                    -- exclusive
+                    --
+                    -- we attempt to normalize here, by appropriate modulo-math
+                    -- and offsetting by 1
+                    (sliceStart, sliceStop) =
+                      ( modBy (Array.length items) start,
+                        1 + modBy (Array.length items + 1) stop
+                      )
+                 in items
+                      |> Array.slice sliceStart sliceStop
+                      |> Array.toList
+                      |> Ok
+              Just _ ->
+                Err wrongTypeErr
+          )
+        Internal.Zrank key member ->
+          ( model,
+            case HM.lookup key hm of
+              Nothing -> Ok Nothing
+              Just (RedisSortedSet sortedSet) ->
+                let find [] = Nothing
+                    find ((idx, v) : rest) = if v == member then Just idx else find rest
+
+                    items =
+                      sortedSet
+                        |> Dict.toList
+                        |> List.sortBy (\(val, score) -> (score, val))
+                        |> List.indexedMap (\idx (val, _) -> (idx, val))
+                 in Ok (find items)
+              Just _ -> Err wrongTypeErr
           )
 
 wrongTypeErr :: Internal.Error
