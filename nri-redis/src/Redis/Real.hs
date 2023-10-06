@@ -14,6 +14,7 @@ import qualified Data.ByteString
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text.Encoding
 import qualified Database.Redis
+import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Platform
 import qualified Redis.Internal as Internal
@@ -299,6 +300,27 @@ doRawQuery query =
       Database.Redis.smembers (toB key)
         |> PreparedQuery
         |> map Ok
+    Internal.Zadd key vals ->
+      Dict.toList vals
+        |> List.map (\(a, b) -> (b, a))
+        |> Database.Redis.zadd (toB key)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
+    Internal.Zrange key start stop ->
+      Database.Redis.zrange
+        (toB key)
+        (Prelude.fromIntegral start)
+        (Prelude.fromIntegral stop)
+        |> PreparedQuery
+        |> map Ok
+    Internal.Zrank key member ->
+      Database.Redis.zrank (toB key) member
+        |> PreparedQuery
+        |> map (Ok << map Prelude.fromIntegral)
+    Internal.Zrevrank key member ->
+      Database.Redis.zrevrank (toB key) member
+        |> PreparedQuery
+        |> map (Ok << map Prelude.fromIntegral)
     Internal.WithResult f q ->
       let PreparedQuery redisCtx = doRawQuery q
        in PreparedQuery
