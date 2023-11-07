@@ -16,6 +16,7 @@ module Redis
     Settings.Settings (..),
     Settings.decoder,
     Settings.decoderWithEnvVarPrefix,
+    Settings.decoderWithCustomConnectionString,
 
     -- * Creating a redis API
     jsonApi,

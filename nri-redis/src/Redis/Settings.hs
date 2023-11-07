@@ -6,6 +6,7 @@ module Redis.Settings
     MaxKeySize (..),
     decoder,
     decoderWithEnvVarPrefix,
+    decoderWithCustomConnectionString,
   )
 where
 
@@ -55,13 +56,24 @@ decoder :: Environment.Decoder Settings
 decoder =
   decoderWithEnvVarPrefix ""
 
+-- | decodes Settings from environmental variables with custom connection string
+decoderWithCustomConnectionString :: Text -> Environment.Decoder Settings
+decoderWithCustomConnectionString connectionStringEnvVar =
+  map5
+    Settings
+    (decoderConnectInfo connectionStringEnvVar)
+    (decoderClusterMode "")
+    (decoderDefaultExpiry "")
+    (decoderQueryTimeout "")
+    (decoderMaxKeySize "")
+
 -- | decodes Settings from environmental variables prefixed with a Text
 -- >>> decoderWithEnvVarPrefix "WORKER_"
 decoderWithEnvVarPrefix :: Text -> Environment.Decoder Settings
 decoderWithEnvVarPrefix prefix =
   map5
     Settings
-    (decoderConnectInfo prefix)
+    (decoderConnectInfo (prefix ++ "REDIS_CONNECTION_STRING"))
     (decoderClusterMode prefix)
     (decoderDefaultExpiry prefix)
     (decoderQueryTimeout prefix)
@@ -85,10 +97,10 @@ decoderClusterMode prefix =
     )
 
 decoderConnectInfo :: Text -> Environment.Decoder ConnectInfo
-decoderConnectInfo prefix =
+decoderConnectInfo envVarName =
   Environment.variable
     Environment.Variable
-      { Environment.name = prefix ++ "REDIS_CONNECTION_STRING",
+      { Environment.name = envVarName,
         Environment.description = "Full redis connection string",
         Environment.defaultValue = "redis://localhost:6379"
       }
