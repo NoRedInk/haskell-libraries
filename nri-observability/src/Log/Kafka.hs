@@ -7,6 +7,7 @@ module Log.Kafka
     topic,
     partitionId,
     key,
+    offset,
     contents,
     createTime,
     logAppendTime,
@@ -41,6 +42,8 @@ data Details = Details
     -- that messages with the same key are guaranteed to end up in the same
     -- partition.
     key :: Maybe Text,
+    -- | The message offset into the partition
+    offset :: Maybe Int,
     -- | The contents of the message.
     contents :: Maybe Contents,
     -- | The time at which this message was created by a producer.
@@ -77,6 +80,7 @@ emptyDetails =
     { topic = Nothing,
       partitionId = Nothing,
       key = Nothing,
+      offset = Nothing,
       contents = Nothing,
       createTime = Nothing,
       logAppendTime = Nothing,

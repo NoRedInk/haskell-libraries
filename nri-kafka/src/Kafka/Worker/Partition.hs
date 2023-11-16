@@ -358,6 +358,7 @@ getTracingDetails analytics (ProcessAttemptsCount processAttempt) record = do
                       Prelude.Left _ -> Nothing
                       Prelude.Right keyText -> Just keyText
                 ),
+          Log.Kafka.offset = Just (Consumer.unOffset (Consumer.crOffset record)),
           Log.Kafka.contents = Just contents,
           Log.Kafka.processAttempt = Just processAttempt,
           Log.Kafka.createTime,

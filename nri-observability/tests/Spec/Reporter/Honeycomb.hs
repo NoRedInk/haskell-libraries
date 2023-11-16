@@ -83,6 +83,7 @@ tests =
                 { Kafka.topic = Just "topic",
                   Kafka.partitionId = Just 12,
                   Kafka.key = Just "key",
+                  Kafka.offset = Just 1,
                   Kafka.contents = Just (Kafka.mkContents ()),
                   Kafka.createTime = Just (Clock.POSIX.posixSecondsToUTCTime 0),
                   Kafka.logAppendTime = Just (Clock.POSIX.posixSecondsToUTCTime 0),
