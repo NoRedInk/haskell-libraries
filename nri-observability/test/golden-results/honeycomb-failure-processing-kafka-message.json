@@ -21,6 +21,7 @@
             "contains_failures": true,
             "kafka.contents": [],
             "service_name": "some service",
+            "kafka.offset": 1,
             "endpoint": "GET /hats/:hat_id",
             "kafka.request_id": "requestId",
             "revision": "gitref",
