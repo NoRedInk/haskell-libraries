@@ -37,6 +37,7 @@ module Environment
     consumes,
     Variable (Variable, name, description, defaultValue),
     variable,
+    variableOrFail,
     variableWithOptionalPrefix,
     either,
     decode,
@@ -324,6 +325,16 @@ variableWithOptionalPrefix prefix var (Parser parse) =
                     |> Maybe.withDefault (defaultValue var)
              in parse value |> Result.mapError (pure << ParseError var)
         }
+
+variableOrFail :: Variable -> Parser a -> Decoder a
+variableOrFail var (Parser parse) =
+  Decoder
+    { consumes = [var],
+      readFromEnvironment = \env ->
+        Dict.get (name var) env
+          |> Maybe.map (parse >> Result.mapError (pure << ParseError var))
+          |> Maybe.withDefault (Err [ParseError var "Variable not specified"])
+    }
 
 -- | If the first decoder fails, try the second.
 either :: Decoder a -> Decoder a -> Decoder a

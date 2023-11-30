@@ -194,5 +194,34 @@ tests =
                 )
                 Dict.empty
                 |> Expect.equal (Ok "default")
-        ]
+        ],
+      let firstDecoder =
+            Environment.variableOrFail
+              Environment.Variable
+                { Environment.name = "FIRST",
+                  Environment.description = "first",
+                  Environment.defaultValue = "first"
+                }
+              Environment.text
+          secondDecoder =
+            Environment.variableOrFail
+              Environment.Variable
+                { Environment.name = "SECOND",
+                  Environment.description = "second",
+                  Environment.defaultValue = "second"
+                }
+              Environment.text
+       in describe
+            "either"
+            [ test "Prefers the first variable if it's in the environment" <| \() ->
+                Environment.decodePairs
+                  (Environment.either firstDecoder secondDecoder)
+                  (Dict.singleton "FIRST" "thisone")
+                  |> Expect.equal (Ok "thisone"),
+              test "Prefers the second variable if it's in the environment" <| \() ->
+                Environment.decodePairs
+                  (Environment.either firstDecoder secondDecoder)
+                  (Dict.singleton "SECOND" "nowthisone")
+                  |> Expect.equal (Ok "nowthisone")
+            ]
     ]
