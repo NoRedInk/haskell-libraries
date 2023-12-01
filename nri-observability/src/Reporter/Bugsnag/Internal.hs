@@ -131,7 +131,7 @@ toEvent requestId timer defaultEvent span =
         "request id" .= requestId
       ]
         |> Aeson.object
-        |> HashMap.singleton "request"
+        |> AesonHelpers.singleton "request"
 
 -- | Find the most recently started span that failed. This span is closest to
 -- the failure and we'll use the data in it and its parents to build the
@@ -363,7 +363,7 @@ renderRemainingTracingSpanDetails span event details =
   event
     { Bugsnag.event_metaData =
         Aeson.toJSON details
-          |> HashMap.singleton (Platform.name span)
+          |> AesonHelpers.singleton (Platform.name span)
           |> Just
           |> (++) (Bugsnag.event_metaData event)
     }
@@ -373,10 +373,10 @@ renderLog event details =
   event
     { Bugsnag.event_metaData =
         Aeson.toJSON details
-          |> HashMap.singleton "custom"
-          |> HashMap.unionWith
+          |> AesonHelpers.singleton "custom"
+          |> AesonHelpers.mergeObjects
             mergeJson
-            (Bugsnag.event_metaData event |> Maybe.withDefault HashMap.empty)
+            (Bugsnag.event_metaData event |> Maybe.withDefault AesonHelpers.emptyObject)
           |> Just
     }
 
@@ -385,12 +385,12 @@ mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (AesonHelpers.mergeOb
 mergeJson _ last = last
 
 mergeMetaData ::
-  Maybe (HashMap.HashMap Text Aeson.Value) ->
-  Maybe (HashMap.HashMap Text Aeson.Value) ->
-  Maybe (HashMap.HashMap Text Aeson.Value)
+  Maybe Aeson.Object ->
+  Maybe Aeson.Object ->
+  Maybe Aeson.Object
 mergeMetaData Nothing x = x
 mergeMetaData x Nothing = x
-mergeMetaData (Just x) (Just y) = Just (HashMap.unionWith mergeJson x y)
+mergeMetaData (Just x) (Just y) = Just (AesonHelpers.mergeObjects mergeJson x y)
 
 renderIncomingHttpRequest ::
   Bugsnag.Event ->
@@ -415,14 +415,14 @@ renderIncomingHttpRequest event (HttpRequest.Incoming request) =
       Bugsnag.event_metaData =
         mergeMetaData
           (Bugsnag.event_metaData event)
-          ( [ "endpoint" .= HttpRequest.endpoint request,
-              "http version" .= HttpRequest.httpVersion request,
-              "response status" .= HttpRequest.status request,
-              "path" .= HttpRequest.path request,
-              "query string" .= HttpRequest.queryString request
+          ( [ AesonHelpers.keyFromText "endpoint" .= HttpRequest.endpoint request,
+              AesonHelpers.keyFromText "http version" .= HttpRequest.httpVersion request,
+              AesonHelpers.keyFromText "response status" .= HttpRequest.status request,
+              AesonHelpers.keyFromText "path" .= HttpRequest.path request,
+              AesonHelpers.keyFromText "query string" .= HttpRequest.queryString request
             ]
               |> Aeson.object
-              |> HashMap.singleton "request"
+              |> AesonHelpers.singleton "request"
               |> Just
           )
     }
