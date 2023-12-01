@@ -53,6 +53,7 @@ library
       Text
       Tuple
   other-modules:
+      Internal.AesonHelpers
       Internal.Shortcut
       Internal.Terminal
       NriPrelude.Plugin.GhcVersionDependent
@@ -134,6 +135,7 @@ test-suite tests
       Dict
       Expect
       Fuzz
+      Internal.AesonHelpers
       Internal.Shortcut
       Internal.Terminal
       List

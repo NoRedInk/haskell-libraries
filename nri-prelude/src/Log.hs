@@ -32,6 +32,7 @@ where
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified GHC.Stack as Stack
+import Internal.AesonHelpers (keyFromText)
 import NriPrelude
 import qualified Platform
 import qualified Platform.Internal as Internal
@@ -161,12 +162,12 @@ newtype LogContexts
 instance Aeson.ToJSON LogContexts where
   toJSON (LogContexts contexts) =
     contexts
-      |> map (\(Context key val) -> key .= val)
+      |> map (\(Context key val) -> (keyFromText key) .= val)
       |> Aeson.object
 
   toEncoding (LogContexts contexts) =
     contexts
-      |> Prelude.foldMap (\(Context key val) -> key .= val)
+      |> Prelude.foldMap (\(Context key val) -> (keyFromText key) .= val)
       |> Aeson.pairs
 
 instance Internal.TracingSpanDetails LogContexts

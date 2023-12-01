@@ -16,37 +16,22 @@
 --
 -- Once we're done supporting versions 1.x of aeson we can drop this module and
 -- inline the 2.x versions of functions wherever they are called.
-module Platform.AesonHelpers (foldObject, mergeObjects) where
+module Internal.AesonHelpers (keyFromText) where
 
 #if MIN_VERSION_aeson(2,0,0)
 
-import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
-import qualified Data.Aeson.KeyMap as KeyMap
+import Text
 
-foldObject :: (Text -> Aeson.Value -> acc -> acc) -> acc -> Aeson.Object -> acc
-foldObject fn = KeyMap.foldrWithKey (\key val acc -> fn (Key.toText key) val acc)
+keyFromText :: Text -> Key.Key
+keyFromText key = Key.fromText key
 
-mergeObjects ::
-  (Aeson.Value -> Aeson.Value -> Aeson.Value) ->
-  Aeson.Object ->
-  Aeson.Object ->
-  Aeson.Object
-mergeObjects = KeyMap.unionWith
 
 #else
 
-import qualified Data.Aeson as Aeson
-import qualified Data.HashMap.Strict as HashMap
+import Text
 
-foldObject :: (Text -> Aeson.Value -> acc -> acc) -> acc -> Aeson.Object -> acc
-foldObject = HashMap.foldrWithKey
-
-mergeObjects ::
-  (Aeson.Value -> Aeson.Value -> Aeson.Value) ->
-  Aeson.Object ->
-  Aeson.Object ->
-  Aeson.Object
-mergeObjects merge object1 object2 = HashMap.unionWith merge object1 object2
+keyFromText :: Text -> Text
+keyFromText key = key
 
 #endif
