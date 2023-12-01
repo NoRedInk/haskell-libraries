@@ -1,12 +1,5 @@
 {
-    "hostname": "some-host",
-    "env": "narnia",
-    "namespace": [
-        "app"
-    ],
     "allocated_mb": 0.0,
-    "duration_ms": 0.0,
-    "name": "",
     "details": {
         "commands": [
             "GET somekey"
@@ -14,6 +7,13 @@
         "host": "cache.noredink.com",
         "port": 6379
     },
-    "start_utc": "1970-01-01T00:00:00Z",
-    "request-id": "request-id"
+    "duration_ms": 0.0,
+    "env": "narnia",
+    "hostname": "some-host",
+    "name": "",
+    "namespace": [
+        "app"
+    ],
+    "request-id": "request-id",
+    "start_utc": "1970-01-01T00:00:00Z"
 }

@@ -1,31 +1,31 @@
 [
     {
-        "time": "1970-01-01T00:00:00Z",
         "data": {
+            "allocated_bytes": 0,
+            "apdex": 1,
+            "contains_failures": true,
+            "duration_ms": 0,
+            "endpoint": "GET /hats/:hat_id",
+            "failed": true,
             "hostname": "some-service-oaiefiowh-aoidawi",
+            "name": "MySQL Query",
+            "revision": "gitref",
+            "service_name": "some service",
+            "source_location": null,
+            "sql.database": "nri",
             "sql.database_type": "PostgreSQL",
+            "sql.host": "http://antsonline.com",
+            "sql.port": 5432,
             "sql.queried_relation": "ants",
             "sql.query": "Secret *****",
             "sql.query_template": "SELECT name FROM ants WHERE id = ${id}",
             "sql.rows_returned": 5,
-            "apdex": 1,
-            "sql.host": "http://antsonline.com",
-            "sql.port": 5432,
+            "sql.sql_operation": "SELECT",
             "trace.parent_id": null,
             "trace.span_id": "request-id-123-0",
-            "trace.trace_id": "request-id-123",
-            "sql.sql_operation": "SELECT",
-            "duration_ms": 0,
-            "name": "MySQL Query",
-            "source_location": null,
-            "allocated_bytes": 0,
-            "contains_failures": true,
-            "sql.database": "nri",
-            "service_name": "some service",
-            "endpoint": "GET /hats/:hat_id",
-            "revision": "gitref",
-            "failed": true
+            "trace.trace_id": "request-id-123"
         },
-        "samplerate": 1
+        "samplerate": 1,
+        "time": "1970-01-01T00:00:00Z"
     }
 ]

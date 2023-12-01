@@ -1,52 +1,52 @@
 [
     {
-        "time": "1970-01-01T00:00:00Z",
         "data": {
-            "hostname": "some-service-oaiefiowh-aoidawi",
+            "allocated_bytes": 0,
             "apdex": 1,
+            "contains_failures": true,
+            "duration_ms": 0,
+            "endpoint": "GET /hats/:hat_id",
+            "failed": false,
+            "hostname": "some-service-oaiefiowh-aoidawi",
+            "name": "root span",
+            "revision": "gitref",
+            "service_name": "some service",
+            "source_location": null,
+            "stats.average_time_ms.log_message": 0,
+            "stats.count.log_message": 1,
             "stats.total_time_ms.log_message": 0,
             "trace.parent_id": null,
             "trace.span_id": "request-id-123-0",
-            "trace.trace_id": "request-id-123",
-            "duration_ms": 0,
-            "name": "root span",
-            "source_location": null,
-            "allocated_bytes": 0,
-            "contains_failures": true,
-            "stats.count.log_message": 1,
-            "service_name": "some service",
-            "endpoint": "GET /hats/:hat_id",
-            "revision": "gitref",
-            "failed": false,
-            "stats.average_time_ms.log_message": 0
+            "trace.trace_id": "request-id-123"
         },
-        "samplerate": 1
+        "samplerate": 1,
+        "time": "1970-01-01T00:00:00Z"
     },
     {
-        "time": "1970-01-01T00:00:00Z",
         "data": {
-            "hostname": "some-service-oaiefiowh-aoidawi",
+            "allocated_bytes": 0,
             "apdex": 1,
-            "log.number": 4,
-            "trace.parent_id": "request-id-123-0",
-            "trace.span_id": "request-id-123-1",
-            "trace.trace_id": "request-id-123",
+            "contains_failures": true,
             "duration_ms": 0,
+            "endpoint": "GET /hats/:hat_id",
+            "failed": true,
+            "hostname": "some-service-oaiefiowh-aoidawi",
             "log.nested": {
                 "a": {
                     "b": 1
                 }
             },
-            "name": "log message",
+            "log.number": 4,
             "log.text": "Hi!",
-            "source_location": null,
-            "allocated_bytes": 0,
-            "contains_failures": true,
-            "service_name": "some service",
-            "endpoint": "GET /hats/:hat_id",
+            "name": "log message",
             "revision": "gitref",
-            "failed": true
+            "service_name": "some service",
+            "source_location": null,
+            "trace.parent_id": "request-id-123-0",
+            "trace.span_id": "request-id-123-1",
+            "trace.trace_id": "request-id-123"
         },
-        "samplerate": 1
+        "samplerate": 1,
+        "time": "1970-01-01T00:00:00Z"
     }
 ]
