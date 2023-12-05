@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-redis
-version:        0.1.1.0
+version:        0.1.2.0
 synopsis:       An intuitive hedis wrapper library.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
 category:       Web
@@ -34,7 +34,6 @@ library
       Redis.Counter
       Redis.Hash
       Redis.List
-      Redis.Mock
       Redis.Set
       Redis.SortedSet
   other-modules:
@@ -97,7 +96,6 @@ test-suite tests
       Redis.Hash
       Redis.Internal
       Redis.List
-      Redis.Mock
       Redis.Set
       Redis.Settings
       Redis.SortedSet

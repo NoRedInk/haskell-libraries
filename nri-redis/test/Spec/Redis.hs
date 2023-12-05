@@ -38,11 +38,10 @@ spanForTask task =
           |> map constantValuesForVariableFields
 
 tests :: TestHandlers -> Test.Test
-tests TestHandlers {handler, mockHandler, autoExtendExpireHandler} =
+tests TestHandlers {handler, autoExtendExpireHandler} =
   Test.describe
     "Redis Library"
-    [ Test.describe "query tests using mock handler" (queryTests mockHandler),
-      Test.describe "query tests using handler" (queryTests handler),
+    [ Test.describe "query tests using handler" (queryTests handler),
       Test.describe "query tests using auto extend expire handler" (queryTests autoExtendExpireHandler),
       Test.describe "observability tests" (observabilityTests handler)
     ]

@@ -1,3 +1,7 @@
+# 0.1.2.0
+
+- Remove `Redis.Mock` - best to test against a real Redis.
+
 # 0.1.1.0
 
 - Add Unix socket config support.

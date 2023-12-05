@@ -3,7 +3,7 @@ synopsis: An intuitive hedis wrapper library.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme
 author: NoRedInk
-version: 0.1.1.0
+version: 0.1.2.0
 maintainer: haskell-open-source@noredink.com
 copyright: 2022 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-redis
@@ -39,7 +39,6 @@ library:
     - Redis.Counter
     - Redis.Hash
     - Redis.List
-    - Redis.Mock
     - Redis.Set
     - Redis.SortedSet
   source-dirs:
