@@ -13,6 +13,7 @@ module Redis
     Internal.Handler,
     Internal.HandlerAutoExtendExpire,
     Internal.Handler',
+    Internal.HasAutoExtendExpire (..),
     Settings.Settings (..),
     Settings.decoder,
     Settings.decoderWithEnvVarPrefix,
