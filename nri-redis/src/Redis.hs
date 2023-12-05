@@ -8,8 +8,8 @@
 -- As with our Ruby Redis access, we enforce working within a "namespace".
 module Redis
   ( -- * Creating a redis handler
-    Real.handler,
-    Real.handlerAutoExtendExpire,
+    Handler.handler,
+    Handler.handlerAutoExtendExpire,
     Internal.Handler,
     Internal.HandlerAutoExtendExpire,
     Internal.Handler',
@@ -59,7 +59,7 @@ import qualified Dict
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Internal as Internal
-import qualified Redis.Real as Real
+import qualified Redis.Handler as Handler
 import qualified Redis.Settings as Settings
 import qualified Prelude
 

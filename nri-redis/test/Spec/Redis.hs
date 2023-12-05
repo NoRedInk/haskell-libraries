@@ -38,13 +38,13 @@ spanForTask task =
           |> map constantValuesForVariableFields
 
 tests :: TestHandlers -> Test.Test
-tests TestHandlers {realHandler, mockHandler, autoExtendExpireHandler} =
+tests TestHandlers {handler, mockHandler, autoExtendExpireHandler} =
   Test.describe
     "Redis Library"
     [ Test.describe "query tests using mock handler" (queryTests mockHandler),
-      Test.describe "query tests using real handler" (queryTests realHandler),
+      Test.describe "query tests using handler" (queryTests handler),
       Test.describe "query tests using auto extend expire handler" (queryTests autoExtendExpireHandler),
-      Test.describe "observability tests" (observabilityTests realHandler)
+      Test.describe "observability tests" (observabilityTests handler)
     ]
 
 -- We want to test all of our potential makeApi alternatives because it's easy

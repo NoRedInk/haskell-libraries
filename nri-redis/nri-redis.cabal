@@ -39,8 +39,8 @@ library
       Redis.SortedSet
   other-modules:
       Redis.Codec
+      Redis.Handler
       Redis.Internal
-      Redis.Real
       Redis.Settings
       Paths_nri_redis
   hs-source-dirs:
@@ -93,11 +93,11 @@ test-suite tests
       Redis
       Redis.Codec
       Redis.Counter
+      Redis.Handler
       Redis.Hash
       Redis.Internal
       Redis.List
       Redis.Mock
-      Redis.Real
       Redis.Set
       Redis.Settings
       Redis.SortedSet

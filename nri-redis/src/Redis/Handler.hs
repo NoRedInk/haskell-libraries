@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 
-module Redis.Real
+module Redis.Handler
   ( handler,
     handlerAutoExtendExpire,
   )
