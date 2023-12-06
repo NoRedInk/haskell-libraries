@@ -16,6 +16,7 @@ import qualified Text
 import Prelude (Either (Left, Right))
 
 data ClusterMode = Cluster | NotCluster
+  deriving (Show)
 
 -- | Settings required to initiate a redis connection.
 data Settings = Settings
@@ -43,13 +44,16 @@ data Settings = Settings
     queryTimeout :: QueryTimeout,
     maxKeySize :: MaxKeySize
   }
+  deriving (Show)
 
 data MaxKeySize = NoMaxKeySize | MaxKeySize Int
+  deriving (Show)
 
 data DefaultExpiry = NoDefaultExpiry | ExpireKeysAfterSeconds Int
   deriving (Show)
 
 data QueryTimeout = NoQueryTimeout | TimeoutQueryAfterMilliseconds Int
+  deriving (Show)
 
 -- | decodes Settings from environmental variables
 decoder :: Environment.Decoder Settings

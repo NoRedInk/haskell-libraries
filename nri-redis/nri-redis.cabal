@@ -87,6 +87,7 @@ test-suite tests
   other-modules:
       Helpers
       Spec.Redis
+      Spec.Settings
       NonEmptyDict
       Redis
       Redis.Codec
