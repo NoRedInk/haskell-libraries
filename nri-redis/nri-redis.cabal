@@ -83,8 +83,10 @@ library
 
 test-suite tests
   type: exitcode-stdio-1.0
-  main-is: Main.hs
+  main-is: Spec.hs
   other-modules:
+      Helpers
+      Spec.Redis
       NonEmptyDict
       Redis
       Redis.Codec

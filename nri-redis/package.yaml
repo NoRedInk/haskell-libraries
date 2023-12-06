@@ -71,7 +71,7 @@ ghc-options:
   - -fplugin=NriPrelude.Plugin
 tests:
   tests:
-    main: Main.hs
+    main: Spec.hs
     source-dirs:
       - test
       - src

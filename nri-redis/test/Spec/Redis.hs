@@ -1,11 +1,10 @@
-module Main (main) where
+module Spec.Redis (tests) where
 
-import qualified Conduit
 import qualified Control.Concurrent.MVar as MVar
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Dict
-import qualified Environment
 import qualified Expect
+import Helpers
 import qualified NonEmptyDict
 import qualified Platform
 import qualified Redis
@@ -13,17 +12,11 @@ import qualified Redis.Counter
 import qualified Redis.Hash
 import qualified Redis.Internal as Internal
 import qualified Redis.List
-import qualified Redis.Mock as Mock
-import qualified Redis.Real as Real
-import qualified Redis.Settings as Settings
 import qualified Redis.SortedSet
 import qualified Set
 import qualified Task
 import qualified Test
 import qualified Prelude
-
-main :: Prelude.IO ()
-main = Conduit.withAcquire getHandlers (Test.run << tests)
 
 -- put this at the top of the file so that adding tests doesn't push
 -- the line number of the source location of this file down, which would
@@ -380,20 +373,6 @@ queryTests redisHandler =
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
-
-data TestHandlers = TestHandlers
-  { mockHandler :: Redis.Handler,
-    autoExtendExpireHandler :: Redis.HandlerAutoExtendExpire,
-    realHandler :: Redis.Handler
-  }
-
-getHandlers :: Conduit.Acquire TestHandlers
-getHandlers = do
-  settings <- Conduit.liftIO (Environment.decode Settings.decoder)
-  autoExtendExpireHandler <- Real.handlerAutoExtendExpire "tests-auto-extend-expire" settings {Settings.defaultExpiry = Settings.ExpireKeysAfterSeconds 1}
-  realHandler <- Real.handler "tests" settings {Settings.defaultExpiry = Settings.NoDefaultExpiry}
-  mockHandler <- Conduit.liftIO <| Mock.handlerIO
-  Prelude.pure TestHandlers {autoExtendExpireHandler, realHandler, mockHandler}
 
 addNamespace :: Text -> Redis.Handler' x -> Redis.Handler' x
 addNamespace namespace handler' =

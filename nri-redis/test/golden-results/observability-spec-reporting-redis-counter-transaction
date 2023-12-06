@@ -7,11 +7,11 @@ TracingSpan
         ( "rootTracingSpanIO"
         , SrcLoc
             { srcLocPackage = "main"
-            , srcLocModule = "Main"
-            , srcLocFile = "test/Main.hs"
-            , srcLocStartLine = 36
+            , srcLocModule = "Spec.Redis"
+            , srcLocFile = "test/Spec/Redis.hs"
+            , srcLocStartLine = 29
             , srcLocStartCol = 7
-            , srcLocEndLine = 40
+            , srcLocEndLine = 33
             , srcLocEndCol = 40
             }
         )
@@ -30,11 +30,11 @@ TracingSpan
                 ( "transaction"
                 , SrcLoc
                     { srcLocPackage = "main"
-                    , srcLocModule = "Main"
-                    , srcLocFile = "test/Main.hs"
-                    , srcLocStartLine = 118
+                    , srcLocModule = "Spec.Redis"
+                    , srcLocFile = "test/Spec/Redis.hs"
+                    , srcLocStartLine = 111
                     , srcLocStartCol = 9
-                    , srcLocEndLine = 118
+                    , srcLocEndLine = 111
                     , srcLocEndCol = 74
                     }
                 )
