@@ -58,7 +58,40 @@ decoderTests =
                       Settings.maxKeySize = Settings.MaxKeySize 500
                     }
              in Environment.decodePairs Settings.decoder env
-                  |> expectEqualShow (Ok expected)
+                  |> expectEqualShow (Ok expected),
+      Test.test "handles unix socket scheme with default db" <| \_ ->
+        let env = Dict.fromList [("REDIS_CONNECTION_STRING", "redis+unix:///path/to/redis.sock")]
+            expected =
+              Settings.Settings
+                { Settings.connectionInfo =
+                    defaultConnectInfo
+                      { connectPort = UnixSocket "/path/to/redis.sock",
+                        connectDatabase = 0
+                      },
+                  Settings.clusterMode = Settings.NotCluster,
+                  Settings.defaultExpiry = Settings.NoDefaultExpiry,
+                  Settings.queryTimeout = Settings.TimeoutQueryAfterMilliseconds 1000,
+                  Settings.maxKeySize = Settings.NoMaxKeySize
+                }
+         in Environment.decodePairs Settings.decoder env
+            |> expectEqualShow (Ok expected),
+      Test.test "handles unix socket scheme with specified db" <| \_ ->
+        let env = Dict.fromList [("REDIS_CONNECTION_STRING", "redis+unix://some:dude@/other/redis.sock?db=5")]
+            expected =
+              Settings.Settings
+                { Settings.connectionInfo =
+                    defaultConnectInfo
+                      { connectPort = UnixSocket "/other/redis.sock",
+                        connectAuth = Just "dude",
+                        connectDatabase = 5
+                      },
+                  Settings.clusterMode = Settings.NotCluster,
+                  Settings.defaultExpiry = Settings.NoDefaultExpiry,
+                  Settings.queryTimeout = Settings.TimeoutQueryAfterMilliseconds 1000,
+                  Settings.maxKeySize = Settings.NoMaxKeySize
+                }
+         in Environment.decodePairs Settings.decoder env
+            |> expectEqualShow (Ok expected)
     ]
 
 decoderWithEnvVarPrefixTests :: Test.Test
@@ -100,7 +133,40 @@ decoderWithEnvVarPrefixTests =
                       Settings.maxKeySize = Settings.MaxKeySize 500
                     }
              in Environment.decodePairs (Settings.decoderWithEnvVarPrefix "TEST_") env
-                  |> expectEqualShow (Ok expected)
+                  |> expectEqualShow (Ok expected),
+      Test.test "handles unix socket scheme with default db" <| \_ ->
+        let env = Dict.fromList [("TEST_REDIS_CONNECTION_STRING", "redis+unix:///path/to/redis.sock")]
+            expected =
+              Settings.Settings
+                { Settings.connectionInfo =
+                    defaultConnectInfo
+                      { connectPort = UnixSocket "/path/to/redis.sock",
+                        connectDatabase = 0
+                      },
+                  Settings.clusterMode = Settings.NotCluster,
+                  Settings.defaultExpiry = Settings.NoDefaultExpiry,
+                  Settings.queryTimeout = Settings.TimeoutQueryAfterMilliseconds 1000,
+                  Settings.maxKeySize = Settings.NoMaxKeySize
+                }
+         in Environment.decodePairs (Settings.decoderWithEnvVarPrefix "TEST_") env
+            |> expectEqualShow (Ok expected),
+      Test.test "handles unix socket scheme with specified db" <| \_ ->
+        let env = Dict.fromList [("TEST_REDIS_CONNECTION_STRING", "redis+unix://some:dude@/other/redis.sock?db=5")]
+            expected =
+              Settings.Settings
+                { Settings.connectionInfo =
+                    defaultConnectInfo
+                      { connectPort = UnixSocket "/other/redis.sock",
+                        connectAuth = Just "dude",
+                        connectDatabase = 5
+                      },
+                  Settings.clusterMode = Settings.NotCluster,
+                  Settings.defaultExpiry = Settings.NoDefaultExpiry,
+                  Settings.queryTimeout = Settings.TimeoutQueryAfterMilliseconds 1000,
+                  Settings.maxKeySize = Settings.NoMaxKeySize
+                }
+         in Environment.decodePairs (Settings.decoderWithEnvVarPrefix "TEST_") env
+            |> expectEqualShow (Ok expected)
     ]
 
 decoderWithCustomConnectionStringTests :: Test.Test
@@ -142,7 +208,40 @@ decoderWithCustomConnectionStringTests =
                       Settings.maxKeySize = Settings.MaxKeySize 500
                     }
              in Environment.decodePairs (Settings.decoderWithCustomConnectionString "COOL_CONNECTION_STRING") env
-                  |> expectEqualShow (Ok expected)
+                  |> expectEqualShow (Ok expected),
+      Test.test "handles unix socket scheme with default db" <| \_ ->
+        let env = Dict.fromList [("COOL_CONNECTION_STRING", "redis+unix:///path/to/redis.sock")]
+            expected =
+              Settings.Settings
+                { Settings.connectionInfo =
+                    defaultConnectInfo
+                      { connectPort = UnixSocket "/path/to/redis.sock",
+                        connectDatabase = 0
+                      },
+                  Settings.clusterMode = Settings.NotCluster,
+                  Settings.defaultExpiry = Settings.NoDefaultExpiry,
+                  Settings.queryTimeout = Settings.TimeoutQueryAfterMilliseconds 1000,
+                  Settings.maxKeySize = Settings.NoMaxKeySize
+                }
+         in Environment.decodePairs (Settings.decoderWithCustomConnectionString "COOL_CONNECTION_STRING") env
+            |> expectEqualShow (Ok expected),
+      Test.test "handles unix socket scheme with specified db" <| \_ ->
+        let env = Dict.fromList [("COOL_CONNECTION_STRING", "redis+unix://some:dude@/other/redis.sock?db=5")]
+            expected =
+              Settings.Settings
+                { Settings.connectionInfo =
+                    defaultConnectInfo
+                      { connectPort = UnixSocket "/other/redis.sock",
+                        connectAuth = Just "dude",
+                        connectDatabase = 5
+                      },
+                  Settings.clusterMode = Settings.NotCluster,
+                  Settings.defaultExpiry = Settings.NoDefaultExpiry,
+                  Settings.queryTimeout = Settings.TimeoutQueryAfterMilliseconds 1000,
+                  Settings.maxKeySize = Settings.NoMaxKeySize
+                }
+         in Environment.decodePairs (Settings.decoderWithCustomConnectionString "COOL_CONNECTION_STRING") env
+            |> expectEqualShow (Ok expected)
     ]
 
 expectEqualShow :: Show a => a -> a -> Expect.Expectation

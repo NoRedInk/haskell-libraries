@@ -10,10 +10,13 @@ module Redis.Settings
   )
 where
 
+import Data.Text.Encoding (encodeUtf8)
+import qualified Data.List.NonEmpty as NonEmpty
 import Database.Redis hiding (Ok)
 import qualified Environment
 import qualified Text
-import Prelude (Either (Left, Right))
+import qualified Text.URI as URI
+import Prelude (Either (Left, Right), foldr, fromIntegral, id, pure)
 
 data ClusterMode = Cluster | NotCluster
   deriving (Show)
@@ -109,13 +112,61 @@ decoderConnectInfo envVarName =
         Environment.defaultValue = "redis://localhost:6379"
       }
     ( Environment.custom
-        Environment.text
-        ( \str ->
-            case str |> Text.toList |> parseConnectInfo of
-              Right info' -> Ok info'
-              Left parseError -> Err ("Invalid Redis connection string: " ++ Text.fromList parseError)
-        )
+        Environment.uri
+          ( \uri ->
+              case map URI.unRText (URI.uriScheme uri) of
+                Just "redis" -> parseRedisSchemeURI uri
+                Just "redis+unix" -> parseRedisSocketSchemeURI uri
+                Just unrecognizedScheme -> Err ("Invalid URI scheme for connection string: " ++ unrecognizedScheme)
+                Nothing -> Err "URI scheme missing from connection string"
+          )
     )
+
+parseRedisSchemeURI :: URI.URI -> Result Text ConnectInfo
+parseRedisSchemeURI uri =
+  case parseConnectInfo (URI.renderStr uri) of
+    Left parseError -> Err ("Invalid Redis connection string: " ++ Text.fromList parseError)
+    Right info' -> Ok info'
+
+parseRedisSocketSchemeURI :: URI.URI -> Result Text ConnectInfo
+parseRedisSocketSchemeURI uri =
+  let uriPathTextFromURI = 
+        case URI.uriPath uri of
+          Nothing -> Err "URI path missing from connection string"
+          Just (_, uriPathSegments) ->
+            uriPathSegments
+              |> map URI.unRText
+              |> NonEmpty.intersperse "/"
+              |> foldr (++) ""
+              |> (if URI.isPathAbsolute uri then ("/" ++) else id)
+              |> Ok
+        
+      dbNumFromParams queryParams =
+        case queryParams of
+          [] -> Ok 0
+          URI.QueryParam key value : rest ->
+            if URI.unRText key == "db"
+              then
+                case Text.toInt (URI.unRText value) of
+                  Nothing -> Err "Expected an integer for db in connection string"
+                  Just dbNum -> Ok (fromIntegral dbNum)
+              else dbNumFromParams rest
+          _ : rest -> dbNumFromParams rest
+      
+      maybePasswordFromURI =
+        case URI.uriAuthority uri of
+          Right (URI.Authority (Just (URI.UserInfo _ (Just passwordRText))) _ _) ->
+            Just (encodeUtf8 <| URI.unRText passwordRText)
+          _ -> Nothing
+   in do
+    uriPathText <- uriPathTextFromURI
+    dbNum <- dbNumFromParams (URI.uriQuery uri)
+    pure <|
+      defaultConnectInfo
+        { connectPort = UnixSocket (Text.toList uriPathText),
+          connectDatabase = dbNum,
+          connectAuth = maybePasswordFromURI
+        }
 
 decoderDefaultExpiry :: Text -> Environment.Decoder DefaultExpiry
 decoderDefaultExpiry prefix =
