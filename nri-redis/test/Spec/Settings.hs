@@ -16,8 +16,12 @@ tests =
       decoderWithCustomConnectionStringTests
     ]
 
--- we lean on `show` for equality since `Database.Redis.ConnectInfo` doesn't have
+-- | Compare equality based on `String` representation.
+--
+-- We lean on `show` for equality since `Database.Redis.ConnectInfo` doesn't have
 -- an `Eq` instance (but does have a `Show` instance)
+expectEqualShow :: Show a => a -> a -> Expect.Expectation
+expectEqualShow x y = Expect.equal (show x) (show y)
 
 decoderTests :: Test.Test
 decoderTests =
@@ -243,6 +247,3 @@ decoderWithCustomConnectionStringTests =
          in Environment.decodePairs (Settings.decoderWithCustomConnectionString "COOL_CONNECTION_STRING") env
             |> expectEqualShow (Ok expected)
     ]
-
-expectEqualShow :: Show a => a -> a -> Expect.Expectation
-expectEqualShow x y = Expect.equal (show x) (show y)
