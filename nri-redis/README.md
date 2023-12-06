@@ -26,6 +26,9 @@ these are the defaults:
 
 ```sh
 REDIS_CONNECTION_STRING=redis://localhost:6379
+# we also support unix sockets via a scheme we provide:
+# REDIS_CONNECTION_STRING=redis+unix:///path/to/redis.sock[?db=DB_NUM]
+
 REDIS_CLUSTER=0 # 1 is on
 REDIS_DEFAULT_EXPIRY_SECONDS=0 # 0 is no expiration
 REDIS_QUERY_TIMEOUT_MILLISECONDS=1000 # 0 is no timeout

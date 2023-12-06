@@ -3,7 +3,7 @@ synopsis: An intuitive hedis wrapper library.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-redis#readme
 author: NoRedInk
-version: 0.1.0.4
+version: 0.1.1.0
 maintainer: haskell-open-source@noredink.com
 copyright: 2022 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-redis
@@ -22,6 +22,7 @@ dependencies:
   - containers >= 0.6.0.1 && < 0.7
   # hedis 14 introduces redis-cluster support
   - hedis >= 0.14.0 && < 0.16
+  - modern-uri >= 0.3.1.0 && < 0.4
   - nri-env-parser >= 0.1.0.0 && < 0.2
   - nri-observability >= 0.1.0 && < 0.2
   - nri-prelude >= 0.1.0.0 && < 0.7
@@ -71,7 +72,7 @@ ghc-options:
   - -fplugin=NriPrelude.Plugin
 tests:
   tests:
-    main: Main.hs
+    main: Spec.hs
     source-dirs:
       - test
       - src
