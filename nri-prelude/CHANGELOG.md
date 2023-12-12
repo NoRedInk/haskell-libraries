@@ -1,4 +1,7 @@
-# Unreleased next version
+# 0.6.1.0
+
+- Fix support for `aeson-2.x`
+- Permit `hedgehog-1.1.x`, `lens-5.1.x`, `safe-coloured-text-0.2.x`, and `safe-coloured-text-terminfo-0.1.x`
 
 # 0.6.0.6
 
