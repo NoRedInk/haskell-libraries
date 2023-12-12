@@ -5,10 +5,8 @@ let
 in import nix/mk-shell.nix {
   pkgs = pkgs;
   haskellPackages = pkgs.haskell.packages.ghc8107.extend (self: super: {
-    safe-coloured-text = super.callCabal2nix "safe-coloured-text"
-      "${sources.safe-coloured-text}/safe-coloured-text" { };
-    safe-coloured-text-terminfo =
-      super.callCabal2nix "safe-coloured-text-terminfo"
-      "${sources.safe-coloured-text}/safe-coloured-text-terminfo" { };
+    # modern-uri-0.3.6.0 is incompatible with the `base` provided by ghc 8.10.7;
+    # use known-good @ 0.3.4.4.
+    modern-uri = self.callHackage "modern-uri" "0.3.4.4" { };
   });
 }

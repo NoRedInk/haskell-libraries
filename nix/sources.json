@@ -34,17 +34,5 @@
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/4c0834929cafb7478a5e82616d484578a80a3e41.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "safe-coloured-text": {
-        "branch": "master",
-        "description": null,
-        "homepage": "https://cs-syd.eu/posts/2021-03-07-safe-coloured-text",
-        "owner": "NorfairKing",
-        "repo": "safe-coloured-text",
-        "rev": "d5788740052925aebf1dec1cf1669f66d3a35120",
-        "sha256": "0mrrfnvvwvdq2cf2figvan8z4jk0bypa0xmg11n3af6vsjryih43",
-        "type": "tarball",
-        "url": "https://github.com/NorfairKing/safe-coloured-text/archive/d5788740052925aebf1dec1cf1669f66d3a35120.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
