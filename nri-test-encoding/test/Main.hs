@@ -59,12 +59,12 @@ data Routes route = Routes
   { foo ::
       route
         :- "foos"
-        :> Capture ":id" Int
-        :> Get '[JSON] Foo,
+          :> Capture ":id" Int
+          :> Get '[JSON] Foo,
     bars ::
       route
         :- "bars"
-        :> Get '[JSON] [Bar]
+          :> Get '[JSON] [Bar]
   }
   deriving (Generic)
 
