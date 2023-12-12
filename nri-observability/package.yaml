@@ -5,7 +5,7 @@ homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-observabi
 author: NoRedInk
 version: 0.1.1.4
 maintainer: haskell-open-source@noredink.com
-copyright: 2022 NoRedInk Corp.
+copyright: 2023 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/observability
 license-file: LICENSE
 category: Web
