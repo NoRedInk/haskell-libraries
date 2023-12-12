@@ -1,5 +1,5 @@
 language: nix
-nix: 2.3.7
+nix: 2.17.0
 os: linux
 dist: xenial
 vm:
