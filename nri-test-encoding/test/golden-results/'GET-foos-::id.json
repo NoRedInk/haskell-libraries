@@ -1,11 +1,11 @@
 Foo
 [
     {
-        "name": "foo",
-        "id": 1
+        "id": 1,
+        "name": "foo"
     },
     {
-        "name": null,
-        "id": 1
+        "id": 1,
+        "name": null
     }
 ]

@@ -1,27 +1,27 @@
 {
+    "breadcrumbs": [],
     "exceptions": [
         {
-            "stacktrace": [],
-            "errorClass": "some span"
+            "errorClass": "some span",
+            "stacktrace": []
         }
     ],
-    "breadcrumbs": [],
     "metaData": {
+        "request": {
+            "megabytes allocated": 0,
+            "request id": "request-id-1234",
+            "response time in ms": 0
+        },
         "some span": {
-            "query template": "SELECT name FROM ants WHERE id = ${id}",
-            "rows returned": 5,
-            "queried relation": "ants",
             "database": "nri",
             "database type": "PostgreSQL",
-            "sql operation": "SELECT",
-            "query": "Secret *****",
             "host": "http://antsonline.com",
-            "port": 5432
-        },
-        "request": {
-            "request id": "request-id-1234",
-            "response time in ms": 0,
-            "megabytes allocated": 0
+            "port": 5432,
+            "queried relation": "ants",
+            "query": "Secret *****",
+            "query template": "SELECT name FROM ants WHERE id = ${id}",
+            "rows returned": 5,
+            "sql operation": "SELECT"
         }
     },
     "unhandled": false
