@@ -1,3 +1,7 @@
+# 0.1.1.4
+
+- Support `servant-0.19.x`
+
 # 0.1.1.3
 
 - Support Servant's `Header'` as well as `Header`
