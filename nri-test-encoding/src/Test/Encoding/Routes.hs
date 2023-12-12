@@ -142,9 +142,9 @@ routesToText routes =
               queryParams' ->
                 Just
                   <| Text.concat
-                    ( routeName route :
-                      "?" :
-                      [Text.join "&" (List.map printQueryParam queryParams')]
+                    ( routeName route
+                        : "?"
+                        : [Text.join "&" (List.map printQueryParam queryParams')]
                     ),
             case headers route of
               [] -> Nothing
@@ -152,9 +152,9 @@ routesToText routes =
                 Just
                   <| Text.join
                     " "
-                    ( routeName route :
-                      "headers" :
-                      List.map printHeaders headers'
+                    ( routeName route
+                        : "headers"
+                        : List.map printHeaders headers'
                     ),
             Just
               <| Text.join
@@ -214,8 +214,8 @@ instance (KnownSymbol s, IsApi a) => IsApi (s :> a) where
         ( \route ->
             route
               { path =
-                  Text.fromList (symbolVal (Proxy :: Proxy s)) :
-                  path route
+                  Text.fromList (symbolVal (Proxy :: Proxy s))
+                    : path route
               }
         )
 
@@ -271,8 +271,8 @@ instance
               { queryParams =
                   ( Text.fromList (symbolVal (Proxy :: Proxy key)),
                     SomeType (Proxy :: Proxy value)
-                  ) :
-                  queryParams route
+                  )
+                    : queryParams route
               }
         )
 
@@ -292,8 +292,8 @@ instance
               { queryParams =
                   ( Text.fromList (symbolVal (Proxy :: Proxy key)) ++ "[]",
                     SomeType (Proxy :: Proxy value)
-                  ) :
-                  queryParams route
+                  )
+                    : queryParams route
               }
         )
 
@@ -323,8 +323,8 @@ instance
               { headers =
                   ( Text.fromList (symbolVal (Proxy :: Proxy key)),
                     SomeType (Proxy :: Proxy val)
-                  ) :
-                  headers route
+                  )
+                    : headers route
               }
         )
 

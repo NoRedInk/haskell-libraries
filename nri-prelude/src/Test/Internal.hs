@@ -558,7 +558,9 @@ getFrame testName =
     Just (_, srcLoc) ->
       srcLoc
     Nothing ->
-      ( "Oops! We can't find the source location for this test: " ++ testName ++ "\n"
+      ( "Oops! We can't find the source location for this test: "
+          ++ testName
+          ++ "\n"
           ++ "This indicates a bug in our Test module in nri-prelude.\n"
       )
         |> TestRunnerMessedUp

@@ -46,8 +46,8 @@ import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Redis.Codec as Codec
-import qualified Redis.Internal as Internal
 import qualified Redis.Handler as Handler
+import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Prelude
 

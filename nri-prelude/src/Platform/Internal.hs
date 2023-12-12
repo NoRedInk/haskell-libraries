@@ -168,16 +168,26 @@ instance Aeson.ToJSON TracingSpan where
       ]
   toEncoding span =
     Aeson.pairs
-      ( "name" .= name span
-          ++ "started" .= started span
-          ++ "finished" .= finished span
-          ++ "frame" .= map SrcLocForEncoding (frame span)
-          ++ "details" .= details span
-          ++ "summary" .= summary span
-          ++ "succeeded" .= succeeded span
-          ++ "containsFailures" .= containsFailures span
-          ++ "allocated" .= allocated span
-          ++ "children" .= children span
+      ( "name"
+          .= name span
+          ++ "started"
+          .= started span
+          ++ "finished"
+          .= finished span
+          ++ "frame"
+          .= map SrcLocForEncoding (frame span)
+          ++ "details"
+          .= details span
+          ++ "summary"
+          .= summary span
+          ++ "succeeded"
+          .= succeeded span
+          ++ "containsFailures"
+          .= containsFailures span
+          ++ "allocated"
+          .= allocated span
+          ++ "children"
+          .= children span
       )
 
 instance Aeson.FromJSON TracingSpan where
@@ -226,14 +236,22 @@ instance Aeson.ToJSON SrcLocForEncoding where
       ]
   toEncoding (SrcLocForEncoding (name, loc)) =
     Aeson.pairs
-      ( "name" .= name
-          ++ "package" .= Stack.srcLocPackage loc
-          ++ "module" .= Stack.srcLocModule loc
-          ++ "file" .= Stack.srcLocFile loc
-          ++ "startLine" .= Stack.srcLocStartLine loc
-          ++ "startCol" .= Stack.srcLocStartCol loc
-          ++ "endLine" .= Stack.srcLocEndLine loc
-          ++ "endCol" .= Stack.srcLocEndCol loc
+      ( "name"
+          .= name
+          ++ "package"
+          .= Stack.srcLocPackage loc
+          ++ "module"
+          .= Stack.srcLocModule loc
+          ++ "file"
+          .= Stack.srcLocFile loc
+          ++ "startLine"
+          .= Stack.srcLocStartLine loc
+          ++ "startCol"
+          .= Stack.srcLocStartCol loc
+          ++ "endLine"
+          .= Stack.srcLocEndLine loc
+          ++ "endCol"
+          .= Stack.srcLocEndCol loc
       )
 
 instance Aeson.FromJSON SrcLocForEncoding where

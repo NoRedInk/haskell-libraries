@@ -139,22 +139,18 @@ map2 :: (a -> b -> result) -> Task x a -> Task x b -> Task x result
 map2 =
   Shortcut.map2
 
--- |
 map3 :: (a -> b -> c -> result) -> Task x a -> Task x b -> Task x c -> Task x result
 map3 =
   Shortcut.map3
 
--- |
 map4 :: (a -> b -> c -> d -> result) -> Task x a -> Task x b -> Task x c -> Task x d -> Task x result
 map4 =
   Shortcut.map4
 
--- |
 map5 :: (a -> b -> c -> d -> e -> result) -> Task x a -> Task x b -> Task x c -> Task x d -> Task x e -> Task x result
 map5 =
   Shortcut.map5
 
--- |
 map6 :: (a -> b -> c -> d -> e -> f -> result) -> Task x a -> Task x b -> Task x c -> Task x d -> Task x e -> Task x f -> Task x result
 map6 =
   Shortcut.map6

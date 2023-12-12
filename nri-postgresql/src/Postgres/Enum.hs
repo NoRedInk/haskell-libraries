@@ -142,7 +142,8 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
   -- Note: We make sure to capture IO errors and re-throw them below in the Q monad so that our test framework can capture them
   (maybePGEnumValues :: Either Control.Exception.IOException (List Text)) <-
-    TH.runIO <| Control.Exception.try
+    TH.runIO
+      <| Control.Exception.try
       <| withTPGConnection
         ( \connection -> do
             -- Check if the databaseTypeName exists on the PG database and is an enum

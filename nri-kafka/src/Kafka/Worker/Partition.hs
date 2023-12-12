@@ -161,7 +161,8 @@ spawnWorkerThread skipOrNot messageFormat commitOffsets observabilityHandler ana
   -- partition as soon as this function returns, even if the processing thread
   -- we start below still needs boot.
   partition <-
-    map Partition <| TVar.newTVarIO
+    map Partition
+      <| TVar.newTVarIO
       <| case commitOffsets of
         ToKafka -> Assigned Seq.empty
         Elsewhere offset -> AwaitingSeekTo offset

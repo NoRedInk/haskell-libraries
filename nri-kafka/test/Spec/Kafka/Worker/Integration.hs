@@ -29,7 +29,8 @@ tests =
             Helpers.sendSync handler topic 1 (1, 2)
             Helpers.sendSync handler topic 2 (2, 3)
             msgs' <- waitFor msgsTVar (\items -> List.length items == 3)
-            msgs' |> groupDictAndMap identity
+            msgs'
+              |> groupDictAndMap identity
               |> Expect.equal
                 ( Dict.fromList
                     [ (1, [2, 1]),

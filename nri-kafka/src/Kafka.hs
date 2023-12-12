@@ -185,7 +185,6 @@ pollEvents producer = do
   Control.Concurrent.threadDelay 100_000 {- 100ms -}
   pollEvents producer
 
--- |
 mkHandler :: Settings.Settings -> Producer.KafkaProducer -> Prelude.IO Internal.Handler
 mkHandler settings producer = do
   doAnything <- Platform.doAnythingHandler

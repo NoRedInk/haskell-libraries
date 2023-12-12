@@ -6,12 +6,10 @@ import List (List)
 import qualified Text
 import qualified Prelude as P
 
--- |
 write :: Text.Text -> P.IO ()
 write string =
   P.putStr (Data.Text.unpack string)
 
--- |
 read :: P.IO Text.Text
 read =
   P.getLine

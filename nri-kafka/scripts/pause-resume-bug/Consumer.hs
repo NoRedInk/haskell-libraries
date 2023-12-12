@@ -38,8 +38,8 @@ main = do
                 printAtomic lock stdout (msgId ++ " Producer has been restarted")
               (Just prev, curr)
                 | prev + 1 == curr ->
-                  -- This is the expected behavior
-                  printAtomic lock stdout (msgId ++ " OK")
+                    -- This is the expected behavior
+                    printAtomic lock stdout (msgId ++ " OK")
               (Just prev, curr) ->
                 -- This is the bug
                 printAtomic

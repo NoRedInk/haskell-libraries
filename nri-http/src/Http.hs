@@ -213,8 +213,8 @@ _request doAnythingHandler manager settings = do
                       Internal.headers settings
                         |> List.map Internal.unHeader
                     Just mimeType ->
-                      ("content-type", mimeType) :
-                      List.map Internal.unHeader (Internal.headers settings),
+                      ("content-type", mimeType)
+                        : List.map Internal.unHeader (Internal.headers settings),
                   HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.bodyContents (Internal.body settings),
                   HTTP.responseTimeout =
                     Internal.timeout settings
@@ -349,7 +349,6 @@ expectTextResponse = Internal.ExpectTextResponse
 expectBytesResponse :: (Internal.Response Data.ByteString.Lazy.ByteString -> Result x a) -> Expect' x a
 expectBytesResponse = Internal.ExpectBytesResponse
 
--- |
 type Error = Internal.Error
 
 -- Our Task type carries around some context values which should influence in
@@ -398,8 +397,8 @@ prepareManagerForRequest manager = do
           pure
             req
               { HTTP.requestHeaders =
-                  ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId) :
-                  HTTP.requestHeaders req
+                  ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId)
+                    : HTTP.requestHeaders req
               }
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
     wrapException log req io =

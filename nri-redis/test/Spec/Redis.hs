@@ -160,7 +160,8 @@ queryTests redisHandler =
       Redis.set api "mgetTest::key1" "value 1" |> Redis.query testNS |> Expect.succeeds
       Redis.set api "mgetTest::key3" "value 3" |> Redis.query testNS |> Expect.succeeds
       result <-
-        Redis.mget api ("mgetTest::key1" :| ["mgetTest::key2", "mgetTest::key3"]) |> Redis.query testNS
+        Redis.mget api ("mgetTest::key1" :| ["mgetTest::key2", "mgetTest::key3"])
+          |> Redis.query testNS
           |> Expect.succeeds
       Expect.equal
         (Dict.toList result)

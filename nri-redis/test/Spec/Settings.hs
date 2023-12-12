@@ -1,6 +1,6 @@
 module Spec.Settings (tests) where
 
-import Database.Redis hiding (String, Ok)
+import Database.Redis hiding (Ok, String)
 import qualified Dict
 import qualified Environment
 import qualified Expect
@@ -10,7 +10,8 @@ import Prelude (Either (..), Show (..), String, pure)
 
 tests :: Test.Test
 tests =
-  Test.describe "parsing settings from environment"
+  Test.describe
+    "parsing settings from environment"
     [ decoderTests,
       decoderWithEnvVarPrefixTests,
       decoderWithCustomConnectionStringTests
@@ -25,7 +26,8 @@ expectEqualShow x y = Expect.equal (show x) (show y)
 
 decoderTests :: Test.Test
 decoderTests =
-  Test.describe "decoder tests"
+  Test.describe
+    "decoder tests"
     [ Test.test "returns expected defaults when no env vars set" <| \_ -> do
         connectInfo <- parseConnectInfoElseFailTest "redis://localhost:6379"
         let expected =
@@ -74,7 +76,7 @@ decoderTests =
                   Settings.maxKeySize = Settings.NoMaxKeySize
                 }
          in Environment.decodePairs Settings.decoder env
-            |> expectEqualShow (Ok expected),
+              |> expectEqualShow (Ok expected),
       Test.test "handles unix socket scheme with specified db" <| \_ ->
         let env = Dict.fromList [("REDIS_CONNECTION_STRING", "redis+unix://some:dude@/other/redis.sock?db=5")]
             expected =
@@ -91,12 +93,13 @@ decoderTests =
                   Settings.maxKeySize = Settings.NoMaxKeySize
                 }
          in Environment.decodePairs Settings.decoder env
-            |> expectEqualShow (Ok expected)
+              |> expectEqualShow (Ok expected)
     ]
 
 decoderWithEnvVarPrefixTests :: Test.Test
 decoderWithEnvVarPrefixTests =
-  Test.describe "decoderWithEnvVarPrefix tests"
+  Test.describe
+    "decoderWithEnvVarPrefix tests"
     [ Test.test "returns expected defaults when no env vars set" <| \_ -> do
         connectInfo <- parseConnectInfoElseFailTest "redis://localhost:6379"
         let expected =
@@ -145,7 +148,7 @@ decoderWithEnvVarPrefixTests =
                   Settings.maxKeySize = Settings.NoMaxKeySize
                 }
          in Environment.decodePairs (Settings.decoderWithEnvVarPrefix "TEST_") env
-            |> expectEqualShow (Ok expected),
+              |> expectEqualShow (Ok expected),
       Test.test "handles unix socket scheme with specified db" <| \_ ->
         let env = Dict.fromList [("TEST_REDIS_CONNECTION_STRING", "redis+unix://some:dude@/other/redis.sock?db=5")]
             expected =
@@ -162,12 +165,13 @@ decoderWithEnvVarPrefixTests =
                   Settings.maxKeySize = Settings.NoMaxKeySize
                 }
          in Environment.decodePairs (Settings.decoderWithEnvVarPrefix "TEST_") env
-            |> expectEqualShow (Ok expected)
+              |> expectEqualShow (Ok expected)
     ]
 
 decoderWithCustomConnectionStringTests :: Test.Test
 decoderWithCustomConnectionStringTests =
-  Test.describe "decoderWithCustomConnectionString tests"
+  Test.describe
+    "decoderWithCustomConnectionString tests"
     [ Test.test "returns expected defaults when no env vars set" <| \_ -> do
         connectInfo <- parseConnectInfoElseFailTest "redis://localhost:6379"
         let expected =
@@ -216,7 +220,7 @@ decoderWithCustomConnectionStringTests =
                   Settings.maxKeySize = Settings.NoMaxKeySize
                 }
          in Environment.decodePairs (Settings.decoderWithCustomConnectionString "COOL_CONNECTION_STRING") env
-            |> expectEqualShow (Ok expected),
+              |> expectEqualShow (Ok expected),
       Test.test "handles unix socket scheme with specified db" <| \_ ->
         let env = Dict.fromList [("COOL_CONNECTION_STRING", "redis+unix://some:dude@/other/redis.sock?db=5")]
             expected =
@@ -233,12 +237,12 @@ decoderWithCustomConnectionStringTests =
                   Settings.maxKeySize = Settings.NoMaxKeySize
                 }
          in Environment.decodePairs (Settings.decoderWithCustomConnectionString "COOL_CONNECTION_STRING") env
-            |> expectEqualShow (Ok expected)
+              |> expectEqualShow (Ok expected)
     ]
 
 parseConnectInfoElseFailTest :: String -> Expect.Expectation' ConnectInfo
 parseConnectInfoElseFailTest uri = do
-  Expect.succeeds <|
-    case parseConnectInfo uri of
+  Expect.succeeds
+    <| case parseConnectInfo uri of
       Left err -> Task.fail <| "you wrote this test wrong, got err: " ++ Text.fromList err
       Right connectInfo -> pure connectInfo

@@ -91,17 +91,14 @@ map2 :: (a -> b -> value) -> Result x a -> Result x b -> Result x value
 map2 =
   Shortcut.map2
 
--- |
 map3 :: (a -> b -> c -> value) -> Result x a -> Result x b -> Result x c -> Result x value
 map3 =
   Shortcut.map3
 
--- |
 map4 :: (a -> b -> c -> d -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x value
 map4 =
   Shortcut.map4
 
--- |
 map5 :: (a -> b -> c -> d -> e -> value) -> Result x a -> Result x b -> Result x c -> Result x d -> Result x e -> Result x value
 map5 =
   Shortcut.map5

@@ -731,11 +731,11 @@ viewFilter filter =
     HasFilter editor ->
       Brick.vBox
         [ Brick.hBox
-            ( Brick.txt "Filter: " :
-              ( getEditWords editor
-                  |> List.map (Brick.withAttr "underlined" << Brick.txt)
-                  |> List.intersperse (Brick.txt " ")
-              )
+            ( Brick.txt "Filter: "
+                : ( getEditWords editor
+                      |> List.map (Brick.withAttr "underlined" << Brick.txt)
+                      |> List.intersperse (Brick.txt " ")
+                  )
             ),
           Border.hBorder
         ]
