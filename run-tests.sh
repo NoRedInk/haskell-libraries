@@ -39,8 +39,8 @@ done
 echo "kafka available"
 
 
-cabal build all
-cabal test all
+cabal build --offline all
+cabal test --offline all
 
 # cleanup
 kafka-server-stop.sh
