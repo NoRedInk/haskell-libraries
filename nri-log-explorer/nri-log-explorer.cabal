@@ -1,11 +1,11 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
 name:           nri-log-explorer
-version:        0.1.1.2
+version:        0.1.1.3
 synopsis:       Explore logs produced by nri-prelude tests.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explorer#readme>.
 category:       Web
@@ -29,6 +29,7 @@ source-repository head
 executable log-explorer
   main-is: Main.hs
   other-modules:
+      AesonHelpers
       Filterable
       Paths_nri_log_explorer
   hs-source-dirs:
@@ -53,7 +54,7 @@ executable log-explorer
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , base >=4.12.0.0 && <4.17
-    , brick >=0.51 && <1.0
+    , brick >=0.51 && <0.72
     , bytestring >=0.10.8.2 && <0.12
     , directory >=1.3.3.0 && <1.4
     , fuzzy >=0.1.0.0 && <0.2
@@ -64,7 +65,7 @@ executable log-explorer
     , process >=1.6.0.0 && <1.7
     , safe-exceptions >=0.1.7.0 && <1.3
     , text >=1.2.3.1 && <2.1
-    , text-zipper >=0.10.1 && <0.12
+    , text-zipper >=0.10.1 && <0.13
     , time >=1.8.0.2 && <2
     , unordered-containers >=0.2.0.0 && <0.3
     , vector >=0.12.1.2 && <0.13

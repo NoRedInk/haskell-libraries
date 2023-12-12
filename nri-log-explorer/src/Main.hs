@@ -7,6 +7,7 @@ module Main
   )
 where
 
+import AesonHelpers (hashMapFromObject, textFromKey)
 import qualified Brick
 import qualified Brick.BChan
 import Brick.Types (ViewportType (..))
@@ -1065,11 +1066,11 @@ viewSpanDetails Span {original} =
                     |> Data.Text.Lazy.toStrict
                 )
             Just (Aeson.Object object) ->
-              HashMap.toList object
+              HashMap.toList (hashMapFromObject object)
                 |> List.map
                   ( \(name, val) ->
                       viewDetail
-                        name
+                        (textFromKey name)
                         ( case Aeson.toJSON val of
                             Aeson.Null -> "Null"
                             Aeson.String str -> str
