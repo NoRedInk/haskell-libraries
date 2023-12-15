@@ -231,8 +231,8 @@ batchEventsHelper sharedTraceData parentSpanId (statsByName, spanIndex) span = d
       { batchevent_time = timestamp,
         batchevent_data = hcSpan,
         batchevent_samplerate = sampleRate sharedTraceData
-      } :
-    children
+      }
+      : children
     )
 
 data Stats = Stats

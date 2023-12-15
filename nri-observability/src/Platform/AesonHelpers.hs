@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 -- | This module supports working with aeson objects in a way compatible with
--- both the 1.x and 2.x versions of the aseon library.
+-- both the 1.x and 2.x versions of the aeson library.
 --
 -- Aeson has a Value type for representing JSON values. The Value type has
 -- constructors for JSON strings, numbers, arrays, and objects. Aeson represents
@@ -16,7 +16,7 @@
 --
 -- Once we're done supporting versions 1.x of aeson we can drop this module and
 -- inline the 2.x versions of functions wherever they are called.
-module Platform.AesonHelpers (foldObject, mergeObjects) where
+module Platform.AesonHelpers (foldObject, mergeObjects, keyFromText, singleton, emptyObject) where
 
 #if MIN_VERSION_aeson(2,0,0)
 
@@ -34,6 +34,15 @@ mergeObjects ::
   Aeson.Object
 mergeObjects = KeyMap.unionWith
 
+keyFromText :: Text -> Key.Key
+keyFromText key = Key.fromText key
+
+singleton :: Text -> Aeson.Value -> Aeson.Object
+singleton key = KeyMap.singleton (keyFromText key)
+
+emptyObject :: Aeson.Object
+emptyObject = KeyMap.empty
+
 #else
 
 import qualified Data.Aeson as Aeson
@@ -48,5 +57,14 @@ mergeObjects ::
   Aeson.Object ->
   Aeson.Object
 mergeObjects merge object1 object2 = HashMap.unionWith merge object1 object2
+
+keyFromText :: Text -> Text
+keyFromText key = key
+
+singleton :: Text -> Aeson.Value -> Aeson.Object
+singleton = HashMap.singleton
+
+emptyObject :: Aeson.Object
+emptyObject = HashMap.empty
 
 #endif

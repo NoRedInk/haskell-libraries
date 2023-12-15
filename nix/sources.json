@@ -12,15 +12,15 @@
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs": {
-        "branch": "release-21.11",
+        "branch": "release-23.05",
         "description": "Nix Packages collection",
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "ba447e151cb970067fdc61b607f17c96f6365f2f",
-        "sha256": "1b8dkwk9b2zwx5rrrp64xvpjq26b3kn3h8achrvb8g6xjk6srliz",
+        "rev": "9463103069725474698139ab10f17a9d125da859",
+        "sha256": "0asjwsl9mg87pmygvc45x0fgaiz496h60q9sfh4mwzjxarj8vq83",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/ba447e151cb970067fdc61b607f17c96f6365f2f.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/9463103069725474698139ab10f17a9d125da859.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs-unstable": {
@@ -33,18 +33,6 @@
         "sha256": "1ld29fsviq5ax1drh25fxqcxi44g3cisf5hfib29d0qxjqlicbdf",
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/4c0834929cafb7478a5e82616d484578a80a3e41.tar.gz",
-        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
-    },
-    "safe-coloured-text": {
-        "branch": "master",
-        "description": null,
-        "homepage": "https://cs-syd.eu/posts/2021-03-07-safe-coloured-text",
-        "owner": "NorfairKing",
-        "repo": "safe-coloured-text",
-        "rev": "d5788740052925aebf1dec1cf1669f66d3a35120",
-        "sha256": "0mrrfnvvwvdq2cf2figvan8z4jk0bypa0xmg11n3af6vsjryih43",
-        "type": "tarball",
-        "url": "https://github.com/NorfairKing/safe-coloured-text/archive/d5788740052925aebf1dec1cf1669f66d3a35120.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

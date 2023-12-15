@@ -75,8 +75,8 @@ logItem LogContext {timer, namespace, environment, requestId, hostname} span =
        )
     ++ (Aeson..=) "allocated_mb" (toFloat (Platform.allocated span) / 1e6)
     ++ (Aeson..=) "details" (Platform.details span)
-      |> Aeson.pairs
-      |> Data.Aeson.Encoding.encodingToLazyByteString
+    |> Aeson.pairs
+    |> Data.Aeson.Encoding.encodingToLazyByteString
 
 -- | Contextual information this reporter needs to do its work. You can create
 -- one using 'handler'.

@@ -70,17 +70,14 @@ map2 :: (a -> b -> value) -> Maybe a -> Maybe b -> Maybe value
 map2 =
   Shortcut.map2
 
--- |
 map3 :: (a -> b -> c -> value) -> Maybe a -> Maybe b -> Maybe c -> Maybe value
 map3 =
   Shortcut.map3
 
--- |
 map4 :: (a -> b -> c -> d -> value) -> Maybe a -> Maybe b -> Maybe c -> Maybe d -> Maybe value
 map4 =
   Shortcut.map4
 
--- |
 map5 :: (a -> b -> c -> d -> e -> value) -> Maybe a -> Maybe b -> Maybe c -> Maybe d -> Maybe e -> Maybe value
 map5 =
   Shortcut.map5

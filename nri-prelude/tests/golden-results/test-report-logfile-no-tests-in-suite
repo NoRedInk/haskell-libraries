@@ -1,21 +1,21 @@
 {
-    "summary": "nri-prelude",
-    "children": [],
     "allocated": 0,
-    "name": "test run",
+    "children": [],
+    "containsFailures": true,
     "details": null,
     "finished": 0,
     "frame": {
-        "startLine": 467,
-        "endLine": 467,
-        "name": "report",
         "endCol": 69,
+        "endLine": 467,
+        "file": "tests/TestSpec.hs",
         "module": "TestSpec",
+        "name": "report",
         "package": "main",
         "startCol": 22,
-        "file": "tests/TestSpec.hs"
+        "startLine": 467
     },
-    "containsFailures": true,
+    "name": "test run",
+    "started": 0,
     "succeeded": "Failed",
-    "started": 0
+    "summary": "nri-prelude"
 }

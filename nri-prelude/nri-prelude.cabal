@@ -1,11 +1,11 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
 name:           nri-prelude
-version:        0.6.0.6
+version:        0.6.1.0
 synopsis:       A Prelude inspired by the Elm programming language
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme>.
 category:       Web
@@ -13,7 +13,7 @@ homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-pre
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com
-copyright:      2022 NoRedInk Corp.
+copyright:      2023 NoRedInk Corp.
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -53,6 +53,7 @@ library
       Text
       Tuple
   other-modules:
+      Internal.AesonHelpers
       Internal.Shortcut
       Internal.Terminal
       NriPrelude.Plugin.GhcVersionDependent
@@ -97,13 +98,13 @@ library
     , exceptions >=0.10.4 && <0.11
     , filepath >=1.4.2.1 && <1.5
     , ghc >=8.6.1 && <9.3
-    , hedgehog >=1.0.2 && <1.1
+    , hedgehog >=1.0.2 && <1.2
     , junit-xml >=0.1.0.0 && <0.2.0.0
-    , lens >=4.16.1 && <5.1
+    , lens >=4.16.1 && <5.2
     , pretty-diff >=0.4.0.2 && <0.5
     , pretty-show >=1.9.5 && <1.11
-    , safe-coloured-text >=0.1.0.0 && <0.2
-    , safe-coloured-text-terminfo >=0.0.0.0 && <0.1
+    , safe-coloured-text >=0.1.0.0 && <0.3
+    , safe-coloured-text-terminfo >=0.0.0.0 && <0.2
     , safe-exceptions >=0.1.7.0 && <1.3
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <2.1
@@ -134,6 +135,7 @@ test-suite tests
       Dict
       Expect
       Fuzz
+      Internal.AesonHelpers
       Internal.Shortcut
       Internal.Terminal
       List
@@ -193,13 +195,13 @@ test-suite tests
     , exceptions >=0.10.4 && <0.11
     , filepath >=1.4.2.1 && <1.5
     , ghc >=8.6.1 && <9.3
-    , hedgehog >=1.0.2 && <1.1
+    , hedgehog >=1.0.2 && <1.2
     , junit-xml >=0.1.0.0 && <0.2.0.0
-    , lens >=4.16.1 && <5.1
+    , lens >=4.16.1 && <5.2
     , pretty-diff >=0.4.0.2 && <0.5
     , pretty-show >=1.9.5 && <1.11
-    , safe-coloured-text >=0.1.0.0 && <0.2
-    , safe-coloured-text-terminfo >=0.0.0.0 && <0.1
+    , safe-coloured-text >=0.1.0.0 && <0.3
+    , safe-coloured-text-terminfo >=0.0.0.0 && <0.2
     , safe-exceptions >=0.1.7.0 && <1.3
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <2.1

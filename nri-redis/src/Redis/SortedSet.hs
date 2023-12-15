@@ -48,8 +48,8 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
-import qualified Redis.Internal as Internal
 import qualified Redis.Handler as Handler
+import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Prelude
 

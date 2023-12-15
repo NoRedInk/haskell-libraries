@@ -1,26 +1,26 @@
 [
     {
-        "time": "1970-01-01T00:00:00Z",
         "data": {
-            "making_http_request.headers": {},
-            "making_http_request.method": "GET",
-            "hostname": "some-service-oaiefiowh-aoidawi",
-            "making_http_request.host": "http://antsonline.com",
+            "allocated_bytes": 0,
             "apdex": 1,
+            "contains_failures": true,
+            "duration_ms": 0,
+            "endpoint": "GET /hats/:hat_id",
+            "failed": true,
+            "hostname": "some-service-oaiefiowh-aoidawi",
+            "making_http_request.headers": {},
+            "making_http_request.host": "http://antsonline.com",
+            "making_http_request.method": "GET",
+            "making_http_request.path": "/bulletin",
+            "name": "Making HTTP request",
+            "revision": "gitref",
+            "service_name": "some service",
+            "source_location": null,
             "trace.parent_id": null,
             "trace.span_id": "request-id-123-0",
-            "trace.trace_id": "request-id-123",
-            "duration_ms": 0,
-            "name": "Making HTTP request",
-            "source_location": null,
-            "allocated_bytes": 0,
-            "contains_failures": true,
-            "making_http_request.path": "/bulletin",
-            "service_name": "some service",
-            "endpoint": "GET /hats/:hat_id",
-            "revision": "gitref",
-            "failed": true
+            "trace.trace_id": "request-id-123"
         },
-        "samplerate": 1
+        "samplerate": 1,
+        "time": "1970-01-01T00:00:00Z"
     }
 ]

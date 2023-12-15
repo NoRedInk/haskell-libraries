@@ -194,7 +194,7 @@ slice :: Int -> Int -> Text -> Text
 slice from to text
   | to' - from' <= 0 = Data.Text.empty
   | otherwise =
-    Data.Text.drop from' (Data.Text.take to' text)
+      Data.Text.drop from' (Data.Text.take to' text)
   where
     len = Data.Text.length text
     handleNegative value

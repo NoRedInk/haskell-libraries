@@ -1,16 +1,16 @@
 {
-    "hostname": "some-host",
+    "allocated_mb": 0.0,
+    "details": {
+        "number": 4,
+        "text": "Hi!"
+    },
+    "duration_ms": 0.0,
     "env": "narnia",
+    "hostname": "some-host",
+    "name": "",
     "namespace": [
         "app"
     ],
-    "allocated_mb": 0.0,
-    "duration_ms": 0.0,
-    "name": "",
-    "details": {
-        "text": "Hi!",
-        "number": 4
-    },
-    "start_utc": "1970-01-01T00:00:00Z",
-    "request-id": "request-id"
+    "request-id": "request-id",
+    "start_utc": "1970-01-01T00:00:00Z"
 }

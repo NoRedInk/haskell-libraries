@@ -330,22 +330,18 @@ truncate =
 (/=) =
   (Prelude./=)
 
--- |
 (<) :: Prelude.Ord comparable => comparable -> comparable -> Bool
 (<) =
   (Prelude.<)
 
--- |
 (>) :: Prelude.Ord comparable => comparable -> comparable -> Bool
 (>) =
   (Prelude.>)
 
--- |
 (<=) :: Prelude.Ord comparable => comparable -> comparable -> Bool
 (<=) =
   (Prelude.<=)
 
--- |
 (>=) :: Prelude.Ord comparable => comparable -> comparable -> Bool
 (>=) =
   (Prelude.>=)

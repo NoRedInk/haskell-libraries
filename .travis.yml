@@ -1,5 +1,5 @@
 language: nix
-nix: 2.3.7
+nix: 2.17.0
 os: linux
 dist: xenial
 vm:
@@ -11,7 +11,7 @@ env:
     - CACHIX_CACHE=nri
   jobs:
     - GHC_VERSION=8-10
-    - GHC_VERSION=9-0
+    - GHC_VERSION=9-2
 install:
   - echo "trusted-users = $USER" | sudo tee -a /etc/nix/nix.conf
   - sudo systemctl restart nix-daemon

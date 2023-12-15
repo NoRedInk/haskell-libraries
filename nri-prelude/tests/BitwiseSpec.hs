@@ -75,34 +75,42 @@ tests =
       describe
         "shiftLeftBy"
         [ test "8 |> shiftLeftBy 1 == 16" <| \() ->
-            8 |> Bitwise.shiftLeftBy 1
+            8
+              |> Bitwise.shiftLeftBy 1
               |> Expect.equal 16,
           test "8 |> shiftLeftby 2 == 32" <| \() ->
-            8 |> Bitwise.shiftLeftBy 2
+            8
+              |> Bitwise.shiftLeftBy 2
               |> Expect.equal 32
         ],
       describe
         "shiftRightBy"
         [ test "32 |> shiftRight 1 == 16" <| \() ->
-            32 |> Bitwise.shiftRightBy 1
+            32
+              |> Bitwise.shiftRightBy 1
               |> Expect.equal 16,
           test "32 |> shiftRight 2 == 8" <| \() ->
-            32 |> Bitwise.shiftRightBy 2
+            32
+              |> Bitwise.shiftRightBy 2
               |> Expect.equal 8,
           test "-32 |> shiftRight 1 == -16" <| \() ->
-            -32 |> Bitwise.shiftRightBy 1
+            -32
+              |> Bitwise.shiftRightBy 1
               |> Expect.equal (-16)
         ],
       describe
         "shiftRightZfBy"
         [ test "32 |> shiftRightZfBy 1 == 16" <| \() ->
-            32 |> Bitwise.shiftRightZfBy 1
+            32
+              |> Bitwise.shiftRightZfBy 1
               |> Expect.equal 16,
           test "32 |> shiftRightZfBy 2 == 8" <| \() ->
-            32 |> Bitwise.shiftRightZfBy 2
+            32
+              |> Bitwise.shiftRightZfBy 2
               |> Expect.equal 8,
           test "-32 |> shiftRightZfBy 1 == 9223372036854775792" <| \() ->
-            -32 |> Bitwise.shiftRightZfBy 1
+            -32
+              |> Bitwise.shiftRightZfBy 1
               |> Expect.equal 9223372036854775792
         ]
     ]

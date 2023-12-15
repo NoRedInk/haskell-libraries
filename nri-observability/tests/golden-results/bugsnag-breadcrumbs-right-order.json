@@ -1,94 +1,94 @@
 {
-    "exceptions": [
-        {
-            "stacktrace": [],
-            "errorClass": "child-3-grandchild-3 (failed, root cause)"
-        }
-    ],
     "breadcrumbs": [
         {
+            "metaData": {
+                "duration in milliseconds": "0.0"
+            },
             "name": "Starting: root-span (failed)",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        },
+        {
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
-        },
-        {
             "name": "child-1 (leaf)",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        },
+        {
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
-        },
-        {
             "name": "Starting: child-2 (failed)",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        },
+        {
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
-        },
-        {
             "name": "child-2-grandchild-1 (leaf)",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        },
+        {
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
-        },
-        {
             "name": "Starting: child-2-grandchild-2",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        },
+        {
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
-        },
-        {
             "name": "child-2-grandchild-2-greatgrandchild-1 (leaf)",
-            "metaData": {
-                "duration in milliseconds": "0.0"
-            },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
         },
         {
-            "name": "child-2-grandchild-2-greatgrandchild-2 (leaf)",
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "name": "child-2-grandchild-2-greatgrandchild-2 (leaf)",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
         },
         {
             "name": "Finished: child-2-grandchild-2",
-            "type": "log",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "log"
         },
         {
+            "metaData": {
+                "duration in milliseconds": "0.0"
+            },
             "name": "child-3-grandchild-3-greatgrandchild-1 (leaf)",
-            "metaData": {
-                "duration in milliseconds": "0.0"
-            },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
         },
         {
-            "name": "child-3-grandchild-3-greatgrandchild-2 (leaf)",
             "metaData": {
                 "duration in milliseconds": "0.0"
             },
-            "type": "manual",
-            "timestamp": "1970-01-01T00:00:00Z"
+            "name": "child-3-grandchild-3-greatgrandchild-2 (leaf)",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        }
+    ],
+    "exceptions": [
+        {
+            "errorClass": "child-3-grandchild-3 (failed, root cause)",
+            "stacktrace": []
         }
     ],
     "metaData": {
         "request": {
+            "megabytes allocated": 0,
             "request id": "request-id-1234",
-            "response time in ms": 0,
-            "megabytes allocated": 0
+            "response time in ms": 0
         }
     },
     "unhandled": false
