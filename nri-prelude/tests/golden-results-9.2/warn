@@ -1,24 +1,24 @@
 [ TracingSpan
-    { name = "pressed the button"
+    { name = "user cut themselves on the modal"
     , started = MonotonicTime { inMicroseconds = 0 }
     , finished = MonotonicTime { inMicroseconds = 0 }
     , frame =
         Just
-          ( "debug"
+          ( "warn"
           , SrcLoc
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 39
+              , srcLocStartLine = 53
               , srcLocStartCol = 15
-              , srcLocEndLine = 41
-              , srcLocEndCol = 53
+              , srcLocEndLine = 53
+              , srcLocEndCol = 19
               }
           )
-    , details = Just "{\"level\":\"Debug\",\"button\":\"PRESS\"}"
+    , details = Just "{\"level\":\"Warn\",\"modal\":\"SURPRISE!\"}"
     , summary = Nothing
-    , succeeded = Succeeded
-    , containsFailures = False
+    , succeeded = Failed
+    , containsFailures = True
     , allocated = 0
     , children = []
     }

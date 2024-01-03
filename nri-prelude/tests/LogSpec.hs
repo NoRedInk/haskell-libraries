@@ -6,6 +6,7 @@ import qualified Data.IORef as IORef
 import qualified Debug
 import qualified Expect
 import qualified GHC.Stack as Stack
+import GoldenHelpers (goldenResultsDir)
 import Log
 import NriPrelude
 import qualified Platform.Internal as Internal
@@ -30,7 +31,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-info",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/log-info"),
       test "`debug` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -43,7 +44,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/debug",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/debug"),
       test "`warn` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -56,7 +57,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/warn",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/warn"),
       test "`error` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -69,7 +70,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/error",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/error"),
       test "nested spans pruduce expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -82,7 +83,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-nested-spans",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/log-nested-spans"),
       test "unexpected exceptions produce expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -96,7 +97,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-unexpected-exceptions",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/log-unexpected-exceptions"),
       test "async exceptions produce expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -115,7 +116,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-async-exceptions",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/log-async-exceptions"),
       test "secrets do not appear in debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -162,7 +163,7 @@ tests =
       test "`Log.Context` can be shown" <| \_ ->
         Log.context "hello" "world"
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-context-show",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/log-context-show"),
       test "`info` with `newRoot` produces expected debugging info" <| \_ -> do
         spans <-
           Expect.fromIO <| do
@@ -179,7 +180,7 @@ tests =
             recordedTracingSpans
         spans
           |> Debug.toString
-          |> Expect.equalToContentsOf "tests/golden-results/log-new-root"
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/log-new-root")
     ]
 
 data TestException = TestException deriving (Show)

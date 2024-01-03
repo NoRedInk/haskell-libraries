@@ -9,10 +9,10 @@
               { srcLocPackage = "main"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 80
+              , srcLocStartLine = 81
               , srcLocStartCol = 20
-              , srcLocEndLine = 80
-              , srcLocEndCol = 76
+              , srcLocEndLine = 81
+              , srcLocEndCol = 31
               }
           )
     , details = Just "{\"number\":825}"
@@ -32,10 +32,10 @@
                       { srcLocPackage = "main"
                       , srcLocModule = "LogSpec"
                       , srcLocFile = "tests/LogSpec.hs"
-                      , srcLocStartLine = 79
+                      , srcLocStartLine = 80
                       , srcLocStartCol = 20
-                      , srcLocEndLine = 79
-                      , srcLocEndCol = 84
+                      , srcLocEndLine = 80
+                      , srcLocEndCol = 31
                       }
                   )
             , details = Just "{\"word\":\"sabbatical\"}"
@@ -55,10 +55,10 @@
                               { srcLocPackage = "main"
                               , srcLocModule = "LogSpec"
                               , srcLocFile = "tests/LogSpec.hs"
-                              , srcLocStartLine = 78
+                              , srcLocStartLine = 79
                               , srcLocStartCol = 15
-                              , srcLocEndLine = 78
-                              , srcLocEndCol = 29
+                              , srcLocEndLine = 79
+                              , srcLocEndCol = 19
                               }
                           )
                     , details = Just "{\"level\":\"Info\"}"

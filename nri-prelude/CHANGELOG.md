@@ -1,3 +1,7 @@
+# 0.6.1.1
+
+- Support GHC 9.2.6.
+
 # 0.6.1.0
 
 - Fix support for `aeson-2.x`

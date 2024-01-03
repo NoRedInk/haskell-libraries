@@ -22,11 +22,16 @@ where
 
 import Data.Function ((&))
 import qualified Data.List
+
 #if __GLASGOW_HASKELL__ >= 900
 import qualified GHC.Plugins as GhcPlugins
-#else
-import GhcPlugins
+#if __GLASGOW_HASKELL__ >= 902
+import qualified GHC.Hs as GhcPlugins (HsParsedModule (..))
 #endif
+#else
+import qualified GhcPlugins
+#endif
+
 import NriPrelude.Plugin.GhcVersionDependent
   ( hsmodImports,
     hsmodName,
@@ -35,6 +40,7 @@ import NriPrelude.Plugin.GhcVersionDependent
     ideclQualified,
     isQualified,
     mkQualified,
+    noLoc,
     simpleImportDecl,
   )
 import qualified Set
@@ -107,7 +113,7 @@ addImplicitImports _ _ parsed =
     unLocate (GhcPlugins.L _ x) = GhcPlugins.moduleNameString x
 
     unqualified name =
-      GhcPlugins.noLoc (simpleImportDecl (GhcPlugins.mkModuleName name))
+      noLoc (simpleImportDecl (GhcPlugins.mkModuleName name))
         & fmap (\qual -> qual {ideclImplicit = True})
     qualified name =
       fmap (\qual -> qual {ideclQualified = mkQualified}) (unqualified name)
