@@ -14,7 +14,7 @@ module GoldenHelpers (goldenResultsDir) where
 -- 
 -- In GHC 8.10.x (and possibly GHC 9.0.x?) `srcLocEndLine` and `srcLocEndCol`
 -- would correspond to the `z` at the end of `baz`.  Unfortunately, in GHC 9.2.x
--- it corrsponds to the second `o` at the end of `foo`.
+-- it corresponds to the second `o` at the end of `foo`.
 
 goldenResultsDir :: Text
 #if __GLASGOW_HASKELL__ >= 902
