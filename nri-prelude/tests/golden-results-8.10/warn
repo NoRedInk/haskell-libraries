@@ -1,0 +1,25 @@
+[ TracingSpan
+    { name = "user cut themselves on the modal"
+    , started = MonotonicTime { inMicroseconds = 0 }
+    , finished = MonotonicTime { inMicroseconds = 0 }
+    , frame =
+        Just
+          ( "warn"
+          , SrcLoc
+              { srcLocPackage = "main"
+              , srcLocModule = "LogSpec"
+              , srcLocFile = "tests/LogSpec.hs"
+              , srcLocStartLine = 53
+              , srcLocStartCol = 15
+              , srcLocEndLine = 55
+              , srcLocEndCol = 56
+              }
+          )
+    , details = Just "{\"level\":\"Warn\",\"modal\":\"SURPRISE!\"}"
+    , summary = Nothing
+    , succeeded = Failed
+    , containsFailures = True
+    , allocated = 0
+    , children = []
+    }
+]

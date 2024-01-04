@@ -10,10 +10,22 @@ module NriPrelude.Plugin.GhcVersionDependent (
   module GHC.Hs,
   isQualified,
   mkQualified,
+  noLoc
 ) where
 
 import GHC.Hs
 import Prelude
+
+#if __GLASGOW_HASKELL__ >= 902
+import qualified GHC.Parser.Annotation
+
+noLoc :: a -> GHC.Parser.Annotation.LocatedAn an a
+noLoc = noLocA
+#elif __GLASGOW_HASKELL__ >= 900
+import GHC.Types.SrcLoc (noLoc)
+#else
+import SrcLoc (noLoc)
+#endif
 
 -- There's more than one way to do a qualified import. See:
 -- https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/import_qualified_post.html
@@ -34,8 +46,10 @@ module NriPrelude.Plugin.GhcVersionDependent (
   module HsSyn,
   isQualified,
   mkQualified,
+  noLoc
 ) where
 
+import GhcPlugins (noLoc)
 import HsSyn
 import Prelude
 

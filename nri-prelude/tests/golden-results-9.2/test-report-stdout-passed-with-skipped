@@ -1,0 +1,17 @@
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 3
+This test was skipped.
+
+↓ Module.hs:2
+↓ suite
+↓ sub suite
+✗ test 4
+This test was skipped.
+
+[4mTEST RUN INCOMPLETE[m because 2 tests were skipped
+
+Duration:  10 ms
+Passed:    2
+Skipped:   2

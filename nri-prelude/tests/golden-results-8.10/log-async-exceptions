@@ -1,0 +1,50 @@
+[ TracingSpan
+    { name = "outer span"
+    , started = MonotonicTime { inMicroseconds = 0 }
+    , finished = MonotonicTime { inMicroseconds = 0 }
+    , frame =
+        Just
+          ( "withContext"
+          , SrcLoc
+              { srcLocPackage = "main"
+              , srcLocModule = "LogSpec"
+              , srcLocFile = "tests/LogSpec.hs"
+              , srcLocStartLine = 113
+              , srcLocStartCol = 20
+              , srcLocEndLine = 113
+              , srcLocEndCol = 76
+              }
+          )
+    , details = Just "{\"number\":825}"
+    , summary = Just "outer span"
+    , succeeded = FailedWith TestException
+    , containsFailures = True
+    , allocated = 0
+    , children =
+        [ TracingSpan
+            { name = "inner span"
+            , started = MonotonicTime { inMicroseconds = 0 }
+            , finished = MonotonicTime { inMicroseconds = 0 }
+            , frame =
+                Just
+                  ( "withContext"
+                  , SrcLoc
+                      { srcLocPackage = "main"
+                      , srcLocModule = "LogSpec"
+                      , srcLocFile = "tests/LogSpec.hs"
+                      , srcLocStartLine = 112
+                      , srcLocStartCol = 20
+                      , srcLocEndLine = 112
+                      , srcLocEndCol = 84
+                      }
+                  )
+            , details = Just "{\"word\":\"sabbatical\"}"
+            , summary = Just "inner span"
+            , succeeded = FailedWith TestException
+            , containsFailures = True
+            , allocated = 0
+            , children = []
+            }
+        ]
+    }
+]

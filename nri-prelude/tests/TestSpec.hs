@@ -12,6 +12,7 @@ import qualified Expect
 import qualified Fuzz
 import qualified GHC.Exts
 import qualified GHC.Stack as Stack
+import GoldenHelpers (goldenResultsDir)
 import qualified List
 import NriPrelude
 import qualified Platform
@@ -85,7 +86,7 @@ api =
             |> Internal.run
               ( Internal.Some
                   [ Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 6)),
-                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 11))
+                    Internal.SubsetOfTests "tests/TestSpec.hs" (Just (srcLoc + 8))
                   ]
               )
             |> Expect.succeeds
@@ -175,7 +176,7 @@ api =
                   )
                   (Debug.todo "foo" :: Prelude.IO Text)
             )
-        Expect.equalToContentsOf "tests/golden-results/debug-todo-stacktrace" contents
+        Expect.equalToContentsOf (goldenResultsDir ++ "/debug-todo-stacktrace") contents
     ]
 
 floatComparison :: Test
@@ -256,7 +257,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-all-passed",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-all-passed"),
       test "onlys passed" <| \_ -> do
         contents <-
           withTempFile
@@ -271,7 +272,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-onlys-passed",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-onlys-passed"),
       test "passed with skipped" <| \_ -> do
         contents <-
           withTempFile
@@ -286,7 +287,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-passed-with-skipped",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-passed-with-skipped"),
       test "no tests in suite" <| \_ -> do
         contents <-
           withTempFile
@@ -295,7 +296,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-no-tests-in-suite",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-no-tests-in-suite"),
       test "tests failed" <| \_ -> do
         contents <-
           withTempFile
@@ -315,7 +316,7 @@ stdoutReporter =
                   |> Test.Reporter.Stdout.report handle
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-tests-failed"),
       test "tests failed (actually running)" <| \_ -> do
         let suite =
               describe
@@ -356,7 +357,7 @@ stdoutReporter =
             )
         contents
           |> withoutDurationLine
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-tests-failed-loc"),
       test "tests failed (actually running) only run subset" <| \_ -> do
         let srcLoc =
               Internal.getFrame "subset test"
@@ -388,7 +389,7 @@ stdoutReporter =
         Expect.true (Text.contains "Failed:    1" contents)
         contents
           |> withoutDurationLine
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-subset",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-tests-failed-loc-subset"),
       test "tests failed (actually running) only run onefile" <| \_ -> do
         let suite =
               describe
@@ -410,7 +411,7 @@ stdoutReporter =
             )
         contents
           |> withoutDurationLine
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-stdout-tests-failed-loc-one-file"
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-stdout-tests-failed-loc-one-file")
     ]
 
 logfileReporter :: Test
@@ -428,7 +429,7 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-all-passed",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-logfile-all-passed"),
       test "onlys passed" <| \_ -> do
         contents <-
           withTempFile
@@ -443,7 +444,7 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-onlys-passed",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-logfile-onlys-passed"),
       test "passed with skipped" <| \_ -> do
         contents <-
           withTempFile
@@ -458,7 +459,7 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-passed-with-skipped",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-logfile-passed-with-skipped"),
       test "no tests in suite" <| \_ -> do
         contents <-
           withTempFile
@@ -467,7 +468,7 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-no-tests-in-suite",
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-logfile-no-tests-in-suite"),
       test "tests failed" <| \_ -> do
         contents <-
           withTempFile
@@ -487,7 +488,7 @@ logfileReporter =
                   |> Test.Reporter.Logfile.report (writeSpan handle)
             )
         contents
-          |> Expect.equalToContentsOf "tests/golden-results/test-report-logfile-tests-failed"
+          |> Expect.equalToContentsOf (goldenResultsDir ++ "/test-report-logfile-tests-failed")
     ]
 
 writeSpan :: System.IO.Handle -> Platform.Internal.TracingSpan -> Prelude.IO ()

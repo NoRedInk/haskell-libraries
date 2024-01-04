@@ -1,3 +1,0 @@
-foo
-CallStack (from HasCallStack):
-  todo, called at tests/TestSpec.hs:176:20 in main:TestSpec

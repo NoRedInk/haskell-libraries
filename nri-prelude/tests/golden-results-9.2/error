@@ -1,0 +1,25 @@
+[ TracingSpan
+    { name = "door is blocked"
+    , started = MonotonicTime { inMicroseconds = 0 }
+    , finished = MonotonicTime { inMicroseconds = 0 }
+    , frame =
+        Just
+          ( "error"
+          , SrcLoc
+              { srcLocPackage = "main"
+              , srcLocModule = "LogSpec"
+              , srcLocFile = "tests/LogSpec.hs"
+              , srcLocStartLine = 66
+              , srcLocStartCol = 15
+              , srcLocEndLine = 66
+              , srcLocEndCol = 20
+              }
+          )
+    , details = Just "{\"level\":\"Error\",\"house number\":5}"
+    , summary = Nothing
+    , succeeded = Failed
+    , containsFailures = True
+    , allocated = 0
+    , children = []
+    }
+]

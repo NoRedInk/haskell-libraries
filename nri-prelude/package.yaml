@@ -3,7 +3,7 @@ synopsis: A Prelude inspired by the Elm programming language
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#readme
 author: NoRedInk
-version: 0.6.1.0
+version: 0.6.1.1
 maintainer: haskell-open-source@noredink.com
 copyright: 2023 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-prelude
