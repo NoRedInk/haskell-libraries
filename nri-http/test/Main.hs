@@ -7,6 +7,7 @@ import qualified Data.ByteString.Lazy
 import qualified Data.List
 import qualified Debug
 import qualified Expect
+import GoldenHelpers (goldenResultsDir)
 import qualified Http
 import qualified Http.Mock
 import qualified Log.HttpRequest as HttpRequest
@@ -109,7 +110,7 @@ tests =
                 Http.get http url Http.expectWhatever
                   |> spanForTask
               Debug.toString span
-                |> Expect.equalToContentsOf "test/golden-results/expected-http-span"
+                |> Expect.equalToContentsOf (goldenResultsDir ++ "/expected-http-span")
           ),
       test "Http.Mock.stub" <| \_ -> do
         urlsAccessed <-

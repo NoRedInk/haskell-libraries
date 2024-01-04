@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -20,7 +20,6 @@ build-type:     Simple
 extra-source-files:
     README.md
     LICENSE
-    test/golden-results/expected-http-span
 
 source-repository head
   type: git
@@ -77,6 +76,7 @@ test-suite spec
       Http
       Http.Internal
       Http.Mock
+      GoldenHelpers
       Paths_nri_http
   hs-source-dirs:
       src
