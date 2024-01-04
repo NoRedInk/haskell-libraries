@@ -62,56 +62,56 @@ observabilityTests handler =
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-query",
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-query"),
     Test.test "Redis.transaction reports the span data we expect" <| \() -> do
       span <-
         Redis.transaction handler (Redis.ping api)
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-transaction",
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-transaction"),
     Test.test "Redis.Hash.query reports the span data we expect" <| \() -> do
       span <-
         Redis.Hash.query handler (Redis.Hash.ping hashApi)
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-query",
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-hash-query"),
     Test.test "Redis.Hash.transaction reports the span data we expect" <| \() -> do
       span <-
         Redis.Hash.transaction handler (Redis.Hash.ping hashApi)
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-hash-transaction",
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-hash-transaction"),
     Test.test "Redis.List.query reports the span data we expect" <| \() -> do
       span <-
         Redis.List.query handler (Redis.List.ping listApi)
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-query",
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-list-query"),
     Test.test "Redis.List.transaction reports the span data we expect" <| \() -> do
       span <-
         Redis.List.transaction handler (Redis.List.ping listApi)
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-list-transaction",
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-list-transaction"),
     Test.test "Redis.Counter.query reports the span data we expect" <| \() -> do
       span <-
         Redis.Counter.query handler (Redis.Counter.ping counterApi)
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-query",
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-counter-query"),
     Test.test "Redis.Counter.transaction reports the span data we expect" <| \() -> do
       span <-
         Redis.Counter.transaction handler (Redis.Counter.ping counterApi)
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf "test/golden-results/observability-spec-reporting-redis-counter-transaction"
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-counter-transaction")
   ]
 
 queryTests :: Redis.Handler' x -> List Test.Test
