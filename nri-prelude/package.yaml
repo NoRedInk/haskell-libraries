@@ -41,7 +41,7 @@ library:
     - text >= 1.2.3.1 && < 2.1
     - time >= 1.8.0.2 && < 2
     - unix >= 2.7.2.2 && < 2.8.0.0
-    - vector >= 0.12.1.2 && < 0.13
+    - vector >= 0.12.1.2 && < 0.14
   exposed-modules:
     - Array
     - Basics
