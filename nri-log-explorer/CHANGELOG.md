@@ -1,6 +1,6 @@
 # 0.1.1.4
 
-- Support GHC 9.4.7, `aeson-2.1.x`
+- Support GHC 9.4.7, `aeson-2.1.x`, `text-zipper-0.13.x`, `vector-0.13.x`
 
 # 0.1.1.3
 
