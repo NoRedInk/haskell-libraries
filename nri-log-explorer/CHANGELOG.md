@@ -1,3 +1,7 @@
+# 0.1.1.4
+
+- Support GHC 9.4.7, `aeson-2.1.x`
+
 # 0.1.1.3
 
 - Relax version bounds to encompass `text-zipper-0.12.x`

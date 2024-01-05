@@ -10,21 +10,28 @@ module NriPrelude.Plugin.GhcVersionDependent (
   module GHC.Hs,
   isQualified,
   mkQualified,
-  noLoc
+  noLoc,
+  withParsedResult
 ) where
 
 import GHC.Hs
 import Prelude
 
+#if __GLASGOW_HASKELL__ >= 904
+import qualified GHC.Driver.Plugins
+#endif
 #if __GLASGOW_HASKELL__ >= 902
 import qualified GHC.Parser.Annotation
-
-noLoc :: a -> GHC.Parser.Annotation.LocatedAn an a
-noLoc = noLocA
 #elif __GLASGOW_HASKELL__ >= 900
 import GHC.Types.SrcLoc (noLoc)
 #else
+import GhcPlugins (HsParsedModule)
 import SrcLoc (noLoc)
+#endif
+
+#if __GLASGOW_HASKELL__ >= 902
+noLoc :: a -> GHC.Parser.Annotation.LocatedAn an a
+noLoc = noLocA
 #endif
 
 -- There's more than one way to do a qualified import. See:
@@ -40,16 +47,27 @@ isQualified imp =
 mkQualified :: ImportDeclQualifiedStyle
 mkQualified = QualifiedPre
 
+#if __GLASGOW_HASKELL__ >= 904
+withParsedResult :: GHC.Driver.Plugins.ParsedResult -> (HsParsedModule -> HsParsedModule) -> GHC.Driver.Plugins.ParsedResult
+withParsedResult parsed f =
+  parsed
+    { GHC.Driver.Plugins.parsedResultModule = f (GHC.Driver.Plugins.parsedResultModule parsed)
+    }
 #else
+withParsedResult :: HsParsedModule -> (HsParsedModule -> HsParsedModule) -> HsParsedModule
+withParsedResult parsed f = f parsed
+#endif
 
+#else
 module NriPrelude.Plugin.GhcVersionDependent (
   module HsSyn,
   isQualified,
   mkQualified,
-  noLoc
+  noLoc,
+  withParsedResult
 ) where
 
-import GhcPlugins (noLoc)
+import GhcPlugins (HsParsedModule, noLoc)
 import HsSyn
 import Prelude
 
@@ -58,5 +76,8 @@ isQualified = ideclQualified
 
 mkQualified :: Bool
 mkQualified = True
+
+withParsedResult :: HsParsedModule -> (HsParsedModule -> HsParsedModule) -> HsParsedModule
+withParsedResult parsed f = f parsed
 
 #endif

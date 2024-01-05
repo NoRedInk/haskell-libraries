@@ -1,3 +1,7 @@
+# 0.6.1.2
+
+- Support GHC 9.4.7, `aeson-2.1.x`, `lens-5.2.x`, `hedgehog-1.3`
+
 # 0.6.1.1
 
 - Support GHC 9.2.6.

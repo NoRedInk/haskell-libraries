@@ -1,3 +1,7 @@
+# 0.1.0.9
+
+- Support GHC 9.4.7
+
 # 0.1.0.8
 
 - Relax version bounds to encompass `text-2.0.x`, `base-4.16.x` and `template-haskell-2.18.x`

@@ -1,3 +1,7 @@
+# 0.1.2.1
+
+- Support GHC 9.4.7, `aeson-2.1.x`
+
 # 0.1.2.0
 
 - Remove `Redis.Mock` - best to test against a real Redis.
