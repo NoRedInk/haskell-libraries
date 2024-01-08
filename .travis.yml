@@ -12,6 +12,7 @@ env:
   jobs:
     - GHC_VERSION=8-10
     - GHC_VERSION=9-2
+    - GHC_VERSION=9-4
 install:
   - echo "trusted-users = $USER" | sudo tee -a /etc/nix/nix.conf
   - sudo systemctl restart nix-daemon

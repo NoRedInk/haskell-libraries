@@ -42,6 +42,7 @@ import NriPrelude.Plugin.GhcVersionDependent
     mkQualified,
     noLoc,
     simpleImportDecl,
+    withParsedResult
   )
 import qualified Set
 import Prelude
@@ -66,14 +67,20 @@ plugin =
 addImplicitImports ::
   [GhcPlugins.CommandLineOption] ->
   GhcPlugins.ModSummary ->
+#if __GLASGOW_HASKELL__ >= 904
+  GhcPlugins.ParsedResult ->
+  GhcPlugins.Hsc GhcPlugins.ParsedResult
+#else
   GhcPlugins.HsParsedModule ->
   GhcPlugins.Hsc GhcPlugins.HsParsedModule
+#endif
 addImplicitImports _ _ parsed =
-  Prelude.pure
-    parsed
-      { GhcPlugins.hpm_module =
-          fmap addImportsWhenNotPath (GhcPlugins.hpm_module parsed)
-      }
+  Prelude.pure $
+    withParsedResult parsed $ \parsed' ->
+      parsed'
+        { GhcPlugins.hpm_module =
+            fmap addImportsWhenNotPath (GhcPlugins.hpm_module parsed')
+        }
   where
     addImportsWhenNotPath hsModule =
       case fmap unLocate (hsmodName hsModule) of

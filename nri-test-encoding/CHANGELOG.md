@@ -1,3 +1,7 @@
+# 0.1.1.5
+
+- Support GHC 9.4.7, `aeson-2.1.x`
+
 # 0.1.1.4
 
 - Support `servant-0.19.x`

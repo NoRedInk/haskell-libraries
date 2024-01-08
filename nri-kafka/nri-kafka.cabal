@@ -1,11 +1,11 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.5.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
 name:           nri-kafka
-version:        0.1.0.4
+version:        0.1.0.5
 synopsis:       Functions for working with Kafka
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme>.
 category:       Web
@@ -67,9 +67,9 @@ library
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin
   build-depends:
-      aeson >=1.4.6.0 && <2.1
+      aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.17
+    , base >=4.12.0.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7
@@ -111,9 +111,9 @@ executable pause-resume-bug-consumer
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -O2 -main-is Consumer
   build-depends:
-      aeson >=1.4.6.0 && <2.1
+      aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.17
+    , base >=4.12.0.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7
@@ -128,11 +128,11 @@ executable pause-resume-bug-consumer
     , time >=1.8.0.2 && <2
     , unix >=2.7.2.2 && <2.8.0.0
     , uuid >=1.3.0 && <1.4
+  default-language: Haskell2010
   if flag(pause-resume-bug)
     buildable: True
   else
     buildable: False
-  default-language: Haskell2010
 
 executable pause-resume-bug-producer
   main-is: Producer.hs
@@ -160,9 +160,9 @@ executable pause-resume-bug-producer
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -main-is Producer
   build-depends:
-      aeson >=1.4.6.0 && <2.1
+      aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.17
+    , base >=4.12.0.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7
@@ -177,11 +177,11 @@ executable pause-resume-bug-producer
     , time >=1.8.0.2 && <2
     , unix >=2.7.2.2 && <2.8.0.0
     , uuid >=1.3.0 && <1.4
+  default-language: Haskell2010
   if flag(pause-resume-bug)
     buildable: True
   else
     buildable: False
-  default-language: Haskell2010
 
 test-suite tests
   type: exitcode-stdio-1.0
@@ -224,9 +224,9 @@ test-suite tests
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fno-warn-type-defaults -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
-      aeson >=1.4.6.0 && <2.1
+      aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.17
+    , base >=4.12.0.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7

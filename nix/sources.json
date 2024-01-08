@@ -17,10 +17,10 @@
         "homepage": "",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "9463103069725474698139ab10f17a9d125da859",
-        "sha256": "0asjwsl9mg87pmygvc45x0fgaiz496h60q9sfh4mwzjxarj8vq83",
+        "rev": "70bdadeb94ffc8806c0570eb5c2695ad29f0e421",
+        "sha256": "05cbl1k193c9la9xhlz4y6y8ijpb2mkaqrab30zij6z4kqgclsrd",
         "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/9463103069725474698139ab10f17a9d125da859.tar.gz",
+        "url": "https://github.com/NixOS/nixpkgs/archive/70bdadeb94ffc8806c0570eb5c2695ad29f0e421.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "nixpkgs-unstable": {
@@ -33,6 +33,30 @@
         "sha256": "1ld29fsviq5ax1drh25fxqcxi44g3cisf5hfib29d0qxjqlicbdf",
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/4c0834929cafb7478a5e82616d484578a80a3e41.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "string-qq": {
+        "branch": "master",
+        "description": "QuasiQuoter for non-interpolated, overloaded strings",
+        "homepage": "",
+        "owner": "audreyt",
+        "repo": "string-qq",
+        "rev": "07189ac96c6c36a51a83e7179b31694d52a843d5",
+        "sha256": "004yf7mxdjs07kf23p9016lpxzfrl3834aig6pm7q54vdcqdgmwk",
+        "type": "tarball",
+        "url": "https://github.com/audreyt/string-qq/archive/07189ac96c6c36a51a83e7179b31694d52a843d5.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "tasty-test-reporter": {
+        "branch": "master",
+        "description": "An ingredient for tasty that prints a summary and outputs junit xml that works with jenkins.",
+        "homepage": "https://hackage.haskell.org/package/tasty-test-reporter",
+        "owner": "stoeffel",
+        "repo": "tasty-test-reporter",
+        "rev": "a99ee6fbcda8d9c10875367fa9d2c3fe0630d5b5",
+        "sha256": "0cgbwhsvkz2gjg3plfkg6dk9mf3a923jwgarsls3iaf0p5dfidxn",
+        "type": "tarball",
+        "url": "https://github.com/stoeffel/tasty-test-reporter/archive/a99ee6fbcda8d9c10875367fa9d2c3fe0630d5b5.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
