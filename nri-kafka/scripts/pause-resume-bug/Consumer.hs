@@ -20,8 +20,8 @@ main = do
   setEnv "KAFKA_MAX_MSGS_PER_PARTITION_BUFFERED_LOCALLY" "20"
   setEnv "KAFKA_POLL_BATCH_SIZE" "5"
 
-  fireDelay <- readIntEnvVar "FIRE_DELAY"
-  fireModulo <- readIntEnvVar "FIRE_MODULO"
+  fireDelay <- readIntEnvVar "FIRE_DELAY" 31  -- seconds
+  fireModulo <- readIntEnvVar "FIRE_MODULO" 5 -- sleep on every Nth message
 
   settings <- Environment.decode Kafka.decoder
   doAnythingHandler <- Platform.doAnythingHandler
@@ -54,11 +54,11 @@ printAtomic lock handle msg = do
     |> forkIO
     |> void
 
-readIntEnvVar :: String -> IO Int
-readIntEnvVar name = do
+readIntEnvVar :: String -> Int -> IO Int
+readIntEnvVar name defaultVal = do
   valueStr <- getEnv name
   valueStr 
     |> Text.fromList 
     |> Text.toInt 
-    |> Maybe.withDefault (Debug.todo (Text.fromList name ++ " must be a number"))
+    |> Maybe.withDefault defaultVal
     |> pure
