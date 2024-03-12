@@ -34,5 +34,17 @@
         "type": "tarball",
         "url": "https://github.com/NixOS/nixpkgs/archive/4c0834929cafb7478a5e82616d484578a80a3e41.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "rdkafka": {
+        "branch": "master",
+        "description": "The Apache Kafka C/C++ library",
+        "homepage": "",
+        "owner": "confluentinc",
+        "repo": "librdkafka",
+        "rev": "a6d85bdbc1023b1a5477b8befe516242c3e182f6",
+        "sha256": "0ybyk5jsfpym5wjkqvz7amv746ahcn73rahv4zi40ipv7yk0fwbr",
+        "type": "tarball",
+        "url": "https://github.com/confluentinc/librdkafka/archive/a6d85bdbc1023b1a5477b8befe516242c3e182f6.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }

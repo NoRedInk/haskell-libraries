@@ -1,4 +1,4 @@
-{ pkgs, haskellPackages }:
+{ pkgs, haskellPackages, rdkafka }:
 
 # Fix from https://github.com/srid/haskell-template
 let
@@ -6,11 +6,12 @@ let
     with pkgs.haskell.lib;
     overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
   # It is still necessary to run `hpack --force` into packages home dirs
-  haskell-language-server = pkgs.haskellPackages.haskell-language-server.override {
-    hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
-      ormolu = (workaround140774 pkgs.haskellPackages.ormolu);
+  haskell-language-server =
+    pkgs.haskellPackages.haskell-language-server.override {
+      hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
+        ormolu = (workaround140774 pkgs.haskellPackages.ormolu);
+      };
     };
-  };
 
 in pkgs.mkShell {
   buildInputs = [
@@ -36,7 +37,8 @@ in pkgs.mkShell {
         hostname
         http-client
         http-client-tls
-        hw-kafka-client
+        (pkgs.haskell.lib.overrideCabal hw-kafka-client
+          (orig: { librarySystemDepends = [ rdkafka ]; }))
         io-streams
         junit-xml
         microlens
