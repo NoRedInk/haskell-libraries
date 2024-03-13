@@ -9,7 +9,26 @@ let
         })
     ];
   };
-  rdkafka = pkgs.rdkafka.overrideAttrs (old: { src = sources.rdkafka; });
+  # rdkafka = pkgs.rdkafka.overrideAttrs (old: { src = sources.rdkafka; });
+  rdkafka = pkgs.stdenv.mkDerivation rec {
+    pname = "rdkafka";
+    version = "2.2.0";
+
+    # git clone https://github.com/confluentinc/librdkafka ../librdkafka
+    src = ../librdkafka;
+
+    nativeBuildInputs = with pkgs; [ pkg-config python3 which ];
+
+    buildInputs = with pkgs; [ zlib zstd openssl ];
+
+    env.NIX_CFLAGS_COMPILE = "-Wno-error=strict-overflow";
+
+    postPatch = ''
+      patchShebangs .
+    '';
+
+    enableParallelBuilding = true;
+  };
 in import nix/mk-shell.nix {
   pkgs = pkgs;
   haskellPackages = pkgs.haskell.packages.ghc8107.extend (self: super: {

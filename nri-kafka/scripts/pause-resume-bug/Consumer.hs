@@ -2,7 +2,7 @@ module Consumer where
 
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (MVar, newMVar, withMVar)
-import Control.Monad (void, when)
+import Control.Monad (void)
 import qualified Environment
 import qualified Kafka.Worker as Kafka
 import Message
@@ -17,11 +17,8 @@ main = do
   setEnv "LOG_FILE" "/dev/null"
 
   -- Reduce buffer and batch sizes to make it fail faster
-  setEnv "KAFKA_MAX_MSGS_PER_PARTITION_BUFFERED_LOCALLY" "20"
-  setEnv "KAFKA_POLL_BATCH_SIZE" "5"
-
-  fireDelay <- readIntEnvVar "FIRE_DELAY" 31  -- seconds
-  fireModulo <- readIntEnvVar "FIRE_MODULO" 5 -- sleep on every Nth message
+  setEnv "KAFKA_MAX_MSGS_PER_PARTITION_BUFFERED_LOCALLY" "1"
+  setEnv "KAFKA_POLL_BATCH_SIZE" "1"
 
   settings <- Environment.decode Kafka.decoder
   doAnythingHandler <- Platform.doAnythingHandler
@@ -32,14 +29,8 @@ main = do
         ( do
             let msgId = id msg
             let msgIdStr = "ID(" ++ show msgId ++ ")"
-            when
-              (msgId `mod` fireModulo == 0)
-              ( do
-                  printAtomic lock stdout (msgIdStr ++ " Pausing consumer (simulating stuck MySQL)")
-                  threadDelay (fromIntegral fireDelay * 1000000)
-              )
-            printAtomic lock stdout (msgIdStr ++ " Done")
-            threadDelay 2000
+            printAtomic lock stdout ("✅ " ++ msgIdStr ++ " Done")
+            threadDelay (10 * 1000000)
         )
           |> fmap Ok
           |> Platform.doAnything doAnythingHandler
