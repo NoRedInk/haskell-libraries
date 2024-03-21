@@ -11,6 +11,7 @@ import qualified Kafka.Worker.Analytics as Analytics
 import qualified Kafka.Worker.Partition as Partition
 import qualified Kafka.Worker.Settings as Settings
 import qualified Prelude
+import qualified Data.Either
 
 type EnqueueRecord = (ConsumerRecord -> Prelude.IO Partition.SeekCmd)
 
@@ -76,8 +77,12 @@ pollingLoop'
       -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
       --
       -- We have a small app to reproduce the bug. Check out scripts/pause-resume-bug/README.md
-      MVar.withMVar consumerLock
-        <| \_ -> Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
+      MVar.withMVar consumerLock <| \_ -> do
+          Prelude.putStrLn "Polling for messages..."
+          em <- Consumer.pollMessageBatch consumer pollingTimeout pollBatchSize
+          let digits = List.filterMap recordContents em |> ByteString.intercalate ", "
+          Prelude.putStrLn <| "Polling done. Found messages: " ++ Prelude.show digits
+          Prelude.pure em
     msgs <- Prelude.traverse handleKafkaError eitherMsgs
     assignment <-
       Consumer.assignment consumer
@@ -102,6 +107,13 @@ pollingLoop'
     now <- nextPollingTimestamp
     throttle maxMsgsPerSecondPerPartition maxPollIntervalMs (List.length appendResults) analytics now lastPollTimestamp
     pollingLoop' settings enqueueRecord analytics consumer consumerLock (pollTimeIsOld now)
+
+recordContents :: Data.Either.Either x ConsumerRecord -> Maybe ByteString.ByteString
+recordContents (Data.Either.Left _) = Nothing
+recordContents (Data.Either.Right record) = do
+  val <- Consumer.crValue record
+  let digits = ByteString.filter (\c -> c >= 48 && c <= 57) val
+  Just digits
 
 getPartitionKey :: Consumer.ConsumerRecord k v -> (Consumer.TopicName, Consumer.PartitionId)
 getPartitionKey record =
