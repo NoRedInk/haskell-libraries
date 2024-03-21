@@ -6,7 +6,7 @@ For those interested in learning more about our reasons for developing these lib
 
 ## Developing
 
-To set up the development environment for this project, install [Nix][nix] and [Direnv][direnv], then run:
+To set up the development environment for this project first install [Nix][nix] and [Direnv][direnv]. Note that the first time setup will take some time (~1 hour). Then run:
 
 ```sh
 direnv allow
