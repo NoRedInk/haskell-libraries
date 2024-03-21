@@ -54,6 +54,7 @@ import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
 import qualified NonEmptyDict
+import NriPrelude
 import qualified Redis.Codec as Codec
 import qualified Redis.Handler as Handler
 import qualified Redis.Internal as Internal
@@ -153,7 +154,7 @@ jsonApi = makeApi Codec.jsonCodec
 
 -- | Creates a Redis API mapping a 'key' to Text
 textApi ::
-  Ord field =>
+  (Ord field) =>
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
@@ -162,7 +163,7 @@ textApi = makeApi Codec.textCodec
 
 -- | Creates a Redis API mapping a 'key' to a ByteString
 byteStringApi ::
-  Ord field =>
+  (Ord field) =>
   (key -> Text) ->
   (field -> Text) ->
   (Text -> Maybe field) ->
@@ -170,7 +171,7 @@ byteStringApi ::
 byteStringApi = makeApi Codec.byteStringCodec
 
 makeApi ::
-  Ord field =>
+  (Ord field) =>
   Codec.Codec a ->
   (key -> Text) ->
   (field -> Text) ->
@@ -211,7 +212,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey toField fromF
         Internal.Hsetnx (toKey key) (toField field) (codecEncoder val)
     }
 
-toDict :: Ord field => (Text -> Maybe field) -> Codec.Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
+toDict :: (Ord field) => (Text -> Maybe field) -> Codec.Decoder a -> List (Text, ByteString) -> Result Internal.Error (Dict.Dict field a)
 toDict fromField decode =
   Result.map Dict.fromList
     << Prelude.traverse

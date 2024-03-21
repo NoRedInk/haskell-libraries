@@ -12,6 +12,7 @@ where
 
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import Dict
+import NriPrelude
 
 -- | A Dict with at least one entry. For use in writing to redis, where it's an
 -- error when writing nothing
@@ -20,14 +21,14 @@ data NonEmptyDict k v
   deriving (Show)
 
 -- | tries to create a 'NonEmptyDict' from a 'Dict'
-fromDict :: Ord k => Dict.Dict k v -> Maybe (NonEmptyDict k v)
+fromDict :: (Ord k) => Dict.Dict k v -> Maybe (NonEmptyDict k v)
 fromDict dict =
   case Dict.toList dict of
     [] -> Nothing
     (k, v) : _ -> Just <| init k v dict
 
 -- | creates a 'Dict' from a 'NonEmptyDict'
-toDict :: Ord k => NonEmptyDict k v -> Dict k v
+toDict :: (Ord k) => NonEmptyDict k v -> Dict k v
 toDict (NonEmptyDict (k, v) dict) =
   Dict.insert k v dict
 
@@ -37,6 +38,6 @@ toNonEmptyList (NonEmptyDict kv dict) =
   kv :| Dict.toList dict
 
 -- | creates a `NonEmptyDict` from a key, value, and dict
-init :: Ord k => k -> v -> Dict.Dict k v -> NonEmptyDict k v
+init :: (Ord k) => k -> v -> Dict.Dict k v -> NonEmptyDict k v
 init key val dict =
   NonEmptyDict (key, val) (Dict.remove key dict)

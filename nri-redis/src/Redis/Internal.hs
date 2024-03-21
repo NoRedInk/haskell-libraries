@@ -39,6 +39,7 @@ import NriPrelude hiding (map, map2, map3)
 import qualified Platform
 import qualified Redis.Settings as Settings
 import qualified Set
+import qualified Task
 import qualified Text
 import qualified Tuple
 import qualified Prelude
@@ -221,8 +222,8 @@ data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
 -- A handler that can only be parametrized by a value of this kind.
 -- Meaning that we use the values of the type parameter at a type level.
 data Handler' (x :: HasAutoExtendExpire) = Handler'
-  { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
-    doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
+  { doQuery :: (Stack.HasCallStack) => forall a. Query a -> Task Error a,
+    doTransaction :: (Stack.HasCallStack) => forall a. Query a -> Task Error a,
     namespace :: Text,
     maxKeySize :: Settings.MaxKeySize
   }
@@ -243,7 +244,7 @@ type HandlerAutoExtendExpire = Handler' 'AutoExtendExpire
 -- Note: A 'Query' in this library can consist of one or more queries in sequence.
 -- if a 'Query' contains multiple queries, it may make more sense, if possible
 -- to run them using 'transaction'
-query :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
+query :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -255,7 +256,7 @@ query handler query' =
 --
 -- In redis terms, this is wrappping the 'Query' in `MULTI` and `EXEC
 -- see redis transaction semantics here: https://redis.io/topics/transactions
-transaction :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
+transaction :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -403,7 +404,7 @@ keysTouchedByQuery query' =
     Zrevrank key _ -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
 
-maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
+maybesToDict :: (Ord key) => List key -> List (Maybe a) -> Dict.Dict key a
 maybesToDict keys values =
   List.map2 (,) keys values
     |> List.filterMap
@@ -414,7 +415,7 @@ maybesToDict keys values =
       )
     |> Dict.fromList
 
-traceQuery :: Stack.HasCallStack => [Text] -> Text -> Maybe Int -> Task e a -> Task e a
+traceQuery :: (Stack.HasCallStack) => [Text] -> Text -> Maybe Int -> Task e a -> Task e a
 traceQuery commands host port task =
   let info =
         RedisCommands.emptyDetails
