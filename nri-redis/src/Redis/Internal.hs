@@ -54,6 +54,7 @@ data Error
   | TransactionAborted
   | TimeoutError
   | KeyExceedsMaxSize Text Int
+  deriving (Eq)
 
 instance Aeson.ToJSON Error where
   toJSON err = Aeson.toJSON (errorForHumans err)
