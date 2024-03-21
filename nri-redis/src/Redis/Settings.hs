@@ -14,6 +14,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text.Encoding (encodeUtf8)
 import Database.Redis hiding (Ok)
 import qualified Environment
+import NriPrelude
 import qualified Text
 import qualified Text.URI as URI
 import Prelude (Either (Left, Right), foldr, fromIntegral, id, pure)
@@ -122,13 +123,13 @@ decoderConnectInfo envVarName =
         )
     )
 
-parseRedisSchemeURI :: URI.URI -> Result Text ConnectInfo
+parseRedisSchemeURI :: URI.URI -> NriPrelude.Result Text ConnectInfo
 parseRedisSchemeURI uri =
   case parseConnectInfo (URI.renderStr uri) of
     Left parseError -> Err ("Invalid Redis connection string: " ++ Text.fromList parseError)
     Right info' -> Ok info'
 
-parseRedisSocketSchemeURI :: URI.URI -> Result Text ConnectInfo
+parseRedisSocketSchemeURI :: URI.URI -> NriPrelude.Result Text ConnectInfo
 parseRedisSocketSchemeURI uri =
   let uriPathTextFromURI =
         case URI.uriPath uri of

@@ -16,10 +16,13 @@ import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
 import qualified GHC.Stack as Stack
+import qualified List
+import NriPrelude
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Settings as Settings
 import qualified Set
+import qualified Task
 import qualified Text
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 import qualified Prelude
@@ -342,7 +345,7 @@ data Connection = Connection
   }
 
 platformRedis ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   [Text] ->
   Connection ->
   Platform.DoAnythingHandler ->

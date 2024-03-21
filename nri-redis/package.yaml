@@ -68,7 +68,6 @@ ghc-options:
   - -Wredundant-constraints
   - -Wincomplete-uni-patterns
   - -fno-warn-type-defaults
-  - -fplugin=NriPrelude.Plugin
 tests:
   tests:
     main: Spec.hs

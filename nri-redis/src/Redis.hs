@@ -57,6 +57,7 @@ import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Dict
 import qualified NonEmptyDict
+import NriPrelude
 import qualified Redis.Codec as Codec
 import qualified Redis.Handler as Handler
 import qualified Redis.Internal as Internal
@@ -102,7 +103,7 @@ data Api key a = Api
     -- operation never fails.
     --
     -- https://redis.io/commands/mget
-    mget :: Ord key => NonEmpty key -> Internal.Query (Dict.Dict key a),
+    mget :: (Ord key) => NonEmpty key -> Internal.Query (Dict.Dict key a),
     -- | Sets the given keys to their respective values. MSET replaces existing
     -- values with new values, just as regular SET. See MSETNX if you don't want to
     -- overwrite existing values.

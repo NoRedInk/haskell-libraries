@@ -45,6 +45,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import NriPrelude
 import qualified Redis.Codec as Codec
 import qualified Redis.Handler as Handler
 import qualified Redis.Internal as Internal

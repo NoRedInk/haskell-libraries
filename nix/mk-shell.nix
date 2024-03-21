@@ -6,11 +6,6 @@ let
     with pkgs.haskell.lib;
     overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
   # It is still necessary to run `hpack --force` into packages home dirs
-  haskell-language-server = pkgs.haskellPackages.haskell-language-server.override {
-    hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
-      ormolu = (workaround140774 pkgs.haskellPackages.ormolu);
-    };
-  };
 
 in pkgs.mkShell {
   buildInputs = [
@@ -72,7 +67,6 @@ in pkgs.mkShell {
     pkgs.cabal-install
     pkgs.cachix
     pkgs.gnumake
-    haskell-language-server
     pkgs.haskellPackages.hpack
     pkgs.pcre
     pkgs.postgresql # for nri-postgres
