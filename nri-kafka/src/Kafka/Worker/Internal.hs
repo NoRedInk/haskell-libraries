@@ -285,7 +285,8 @@ createConsumer
             ++ Consumer.compression compressionCodec
             ++ Consumer.extraProps
               ( Dict.fromList
-                  [("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs))]
+                  [("max.poll.interval.ms", Text.fromInt (Settings.unMaxPollIntervalMs maxPollIntervalMs))
+                  , ("partition.assignment.strategy", "range,cooperative-sticky")]
               )
     let subscription' =
           Consumer.topics [Consumer.TopicName (Kafka.unTopic topic)]
