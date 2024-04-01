@@ -484,3 +484,10 @@ any = Data.Text.any
 -- > all isDigit "heart" == False
 all :: (Char -> Bool) -> Text -> Bool
 all = Data.Text.all
+
+-- | Get a Text representation of something Show-able.
+--
+-- > newtype MyType = MyType deriving (Show)
+-- > myTypeText = tshow MyType
+tshow :: (Show a) => a -> Text
+tshow = Data.Text.pack << Prelude.show
