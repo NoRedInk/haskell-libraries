@@ -12,6 +12,7 @@ import qualified Data.ByteString.Lazy
 import qualified Data.Time as Time
 import NriPrelude
 import qualified Platform.Internal
+import qualified System.Environment.Blank as Environment
 import qualified System.IO
 import qualified System.IO.Unsafe
 import qualified System.Posix.Files as Files
@@ -22,7 +23,7 @@ import qualified Prelude
 writeSpanToDevLog :: Platform.Internal.TracingSpan -> Prelude.IO ()
 writeSpanToDevLog span = do
   now <- Time.getCurrentTime
-  let logFile = "/tmp/nri-prelude-logs"
+  logFile <- Environment.getEnvDefault "NRI_DEV_LOG" "/tmp/nri-prelude-logs"
   MVar.withMVar writeLock <| \_ ->
     System.IO.withFile
       logFile

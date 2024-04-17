@@ -81,7 +81,7 @@ renderFailed test maybeSrcLoc =
             Nothing -> msg
             Just (loc, src) ->
               Test.Reporter.Internal.renderSrcLoc loc src
-                |> Text.Colour.renderChunksBS Text.Colour.WithoutColours
+                |> Text.Colour.renderChunksUtf8BS Text.Colour.WithoutColours
                 |> TE.decodeUtf8
                 |> (\srcStr -> srcStr ++ "\n" ++ msg)
        in JUnit.failed (Internal.name test)

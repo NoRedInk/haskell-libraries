@@ -28,7 +28,7 @@ report :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
 report handle results = do
   terminalCapabilities <- Text.Colour.Capabilities.FromEnv.getTerminalCapabilitiesFromHandle handle
   reportChunks <- renderReport results
-  Text.Colour.hPutChunksWith terminalCapabilities handle reportChunks
+  Text.Colour.hPutChunksUtf8With terminalCapabilities handle reportChunks
   System.IO.hFlush handle
 
 renderReport :: Internal.SuiteResult -> Prelude.IO (List (Text.Colour.Chunk))
