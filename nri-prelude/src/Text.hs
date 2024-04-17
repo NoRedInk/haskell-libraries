@@ -48,6 +48,9 @@ module Text
     toList,
     fromList,
 
+    -- * Random stuff to Text
+    tshow,
+
     -- * Formatting
 
     -- | Cosmetic operations such as padding with extra characters or trimming whitespace.
@@ -489,5 +492,5 @@ all = Data.Text.all
 --
 -- > newtype MyType = MyType deriving (Show)
 -- > myTypeText = tshow MyType
-tshow :: (Show a) => a -> Text
+tshow :: (Prelude.Show a) => a -> Text
 tshow = Data.Text.pack << Prelude.show
