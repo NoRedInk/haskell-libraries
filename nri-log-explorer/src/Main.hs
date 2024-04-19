@@ -23,7 +23,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty
 import qualified Data.ByteString as ByteString
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.List
 import qualified Data.Text
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy
@@ -1175,14 +1174,14 @@ main = do
         "",
         "log-explorer is a tool for exploring traces produced by the nri-prelude set of libraries."
       ]
-        |> Prelude.unlines
-        |> Prelude.putStrLn
+        |> Text.join "\n"
+        |> putTextLn
     ["--version"] ->
       let version =
             Version.versionBranch Paths.version
-              |> map Prelude.show
-              |> Data.List.intercalate "."
-       in Prelude.putStrLn ("log-explorer " ++ version)
+              |> map Text.tshow
+              |> Text.join "."
+       in putTextLn ("log-explorer " ++ version)
     ["--all"] -> do
       run ShowAll FullHistory
     _ -> System.Exit.die "log-explorer was called with unknown arguments"

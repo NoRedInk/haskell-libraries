@@ -76,8 +76,8 @@ run suite = do
       reportJunit args results
     ]
   if logExplorerAvailable
-    then Prelude.putStrLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
-    else Prelude.putStrLn "\nInstall the log-explorer tool to inspect logs collected during test runs. Find it at github.com/NoRedInk/haskell-libraries."
+    then putTextLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
+    else putTextLn "\nInstall the log-explorer tool to inspect logs collected during test runs. Find it at github.com/NoRedInk/haskell-libraries."
   Test.Reporter.ExitCode.report results
 
 reportStdout :: Internal.SuiteResult -> Prelude.IO ()

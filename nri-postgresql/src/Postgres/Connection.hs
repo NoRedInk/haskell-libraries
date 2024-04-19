@@ -79,10 +79,10 @@ connection settings =
 
 handleError :: Text -> Exception.IOException -> Prelude.IO a
 handleError connectionString err = do
-  Prelude.putStrLn "I couldn't connect to Postgres"
-  Prelude.putStrLn ""
-  Prelude.putStrLn "Is the database running?"
-  Prelude.putStrLn ("I tried to connect to: " ++ Text.toList connectionString)
+  putTextLn "I couldn't connect to Postgres"
+  putTextLn ""
+  putTextLn "Is the database running?"
+  putTextLn ("I tried to connect to: " ++ connectionString)
   System.Exit.die (Exception.displayException err)
 
 toConnectionString :: PGDatabase -> Text

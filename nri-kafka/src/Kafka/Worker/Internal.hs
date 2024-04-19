@@ -200,7 +200,7 @@ process settings groupIdText topicSubscriptions = do
         -- that's not doing anything. We should try to fix those failures, but for the
         -- ones that remain this is our fallback.
         Control.Concurrent.threadDelay 5_000_000 {- 5 seconds -}
-        Prelude.putStrLn "Something is holding up shutdown. Going to die ungracefully now."
+        putTextLn "Something is holding up shutdown. Going to die ungracefully now."
         System.Posix.Process.exitImmediately (System.Exit.ExitFailure 1)
     )
     (process' state settings (Consumer.ConsumerGroupId groupIdText) topicSubscriptions)
@@ -445,7 +445,7 @@ rebalanceCallback skipOrNot messageFormat observability callback offsetSource co
 -- | Disconnects our Consumer / yields back partitions on quit / node shutdown
 cleanUp :: Observability.Handler -> RebalanceInfo -> Stopping.Stopping -> Maybe Exception.SomeException -> Consumer.KafkaConsumer -> Prelude.IO ()
 cleanUp observabilityHandler rebalanceInfo stopping maybeException consumer = do
-  Prelude.putStrLn "Cleaning up"
+  putTextLn "Cleaning up"
   _ <- Consumer.closeConsumer consumer
   -- In case we're already stopping, get the reason we're doing so.
   maybeStopReason <- Stopping.stopReason stopping
@@ -471,9 +471,9 @@ cleanUp observabilityHandler rebalanceInfo stopping maybeException consumer = do
             |> Task.perform log
   writeCrashLogOnError maybeException
   case (maybeException, maybeStopReason) of
-    (Just exception, _) -> Prelude.putStrLn ("Shut down because of exception: " ++ Exception.displayException exception)
-    (_, Just stopReason) -> Prelude.putStrLn ("Shut down because of: " ++ Text.toList stopReason)
-    (Nothing, Nothing) -> Prelude.putStrLn "Shut down for an unknown reason."
+    (Just exception, _) -> putTextLn ("Shut down because of exception: " ++ Text.fromList (Exception.displayException exception))
+    (_, Just stopReason) -> putTextLn ("Shut down because of: " ++ stopReason)
+    (Nothing, Nothing) -> putTextLn "Shut down for an unknown reason."
 
 -- | Handle crash logging
 writeCrashLogOnError :: Maybe Exception.SomeException -> Prelude.IO ()
@@ -539,7 +539,7 @@ initPartition skipOrNot messageFormat commitOffset observabilityHandler consumer
         ( do
             -- Remove the partition from the dict to clean up memory
             STM.atomically <| TVar.modifyTVar' (partitions state) (Dict.remove key)
-            Prelude.putStrLn ("Stop processing messages for partition: " ++ Prelude.show key)
+            putTextLn ("Stop processing messages for partition: " ++ Text.tshow key)
         )
     )
 

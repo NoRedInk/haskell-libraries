@@ -54,6 +54,7 @@ library
       Tuple
   other-modules:
       Internal.AesonHelpers
+      Internal.IO
       Internal.Shortcut
       Internal.Terminal
       NriPrelude.Plugin.GhcVersionDependent
@@ -137,6 +138,7 @@ test-suite tests
       Expect
       Fuzz
       Internal.AesonHelpers
+      Internal.IO
       Internal.Shortcut
       Internal.Terminal
       List
