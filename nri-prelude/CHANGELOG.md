@@ -1,6 +1,7 @@
 # Unreleased
 
 - Allow specifying where devlogs for log-explorer go through `NRI_DEV_LOG` environment variable.
+- Added `putText` and `putTextLn` functions for thread-safe console printing.
 
 # 0.6.1.2
 

@@ -21,7 +21,7 @@ module NriPrelude
     (<*>),
     (>>=),
 
-    -- * IO
+    -- * Simple I/O operations
     module Internal.IO,
   )
 where

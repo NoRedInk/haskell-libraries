@@ -15,11 +15,21 @@ import qualified Prelude
 stdoutLock :: MVar ()
 stdoutLock = unsafePerformIO (newMVar ())
 
+-- Output functions
+
+-- | Write text to stdout.
+--
+-- This function is similar to `Prelude.putStr` but receives a `Text` instead of a `Prelude.String`.
+-- Also this function is thread-safe, using a lock to prevent interleaved output.
 putText :: Text -> Prelude.IO ()
 putText text = do
   withMVar stdoutLock \_ ->
     Prelude.putStr (Text.toList text)
 
+-- | Write text to stdout followed by a newline.
+--
+-- This function is similar to `Prelude.putStrLn` but receives a `Text` instead of a `Prelude.String`.
+-- Also this function is thread-safe, using a lock to prevent interleaved output.
 putTextLn :: Text -> Prelude.IO ()
 putTextLn text = do
   withMVar stdoutLock \_ ->
