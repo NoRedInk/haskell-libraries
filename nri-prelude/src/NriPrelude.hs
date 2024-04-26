@@ -20,12 +20,16 @@ module NriPrelude
     fmap,
     (<*>),
     (>>=),
+
+    -- * Simple I/O operations
+    module Internal.IO,
   )
 where
 
 import Basics
 import qualified Char
 import qualified GHC.Generics
+import Internal.IO
 import Internal.Shortcut
 import qualified List
 import qualified Maybe

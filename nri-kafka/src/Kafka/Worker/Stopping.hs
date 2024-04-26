@@ -23,7 +23,7 @@ stopReason (Stopping stopping) =
 
 stopTakingRequests :: Stopping -> Text -> Prelude.IO ()
 stopTakingRequests (Stopping stopping) reason = do
-  Prelude.putStrLn "Gracefully shutting down..."
+  putTextLn "Gracefully shutting down..."
   MVar.tryPutMVar stopping reason
     |> map (\_ -> ())
 

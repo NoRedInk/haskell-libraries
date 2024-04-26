@@ -6,7 +6,6 @@ import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
-import qualified Data.Text.IO
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder as Builder
 import qualified Log.HttpRequest as HttpRequest
@@ -102,7 +101,7 @@ logLoop counter lock = do
   line <- MVar.takeMVar lock
   Builder.toLazyText line
     |> Data.Text.Lazy.toStrict
-    |> Data.Text.IO.putStrLn
+    |> putTextLn
   ownCount <- MVar.modifyMVar counter (\n -> Prelude.pure (n + 1, n + 1))
   Async.concurrently_
     (logLoop counter lock)
@@ -111,6 +110,6 @@ logLoop counter lock = do
         Control.Concurrent.threadDelay 3_000_000 {- 3 seconds -}
         currentCount <- MVar.readMVar counter
         if ownCount == currentCount
-          then Prelude.putStrLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
+          then putTextLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
           else Prelude.pure ()
     )

@@ -7,7 +7,7 @@ import qualified Environment
 import qualified Kafka
 import Message
 import System.Environment (setEnv)
-import Prelude (IO, error, pure, putStrLn)
+import Prelude (IO, error, pure)
 
 main :: IO ()
 main = do
@@ -15,7 +15,7 @@ main = do
   settings <- Environment.decode Kafka.decoder
   logHandler <- Platform.silentHandler
 
-  putStrLn "Sending messages..."
+  putTextLn "Sending messages..."
 
   Conduit.withAcquire (Kafka.handler settings) <| \handler -> do
     [1 .. 300]
