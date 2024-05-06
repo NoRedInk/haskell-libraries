@@ -26,6 +26,7 @@ module Redis.SortedSet
     ping,
     zadd,
     zrange,
+    zrangeByScoreWithScores,
     zrank,
     zrevrank,
 
@@ -97,6 +98,9 @@ data Api key a = Api
     --
     -- https://redis.io/commands/zrange
     zrange :: key -> Int -> Int -> Internal.Query (List a),
+    -- | Like `zrange`, but with the bounds being scores rather than offsets,
+    -- and with the result including the scores for each returned result.
+    zrangeByScoreWithScores :: key -> Float -> Float -> Internal.Query [(a, Float)],
     -- | Returns the rank of member in the sorted set stored at key, with the
     -- scores ordered from low to high. The rank (or index) is 0-based, which
     -- means that the member with the lowest score has rank 0.
@@ -149,6 +153,14 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       zrange = \key start stop ->
         Internal.Zrange (toKey key) start stop
           |> Internal.WithResult (Prelude.traverse codecDecoder),
+      zrangeByScoreWithScores = \key start stop ->
+        Internal.ZrangeByScoreWithScores (toKey key) start stop
+          |> Internal.WithResult
+            ( Prelude.traverse
+                ( \(v, score) ->
+                    codecDecoder v |> Result.map (\val -> (val, score))
+                )
+            ),
       zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member),
       zrevrank = \key member -> Internal.Zrevrank (toKey key) (codecEncoder member)
     }

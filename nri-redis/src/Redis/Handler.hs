@@ -313,6 +313,13 @@ doRawQuery query =
         (Prelude.fromIntegral stop)
         |> PreparedQuery
         |> map Ok
+    Internal.ZrangeByScoreWithScores key start stop ->
+      Database.Redis.zrangebyscoreWithscores
+        (toB key)
+        start
+        stop
+        |> PreparedQuery
+        |> map Ok
     Internal.Zrank key member ->
       Database.Redis.zrank (toB key) member
         |> PreparedQuery
