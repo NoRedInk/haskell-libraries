@@ -6,9 +6,13 @@ pushd nri-postgresql
 source setup-postgres.sh
 popd
 
-## start redis
+## start redis. We don't want background snapshotting, and we don't want it to
+## block us, if it happens to be enabled. This is an instance for testing only.
 mkdir -p ./_build/redis/data
-redis-server --daemonize yes --dir ./_build/redis/data
+redis-server --daemonize yes \
+  --dir ./_build/redis/data \
+  --save '' \
+  --stop-writes-on-bgsave-error no
 
 ## start zookeeper (for kafka) 
 mkdir -p /tmp/zookeeper /tmp/zookeeper-logs
