@@ -38,6 +38,7 @@ import qualified Log.RedisCommands as RedisCommands
 import NriPrelude hiding (map, map2, map3)
 import qualified Platform
 import qualified Redis.Settings as Settings
+import qualified Redis.Script as Script
 import qualified Set
 import qualified Text
 import qualified Tuple
@@ -79,6 +80,7 @@ cmds :: Query b -> [Text]
 cmds query'' =
   case query'' of
     Del keys -> [unwords ("DEL" : NonEmpty.toList keys)]
+    Eval script -> [Script.evalString script]
     Exists key -> [unwords ["EXISTS", key]]
     Expire key val -> [unwords ["EXPIRE", key, Text.fromInt val]]
     Get key -> [unwords ["GET", key]]
@@ -136,6 +138,7 @@ unwords = Text.join " "
 -- | A Redis query
 data Query a where
   Del :: NonEmpty Text -> Query Int
+  Eval :: Database.Redis.RedisResult a => Script.Script a -> Query a
   Exists :: Text -> Query Bool
   Expire :: Text -> Int -> Query ()
   Get :: Text -> Query (Maybe ByteString)
@@ -271,6 +274,7 @@ namespaceQuery prefix query' =
 mapKeys :: (Text -> Task err Text) -> Query a -> Task err (Query a)
 mapKeys fn query' =
   case query' of
+    Eval script -> Task.map Eval (Script.mapKeys fn script)
     Exists key -> Task.map Exists (fn key)
     Ping -> Task.succeed Ping
     Get key -> Task.map Get (fn key)
@@ -314,6 +318,7 @@ mapKeys fn query' =
 mapReturnedKeys :: (Text -> Text) -> Query a -> Query a
 mapReturnedKeys fn query' =
   case query' of
+    Eval _ -> query'
     Exists key -> Exists key
     Ping -> Ping
     Get key -> Get key
@@ -371,6 +376,7 @@ keysTouchedByQuery query' =
   case query' of
     Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)
     Del keys -> Set.fromList (NonEmpty.toList keys)
+    Eval script -> Script.keysTouchedByScript script
     Exists key -> Set.singleton key
     -- We use this function to collect keys we need to expire. If the user is
     -- explicitly setting an expiry we don't want to overwrite that.
