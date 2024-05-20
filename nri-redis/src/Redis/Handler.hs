@@ -12,13 +12,13 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.Acquire
 import qualified Data.ByteString
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Redis.Script as Script
 import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Platform
 import qualified Redis.Internal as Internal
+import qualified Redis.Script as Script
 import qualified Redis.Settings as Settings
 import qualified Set
 import qualified Text
@@ -167,7 +167,7 @@ doRawQuery query =
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
     Internal.Eval script ->
-      Database.Redis.eval (toB (Script.luaScript script)) (map toB (Script.paramNames script)) (map toB(Script.paramValues script))
+      Database.Redis.eval (toB (Script.luaScript script)) (map toB (Script.paramNames script)) (map toB (Script.paramValues script))
         |> PreparedQuery
         |> map Ok
     Internal.Exists key ->

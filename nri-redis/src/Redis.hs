@@ -53,16 +53,16 @@ module Redis
 where
 
 import qualified Data.Aeson as Aeson
-import qualified Redis.Script as Script
-import qualified Database.Redis
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Database.Redis
 import qualified Dict
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Handler as Handler
 import qualified Redis.Internal as Internal
+import qualified Redis.Script as Script
 import qualified Redis.Settings as Settings
 import qualified Prelude
 

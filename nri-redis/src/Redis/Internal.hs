@@ -37,8 +37,8 @@ import qualified List
 import qualified Log.RedisCommands as RedisCommands
 import NriPrelude hiding (map, map2, map3)
 import qualified Platform
-import qualified Redis.Settings as Settings
 import qualified Redis.Script as Script
+import qualified Redis.Settings as Settings
 import qualified Set
 import qualified Text
 import qualified Tuple
