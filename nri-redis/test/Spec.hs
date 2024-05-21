@@ -1,6 +1,7 @@
 import qualified Conduit
 import Helpers
 import qualified Spec.Redis
+import qualified Spec.Redis.Script
 import qualified Spec.Settings
 import qualified Test
 import qualified Prelude
@@ -12,5 +13,6 @@ main =
       <| Test.describe
         "nri-redis"
         [ Spec.Redis.tests testHandlers,
-          Spec.Settings.tests
+          Spec.Settings.tests,
+          Spec.Redis.Script.tests
         ]
