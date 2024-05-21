@@ -1,12 +1,13 @@
-module Redis.Script (Script (..), script, evalString, mapKeys, keysTouchedByScript, paramNames, paramValues, parser, ScriptExpression (..)) where
+module Redis.Script (Script (..), script, evalString, mapKeys, keysTouchedByScript, paramNames, paramValues, parser, Tokens (..)) where
 
-import Data.Attoparsec.Text (Parser, char,choice, inClass, many1', skipSpace, takeWhile1, (<?>), endOfInput)
-import qualified Data.Attoparsec.Text as Attoparsec
+import Data.Void (Void)
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as QQ
--- import Control.Applicative ((<|>))
 import qualified Set
-import Prelude (pure)
+import Text.Megaparsec ((<|>))
+import qualified Text.Megaparsec as P
+import qualified Text.Megaparsec.Char as PC
+import Prelude (notElem, pure, (<*))
 import qualified Prelude
 
 data Script result = Script
@@ -41,37 +42,36 @@ script =
 qqScript :: Prelude.String -> TH.ExpQ
 qqScript scriptWithVars = do
   let str = Text.fromList scriptWithVars
-  let _expr = Attoparsec.parseOnly parser str
+  let _expr = P.parse parser "" str
   -- let parsedScript = case expr str of
   --       Left err -> Prelude.error <| "Failed to parse script: " ++ err
   --       Right parsed ->
   -- [|parsedScript|]
   Debug.todo "qqScript"
 
-data ScriptExpression
+data Tokens
   = ScriptText Text
   | ScriptVariable Text
   deriving (Show, Eq)
 
-parser :: Parser (List ScriptExpression)
-parser = do
-  result <- many1' (choice [parseText, parseVariable]) <?> "Expected at least one"
-  endOfInput
-  pure <| result
+type Parser = P.Parsec Void Text
 
-parseText :: Parser ScriptExpression
+parser :: Parser (List Tokens)
+parser = do
+  (P.some (parseText <|> parseVariable))
+    <* P.eof
+
+parseText :: Parser Tokens
 parseText = do
-  text <- takeWhile1 ('$' /=) <?> "Expected text"
+  text <- P.takeWhile1P (Just "some plain text") (/= '$')
   pure <| ScriptText text
 
-parseVariable :: Parser ScriptExpression
+parseVariable :: Parser Tokens
 parseVariable = do
-  _ <- char '$' <?> "Expected '$'"
-  _ <- char '{' <?> "Expected '{'"
-  skipSpace <?> "Expected space after '{'"
-  name <- (takeWhile1 (not << inClass "${}"))
-    <?> "No '$', '{' or '}' allowed in interpolated expression. Note: I'm a simple parser and I don't support records inside ${}."
-  _ <- char '}' <?> "Expected '}' after: ${" ++ Text.toList name
+  _ <- PC.string "${"
+  _ <- PC.space
+  name <- P.takeWhile1P (Just "anything but '$', '{' or '}' (no records, sorry)") (\t -> t `notElem` ['$', '{', '}'])
+  _ <- PC.char '}'
   pure <| ScriptVariable <| Text.trim name
 
 -- | EVAL script numkeys [key [key ...]] [arg [arg ...]]
