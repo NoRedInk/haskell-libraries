@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Spec.Redis.Script (tests) where
 
 import Data.Either (Either (..))
@@ -10,7 +12,8 @@ tests :: Test.Test
 tests =
   Test.describe
     "Redis.Script"
-    [ Test.describe "parser" parserTests
+    [ Test.describe "parser" parserTests,
+      Test.describe "th tests" thTests
     ]
 
 parserTests :: List Test.Test
@@ -102,6 +105,23 @@ parserTests =
               \expecting '}' or anything but '$', '{' or '}' (no records, sorry)\n\
               \"
           )
+  ]
+
+thTests :: List Test.Test
+thTests =
+  [ Test.test "just text" <| \_ ->
+      [script|some text|]
+        |> printScript
+        |> Expect.equal "Script { luaScript = \"some text\", quasiQuotedString = \"some text\", params = [] }",
+    Test.test "one key argument" <| \_ ->
+      [script|${Key "hi"}|]
+        |> printScript
+        |> Expect.equal "Script { luaScript = \"@arg0\", quasiQuotedString = \"${Key \"hi\"}\", params = [ EvaluatedParam\n    { kind = RedisKey , name = \"arg0\" , value = \"\\\"hi\\\"\" }\n] }"
+    -- We can't test for compile-time errors, but manually test our helpful error message, uncomment
+    -- the lines below:
+    -- Test.test "compilation error" <| \_ ->
+    --   [script|${123}|]
+    --     |> Expect.equal "Doesn't matter, this won't compile"
   ]
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
