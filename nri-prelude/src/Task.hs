@@ -9,6 +9,7 @@
 module Task
   ( -- * Tasks
     Task,
+    Task',
     perform,
     attempt,
 
@@ -43,7 +44,7 @@ import qualified Control.Concurrent.Async as Async
 import qualified Internal.Shortcut as Shortcut
 import List (List)
 import Maybe (Maybe (..))
-import Platform.Internal (Task)
+import Platform.Internal (Task', Task)
 import qualified Platform.Internal as Internal
 import Result (Result (..))
 import qualified System.Timeout
@@ -60,7 +61,7 @@ import qualified Prelude
 -- > main :: IO
 -- > main =
 -- >   Task.perform Platform.silentHandler Time.now
-perform :: Internal.LogHandler -> Task Never a -> IO a
+perform :: env -> Task' env Never a -> IO a
 perform output task =
   let onResult result =
         case result of
@@ -72,7 +73,7 @@ perform output task =
         |> Shortcut.map onResult
 
 -- | This is very similar to perform except it can handle failures!
-attempt :: Internal.LogHandler -> Task x a -> IO (Result x a)
+attempt :: env -> Task' env x a -> IO (Result x a)
 attempt output task =
   let onResult result =
         Prelude.pure result
@@ -87,7 +88,7 @@ attempt output task =
 -- > timeInMillis =
 -- >   Time.now
 -- >     |> andThen (\t -> succeed (Time.posixToMillis t))
-succeed :: a -> Task x a
+succeed :: a -> Task' env x a
 succeed a =
   Internal.Task <| \_ -> Prelude.pure (Ok a)
 
@@ -99,7 +100,7 @@ succeed a =
 -- > notFound : Task Error a
 -- > notFound =
 -- >   fail NotFound
-fail :: x -> Task x a
+fail :: x -> Task' env x a
 fail x =
   Internal.Task <| \_ -> Prelude.pure (Err x)
 
@@ -118,7 +119,7 @@ fail x =
 -- > addAnHour : Time.Posix -> Time.Posix
 -- > addAnHour time =
 -- >   Time.millisToPosix (Time.posixToMillis time + 60 * 60 * 1000)
-map :: (a -> b) -> Task x a -> Task x b
+map :: (a -> b) -> Task' env x a -> Task' env x b
 map =
   Shortcut.map
 
@@ -135,23 +136,23 @@ map =
 -- __Note:__ Say we were doing HTTP requests instead. @map2@ does each task in
 -- order, so it would try the first request and only continue after it succeeds.
 -- If it fails, the whole thing fails!
-map2 :: (a -> b -> result) -> Task x a -> Task x b -> Task x result
+map2 :: (a -> b -> result) -> Task' env x a -> Task' env x b -> Task' env x result
 map2 =
   Shortcut.map2
 
-map3 :: (a -> b -> c -> result) -> Task x a -> Task x b -> Task x c -> Task x result
+map3 :: (a -> b -> c -> result) -> Task' env x a -> Task' env x b -> Task' env x c -> Task' env x result
 map3 =
   Shortcut.map3
 
-map4 :: (a -> b -> c -> d -> result) -> Task x a -> Task x b -> Task x c -> Task x d -> Task x result
+map4 :: (a -> b -> c -> d -> result) -> Task' env x a -> Task' env x b -> Task' env x c -> Task' env x d -> Task' env x result
 map4 =
   Shortcut.map4
 
-map5 :: (a -> b -> c -> d -> e -> result) -> Task x a -> Task x b -> Task x c -> Task x d -> Task x e -> Task x result
+map5 :: (a -> b -> c -> d -> e -> result) -> Task' env x a -> Task' env x b -> Task' env x c -> Task' env x d -> Task' env x e -> Task' env x result
 map5 =
   Shortcut.map5
 
-map6 :: (a -> b -> c -> d -> e -> f -> result) -> Task x a -> Task x b -> Task x c -> Task x d -> Task x e -> Task x f -> Task x result
+map6 :: (a -> b -> c -> d -> e -> f -> result) -> Task' env x a -> Task' env x b -> Task' env x c -> Task' env x d -> Task' env x e -> Task' env x f -> Task' env x result
 map6 =
   Shortcut.map6
 
@@ -163,13 +164,13 @@ map6 =
 -- > import qualified Time
 -- > import qualified Process
 -- >
--- > timeInOneHour : Task x Time.Posix
+-- > timeInOneHour : Task' env x Time.Posix
 -- > timeInOneHour =
 -- >   Process.sleep (60 * 60 * 1000)
 -- >     |> andThen (\_ -> Time.now)
 --
 -- First the process sleeps for an hour __and then__ it tells us what time it is.
-andThen :: (a -> Task x b) -> Task x a -> Task x b
+andThen :: (a -> Task' env x b) -> Task' env x a -> Task' env x b
 andThen =
   Shortcut.andThen
 
@@ -178,7 +179,7 @@ andThen =
 -- sequence fails.
 --
 -- > sequence [ succeed 1, succeed 2 ] == succeed [ 1, 2 ]
-sequence :: List (Task x a) -> Task x (List a)
+sequence :: List (Task' env x a) -> Task' env x (List a)
 sequence = Prelude.sequence
 
 -- | Start with a list of tasks, and turn them into a single task that returns a
@@ -186,7 +187,7 @@ sequence = Prelude.sequence
 -- parallel call fails.
 --
 -- > parallel [ succeed 1, succeed 2 ] == succeed [ 1, 2 ]
-parallel :: List (Task x a) -> Task x (List a)
+parallel :: List (Task' env x a) -> Task' env x (List a)
 parallel tasks =
   Internal.Task
     ( \handler ->
@@ -199,7 +200,7 @@ parallel tasks =
 -- task also fails.
 --
 -- > concurrently (succeed 1) (succeed "Expecto Patronum!") == succeed (1, "Expecto Patronum!")
-concurrently :: Task x a -> Task x b -> Task x (a, b)
+concurrently :: Task' env x a -> Task' env x b -> Task' env x (a, b)
 concurrently taskA taskB =
   Internal.Task
     ( \handler -> do
@@ -208,7 +209,7 @@ concurrently taskA taskB =
     )
 
 -- | Given a task, execute the task in a greenthread.
-background :: Task Never a -> Task x ()
+background :: Task' env Never a -> Task' env x ()
 background task =
   Internal.Task
     ( \handler -> do
@@ -226,7 +227,7 @@ background task =
 -- > succeed 9
 -- >   |> onError (\msg -> succeed 42)
 -- >   -- succeed 9
-onError :: (x -> Task y a) -> Task x a -> Task y a
+onError :: (x -> Task' env y a) -> Task' env x a -> Task' env y a
 onError func task =
   Internal.Task <| \key ->
     let onResult result =
@@ -249,7 +250,7 @@ onError func task =
 -- >     [ mapError Http serverTask
 -- >     , mapError WebGL textureTask
 -- >     ]
-mapError :: (x -> y) -> Task x a -> Task y a
+mapError :: (x -> y) -> Task' env x a -> Task' env y a
 mapError func task =
   task |> onError (fail << func)
 
@@ -258,7 +259,7 @@ mapError func task =
 --
 -- > Process.sleep 2000
 -- >   |> timeout 1000 "overslept!"
-timeout :: Float -> err -> Task err a -> Task err a
+timeout :: Float -> err -> Task' env err a -> Task' env err a
 timeout duration err task =
   Internal.Task
     ( \handler -> do
