@@ -163,7 +163,11 @@ tokensToScript tokens =
 
 -- | EVAL script numkeys [key [key ...]] [arg [arg ...]]
 evalString :: Script a -> Text
-evalString = Debug.todo "evalString"
+evalString script' =
+  let paramCount = script' |> params |> Log.unSecret |> List.length |> Text.fromInt
+      paramKeys = paramNames script' |> Text.join " "
+      paramArgs = paramValues script' |> List.map (\_ -> "***") |> Text.join " "
+   in "EVAL " ++ luaScript script' ++ " " ++ paramCount ++ " " ++ paramKeys ++ " " ++ paramArgs
 
 -- | Map the keys in the script to the keys in the Redis API
 mapKeys :: (Text -> Task err Text) -> Script a -> Task err (Script a)
