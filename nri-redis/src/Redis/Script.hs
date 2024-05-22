@@ -191,4 +191,4 @@ paramValues script' =
 printScript :: Script a -> Text
 printScript Script {luaScript, quasiQuotedString, params} =
   let printableParams = Log.unSecret params
-  in "Script { luaScript = \"" ++ luaScript ++ "\", quasiQuotedString = \"" ++ quasiQuotedString ++ "\", params = " ++ Debug.toString printableParams ++ " }"
+   in "Script { luaScript = \"" ++ luaScript ++ "\", quasiQuotedString = \"" ++ quasiQuotedString ++ "\", params = " ++ Debug.toString printableParams ++ " }"

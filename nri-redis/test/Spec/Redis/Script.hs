@@ -58,13 +58,13 @@ parserTests =
         |> mapLeft P.errorBundlePretty
         |> Expect.equal
           ( Left
-                "1:3:\n\
-                \  |\n\
-                \1 | ${}\n\
-                \  |   ^\n\
-                \unexpected '}'\n\
-                \expecting anything but '$', '{' or '}' (no records, sorry) or white space\n\
-                \"
+              "1:3:\n\
+              \  |\n\
+              \1 | ${}\n\
+              \  |   ^\n\
+              \unexpected '}'\n\
+              \expecting anything but '$', '{' or '}' (no records, sorry) or white space\n\
+              \"
           ),
     Test.test "ERROR: nested ${}" <| \_ -> do
       P.runParser parser "" "asdasd ${ ${ value } }"
@@ -117,11 +117,11 @@ thTests =
       [script|${Key "hi"}|]
         |> printScript
         |> Expect.equal "Script { luaScript = \"@arg0\", quasiQuotedString = \"${Key \"hi\"}\", params = [ EvaluatedParam\n    { kind = RedisKey , name = \"arg0\" , value = \"\\\"hi\\\"\" }\n] }"
-    -- We can't test for compile-time errors, but manually test our helpful error message, uncomment
-    -- the lines below:
-    -- Test.test "compilation error" <| \_ ->
-    --   [script|${123}|]
-    --     |> Expect.equal "Doesn't matter, this won't compile"
+        -- We can't test for compile-time errors, but manually test our helpful error message, uncomment
+        -- the lines below:
+        -- Test.test "compilation error" <| \_ ->
+        --   [script|${123}|]
+        --     |> Expect.equal "Doesn't matter, this won't compile"
   ]
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
