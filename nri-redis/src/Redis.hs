@@ -38,6 +38,8 @@ module Redis
     setex,
     setnx,
     eval,
+    script,
+    ScriptParam (..),
 
     -- * Running Redis queries
     Internal.query,
@@ -62,6 +64,7 @@ import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Handler as Handler
 import qualified Redis.Internal as Internal
+import Redis.Script (ScriptParam (..), script)
 import qualified Redis.Script as Script
 import qualified Redis.Settings as Settings
 import qualified Prelude
@@ -189,5 +192,5 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setex = \key seconds value -> Internal.Setex (toKey key) seconds (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
-      eval = \script -> Internal.Eval script
+      eval = \script' -> Internal.Eval script'
     }

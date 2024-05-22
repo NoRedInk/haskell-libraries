@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Spec.Redis (tests) where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -369,7 +371,11 @@ queryTests redisHandler =
         |> Expect.equal (List.length expectedKeys)
       keySet
         |> Set.toList
-        |> Expect.equal expectedKeys
+        |> Expect.equal expectedKeys,
+    Test.test "eval runs and returns something" <| \() -> do
+      let script = [Redis.script|return 1|]
+      result <- Redis.eval intJsonApi script |> Redis.query testNS |> Expect.succeeds
+      Expect.equal result 1
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
@@ -395,6 +401,9 @@ sortedSetApi = Redis.SortedSet.textApi identity
 
 jsonApi' :: Redis.Api Text [Int]
 jsonApi' = Redis.jsonApi identity
+
+intJsonApi :: Redis.Api Text Prelude.Integer
+intJsonApi = Redis.jsonApi identity
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.
