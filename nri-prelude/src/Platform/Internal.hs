@@ -60,16 +60,21 @@ import qualified Prelude
 -- list. Or like a grocery list. Or like GitHub issues. So saying "the task is
 -- to tell me the current POSIX time" does not complete the task! You need
 -- 'perform' tasks or 'attempt' tasks.
-newtype Task x a = Task {_run :: LogHandler -> IO (Result x a)}
+newtype Task' env x a = Task {_run :: env -> IO (Result x a)}
   deriving (Functor)
 
-instance Applicative (Task a) where
+class Has handler env where
+  getEnv :: Task' env a handler
+
+type Task x a = Task' LogHandler x a
+
+instance Applicative (Task' env a) where
   pure a =
     Task (\_ -> Prelude.pure (Ok a))
 
   (<*>) func task = Control.Monad.ap func task
 
-instance Monad (Task a) where
+instance Monad (Task' env a) where
   task >>= func =
     Task <| \key ->
       let onResult result =
