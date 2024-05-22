@@ -5,6 +5,7 @@
 
 module Redis.Script (Script (..), script, evalString, mapKeys, keysTouchedByScript, paramNames, paramValues, parser, Tokens (..), ScriptParam (..), printScript) where
 
+import qualified Control.Monad
 import Data.Either (Either (..))
 import Data.Void (Void)
 import qualified GHC.TypeLits
@@ -166,7 +167,18 @@ evalString = Debug.todo "evalString"
 
 -- | Map the keys in the script to the keys in the Redis API
 mapKeys :: (Text -> Task err Text) -> Script a -> Task err (Script a)
-mapKeys _fn _script = Debug.todo "mapKeys"
+mapKeys fn script' = do
+  newParams <-
+    script'
+      |> params
+      |> Log.unSecret
+      |> Control.Monad.mapM
+        ( \param ->
+            case kind param of
+              RedisKey -> fn (value param) |> Task.map (\newValue -> param {value = newValue})
+              ArbitraryValue -> pure param
+        )
+  pure <| script' {params = Log.mkSecret newParams}
 
 -- | Get the keys touched by the script
 keysTouchedByScript :: Script a -> Set.Set Text
