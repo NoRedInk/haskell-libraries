@@ -182,7 +182,17 @@ mapKeys fn script' = do
 
 -- | Get the keys touched by the script
 keysTouchedByScript :: Script a -> Set.Set Text
-keysTouchedByScript = Debug.todo "keysTouchedByScript"
+keysTouchedByScript script' =
+  script'
+    |> params
+    |> Log.unSecret
+    |> List.filterMap
+      ( \param ->
+          case kind param of
+            RedisKey -> Just (value param)
+            ArbitraryValue -> Nothing
+      )
+    |> Set.fromList
 
 -- | Get the parameter names in the script
 paramNames :: Script a -> List Text
