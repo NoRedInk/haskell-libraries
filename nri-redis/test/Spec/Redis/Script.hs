@@ -112,11 +112,11 @@ thTests =
   [ Test.test "just text" <| \_ ->
       [script|some text|]
         |> printScript
-        |> Expect.equal "Script { luaScript = \"some text\", quasiQuotedString = \"some text\", params = [] }",
+        |> Expect.equal "Script { luaScript = \"some text\", quasiQuotedString = \"some text\", keys = [], arguments = [] }",
     Test.test "one key argument" <| \_ ->
       [script|${Key "hi"}|]
         |> printScript
-        |> Expect.equal "Script { luaScript = \"@arg0\", quasiQuotedString = \"${Key \"hi\"}\", params = [ EvaluatedParam\n    { kind = RedisKey , name = \"arg0\" , value = \"\\\"hi\\\"\" }\n] }"
+        |> Expect.equal "Script { luaScript = \"KEYS[1]\", quasiQuotedString = \"${Key \"hi\"}\", keys = [\"hi\"], arguments = [] }"
         -- We can't test for compile-time errors, but manually test our helpful error message, uncomment
         -- the lines below:
         -- Test.test "compilation error" <| \_ ->

@@ -3,10 +3,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Redis.Script (Script (..), script, evalString, mapKeys, keysTouchedByScript, paramNames, paramValues, parser, Tokens (..), ScriptParam (..), printScript) where
+module Redis.Script (Script (..), script, evalString, mapKeys, keysTouchedByScript, parser, Tokens (..), ScriptParam (..), printScript) where
 
 import qualified Control.Monad
 import Data.Either (Either (..))
+import qualified Data.Text
 import Data.Void (Void)
 import qualified GHC.TypeLits
 import Language.Haskell.Meta.Parse (parseExp)
@@ -24,8 +25,9 @@ data Script result = Script
     luaScript :: Text,
     -- | The script string as extracted from a `script` quasi quote.
     quasiQuotedString :: Text,
+    keys :: [Text],
     -- | The parameters that fill the placeholders in this query
-    params :: Log.Secret [EvaluatedParam]
+    arguments :: Log.Secret [Text]
   }
   deriving (Eq, Show)
 
@@ -59,7 +61,6 @@ instance
 
 data EvaluatedParam = EvaluatedParam
   { kind :: ParamKind,
-    name :: Text,
     value :: Text
   }
   deriving (Eq, Show)
@@ -78,46 +79,88 @@ script =
 
 qqScript :: Prelude.String -> TH.Q TH.Exp
 qqScript scriptWithVars = do
-  let str = Text.fromList scriptWithVars
-  let parseResult = P.parse parser "" str
+  let quotedScript = Text.fromList scriptWithVars
+  let parseResult = P.parse parser "" quotedScript
   case parseResult of
     Left err -> Prelude.error <| "Failed to parse script: " ++ P.errorBundlePretty err
     Right tokens -> do
-      let luaScript' = tokensToScript tokens
-      let paramsExp =
-            tokens
-              |> List.filterMap
-                ( \t ->
-                    case t of
-                      ScriptVariable name -> Just name
-                      _ -> Nothing
-                )
-              -- Parse haskell syntax between ${} and convert to a TH Exp
-              |> List.indexedMap (\idx exp -> varToExp exp |> scriptParamExpression (Prelude.fromIntegral idx))
-              |> TH.ListE
-              |> TH.AppE (TH.VarE 'Log.mkSecret)
-      scriptConstructor <- [|Script luaScript' str|]
-      pure <| scriptConstructor `TH.AppE` paramsExp
+      paramsExp <-
+        tokens
+          |> Control.Monad.mapM toEvaluatedToken
+          |> map TH.ListE
+      quotedScriptExp <- [|quotedScript|]
+      pure <| (TH.VarE 'scriptFromEvaluatedTokens) `TH.AppE` quotedScriptExp `TH.AppE` paramsExp
 
-scriptParamExpression :: Prelude.Integer -> TH.Exp -> TH.Exp
-scriptParamExpression idx exp =
-  (TH.VarE 'evaluateScriptParam) `TH.AppE` TH.LitE (TH.IntegerL idx) `TH.AppE` exp
+data ScriptBuilder = ScriptBuilder
+  { buffer :: Text,
+    keyIdx :: Int,
+    keyList :: List Text,
+    argIdx :: Int,
+    argList :: List Text
+  }
 
-evaluateScriptParam :: HasScriptParam a => Int -> a -> EvaluatedParam
-evaluateScriptParam idx scriptParam =
+scriptFromEvaluatedTokens :: Text -> [EvaluatedToken] -> Script a
+scriptFromEvaluatedTokens quasiQuotedString' evaluatedTokens =
+  let keyTpl n = "KEYS[" ++ Text.fromInt n ++ "]"
+      argTpl n = "ARGV[" ++ Text.fromInt n ++ "]"
+      script' =
+        List.foldl
+          ( \token scriptBuilder@(ScriptBuilder {buffer, keyIdx, keyList, argIdx, argList}) ->
+              case token of
+                EvaluatedText text -> scriptBuilder {buffer = buffer ++ text}
+                EvaluatedVariable var ->
+                  case kind var of
+                    RedisKey ->
+                      scriptBuilder
+                        { buffer = buffer ++ keyTpl (keyIdx + 1),
+                          keyIdx = keyIdx + 1,
+                          keyList = value var : keyList
+                        }
+                    ArbitraryValue ->
+                      scriptBuilder
+                        { buffer = buffer ++ argTpl (argIdx + 1),
+                          argIdx = argIdx + 1,
+                          argList = value var : argList
+                        }
+          )
+          (ScriptBuilder "" 0 [] 0 [])
+          evaluatedTokens
+   in Script
+        { luaScript = buffer script',
+          quasiQuotedString = quasiQuotedString',
+          keys = keyList script',
+          arguments = Log.mkSecret (argList script')
+        }
+
+toEvaluatedToken :: Tokens -> TH.Q TH.Exp
+toEvaluatedToken token =
+  case token of
+    ScriptText text -> [|EvaluatedText text|]
+    ScriptVariable var -> pure <| (TH.VarE 'evaluateScriptParam) `TH.AppE` (varToExp var)
+
+evaluateScriptParam :: HasScriptParam a => a -> EvaluatedToken
+evaluateScriptParam scriptParam =
   case getScriptParam scriptParam of
     Key a ->
-      EvaluatedParam
-        { kind = RedisKey,
-          name = "arg" ++ Text.fromInt idx,
-          value = Debug.toString a
-        }
+      EvaluatedVariable
+        <| EvaluatedParam
+          { kind = RedisKey,
+            value = unquoteString (Debug.toString a)
+          }
     Literal a ->
-      EvaluatedParam
-        { kind = ArbitraryValue,
-          name = "arg" ++ Text.fromInt idx,
-          value = Debug.toString a
-        }
+      EvaluatedVariable
+        <| EvaluatedParam
+          { kind = ArbitraryValue,
+            value = unquoteString (Debug.toString a)
+          }
+
+-- | Remove leading and trailing quotes from a string
+unquoteString :: Text -> Text
+unquoteString str =
+  str
+    |> Data.Text.stripPrefix "\""
+    |> Maybe.andThen (Data.Text.stripSuffix "\"")
+    |> Maybe.withDefault str
 
 varToExp :: Text -> TH.Exp
 varToExp var =
@@ -125,6 +168,7 @@ varToExp var =
     Left err -> Prelude.error <| "Failed to parse variable: " ++ err
     Right exp -> exp
 
+-- | Tokens after parsing quasi-quoted text
 data Tokens
   = ScriptText Text
   | ScriptVariable Text
@@ -150,71 +194,34 @@ parseVariable = do
   _ <- PC.char '}'
   pure <| ScriptVariable <| Text.trim name
 
-tokensToScript :: List Tokens -> Text
-tokensToScript tokens =
-  tokens
-    |> List.indexedMap
-      ( \idx t ->
-          case t of
-            ScriptText text -> text
-            ScriptVariable _ -> "@arg" ++ Text.fromInt idx
-      )
-    |> Text.join ""
+data EvaluatedToken
+  = EvaluatedText Text
+  | EvaluatedVariable EvaluatedParam
+  deriving (Show, Eq)
 
 -- | EVAL script numkeys [key [key ...]] [arg [arg ...]]
 evalString :: Script a -> Text
-evalString script' =
-  let paramCount = script' |> params |> Log.unSecret |> List.length |> Text.fromInt
-      paramKeys = paramNames script' |> Text.join " "
-      paramArgs = paramValues script' |> List.map (\_ -> "***") |> Text.join " "
-   in "EVAL " ++ luaScript script' ++ " " ++ paramCount ++ " " ++ paramKeys ++ " " ++ paramArgs
+evalString Script {luaScript, keys, arguments} =
+  let keyCount = keys |> List.length |> Text.fromInt
+      keys' = keys |> Text.join " "
+      args' = arguments |> Log.unSecret |> List.map (\_ -> "***") |> Text.join " "
+   in "EVAL {{" ++ luaScript ++ "}} " ++ keyCount ++ " " ++ keys' ++ " " ++ args'
 
 -- | Map the keys in the script to the keys in the Redis API
 mapKeys :: (Text -> Task err Text) -> Script a -> Task err (Script a)
 mapKeys fn script' = do
-  newParams <-
-    script'
-      |> params
-      |> Log.unSecret
-      |> Control.Monad.mapM
-        ( \param ->
-            case kind param of
-              RedisKey -> fn (value param) |> Task.map (\newValue -> param {value = newValue})
-              ArbitraryValue -> pure param
-        )
-  pure <| script' {params = Log.mkSecret newParams}
+  keys script'
+    |> List.map fn
+    |> Task.sequence
+    |> Task.map (\keys' -> script' {keys = keys'})
 
 -- | Get the keys touched by the script
 keysTouchedByScript :: Script a -> Set.Set Text
 keysTouchedByScript script' =
-  script'
-    |> params
-    |> Log.unSecret
-    |> List.filterMap
-      ( \param ->
-          case kind param of
-            RedisKey -> Just (value param)
-            ArbitraryValue -> Nothing
-      )
+  keys script'
     |> Set.fromList
 
--- | Get the parameter names in the script
-paramNames :: Script a -> List Text
-paramNames script' =
-  script'
-    |> params
-    |> Log.unSecret
-    |> List.map name
-
--- | Get the parameter values in the script
-paramValues :: Script a -> List Text
-paramValues script' =
-  script'
-    |> params
-    |> Log.unSecret
-    |> List.map value
-
 printScript :: Script a -> Text
-printScript Script {luaScript, quasiQuotedString, params} =
-  let printableParams = Log.unSecret params
-   in "Script { luaScript = \"" ++ luaScript ++ "\", quasiQuotedString = \"" ++ quasiQuotedString ++ "\", params = " ++ Debug.toString printableParams ++ " }"
+printScript Script {luaScript, quasiQuotedString, keys, arguments} =
+  let listStr l = List.map (\s -> "\"" ++ s ++ "\"") l |> Text.join ", "
+   in "Script { luaScript = \"" ++ luaScript ++ "\", quasiQuotedString = \"" ++ quasiQuotedString ++ "\", keys = [" ++ listStr keys ++ "], arguments = [" ++ listStr (Log.unSecret arguments) ++ "] }"

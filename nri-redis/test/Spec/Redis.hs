@@ -377,7 +377,8 @@ queryTests redisHandler =
       result <- Redis.eval intJsonApi script |> Redis.query testNS |> Expect.succeeds
       Expect.equal result 1,
     Test.test "eval with arguments runs and returns something" <| \() -> do
-      let script = [Redis.script|
+      let script =
+            [Redis.script|
       local a = ${Redis.Key "hi"}
       local b = ${Redis.Literal "hello"}
       return 1|]
