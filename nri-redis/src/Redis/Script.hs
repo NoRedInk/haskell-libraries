@@ -3,7 +3,20 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Redis.Script (Script (..), script, evalString, mapKeys, keysTouchedByScript, parser, Tokens (..), ScriptParam (..), printScript) where
+module Redis.Script
+  ( Script (..),
+    script,
+    -- Internal API
+    evalString,
+    mapKeys,
+    keysTouchedByScript,
+    -- For testing
+    parser,
+    Tokens (..),
+    ScriptParam (..),
+    printScript,
+  )
+where
 
 import qualified Control.Monad
 import Data.Either (Either (..))
@@ -59,15 +72,6 @@ instance
   where
   getScriptParam = Prelude.error "This won't ever hit bc this generates a compile-time error."
 
-data EvaluatedParam = EvaluatedParam
-  { kind :: ParamKind,
-    value :: Text
-  }
-  deriving (Eq, Show)
-
-data ParamKind = RedisKey | ArbitraryValue
-  deriving (Eq, Show)
-
 -- | Quasi-quoter for creating a Redis Lua script with placeholders for Redis keys and arguments.
 --
 -- > [script|SET ${Key "a-redis-key"} ${Literal 123}|]
@@ -97,6 +101,64 @@ qqScript scriptWithVars = do
           |> map TH.ListE
       quotedScriptExp <- [|quotedScript|]
       pure <| (TH.VarE 'scriptFromEvaluatedTokens) `TH.AppE` quotedScriptExp `TH.AppE` paramsExp
+
+----------------------------
+-- Script template compile-time evaluation
+----------------------------
+
+data EvaluatedToken
+  = EvaluatedText Text
+  | EvaluatedVariable EvaluatedParam
+  deriving (Show, Eq)
+
+data EvaluatedParam = EvaluatedParam
+  { kind :: ParamKind,
+    value :: Text
+  }
+  deriving (Eq, Show)
+
+data ParamKind = RedisKey | ArbitraryValue
+  deriving (Eq, Show)
+
+toEvaluatedToken :: Tokens -> TH.Q TH.Exp
+toEvaluatedToken token =
+  case token of
+    ScriptText text -> [|EvaluatedText text|]
+    ScriptVariable var -> pure <| (TH.VarE 'evaluateScriptParam) `TH.AppE` (varToExp var)
+
+evaluateScriptParam :: HasScriptParam a => a -> EvaluatedToken
+evaluateScriptParam scriptParam =
+  case getScriptParam scriptParam of
+    Key a ->
+      EvaluatedVariable
+        <| EvaluatedParam
+          { kind = RedisKey,
+            value = unquoteString (Debug.toString a)
+          }
+    Literal a ->
+      EvaluatedVariable
+        <| EvaluatedParam
+          { kind = ArbitraryValue,
+            value = unquoteString (Debug.toString a)
+          }
+
+-- | Remove leading and trailing quotes from a string
+unquoteString :: Text -> Text
+unquoteString str =
+  str
+    |> Data.Text.stripPrefix "\""
+    |> Maybe.andThen (Data.Text.stripSuffix "\"")
+    |> Maybe.withDefault str
+
+varToExp :: Text -> TH.Exp
+varToExp var =
+  case parseExp (Text.toList var) of
+    Left err -> Prelude.error <| "Failed to parse variable: " ++ err
+    Right exp -> exp
+
+-----------------------------
+-- Script record construction
+-----------------------------
 
 data ScriptBuilder = ScriptBuilder
   { buffer :: Text,
@@ -139,41 +201,9 @@ scriptFromEvaluatedTokens quasiQuotedString' evaluatedTokens =
           arguments = Log.mkSecret (argList script')
         }
 
-toEvaluatedToken :: Tokens -> TH.Q TH.Exp
-toEvaluatedToken token =
-  case token of
-    ScriptText text -> [|EvaluatedText text|]
-    ScriptVariable var -> pure <| (TH.VarE 'evaluateScriptParam) `TH.AppE` (varToExp var)
-
-evaluateScriptParam :: HasScriptParam a => a -> EvaluatedToken
-evaluateScriptParam scriptParam =
-  case getScriptParam scriptParam of
-    Key a ->
-      EvaluatedVariable
-        <| EvaluatedParam
-          { kind = RedisKey,
-            value = unquoteString (Debug.toString a)
-          }
-    Literal a ->
-      EvaluatedVariable
-        <| EvaluatedParam
-          { kind = ArbitraryValue,
-            value = unquoteString (Debug.toString a)
-          }
-
--- | Remove leading and trailing quotes from a string
-unquoteString :: Text -> Text
-unquoteString str =
-  str
-    |> Data.Text.stripPrefix "\""
-    |> Maybe.andThen (Data.Text.stripSuffix "\"")
-    |> Maybe.withDefault str
-
-varToExp :: Text -> TH.Exp
-varToExp var =
-  case parseExp (Text.toList var) of
-    Left err -> Prelude.error <| "Failed to parse variable: " ++ err
-    Right exp -> exp
+-----------------------------
+-- Quasi-quoted text parser
+-----------------------------
 
 -- | Tokens after parsing quasi-quoted text
 data Tokens
@@ -201,10 +231,9 @@ parseVariable = do
   _ <- PC.char '}'
   pure <| ScriptVariable <| Text.trim name
 
-data EvaluatedToken
-  = EvaluatedText Text
-  | EvaluatedVariable EvaluatedParam
-  deriving (Show, Eq)
+---------------------------------------------
+-- Helper functions for internal library use
+---------------------------------------------
 
 -- | EVAL script numkeys [key [key ...]] [arg [arg ...]]
 evalString :: Script a -> Text
@@ -227,6 +256,10 @@ keysTouchedByScript :: Script a -> Set.Set Text
 keysTouchedByScript script' =
   keys script'
     |> Set.fromList
+
+---------------------------------------------
+-- Helper functions for testing
+---------------------------------------------
 
 printScript :: Script a -> Text
 printScript Script {luaScript, quasiQuotedString, keys, arguments} =
