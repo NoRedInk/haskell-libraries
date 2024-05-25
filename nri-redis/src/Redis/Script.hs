@@ -68,6 +68,13 @@ data EvaluatedParam = EvaluatedParam
 data ParamKind = RedisKey | ArbitraryValue
   deriving (Eq, Show)
 
+-- | Quasi-quoter for creating a Redis Lua script with placeholders for Redis keys and arguments.
+--
+-- > [script|SET ${Key "a-redis-key"} ${Literal 123}|]
+--
+-- **IMPORTANT**: It is NOT SAFE to return Redis keys using this. Our Redis APIs inject
+-- "namespaces" (prefixes) on keys, and any keys returned by Lua will have their namespaces
+-- applied. If you try to reuse those keys in follow-up queries, namespaces will be doubly-applied.
 script :: QQ.QuasiQuoter
 script =
   QQ.QuasiQuoter
