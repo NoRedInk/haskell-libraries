@@ -7,6 +7,7 @@ module Redis.Script
   ( Script (..),
     script,
     -- Internal API
+    luaScriptHash,
     evalString,
     mapKeys,
     keysTouchedByScript,
@@ -19,8 +20,11 @@ module Redis.Script
 where
 
 import qualified Control.Monad
+import qualified Crypto.Hash.SHA1
+import qualified Data.ByteString
 import Data.Either (Either (..))
 import qualified Data.Text
+import qualified Data.Text.Encoding
 import Data.Void (Void)
 import qualified GHC.TypeLits
 import Language.Haskell.Meta.Parse (parseExp)
@@ -256,6 +260,12 @@ keysTouchedByScript :: Script a -> Set.Set Text
 keysTouchedByScript script' =
   keys script'
     |> Set.fromList
+
+luaScriptHash :: Script a -> Data.ByteString.ByteString
+luaScriptHash Script {luaScript} =
+  luaScript
+    |> Data.Text.Encoding.encodeUtf8
+    |> Crypto.Hash.SHA1.hash
 
 ---------------------------------------------
 -- Helper functions for testing

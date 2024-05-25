@@ -84,6 +84,7 @@ cmds query'' =
   case query'' of
     Del keys -> [unwords ("DEL" : NonEmpty.toList keys)]
     Eval script -> [Script.evalString script]
+    EvalCached script -> [Script.evalString script]
     Exists key -> [unwords ["EXISTS", key]]
     Expire key val -> [unwords ["EXPIRE", key, Text.fromInt val]]
     Get key -> [unwords ["GET", key]]
@@ -142,6 +143,7 @@ unwords = Text.join " "
 data Query a where
   Del :: NonEmpty Text -> Query Int
   Eval :: Database.Redis.RedisResult a => Script.Script a -> Query a
+  EvalCached :: Database.Redis.RedisResult a => Script.Script a -> Query a
   Exists :: Text -> Query Bool
   Expire :: Text -> Int -> Query ()
   Get :: Text -> Query (Maybe ByteString)
@@ -278,6 +280,7 @@ mapKeys :: (Text -> Task err Text) -> Query a -> Task err (Query a)
 mapKeys fn query' =
   case query' of
     Eval script -> Task.map Eval (Script.mapKeys fn script)
+    EvalCached script -> Task.map EvalCached (Script.mapKeys fn script)
     Exists key -> Task.map Exists (fn key)
     Ping -> Task.succeed Ping
     Get key -> Task.map Get (fn key)
@@ -322,6 +325,7 @@ mapReturnedKeys :: (Text -> Text) -> Query a -> Query a
 mapReturnedKeys fn query' =
   case query' of
     Eval _ -> query'
+    EvalCached _ -> query'
     Exists key -> Exists key
     Ping -> Ping
     Get key -> Get key
@@ -380,6 +384,7 @@ keysTouchedByQuery query' =
     Apply f x -> Set.union (keysTouchedByQuery f) (keysTouchedByQuery x)
     Del keys -> Set.fromList (NonEmpty.toList keys)
     Eval script -> Script.keysTouchedByScript script
+    EvalCached script -> Script.keysTouchedByScript script
     Exists key -> Set.singleton key
     -- We use this function to collect keys we need to expire. If the user is
     -- explicitly setting an expiry we don't want to overwrite that.

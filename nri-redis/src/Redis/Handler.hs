@@ -170,6 +170,24 @@ doRawQuery query =
       Database.Redis.eval (toB (Script.luaScript script)) (map toB (Script.keys script)) (map toB (Log.unSecret (Script.arguments script)))
         |> PreparedQuery
         |> map Ok
+    Internal.EvalCached script ->
+      let evalsha =
+            Database.Redis.evalsha
+              (Script.luaScriptHash script)
+              (map toB (Script.keys script))
+              (map toB (Log.unSecret (Script.arguments script)))
+          loadScript = Database.Redis.scriptLoad (toB (Script.luaScript script))
+          evalWithAutorecover = do
+            result <- evalsha
+            case result of
+              Left (Database.Redis.Error err) ->
+                case err of
+                  "NOSCRIPT No matching script. Please use EVAL." -> loadScript >>= evalsha
+                  _ -> pure result
+              Right _ -> pure result
+       in evalWithAutorecover
+            |> PreparedQuery
+            |> map Ok
     Internal.Exists key ->
       Database.Redis.exists (toB key)
         |> PreparedQuery
