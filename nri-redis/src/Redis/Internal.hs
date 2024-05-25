@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
+-- For the RedisResult Text instance
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Redis.Internal
   ( Error (..),
@@ -30,6 +32,7 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
 import qualified GHC.Stack as Stack
@@ -466,3 +469,9 @@ foldWithScan handler keyMatchPattern approxCountPerBatch processKeyBatch initAcc
           then Task.succeed nextAccumulator
           else go nextAccumulator nextCursor
    in go initAccumulator Database.Redis.cursor0
+
+-- This is an orphaned instance
+instance Database.Redis.RedisResult Text where
+  decode r = do
+    decodedBs <- Database.Redis.decode r
+    Prelude.pure <| Data.Text.Encoding.decodeUtf8 decodedBs

@@ -383,7 +383,29 @@ queryTests redisHandler =
       local b = ${Redis.Literal "hello"}
       return 1|]
       result <- Redis.eval intJsonApi script |> Redis.query testNS |> Expect.succeeds
-      Expect.equal result 1
+      Expect.equal result 1,
+    Test.test "eval with arguments returns argument" <| \() -> do
+      let script =
+            [Redis.script|
+      local a = ${Redis.Key 2}
+      local b = ${Redis.Literal 3}
+      return b|]
+      result <- Redis.eval intJsonApi script |> Redis.query testNS |> Expect.succeeds
+      Expect.equal result 3,
+    Test.test "eval with arguments namespaces key" <| \() -> do
+      let script = [Redis.script|return ${Redis.Key "hi"}|]
+      result <- Redis.eval api script |> Redis.query testNS |> Expect.succeeds
+      Expect.true
+        ( List.member
+            result
+            -- All tests here run twice:
+            -- - once with the auto-extend-expire handler
+            -- - once with the normal handler
+            -- each run generates a different namespace
+            [ "tests-auto-extend-expire:testNamespace:hi",
+              "tests:testNamespace:hi"
+            ]
+        )
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
