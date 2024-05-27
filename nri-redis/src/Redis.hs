@@ -38,7 +38,6 @@ module Redis
     setex,
     setnx,
     eval,
-    evalCached,
     script,
     ScriptParam (..),
 
@@ -145,23 +144,8 @@ data Api key a = Api
     setnx :: key -> a -> Internal.Query Bool,
     -- | Invoke the execution of a server-side Lua script.
     --
-    -- Calling this is not ideal. It's better to use `evalCached`, which will:
-    -- - Assume the Lua script has been cached and run EVALSHA
-    -- - Recover from a cache miss error and `SCRIPT LOAD` the Lua script into Redis
-    -- - Retry the original EVALSHA command
-    --
     -- https://redis.io/commands/eval
-    eval :: Database.Redis.RedisResult a => Script.Script a -> Internal.Query a,
-    -- | Invoke the execution of a server-side Lua script.
-    --
-    -- This function will:
-    -- - Assume the Lua script has been cached and run EVALSHA
-    -- - Recover from a cache miss error and `SCRIPT LOAD` the Lua script into Redis
-    -- - Retry the original EVALSHA command
-    --
-    -- https://redis.io/commands/evalsha
-    -- https://redis.io/commands/script-load/
-    evalCached :: Database.Redis.RedisResult a => Script.Script a -> Internal.Query a
+    eval :: Database.Redis.RedisResult a => Script.Script a -> Internal.Query a
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
@@ -208,6 +192,5 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setex = \key seconds value -> Internal.Setex (toKey key) seconds (codecEncoder value),
       setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
-      eval = \script' -> Internal.Eval script',
-      evalCached = \script' -> Internal.EvalCached script'
+      eval = \script' -> Internal.Eval script'
     }
