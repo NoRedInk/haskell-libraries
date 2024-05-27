@@ -37,13 +37,13 @@ module Redis
     set,
     setex,
     setnx,
-    eval,
     script,
     ScriptParam (..),
 
     -- * Running Redis queries
     Internal.query,
     Internal.transaction,
+    Internal.eval,
     Internal.Query,
     Internal.Error (..),
     Internal.map,

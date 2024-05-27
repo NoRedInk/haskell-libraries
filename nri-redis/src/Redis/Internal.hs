@@ -20,6 +20,7 @@ module Redis.Internal
     sequence,
     query,
     transaction,
+    eval,
     foldWithScan,
     -- internal tools
     traceQuery,
@@ -231,6 +232,7 @@ data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
 data Handler' (x :: HasAutoExtendExpire) = Handler'
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
+    doEval :: Stack.HasCallStack => forall a. Database.Redis.RedisResult a => Script.Script a -> Task Error a,
     namespace :: Text,
     maxKeySize :: Settings.MaxKeySize
   }
@@ -268,6 +270,11 @@ transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler))
+
+eval :: (Stack.HasCallStack, Database.Redis.RedisResult a) => Handler' x -> Script.Script a -> Task Error a
+eval handler script =
+  Script.mapKeys (\key -> Task.succeed (namespace handler ++ ":" ++ key)) script
+    |> Task.andThen (Stack.withFrozenCallStack (doEval handler))
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
 namespaceQuery prefix query' =

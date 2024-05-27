@@ -374,7 +374,7 @@ queryTests redisHandler =
         |> Expect.equal expectedKeys,
     Test.test "eval runs and returns something" <| \() -> do
       let script = [Redis.script|return 1|]
-      result <- Redis.eval intJsonApi script |> Redis.query testNS |> Expect.succeeds
+      result <- Redis.eval testNS script |> Expect.succeeds
       Expect.equal result 1,
     Test.test "eval with arguments runs and returns something" <| \() -> do
       let script =
@@ -382,7 +382,7 @@ queryTests redisHandler =
       local a = ${Redis.Key "hi"}
       local b = ${Redis.Literal "hello"}
       return 1|]
-      result <- Redis.eval intJsonApi script |> Redis.query testNS |> Expect.succeeds
+      result <- Redis.eval testNS script |> Expect.succeeds
       Expect.equal result 1,
     Test.test "eval with arguments returns argument" <| \() -> do
       let script =
@@ -390,11 +390,11 @@ queryTests redisHandler =
       local a = ${Redis.Key 2}
       local b = ${Redis.Literal 3}
       return b|]
-      result <- Redis.eval intJsonApi script |> Redis.query testNS |> Expect.succeeds
+      result <- Redis.eval testNS script |> Expect.succeeds
       Expect.equal result 3,
     Test.test "eval with arguments namespaces key" <| \() -> do
       let script = [Redis.script|return ${Redis.Key "hi"}|]
-      result <- Redis.eval api script |> Redis.query testNS |> Expect.succeeds
+      (result :: Text) <- Redis.eval testNS script |> Expect.succeeds
       Expect.true
         ( List.member
             result
@@ -431,9 +431,6 @@ sortedSetApi = Redis.SortedSet.textApi identity
 
 jsonApi' :: Redis.Api Text [Int]
 jsonApi' = Redis.jsonApi identity
-
-intJsonApi :: Redis.Api Text Prelude.Integer
-intJsonApi = Redis.jsonApi identity
 
 -- | Timestamps recorded in spans would make each test result different from the
 -- last. This helper sets all timestamps to zero to prevent this.

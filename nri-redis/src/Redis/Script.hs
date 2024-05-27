@@ -9,6 +9,8 @@ module Redis.Script
     -- Internal API
     luaScriptHash,
     evalString,
+    evalShaString,
+    scriptLoadString,
     mapKeys,
     keysTouchedByScript,
     -- For testing
@@ -34,6 +36,7 @@ import qualified Set
 import Text.Megaparsec ((<|>))
 import qualified Text.Megaparsec as P
 import qualified Text.Megaparsec.Char as PC
+import qualified Text.Printf
 import Prelude (notElem, pure, (<*))
 import qualified Prelude
 
@@ -247,6 +250,20 @@ evalString Script {luaScript, keys, arguments} =
       args' = arguments |> Log.unSecret |> List.map (\_ -> "***") |> Text.join " "
    in "EVAL {{" ++ luaScript ++ "}} " ++ keyCount ++ " " ++ keys' ++ " " ++ args'
 
+-- | EVALSHA hash numkeys [key [key ...]] [arg [arg ...]]
+evalShaString :: Script a -> Text
+evalShaString script'@(Script {keys, arguments}) =
+  let keyCount = keys |> List.length |> Text.fromInt
+      keys' = keys |> Text.join " "
+      args' = arguments |> Log.unSecret |> List.map (\_ -> "***") |> Text.join " "
+      hash = luaScriptHash script'
+   in "EVALSHA " ++ hash ++ " " ++ keyCount ++ " " ++ keys' ++ " " ++ args'
+
+-- | SCRIPT LOAD "return KEYS[1]"
+scriptLoadString :: Script a -> Text
+scriptLoadString Script {luaScript} =
+  "SCRIPT LOAD \"" ++ luaScript ++ "\""
+
 -- | Map the keys in the script to the keys in the Redis API
 mapKeys :: (Text -> Task err Text) -> Script a -> Task err (Script a)
 mapKeys fn script' = do
@@ -261,11 +278,20 @@ keysTouchedByScript script' =
   keys script'
     |> Set.fromList
 
-luaScriptHash :: Script a -> Data.ByteString.ByteString
+luaScriptHash :: Script a -> Text
 luaScriptHash Script {luaScript} =
   luaScript
     |> Data.Text.Encoding.encodeUtf8
     |> Crypto.Hash.SHA1.hash
+    |> toHex
+
+toHex :: Data.ByteString.ByteString -> Text
+toHex bytes =
+  bytes
+    |> Data.ByteString.unpack
+    |> List.map (Text.Printf.printf "%02x")
+    |> List.concat
+    |> Text.fromList
 
 ---------------------------------------------
 -- Helper functions for testing
