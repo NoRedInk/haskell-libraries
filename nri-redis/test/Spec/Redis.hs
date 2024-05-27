@@ -383,6 +383,10 @@ queryTests redisHandler =
     Test.test "eval returns ()" <| \() -> do
       let script = [Redis.script|redis.call("ECHO", "hi")|]
       Redis.eval testNS script |> Expect.succeeds,
+    Test.test "eval returns List Int" <| \() -> do
+      let script = [Redis.script|return {1,2}|]
+      (result :: List Int) <- Redis.eval testNS script |> Expect.succeeds
+      Expect.equal result [1,2],
     Test.test "eval with arguments runs and returns something" <| \() -> do
       let script =
             [Redis.script|
