@@ -37,13 +37,10 @@ module Redis
     set,
     setex,
     setnx,
-    script,
-    ScriptParam (..),
 
     -- * Running Redis queries
     Internal.query,
     Internal.transaction,
-    Internal.eval,
     Internal.Query,
     Internal.Error (..),
     Internal.map,
@@ -51,6 +48,11 @@ module Redis
     Internal.map3,
     Internal.sequence,
     Internal.foldWithScan,
+
+    -- * Lua Scripting
+    script,
+    ScriptParam (..),
+    Internal.eval,
   )
 where
 
