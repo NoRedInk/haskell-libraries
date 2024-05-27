@@ -477,8 +477,22 @@ foldWithScan handler keyMatchPattern approxCountPerBatch processKeyBatch initAcc
           else go nextAccumulator nextCursor
    in go initAccumulator Database.Redis.cursor0
 
--- This is an orphaned instance
+--------------------------------------
+-- Orphaned instances for RedisResult
+--------------------------------------
 instance Database.Redis.RedisResult Text where
   decode r = do
     decodedBs <- Database.Redis.decode r
     Prelude.pure <| Data.Text.Encoding.decodeUtf8 decodedBs
+
+instance Database.Redis.RedisResult Int where
+  decode r = do
+    (decodedInteger :: Prelude.Integer) <- Database.Redis.decode r
+    Prelude.pure <| Prelude.fromIntegral decodedInteger
+
+instance Database.Redis.RedisResult () where
+  decode r = do
+    (reply :: Database.Redis.Reply) <- Database.Redis.decode r
+    case reply of
+      Database.Redis.Bulk Nothing -> Prelude.pure ()
+      other -> Prelude.Left other
