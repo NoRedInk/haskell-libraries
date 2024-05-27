@@ -74,7 +74,7 @@ instance HasScriptParam ScriptParam where
 -- It is what forces us to have IncoherentInstances and UndecidedInstances enabled.
 instance
   {-# OVERLAPPABLE #-}
-  GHC.TypeLits.TypeError (GHC.TypeLits.Text "[script| ${..} ] interpolation only supports Key or Literal inputs.") =>
+  GHC.TypeLits.TypeError ('GHC.TypeLits.Text "[script| ${..} ] interpolation only supports Key or Literal inputs.") =>
   HasScriptParam x
   where
   getScriptParam = Prelude.error "This won't ever hit bc this generates a compile-time error."
