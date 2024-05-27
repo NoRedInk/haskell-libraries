@@ -58,14 +58,12 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as ByteString
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Database.Redis
 import qualified Dict
 import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Handler as Handler
 import qualified Redis.Internal as Internal
 import Redis.Script (ScriptParam (..), script)
-import qualified Redis.Script as Script
 import qualified Redis.Settings as Settings
 import qualified Prelude
 
@@ -141,11 +139,7 @@ data Api key a = Api
     -- performed. SETNX is short for "SET if Not eXists".
     --
     -- https://redis.io/commands/setnx
-    setnx :: key -> a -> Internal.Query Bool,
-    -- | Invoke the execution of a server-side Lua script.
-    --
-    -- https://redis.io/commands/eval
-    eval :: Database.Redis.RedisResult a => Script.Script a -> Internal.Query a
+    setnx :: key -> a -> Internal.Query Bool
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
@@ -191,6 +185,5 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setex = \key seconds value -> Internal.Setex (toKey key) seconds (codecEncoder value),
-      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
-      eval = \script' -> Internal.Eval script'
+      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value)
     }

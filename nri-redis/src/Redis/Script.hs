@@ -8,11 +8,9 @@ module Redis.Script
     script,
     -- Internal API
     luaScriptHash,
-    evalString,
     evalShaString,
     scriptLoadString,
     mapKeys,
-    keysTouchedByScript,
     -- For testing
     parser,
     Tokens (..),
@@ -32,7 +30,6 @@ import qualified GHC.TypeLits
 import Language.Haskell.Meta.Parse (parseExp)
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.TH.Quote as QQ
-import qualified Set
 import Text.Megaparsec ((<|>))
 import qualified Text.Megaparsec as P
 import qualified Text.Megaparsec.Char as PC
@@ -242,14 +239,6 @@ parseVariable = do
 -- Helper functions for internal library use
 ---------------------------------------------
 
--- | EVAL script numkeys [key [key ...]] [arg [arg ...]]
-evalString :: Script a -> Text
-evalString Script {luaScript, keys, arguments} =
-  let keyCount = keys |> List.length |> Text.fromInt
-      keys' = keys |> Text.join " "
-      args' = arguments |> Log.unSecret |> List.map (\_ -> "***") |> Text.join " "
-   in "EVAL {{" ++ luaScript ++ "}} " ++ keyCount ++ " " ++ keys' ++ " " ++ args'
-
 -- | EVALSHA hash numkeys [key [key ...]] [arg [arg ...]]
 evalShaString :: Script a -> Text
 evalShaString script'@(Script {keys, arguments}) =
@@ -271,12 +260,6 @@ mapKeys fn script' = do
     |> List.map fn
     |> Task.sequence
     |> Task.map (\keys' -> script' {keys = keys'})
-
--- | Get the keys touched by the script
-keysTouchedByScript :: Script a -> Set.Set Text
-keysTouchedByScript script' =
-  keys script'
-    |> Set.fromList
 
 luaScriptHash :: Script a -> Text
 luaScriptHash Script {luaScript} =

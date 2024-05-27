@@ -174,10 +174,6 @@ doRawQuery query =
       Database.Redis.del (NonEmpty.toList (map toB keys))
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
-    Internal.Eval script ->
-      Database.Redis.eval (toB (Script.luaScript script)) (map toB (Script.keys script)) (map toB (Log.unSecret (Script.arguments script)))
-        |> PreparedQuery
-        |> map Ok
     Internal.Exists key ->
       Database.Redis.exists (toB key)
         |> PreparedQuery
