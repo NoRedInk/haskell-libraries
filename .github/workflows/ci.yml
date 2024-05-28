@@ -1,0 +1,48 @@
+name: Run tests and push shell closures
+on:
+  pull_request:
+    branches:
+      - "trunk"
+  push:
+    branches:
+      - "trunk"
+
+  # We also provide a way to run this manually, if needed.
+  workflow_dispatch:
+
+jobs:
+  ci:
+    strategy:
+      matrix:
+        runner:
+          - os: macos-14 # macos sonoma on m1; 3 vcpu, 7 GB memory
+            base-nixpkgs-channel: nixpkgs-23.11-darwin
+          - os: ubuntu-22.04 # linux x86_64; 4 vcpu, 16 GB memory
+            base-nixpkgs-channel: nixos-23.11
+        ghc:
+          - ghc-8-10
+          - ghc-9-2
+          - ghc-9-4
+    runs-on: ${{ matrix.runner.os }}
+    steps:
+      - name: Install Nix
+        uses: cachix/install-nix-action@v26
+        with:
+          nix_path: nixpkgs=channel:${{ matrix.runner.base-nixpkgs-channel }}
+          extra_nix_config: |
+            extra-substituters = https://nri.cachix.org https://nix-script.cachix.org
+            trusted-public-keys = nri.cachix.org-1:9/BMj3Obc+uio3O5rYGT+egHzkBzDunAzlZZfhCGj6o= nix-script.cachix.org-1:czo3tF6XERpkDdMd6m84XjmgeHQXNeIooSt7b0560+c= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+
+      - name: Install cachix
+        run: nix-env -f '<nixpkgs>' -iA cachix
+
+      - name: Check out repository code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run tests and push shell closures
+        run: cachix watch-exec nri -- nix-shell shell-${{ matrix.ghc }}.nix --run "./run-tests.sh"
+        env:
+          CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_SIGNING_KEY }}
+          PGPORT: "8088"
