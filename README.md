@@ -30,13 +30,13 @@ We use [Ormolu][ormolu] for code formatting.
 
 Documentation comments use the [Haddock][haddock] format to ensure they are rendered correctly on package websites.
 
-### Testing compilation against GHC 8.10
+### Testing compilation
 
-Our default `shell.nix` sets up an environment around GHC version 8.10. CI also runs tests against GHC 9.0. To test using this version locally:
+Our default `shell.nix` sets up an environment around the most recent version of GHC that we support. CI also runs tests against a couple of older versions of GHC. To test using any of these versions locally:
 
 ```sh
-cachix use nri-open-source       # set up cache so the next step goes faster
-nix-shell shell-ghc-9-0.nix
+cachix use nri              # set up cache so the next step goes faster
+nix-shell shell-ghc-X-Y.nix # where X and Y correspond to any of the shells at the root of this repo
 ```
 
 This starts a special shell in which you can run any of the commands above.
