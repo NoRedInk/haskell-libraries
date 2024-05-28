@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -62,15 +61,15 @@ data ScriptParam
 class HasScriptParam a where
   getScriptParam :: a -> ScriptParam
 
-instance HasScriptParam ScriptParam where
+-- | This instance is marked as INCOHERENT so that it will be chosen if possible in the overlapping case
+instance {-# INCOHERENT #-} HasScriptParam ScriptParam where
   getScriptParam = Prelude.id
 
 -- | This instance is used to provide a helpful error message when a user tries to use a type
 -- other than a ScriptParam in a [script|${ ... }|] quasi quote.
 --
--- It is what forces us to have IncoherentInstances and UndecidedInstances enabled.
+-- It is what forces us to hav UndecidableInstances enabled.
 instance
-  {-# OVERLAPPABLE #-}
   GHC.TypeLits.TypeError ('GHC.TypeLits.Text "[script| ${..} ] interpolation only supports Key or Literal inputs.") =>
   HasScriptParam x
   where
