@@ -14,6 +14,7 @@ module Redis.Script
     parser,
     Tokens (..),
     ScriptParam (..),
+    HasScriptParam (..),
     printScript,
   )
 where

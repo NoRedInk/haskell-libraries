@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Spec.Redis.Script (tests) where
 
@@ -116,13 +117,16 @@ thTests =
     Test.test "one key argument" <| \_ ->
       [script|${Key "hi"}|]
         |> printScript
-        |> Expect.equal "Script { luaScript = \"KEYS[1]\", quasiQuotedString = \"${Key \"hi\"}\", keys = [\"hi\"], arguments = [] }"
-        -- We can't test for compile-time errors, but manually test our helpful error message, uncomment
-        -- the lines below:
-        -- Test.test "compilation error" <| \_ ->
-        --   [script|${123}|]
-        --     |> Expect.equal "Doesn't matter, this won't compile"
+        |> Expect.equal "Script { luaScript = \"KEYS[1]\", quasiQuotedString = \"${Key \"hi\"}\", keys = [\"hi\"], arguments = [] }",
+    Test.test "fails on type-checking when not given Key or Literal" <| \_ ->
+      [script|${False}|]
+        |> arguments
+        |> Log.unSecret
+        |> Expect.equal ["this would have been a type-checking error"]
   ]
+
+instance {-# INCOHERENT #-} HasScriptParam Bool where
+  getScriptParam _ = Literal "this would have been a type-checking error"
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f (Left a) = Left (f a)
