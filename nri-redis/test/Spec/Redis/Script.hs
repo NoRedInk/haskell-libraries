@@ -3,6 +3,7 @@
 
 module Spec.Redis.Script (tests) where
 
+import qualified Data.Bifunctor
 import Data.Either (Either (..))
 import qualified Expect
 import Redis.Script
@@ -43,7 +44,7 @@ parserTests =
           ),
     Test.test "ERROR: empty" <| \_ -> do
       P.runParser parser "" ""
-        |> mapLeft P.errorBundlePretty
+        |> Data.Bifunctor.first P.errorBundlePretty
         |> Expect.equal
           ( Left
               "1:1:\n\
@@ -56,7 +57,7 @@ parserTests =
           ),
     Test.test "ERROR: empty variable" <| \_ -> do
       P.runParser parser "" "${}"
-        |> mapLeft P.errorBundlePretty
+        |> Data.Bifunctor.first P.errorBundlePretty
         |> Expect.equal
           ( Left
               "1:3:\n\
@@ -69,7 +70,7 @@ parserTests =
           ),
     Test.test "ERROR: nested ${}" <| \_ -> do
       P.runParser parser "" "asdasd ${ ${ value } }"
-        |> mapLeft P.errorBundlePretty
+        |> Data.Bifunctor.first P.errorBundlePretty
         |> Expect.equal
           ( Left
               "1:11:\n\
@@ -82,7 +83,7 @@ parserTests =
           ),
     Test.test "ERROR: misplaced ${ inside ${}" <| \_ -> do
       P.runParser parser "" "${ v$alue }"
-        |> mapLeft P.errorBundlePretty
+        |> Data.Bifunctor.first P.errorBundlePretty
         |> Expect.equal
           ( Left
               "1:5:\n\
@@ -95,7 +96,7 @@ parserTests =
           ),
     Test.test "ERROR: misplaced { inside ${}" <| \_ -> do
       P.runParser parser "" "${ v{alue }"
-        |> mapLeft P.errorBundlePretty
+        |> Data.Bifunctor.first P.errorBundlePretty
         |> Expect.equal
           ( Left
               "1:5:\n\
@@ -129,7 +130,3 @@ thTests =
 -- proving in real code we would have a type-checking error.
 instance {-# INCOHERENT #-} HasScriptParam Bool where
   getScriptParam _ = Literal "this would have been a type-checking error"
-
-mapLeft :: (a -> c) -> Either a b -> Either c b
-mapLeft f (Left a) = Left (f a)
-mapLeft _ (Right b) = Right b
