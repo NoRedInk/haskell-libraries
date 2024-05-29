@@ -125,6 +125,8 @@ thTests =
         |> Expect.equal ["this would have been a type-checking error"]
   ]
 
+-- This instance is picked when none of the instances in src/Redis/Script.hs work..
+-- proving in real code we would have a type-checking error.
 instance {-# INCOHERENT #-} HasScriptParam Bool where
   getScriptParam _ = Literal "this would have been a type-checking error"
 
