@@ -11,8 +11,8 @@ TracingSpan
             , srcLocFile = "test/ObservabilitySpec.hs"
             , srcLocStartLine = 53
             , srcLocStartCol = 7
-            , srcLocEndLine = 57
-            , srcLocEndCol = 40
+            , srcLocEndLine = 53
+            , srcLocEndCol = 33
             }
         )
   , details = Nothing
@@ -34,8 +34,8 @@ TracingSpan
                     , srcLocFile = "test/ObservabilitySpec.hs"
                     , srcLocStartLine = 35
                     , srcLocStartCol = 11
-                    , srcLocEndLine = 42
-                    , srcLocEndCol = 14
+                    , srcLocEndLine = 35
+                    , srcLocEndCol = 27
                     }
                 )
           , details =
@@ -60,7 +60,7 @@ TracingSpan
                             , srcLocStartLine = 225
                             , srcLocStartCol = 9
                             , srcLocEndLine = 225
-                            , srcLocEndCol = 69
+                            , srcLocEndCol = 24
                             }
                         )
                   , details = Just "{}"
