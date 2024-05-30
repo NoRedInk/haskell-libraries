@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 module Spec.Redis (tests) where
 
 import qualified Control.Concurrent.MVar as MVar
@@ -369,7 +371,52 @@ queryTests redisHandler =
         |> Expect.equal (List.length expectedKeys)
       keySet
         |> Set.toList
-        |> Expect.equal expectedKeys
+        |> Expect.equal expectedKeys,
+    Test.test "eval runs and returns something" <| \() -> do
+      let script = [Redis.script|return 1|]
+      result <- Redis.eval testNS script |> Expect.succeeds
+      Expect.equal result 1,
+    Test.test "eval returns Int" <| \() -> do
+      let script = [Redis.script|return 1|]
+      (result :: Int) <- Redis.eval testNS script |> Expect.succeeds
+      Expect.equal result 1,
+    Test.test "eval returns ()" <| \() -> do
+      let script = [Redis.script|redis.call("ECHO", "hi")|]
+      Redis.eval testNS script |> Expect.succeeds,
+    Test.test "eval returns List Int" <| \() -> do
+      let script = [Redis.script|return {1,2}|]
+      (result :: List Int) <- Redis.eval testNS script |> Expect.succeeds
+      Expect.equal result [1, 2],
+    Test.test "eval with arguments runs and returns something" <| \() -> do
+      let script =
+            [Redis.script|
+      local a = ${Redis.Key "hi"}
+      local b = ${Redis.Literal "hello"}
+      return 1|]
+      result <- Redis.eval testNS script |> Expect.succeeds
+      Expect.equal result 1,
+    Test.test "eval with arguments returns argument" <| \() -> do
+      let script =
+            [Redis.script|
+      local a = ${Redis.Key 2}
+      local b = ${Redis.Literal 3}
+      return b|]
+      result <- Redis.eval testNS script |> Expect.succeeds
+      Expect.equal result 3,
+    Test.test "eval with arguments namespaces key" <| \() -> do
+      let script = [Redis.script|return ${Redis.Key "hi"}|]
+      (result :: Text) <- Redis.eval testNS script |> Expect.succeeds
+      Expect.true
+        ( List.member
+            result
+            -- All tests here run twice:
+            -- - once with the auto-extend-expire handler
+            -- - once with the normal handler
+            -- each run generates a different namespace
+            [ "tests-auto-extend-expire:testNamespace:hi",
+              "tests:testNamespace:hi"
+            ]
+        )
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler

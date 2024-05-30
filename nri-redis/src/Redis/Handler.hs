@@ -18,6 +18,7 @@ import qualified Dict
 import qualified GHC.Stack as Stack
 import qualified Platform
 import qualified Redis.Internal as Internal
+import qualified Redis.Script as Script
 import qualified Redis.Settings as Settings
 import qualified Set
 import qualified Text
@@ -76,6 +77,9 @@ timeoutAfterMilliseconds milliseconds handler' =
           >> Task.timeout milliseconds Internal.TimeoutError,
       Internal.doTransaction =
         Stack.withFrozenCallStack (Internal.doTransaction handler')
+          >> Task.timeout milliseconds Internal.TimeoutError,
+      Internal.doEval =
+        Stack.withFrozenCallStack (Internal.doEval handler')
           >> Task.timeout milliseconds Internal.TimeoutError
     }
 
@@ -94,7 +98,10 @@ defaultExpiryKeysAfterSeconds secs handler' =
               |> Stack.withFrozenCallStack (Internal.doQuery handler'),
           Internal.doTransaction = \query' ->
             wrapWithExpire query'
-              |> Stack.withFrozenCallStack (Internal.doTransaction handler')
+              |> Stack.withFrozenCallStack (Internal.doTransaction handler'),
+          Internal.doEval = \script' ->
+            -- We can't guarantee auto-expire for EVAL, so we just run it as-is
+            Stack.withFrozenCallStack (Internal.doEval handler' script')
         }
 
 acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler' x, Connection)
@@ -131,6 +138,8 @@ acquireHandler namespace settings = do
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Text.fromList err)))
                     )
                   |> Stack.withFrozenCallStack (platformRedis (Internal.cmds query) connection anything),
+          Internal.doEval = \script' ->
+            Stack.withFrozenCallStack (platformRedisScript script' connection anything),
           Internal.namespace = namespace,
           Internal.maxKeySize = Settings.maxKeySize settings
         },
@@ -364,15 +373,7 @@ platformRedis cmds connection anything action =
             Ok a -> a
             Err err -> Err err
       )
-    |> Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
-    |> Exception.handleAny
-      ( \err ->
-          Exception.displayException err
-            |> Text.fromList
-            |> Internal.LibraryError
-            |> Err
-            |> pure
-      )
+    |> handleExceptions
     |> Platform.doAnything anything
     |> Stack.withFrozenCallStack Internal.traceQuery cmds (connectionHost connection) (connectionPort connection)
 
@@ -382,6 +383,71 @@ toResult reply =
     Left (Database.Redis.Error err) -> Err (Internal.RedisError <| Data.Text.Encoding.decodeUtf8 err)
     Left err -> Err (Internal.RedisError ("Redis library got back a value with a type it didn't expect: " ++ Text.fromList (Prelude.show err)))
     Right r -> Ok r
+
+handleExceptions :: IO (Result Internal.Error value) -> IO (Result Internal.Error value)
+handleExceptions =
+  Exception.handle (\(_ :: Database.Redis.ConnectionLostException) -> pure <| Err Internal.ConnectionLost)
+    >> Exception.handleAny
+      ( \err ->
+          Exception.displayException err
+            |> Text.fromList
+            |> Internal.LibraryError
+            |> Err
+            |> pure
+      )
+
+-- | Run a script in Redis trying to leverage the script cache
+platformRedisScript ::
+  (Stack.HasCallStack, Database.Redis.RedisResult a) =>
+  Script.Script a ->
+  Connection ->
+  Platform.DoAnythingHandler ->
+  Task Internal.Error a
+platformRedisScript script connection anything = do
+  -- Try EVALSHA
+  evalsha script connection anything
+    |> Task.onError
+      ( \err ->
+          case err of
+            Internal.RedisError "NOSCRIPT No matching script. Please use EVAL." -> do
+              -- If it fails with NOSCRIPT, load the script and try again
+              loadScript script connection anything
+              evalsha script connection anything
+            _ -> Task.fail err
+      )
+
+evalsha ::
+  (Stack.HasCallStack, Database.Redis.RedisResult a) =>
+  Script.Script a ->
+  Connection ->
+  Platform.DoAnythingHandler ->
+  Task Internal.Error a
+evalsha script connection anything =
+  Database.Redis.evalsha
+    (toB (Script.luaScriptHash script))
+    (map toB (Script.keys script))
+    (map toB (Log.unSecret (Script.arguments script)))
+    |> Database.Redis.runRedis (connectionHedis connection)
+    |> map toResult
+    |> handleExceptions
+    |> Platform.doAnything anything
+    |> Stack.withFrozenCallStack Internal.traceQuery [Script.evalShaString script] (connectionHost connection) (connectionPort connection)
+
+loadScript ::
+  Stack.HasCallStack =>
+  Script.Script a ->
+  Connection ->
+  Platform.DoAnythingHandler ->
+  Task Internal.Error ()
+loadScript script connection anything = do
+  Database.Redis.scriptLoad (toB (Script.luaScript script))
+    |> Database.Redis.runRedis (connectionHedis connection)
+    |> map toResult
+    |> handleExceptions
+    -- The result is the hash, which we already have. No sense in decoding it.
+    |> map (map (\_ -> ()))
+    |> Platform.doAnything anything
+    |> Stack.withFrozenCallStack Internal.traceQuery [Script.scriptLoadString script] (connectionHost connection) (connectionPort connection)
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
