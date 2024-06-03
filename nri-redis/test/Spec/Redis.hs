@@ -400,9 +400,11 @@ queryTests redisHandler =
             [Redis.script|
       local a = ${Redis.Key 2}
       local b = ${Redis.Literal 3}
-      return b|]
+      local c = ${Redis.Literal 4}
+      local d = ${Redis.Literal 5}
+      return {b, c, d}|]
       result <- Redis.eval testNS script |> Expect.succeeds
-      Expect.equal result 3,
+      Expect.equal result [3, 4, 5],
     Test.test "eval with arguments namespaces key" <| \() -> do
       let script = [Redis.script|return ${Redis.Key "hi"}|]
       (result :: Text) <- Redis.eval testNS script |> Expect.succeeds

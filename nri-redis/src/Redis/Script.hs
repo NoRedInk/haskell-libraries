@@ -15,7 +15,6 @@ module Redis.Script
     Tokens (..),
     ScriptParam (..),
     HasScriptParam (..),
-    printScript,
   )
 where
 
@@ -201,8 +200,8 @@ scriptFromEvaluatedTokens quasiQuotedString' evaluatedTokens =
    in Script
         { luaScript = buffer script',
           quasiQuotedString = quasiQuotedString',
-          keys = keyList script',
-          arguments = Log.mkSecret (argList script')
+          keys = List.reverse (keyList script'),
+          arguments = Log.mkSecret (List.reverse (argList script'))
         }
 
 -----------------------------
@@ -275,12 +274,3 @@ toHex bytes =
     |> List.map (Text.Printf.printf "%02x")
     |> List.concat
     |> Text.fromList
-
----------------------------------------------
--- Helper functions for testing
----------------------------------------------
-
-printScript :: Script a -> Text
-printScript Script {luaScript, quasiQuotedString, keys, arguments} =
-  let listStr l = List.map (\s -> "\"" ++ s ++ "\"") l |> Text.join ", "
-   in "Script { luaScript = \"" ++ luaScript ++ "\", quasiQuotedString = \"" ++ quasiQuotedString ++ "\", keys = [" ++ listStr keys ++ "], arguments = [" ++ listStr (Log.unSecret arguments) ++ "] }"
