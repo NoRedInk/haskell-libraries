@@ -200,7 +200,7 @@ scriptFromEvaluatedTokens quasiQuotedString' evaluatedTokens =
    in Script
         { luaScript = buffer script',
           quasiQuotedString = quasiQuotedString',
-          keys = keyList script',
+          keys = List.reverse (keyList script'),
           arguments = Log.mkSecret (List.reverse (argList script'))
         }
 

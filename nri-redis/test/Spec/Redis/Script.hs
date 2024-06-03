@@ -131,6 +131,36 @@ thTests =
                 arguments = Log.mkSecret []
               }
           ),
+    Test.test "one literal argument" <| \_ ->
+      [script|${Literal "hi"}|]
+        |> Expect.equal
+          ( Script
+              { luaScript = "ARGV[1]",
+                quasiQuotedString = "${Literal \"hi\"}",
+                keys = [],
+                arguments = Log.mkSecret ["hi"]
+              }
+          ),
+    Test.test "one key one literal argument" <| \_ ->
+      [script|${Key "a key"} ${Literal "a literal"}|]
+        |> Expect.equal
+          ( Script
+              { luaScript = "KEYS[1] ARGV[1]",
+                quasiQuotedString = "${Key \"a key\"} ${Literal \"a literal\"}",
+                keys = ["a key"],
+                arguments = Log.mkSecret ["a literal"]
+              }
+          ),
+    Test.test "multiple keys and literals" <| \_ ->
+      [script|${Key "key1"} ${Key "key2"} ${Key "key3"} ${Literal "literal1"} ${Literal "literal2"} ${Literal "literal3"}|]
+        |> Expect.equal
+          ( Script
+              { luaScript = "KEYS[1] KEYS[2] KEYS[3] ARGV[1] ARGV[2] ARGV[3]",
+                quasiQuotedString = "${Key \"key1\"} ${Key \"key2\"} ${Key \"key3\"} ${Literal \"literal1\"} ${Literal \"literal2\"} ${Literal \"literal3\"}",
+                keys = ["key1", "key2", "key3"],
+                arguments = Log.mkSecret ["literal1", "literal2", "literal3"]
+              }
+          ),
     Test.test "fails on type-checking when not given Key or Literal" <| \_ ->
       [script|${False}|]
         |> arguments
