@@ -113,12 +113,24 @@ thTests :: List Test.Test
 thTests =
   [ Test.test "just text" <| \_ ->
       [script|some text|]
-        |> printScript
-        |> Expect.equal "Script { luaScript = \"some text\", quasiQuotedString = \"some text\", keys = [], arguments = [] }",
+        |> Expect.equal
+          ( Script
+              { luaScript = "some text",
+                quasiQuotedString = "some text",
+                keys = [],
+                arguments = Log.mkSecret []
+              }
+          ),
     Test.test "one key argument" <| \_ ->
       [script|${Key "hi"}|]
-        |> printScript
-        |> Expect.equal "Script { luaScript = \"KEYS[1]\", quasiQuotedString = \"${Key \"hi\"}\", keys = [\"hi\"], arguments = [] }",
+        |> Expect.equal
+          ( Script
+              { luaScript = "KEYS[1]",
+                quasiQuotedString = "${Key \"hi\"}",
+                keys = ["hi"],
+                arguments = Log.mkSecret []
+              }
+          ),
     Test.test "fails on type-checking when not given Key or Literal" <| \_ ->
       [script|${False}|]
         |> arguments
