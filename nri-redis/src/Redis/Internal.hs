@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
+-- For the RedisResult Text instance
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Redis.Internal
   ( Error (..),
@@ -18,6 +20,7 @@ module Redis.Internal
     sequence,
     query,
     transaction,
+    eval,
     foldWithScan,
     -- internal tools
     traceQuery,
@@ -30,6 +33,7 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
 import qualified GHC.Stack as Stack
@@ -37,6 +41,7 @@ import qualified List
 import qualified Log.RedisCommands as RedisCommands
 import NriPrelude hiding (map, map2, map3)
 import qualified Platform
+import qualified Redis.Script as Script
 import qualified Redis.Settings as Settings
 import qualified Set
 import qualified Text
@@ -225,6 +230,7 @@ data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
 data Handler' (x :: HasAutoExtendExpire) = Handler'
   { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
     doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
+    doEval :: Stack.HasCallStack => forall a. Database.Redis.RedisResult a => Script.Script a -> Task Error a,
     namespace :: Text,
     maxKeySize :: Settings.MaxKeySize
   }
@@ -262,6 +268,11 @@ transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler))
+
+eval :: (Stack.HasCallStack, Database.Redis.RedisResult a) => Handler' x -> Script.Script a -> Task Error a
+eval handler script =
+  Script.mapKeys (\key -> Task.succeed (namespace handler ++ ":" ++ key)) script
+    |> Task.andThen (Stack.withFrozenCallStack (doEval handler))
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
 namespaceQuery prefix query' =
@@ -460,3 +471,23 @@ foldWithScan handler keyMatchPattern approxCountPerBatch processKeyBatch initAcc
           then Task.succeed nextAccumulator
           else go nextAccumulator nextCursor
    in go initAccumulator Database.Redis.cursor0
+
+--------------------------------------
+-- Orphaned instances for RedisResult
+--------------------------------------
+instance Database.Redis.RedisResult Text where
+  decode r = do
+    decodedBs <- Database.Redis.decode r
+    Prelude.pure <| Data.Text.Encoding.decodeUtf8 decodedBs
+
+instance Database.Redis.RedisResult Int where
+  decode r = do
+    (decodedInteger :: Prelude.Integer) <- Database.Redis.decode r
+    Prelude.pure <| Prelude.fromIntegral decodedInteger
+
+instance Database.Redis.RedisResult () where
+  decode r = do
+    (reply :: Database.Redis.Reply) <- Database.Redis.decode r
+    case reply of
+      Database.Redis.Bulk Nothing -> Prelude.pure ()
+      other -> Prelude.Left other

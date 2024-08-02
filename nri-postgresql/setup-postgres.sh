@@ -23,3 +23,7 @@ psql -c "CREATE TABLE test_table2 (enum_array_col test_enum[] NOT NULL)" || true
 
 ## Setup for test/Test.hs
 psql -c "CREATE TABLE constraints_table (user_id int PRIMARY KEY)" || true
+
+## Setup for test/ObservabilitySpec.hs
+createuser -s postgres
+psql -c "GRANT ALL PRIVILEGES ON DATABASE testdb TO postgres;" || true

@@ -48,6 +48,11 @@ module Redis
     Internal.map3,
     Internal.sequence,
     Internal.foldWithScan,
+
+    -- * Lua Scripting
+    script,
+    ScriptParam (..),
+    Internal.eval,
   )
 where
 
@@ -60,6 +65,7 @@ import qualified NonEmptyDict
 import qualified Redis.Codec as Codec
 import qualified Redis.Handler as Handler
 import qualified Redis.Internal as Internal
+import Redis.Script (ScriptParam (..), script)
 import qualified Redis.Settings as Settings
 import qualified Prelude
 
