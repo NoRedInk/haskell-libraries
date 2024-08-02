@@ -1,3 +1,7 @@
+# 0.5.0.0
+
+- Drop support for GHC 8.10.7
+
 # 0.4.0.1
 
 - Regen golden results for GHC 9.2.6 / 8.10.7

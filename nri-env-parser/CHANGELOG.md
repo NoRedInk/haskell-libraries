@@ -1,3 +1,7 @@
+# 0.2.0.0
+
+- Drop support for GHC 8.10.7
+
 # 0.1.0.9
 
 - Support GHC 9.4.7

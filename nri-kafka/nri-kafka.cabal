@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           nri-kafka
-version:        0.1.0.5
+version:        0.2.0.0
 synopsis:       Functions for working with Kafka
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-kafka#readme>.
 category:       Web
@@ -69,13 +69,13 @@ library
   build-depends:
       aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.18
+    , base >=4.16.4.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7
     , hw-kafka-client >=4.0.3 && <5.0
-    , nri-env-parser >=0.1.0.0 && <0.2
-    , nri-observability >=0.1.1.1 && <0.2
+    , nri-env-parser >=0.1.0.0 && <0.3
+    , nri-observability >=0.1.1.1 && <0.3
     , nri-prelude >=0.1.0.0 && <0.7
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6
@@ -113,14 +113,14 @@ executable pause-resume-bug-consumer
   build-depends:
       aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.18
+    , base >=4.16.4.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7
     , hw-kafka-client >=4.0.3 && <5.0
-    , nri-env-parser >=0.1.0.0 && <0.2
+    , nri-env-parser >=0.1.0.0 && <0.3
     , nri-kafka
-    , nri-observability >=0.1.1.1 && <0.2
+    , nri-observability >=0.1.1.1 && <0.3
     , nri-prelude >=0.1.0.0 && <0.7
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6
@@ -162,14 +162,14 @@ executable pause-resume-bug-producer
   build-depends:
       aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.18
+    , base >=4.16.4.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7
     , hw-kafka-client >=4.0.3 && <5.0
-    , nri-env-parser >=0.1.0.0 && <0.2
+    , nri-env-parser >=0.1.0.0 && <0.3
     , nri-kafka
-    , nri-observability >=0.1.1.1 && <0.2
+    , nri-observability >=0.1.1.1 && <0.3
     , nri-prelude >=0.1.0.0 && <0.7
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6
@@ -226,13 +226,13 @@ test-suite tests
   build-depends:
       aeson >=1.4.6.0 && <2.2
     , async >=2.2.2 && <2.3
-    , base >=4.12.0.0 && <4.18
+    , base >=4.16.4.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , conduit >=1.3.0 && <1.4
     , containers >=0.6.0.1 && <0.7
     , hw-kafka-client >=4.0.3 && <5.0
-    , nri-env-parser >=0.1.0.0 && <0.2
-    , nri-observability >=0.1.1.1 && <0.2
+    , nri-env-parser >=0.1.0.0 && <0.3
+    , nri-observability >=0.1.1.1 && <0.3
     , nri-prelude >=0.1.0.0 && <0.7
     , safe-exceptions >=0.1.7.0 && <1.3
     , stm >=2.4 && <2.6
