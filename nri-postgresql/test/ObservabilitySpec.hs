@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module ObservabilitySpec
@@ -44,12 +43,7 @@ tests postgres =
             |> spanForTask
         Debug.toString span
           |> Expect.equalToContentsOf
-#if __GLASGOW_HASKELL__ >= 902
             "test/golden-results/observability-spec-postgres-reporting-ghc-9"
-#else
-            "test/golden-results/observability-spec-postgres-reporting-ghc-8"
-#endif
-
     ]
 
 spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
