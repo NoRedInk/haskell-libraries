@@ -7,7 +7,6 @@ let
   workaround140774 = hpkg:
     with pkgs.haskell.lib;
     overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
-  # It is still necessary to run `hpack --force` into packages home dirs
   haskell-language-server =
     pkgs.haskellPackages.haskell-language-server.override {
       hls-ormolu-plugin = pkgs.haskellPackages.hls-ormolu-plugin.override {
