@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-test-encoding
-version:        0.1.1.5
+version:        0.2.0.0
 synopsis:       A library to simplify writing golden tests for encoding types.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding#readme>.
 category:       Testing
@@ -55,11 +55,11 @@ library
   build-depends:
       aeson >=1.4.6.0 && <2.2
     , aeson-pretty >=0.8.0 && <0.9
-    , base >=4.12.0.0 && <4.18
+    , base >=4.16.4.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , filepath >=1.4.2.1 && <1.5
     , nri-prelude >=0.1.0.0 && <0.7
-    , nri-redis >=0.1.0.0 && <0.2
+    , nri-redis >=0.1.0.0 && <0.3
     , servant >=0.16.2 && <0.20
     , servant-auth-server >=0.4.5.1 && <0.5
     , servant-server >=0.16.2 && <0.20
@@ -96,11 +96,11 @@ test-suite tests
   build-depends:
       aeson >=1.4.6.0 && <2.2
     , aeson-pretty >=0.8.0 && <0.9
-    , base >=4.12.0.0 && <4.18
+    , base >=4.16.4.0 && <4.18
     , bytestring >=0.10.8.2 && <0.12
     , filepath >=1.4.2.1 && <1.5
     , nri-prelude >=0.1.0.0 && <0.7
-    , nri-redis >=0.1.0.0 && <0.2
+    , nri-redis >=0.1.0.0 && <0.3
     , servant >=0.16.2 && <0.20
     , servant-auth-server >=0.4.5.1 && <0.5
     , servant-server >=0.16.2 && <0.20

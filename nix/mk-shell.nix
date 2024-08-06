@@ -2,6 +2,8 @@
 
 # Fix from https://github.com/srid/haskell-template
 let
+  sources = import ./sources.nix { };
+  pkgs-unstable = import sources.nixpkgs-unstable { };
   workaround140774 = hpkg:
     with pkgs.haskell.lib;
     overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
@@ -80,6 +82,6 @@ in pkgs.mkShell {
     pkgs.postgresql # for nri-postgres
     pkgs.redis # for nri-redis
     pkgs.zlib
-    pkgs.zookeeper # for nri-kafka
+    pkgs-unstable.zookeeper # for nri-kafka
   ];
 }
