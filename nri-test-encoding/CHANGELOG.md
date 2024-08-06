@@ -1,3 +1,7 @@
+# 0.2.0.1
+
+- Allow `servant-0.20.x`
+
 # 0.2.0.0
 
 - Drop support for GHC 8.10.7
