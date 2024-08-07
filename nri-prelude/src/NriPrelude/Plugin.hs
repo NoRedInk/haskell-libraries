@@ -27,7 +27,7 @@ import qualified GHC.Hs
 import qualified GHC.Parser.Annotation
 import qualified GHC.Plugins
 
-import NriPrelude.Plugin.GhcVersionDependent (withParsedResult)
+import NriPrelude.Plugin.GhcVersionDependent (setIDeclImplicit, withParsedResult)
 import qualified Set
 import Prelude
 
@@ -105,7 +105,7 @@ addImplicitImports _ _ parsed =
 
     unqualified name =
       GHC.Parser.Annotation.noLocA (GHC.Hs.simpleImportDecl (GHC.Plugins.mkModuleName name))
-        & fmap (\qual -> qual {GHC.Hs.ideclImplicit = True})
+        & fmap (setIDeclImplicit True)
     qualified name =
       fmap (\qual -> qual {GHC.Hs.ideclQualified = GHC.Hs.QualifiedPre}) (unqualified name)
 

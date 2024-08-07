@@ -2,6 +2,7 @@
 
 - Drop support for `aeson-1.x`
 - Allow `servant-0.20.x`
+- Support GHC 9.6.5
 
 # 0.2.0.0
 

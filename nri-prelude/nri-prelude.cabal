@@ -91,7 +91,7 @@ library
     , async >=2.2.2 && <2.3
     , attoparsec >=0.13.0.0 && <0.15
     , auto-update >=0.1.6 && <0.2
-    , base >=4.16.4.0 && <4.18
+    , base >=4.16.4.0 && <4.19
     , bytestring >=0.10.8.2 && <0.12
     , containers >=0.6.0.1 && <0.7
     , directory >=1.3.3.0 && <1.4
@@ -109,7 +109,7 @@ library
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <2.1
     , time >=1.8.0.2 && <2
-    , unix >=2.7.2.2 && <2.8.0.0
+    , unix >=2.7.2.2 && <2.9
     , vector >=0.12.1.2 && <0.14
   default-language: Haskell2010
 
@@ -189,7 +189,7 @@ test-suite tests
     , async >=2.2.2 && <2.3
     , attoparsec >=0.13.0.0 && <0.15
     , auto-update >=0.1.6 && <0.2
-    , base >=4.16.4.0 && <4.18
+    , base >=4.16.4.0 && <4.19
     , bytestring >=0.10.8.2 && <0.12
     , containers >=0.6.0.1 && <0.7
     , directory >=1.3.3.0 && <1.4
@@ -207,6 +207,6 @@ test-suite tests
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <2.1
     , time >=1.8.0.2 && <2
-    , unix >=2.7.2.2 && <2.8.0.0
+    , unix >=2.7.2.2 && <2.9
     , vector >=0.12.1.2 && <0.14
   default-language: Haskell2010
