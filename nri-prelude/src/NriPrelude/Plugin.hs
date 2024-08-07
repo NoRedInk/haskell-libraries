@@ -18,7 +18,7 @@ where
 -- Useful documentation
 -- - Elm's default imports: https://package.elm-lang.org/packages/elm/core/latest/
 -- - GHC user guide on compiler plugins: https://ghc.gitlab.haskell.org/ghc/doc/users_guide/extending_ghc.html#compiler-plugins
--- - Module providing API for creating plugins: https://www.stackage.org/haddock/lts-17.4/ghc-lib-8.10.4.20210206/GHC.Plugins.html
+-- - Module providing API for creating plugins: https://hackage.haskell.org/package/ghc-lib-9.6.5.20240423/docs/GHC-Plugins.html
 
 import Data.Function ((&))
 import qualified Data.List
