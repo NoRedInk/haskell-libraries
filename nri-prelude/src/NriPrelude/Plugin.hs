@@ -18,32 +18,16 @@ where
 -- Useful documentation
 -- - Elm's default imports: https://package.elm-lang.org/packages/elm/core/latest/
 -- - GHC user guide on compiler plugins: https://ghc.gitlab.haskell.org/ghc/doc/users_guide/extending_ghc.html#compiler-plugins
--- - Module providing API for creating plugins: https://www.stackage.org/haddock/lts-17.4/ghc-lib-8.10.4.20210206/GhcPlugins.html
+-- - Module providing API for creating plugins: https://www.stackage.org/haddock/lts-17.4/ghc-lib-8.10.4.20210206/GHC.Plugins.html
 
 import Data.Function ((&))
 import qualified Data.List
 
-#if __GLASGOW_HASKELL__ >= 900
-import qualified GHC.Plugins as GhcPlugins
-#if __GLASGOW_HASKELL__ >= 902
-import qualified GHC.Hs as GhcPlugins (HsParsedModule (..))
-#endif
-#else
-import qualified GhcPlugins
-#endif
+import qualified GHC.Hs
+import qualified GHC.Parser.Annotation
+import qualified GHC.Plugins
 
-import NriPrelude.Plugin.GhcVersionDependent
-  ( hsmodImports,
-    hsmodName,
-    ideclImplicit,
-    ideclName,
-    ideclQualified,
-    isQualified,
-    mkQualified,
-    noLoc,
-    simpleImportDecl,
-    withParsedResult
-  )
+import NriPrelude.Plugin.GhcVersionDependent (withParsedResult)
 import qualified Set
 import Prelude
 
@@ -54,36 +38,36 @@ import Prelude
 -- then add the follwing ghc option to your cabal or package yaml file:
 --
 -- > -fplugin=NriPrelude.Plugin
-plugin :: GhcPlugins.Plugin
+plugin :: GHC.Plugins.Plugin
 plugin =
-  GhcPlugins.defaultPlugin
-    { GhcPlugins.parsedResultAction = addImplicitImports,
+  GHC.Plugins.defaultPlugin
+    { GHC.Plugins.parsedResultAction = addImplicitImports,
       -- Let GHC know this plugin doesn't perform arbitrary IO. Given the same
       -- input file it will make the same changes. Without this GHC will
       -- recompile modules using this plugin every time which is expensive.
-      GhcPlugins.pluginRecompile = GhcPlugins.purePlugin
+      GHC.Plugins.pluginRecompile = GHC.Plugins.purePlugin
     }
 
 addImplicitImports ::
-  [GhcPlugins.CommandLineOption] ->
-  GhcPlugins.ModSummary ->
+  [GHC.Plugins.CommandLineOption] ->
+  GHC.Plugins.ModSummary ->
 #if __GLASGOW_HASKELL__ >= 904
-  GhcPlugins.ParsedResult ->
-  GhcPlugins.Hsc GhcPlugins.ParsedResult
+  GHC.Plugins.ParsedResult ->
+  GHC.Plugins.Hsc GHC.Plugins.ParsedResult
 #else
-  GhcPlugins.HsParsedModule ->
-  GhcPlugins.Hsc GhcPlugins.HsParsedModule
+  GHC.Hs.HsParsedModule ->
+  GHC.Plugins.Hsc GHC.Hs.HsParsedModule
 #endif
 addImplicitImports _ _ parsed =
   Prelude.pure $
     withParsedResult parsed $ \parsed' ->
       parsed'
-        { GhcPlugins.hpm_module =
-            fmap addImportsWhenNotPath (GhcPlugins.hpm_module parsed')
+        { GHC.Hs.hpm_module =
+            fmap addImportsWhenNotPath (GHC.Hs.hpm_module parsed')
         }
   where
     addImportsWhenNotPath hsModule =
-      case fmap unLocate (hsmodName hsModule) of
+      case fmap unLocate (GHC.Hs.hsmodName hsModule) of
         Nothing -> addImports hsModule
         Just modName ->
           if Data.List.isPrefixOf "Paths_" modName
@@ -92,10 +76,10 @@ addImplicitImports _ _ parsed =
 
     addImports hsModule =
       hsModule
-        { hsmodImports =
+        { GHC.Hs.hsmodImports =
             -- Add default Elm-like imports when the user hasn't imported them
             -- explicitly yet, in order to avoid duplicate import warnings.
-            hsmodImports hsModule
+            GHC.Hs.hsmodImports hsModule
               ++ ( Set.diff extraImports (existingImports hsModule)
                      & Set.toList
                      & fmap
@@ -108,22 +92,32 @@ addImplicitImports _ _ parsed =
         }
 
     existingImports hsModule =
-      hsmodImports hsModule
+      GHC.Hs.hsmodImports hsModule
         & fmap
-          ( \(GhcPlugins.L _ imp) ->
-              case (isQualified imp, unLocate (ideclName imp)) of
+          ( \(GHC.Plugins.L _ imp) ->
+              case (isQualified imp, unLocate (GHC.Hs.ideclName imp)) of
                 (True, name) -> Qualified name
                 (False, name) -> Unqualified name
           )
         & Set.fromList
 
-    unLocate (GhcPlugins.L _ x) = GhcPlugins.moduleNameString x
+    unLocate (GHC.Plugins.L _ x) = GHC.Plugins.moduleNameString x
 
     unqualified name =
-      noLoc (simpleImportDecl (GhcPlugins.mkModuleName name))
-        & fmap (\qual -> qual {ideclImplicit = True})
+      GHC.Parser.Annotation.noLocA (GHC.Hs.simpleImportDecl (GHC.Plugins.mkModuleName name))
+        & fmap (\qual -> qual {GHC.Hs.ideclImplicit = True})
     qualified name =
-      fmap (\qual -> qual {ideclQualified = mkQualified}) (unqualified name)
+      fmap (\qual -> qual {GHC.Hs.ideclQualified = GHC.Hs.QualifiedPre}) (unqualified name)
+
+-- There's more than one way to do a qualified import. See:
+-- https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/import_qualified_post.html
+
+isQualified :: GHC.Hs.ImportDecl pass -> Bool
+isQualified imp =
+  case GHC.Hs.ideclQualified imp of
+    GHC.Hs.QualifiedPre -> True
+    GHC.Hs.QualifiedPost -> True
+    GHC.Hs.NotQualified -> False
 
 data Import
   = Unqualified String
