@@ -5,7 +5,6 @@ import Data.Proxy
 import Examples
 import qualified Redis
 import Servant
-import Servant.API.Generic ((:-))
 import qualified Test
 import qualified Test.Encoding.Redis
 import qualified Test.Encoding.Routes

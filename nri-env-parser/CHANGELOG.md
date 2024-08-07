@@ -1,3 +1,8 @@
+# 0.2.0.1
+
+- Drop support for `aeson-1.x`
+- Support GHC 9.6.5
+
 # 0.2.0.0
 
 - Drop support for GHC 8.10.7

@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- | Provides a functionality for generating a bridge between a Haskell type and a Postgres enum type using Template Haskell.
@@ -255,18 +254,13 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
   --   Labeled -> "labeled"
   --   Blank -> "blank"
 
-#if __GLASGOW_HASKELL__ >= 902
-  let conP conName = TH.ConP conName [] []
-#else
-  let conP conName = TH.ConP conName []
-#endif
   let hsToPg =
         TH.CaseE
           (TH.VarE varX)
           ( mapping
               |> List.map
                 ( \(conName, pgValue) ->
-                    TH.Match (conP conName) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) []
+                    TH.Match (TH.ConP conName [] []) (TH.NormalB <| TH.LitE <| TH.StringL <| Text.toList pgValue) []
                 )
           )
 

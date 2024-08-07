@@ -7,7 +7,6 @@ module Main
   )
 where
 
-import AesonHelpers (hashMapFromObject, textFromKey)
 import qualified Brick
 import qualified Brick.BChan
 import Brick.Types (ViewportType (..))
@@ -21,6 +20,8 @@ import qualified Control.Exception.Safe as Exception
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty
+import Data.Aeson.Key (toText)
+import Data.Aeson.KeyMap (toHashMap)
 import qualified Data.ByteString as ByteString
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text
@@ -1065,11 +1066,11 @@ viewSpanDetails Span {original} =
                     |> Data.Text.Lazy.toStrict
                 )
             Just (Aeson.Object object) ->
-              HashMap.toList (hashMapFromObject object)
+              HashMap.toList (toHashMap object)
                 |> List.map
                   ( \(name, val) ->
                       viewDetail
-                        (textFromKey name)
+                        (toText name)
                         ( case Aeson.toJSON val of
                             Aeson.Null -> "Null"
                             Aeson.String str -> str

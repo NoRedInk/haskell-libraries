@@ -1,6 +1,6 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -53,7 +53,6 @@ library
       Text
       Tuple
   other-modules:
-      Internal.AesonHelpers
       Internal.IO
       Internal.Shortcut
       Internal.Terminal
@@ -92,14 +91,14 @@ library
     , async >=2.2.2 && <2.3
     , attoparsec >=0.13.0.0 && <0.15
     , auto-update >=0.1.6 && <0.2
-    , base >=4.16.4.0 && <4.18
+    , base >=4.16.4.0 && <4.19
     , bytestring >=0.10.8.2 && <0.12
     , containers >=0.6.0.1 && <0.7
     , directory >=1.3.3.0 && <1.4
     , exceptions >=0.10.4 && <0.11
     , filepath >=1.4.2.1 && <1.5
     , ghc >=8.6.1 && <9.8
-    , hedgehog >=1.0.2 && <1.3
+    , hedgehog >=1.0.2 && <1.5
     , junit-xml >=0.1.0.0 && <0.2.0.0
     , lens >=4.16.1 && <5.3
     , pretty-diff >=0.4.0.2 && <0.5
@@ -110,7 +109,7 @@ library
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <2.1
     , time >=1.8.0.2 && <2
-    , unix >=2.7.2.2 && <2.8.0.0
+    , unix >=2.7.2.2 && <2.9
     , vector >=0.12.1.2 && <0.14
   default-language: Haskell2010
 
@@ -137,7 +136,6 @@ test-suite tests
       Dict
       Expect
       Fuzz
-      Internal.AesonHelpers
       Internal.IO
       Internal.Shortcut
       Internal.Terminal
@@ -191,14 +189,14 @@ test-suite tests
     , async >=2.2.2 && <2.3
     , attoparsec >=0.13.0.0 && <0.15
     , auto-update >=0.1.6 && <0.2
-    , base >=4.16.4.0 && <4.18
+    , base >=4.16.4.0 && <4.19
     , bytestring >=0.10.8.2 && <0.12
     , containers >=0.6.0.1 && <0.7
     , directory >=1.3.3.0 && <1.4
     , exceptions >=0.10.4 && <0.11
     , filepath >=1.4.2.1 && <1.5
     , ghc >=8.6.1 && <9.8
-    , hedgehog >=1.0.2 && <1.3
+    , hedgehog >=1.0.2 && <1.5
     , junit-xml >=0.1.0.0 && <0.2.0.0
     , lens >=4.16.1 && <5.3
     , pretty-diff >=0.4.0.2 && <0.5
@@ -209,6 +207,6 @@ test-suite tests
     , terminal-size >=0.3.2.1 && <0.4
     , text >=1.2.3.1 && <2.1
     , time >=1.8.0.2 && <2
-    , unix >=2.7.2.2 && <2.8.0.0
+    , unix >=2.7.2.2 && <2.9
     , vector >=0.12.1.2 && <0.14
   default-language: Haskell2010

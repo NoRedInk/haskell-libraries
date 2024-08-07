@@ -1,11 +1,11 @@
 cabal-version: 1.18
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
 name:           nri-test-encoding
-version:        0.2.0.0
+version:        0.2.0.1
 synopsis:       A library to simplify writing golden tests for encoding types.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-test-encoding#readme>.
 category:       Testing
@@ -53,16 +53,16 @@ library
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
-      aeson >=1.4.6.0 && <2.2
+      aeson >=2.0 && <2.2
     , aeson-pretty >=0.8.0 && <0.9
-    , base >=4.16.4.0 && <4.18
+    , base >=4.16.4.0 && <4.19
     , bytestring >=0.10.8.2 && <0.12
     , filepath >=1.4.2.1 && <1.5
     , nri-prelude >=0.1.0.0 && <0.7
     , nri-redis >=0.1.0.0 && <0.3
-    , servant >=0.16.2 && <0.20
+    , servant >=0.16.2 && <0.21
     , servant-auth-server >=0.4.5.1 && <0.5
-    , servant-server >=0.16.2 && <0.20
+    , servant-server >=0.16.2 && <0.21
     , text >=1.2.3.1 && <2.1
   default-language: Haskell2010
 
@@ -94,15 +94,15 @@ test-suite tests
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
-      aeson >=1.4.6.0 && <2.2
+      aeson >=2.0 && <2.2
     , aeson-pretty >=0.8.0 && <0.9
-    , base >=4.16.4.0 && <4.18
+    , base >=4.16.4.0 && <4.19
     , bytestring >=0.10.8.2 && <0.12
     , filepath >=1.4.2.1 && <1.5
     , nri-prelude >=0.1.0.0 && <0.7
     , nri-redis >=0.1.0.0 && <0.3
-    , servant >=0.16.2 && <0.20
+    , servant >=0.16.2 && <0.21
     , servant-auth-server >=0.4.5.1 && <0.5
-    , servant-server >=0.16.2 && <0.20
+    , servant-server >=0.16.2 && <0.21
     , text >=1.2.3.1 && <2.1
   default-language: Haskell2010

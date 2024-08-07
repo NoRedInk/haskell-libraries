@@ -22,6 +22,7 @@ jobs:
         ghc:
           - ghc-9-2
           - ghc-9-4
+          - ghc-9-6
     runs-on: ${{ matrix.runner.os }}
     steps:
       - name: Install Nix

@@ -7,6 +7,8 @@ module Reporter.Bugsnag.Internal where
 import qualified Control.Exception.Safe as Exception
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List
 import qualified Data.Proxy as Proxy
@@ -374,14 +376,14 @@ renderLog event details =
     { Bugsnag.event_metaData =
         Aeson.toJSON details
           |> AesonHelpers.singleton "custom"
-          |> AesonHelpers.mergeObjects
+          |> KeyMap.unionWith
             mergeJson
-            (Bugsnag.event_metaData event |> Maybe.withDefault AesonHelpers.emptyObject)
+            (Bugsnag.event_metaData event |> Maybe.withDefault KeyMap.empty)
           |> Just
     }
 
 mergeJson :: Aeson.Value -> Aeson.Value -> Aeson.Value
-mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (AesonHelpers.mergeObjects mergeJson x y)
+mergeJson (Aeson.Object x) (Aeson.Object y) = Aeson.Object (KeyMap.unionWith mergeJson x y)
 mergeJson _ last = last
 
 mergeMetaData ::
@@ -390,7 +392,7 @@ mergeMetaData ::
   Maybe Aeson.Object
 mergeMetaData Nothing x = x
 mergeMetaData x Nothing = x
-mergeMetaData (Just x) (Just y) = Just (AesonHelpers.mergeObjects mergeJson x y)
+mergeMetaData (Just x) (Just y) = Just (KeyMap.unionWith mergeJson x y)
 
 renderIncomingHttpRequest ::
   Bugsnag.Event ->
@@ -415,11 +417,11 @@ renderIncomingHttpRequest event (HttpRequest.Incoming request) =
       Bugsnag.event_metaData =
         mergeMetaData
           (Bugsnag.event_metaData event)
-          ( [ AesonHelpers.keyFromText "endpoint" .= HttpRequest.endpoint request,
-              AesonHelpers.keyFromText "http version" .= HttpRequest.httpVersion request,
-              AesonHelpers.keyFromText "response status" .= HttpRequest.status request,
-              AesonHelpers.keyFromText "path" .= HttpRequest.path request,
-              AesonHelpers.keyFromText "query string" .= HttpRequest.queryString request
+          ( [ Key.fromText "endpoint" .= HttpRequest.endpoint request,
+              Key.fromText "http version" .= HttpRequest.httpVersion request,
+              Key.fromText "response status" .= HttpRequest.status request,
+              Key.fromText "path" .= HttpRequest.path request,
+              Key.fromText "query string" .= HttpRequest.queryString request
             ]
               |> Aeson.object
               |> AesonHelpers.singleton "request"
