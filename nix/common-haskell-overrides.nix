@@ -20,20 +20,9 @@ self: super:
     # jailbreak to allow text >= 2
     pretty-diff = pkgs.haskell.lib.doJailbreak super.pretty-diff;
 
-    # servant-auth-server 0.4.8.0 is marked as broken in nixpkgs, so jailbreak
-    # (known good) 0.4.7.0 to make it work
-    servant-auth-server = pkgs.haskell.lib.doJailbreak
-      (self.callHackage "servant-auth-server" "0.4.7.0" { });
-
-    # required by servant-auth-server@0.4.7.0
-    jose = pkgs.haskell.lib.dontCheck (self.callHackage "jose" "0.9" { });
-    jose-jwt = self.callHackage "jose-jwt" "0.9.5" { };
-
-    # servant-auth@0.4.1.0 is known-good but now complains re: jose version
-    # (now needs >= 0.10 but we've already used it successfully with 0.9).  we
-    # can bypass this issue with a jailbreak
-    servant-auth = pkgs.haskell.lib.doJailbreak (self.callHackage "servant-auth" "0.4.1.0" { });
-
+    # servant-auth-server 0.4.8.0 is marked as broken in nixpkgs but it should be fine
+    servant-auth-server = pkgs.haskell.lib.markUnbroken super.servant-auth-server;
+  
     # for now, pin hw-kafka-client to 4.0.3; nixpkgs@release-24.05 provides 5.3.0
     hw-kafka-client = self.callHackage "hw-kafka-client" "4.0.3" { };
   }
