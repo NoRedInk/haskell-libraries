@@ -29,7 +29,6 @@ source-repository head
 executable log-explorer
   main-is: Main.hs
   other-modules:
-      AesonHelpers
       Filterable
       Paths_nri_log_explorer
   hs-source-dirs:
@@ -50,7 +49,7 @@ executable log-explorer
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -threaded -rtsopts "-with-rtsopts=-N -T -xq10m" -O2 -fplugin=NriPrelude.Plugin
   build-depends:
-      aeson >=1.4.6.0 && <2.2
+      aeson >=2.0 && <2.2
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , base >=4.16.4.0 && <4.18

@@ -53,7 +53,6 @@ library
       Text
       Tuple
   other-modules:
-      Internal.AesonHelpers
       Internal.IO
       Internal.Shortcut
       Internal.Terminal
@@ -137,7 +136,6 @@ test-suite tests
       Dict
       Expect
       Fuzz
-      Internal.AesonHelpers
       Internal.IO
       Internal.Shortcut
       Internal.Terminal

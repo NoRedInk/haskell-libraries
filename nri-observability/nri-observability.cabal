@@ -65,7 +65,7 @@ library
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
-      aeson >=1.4.6.0 && <2.2
+      aeson >=2.0 && <2.2
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , base >=4.16.4.0 && <4.18
@@ -134,7 +134,7 @@ test-suite tests
       ExtendedDefaultRules
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
-      aeson >=1.4.6.0 && <2.2
+      aeson >=2.0 && <2.2
     , aeson-pretty >=0.8.0 && <0.9
     , async >=2.2.2 && <2.3
     , base >=4.16.4.0 && <4.18
