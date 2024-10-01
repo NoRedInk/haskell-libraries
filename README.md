@@ -1,5 +1,7 @@
 # NoRedInk/haskell-libraries
 
+Testing out continous integration flow.
+
 A monorepo of our opensourced Haskell libraries.
 
 For those interested in learning more about our reasons for developing these libraries, we invite you to check out our blog post titled "Haskell for the Elm Enthusiast" available at https://blog.noredink.com/post/658510851000713216/haskell-for-the-elm-enthusiast. This post provides insights into the motivations behind our efforts.
