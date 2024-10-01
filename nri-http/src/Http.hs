@@ -218,8 +218,7 @@ _request doAnythingHandler manager settings = do
                   HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.bodyContents (Internal.body settings),
                   HTTP.responseTimeout =
                     Internal.timeout settings
-                      |> Maybe.withDefault (30 * 1000)
-                      |> (*) 1000
+                      |> Maybe.withDefault (30 * 1000 * 1000)
                       |> fromIntegral
                       |> HTTP.responseTimeoutMicro
                 }
