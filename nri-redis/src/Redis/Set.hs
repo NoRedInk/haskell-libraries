@@ -29,6 +29,7 @@ module Redis.Set
     sadd,
     scard,
     srem,
+    sismember,
     smembers,
 
     -- * Running Redis queries
@@ -103,7 +104,11 @@ data Api key a = Api
     -- | Returns all the members of the set value stored at key.
     --
     -- https://redis.io/commands/smembers
-    smembers :: key -> Internal.Query (Set.Set a)
+    smembers :: key -> Internal.Query (Set.Set a),
+    -- | Returns if member is a member of the set stored at key.
+    --
+    -- https://redis.io/docs/latest/commands/sismember/
+    sismember :: key -> a -> Internal.Query Bool
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
@@ -148,5 +153,8 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       smembers = \key ->
         Internal.Smembers (toKey key)
           |> Internal.WithResult (Prelude.traverse codecDecoder)
-          |> Internal.map Set.fromList
+          |> Internal.map Set.fromList,
+    sismember = \key val->
+            Internal.Sismember (toKey key) (codecEncoder val)
+
     }
