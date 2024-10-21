@@ -16,9 +16,9 @@ jobs:
       matrix:
         runner:
           - os: macos-14 # macos sonoma on m1; 3 vcpu, 7 GB memory
-            base-nixpkgs-channel: nixpkgs-23.11-darwin
+            base-nixpkgs-channel: nixpkgs-24.05-darwin
           - os: ubuntu-22.04 # linux x86_64; 4 vcpu, 16 GB memory
-            base-nixpkgs-channel: nixos-23.11
+            base-nixpkgs-channel: nixos-24.05
         ghc:
           - ghc-9-2
           - ghc-9-4
