@@ -10,22 +10,21 @@ popd
 ## block us, if it happens to be enabled. This is an instance for testing only.
 mkdir -p ./_build/redis/data
 redis-server --daemonize yes \
-  --dir ./_build/redis/data \
-  --save '' \
-  --stop-writes-on-bgsave-error no
+    --dir ./_build/redis/data \
+    --save '' \
+    --stop-writes-on-bgsave-error no
 
-## start zookeeper (for kafka) 
+## start zookeeper (for kafka)
 mkdir -p /tmp/zookeeper /tmp/zookeeper-logs
-ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs  zkServer.sh stop zoo_sample.cfg
+ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs zkServer.sh stop zoo_sample.cfg
 rm -rf /tmp/zookeeper/* /tmp/zookeeper-logs/*
 ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs zkServer.sh start zoo_sample.cfg
 
 ## wait for zookeeper
 echo "waiting for zookeeper to start"
-until nc -vz localhost 2181
-do
-  sleep 1
-done 
+until nc -vz localhost 2181; do
+    sleep 1
+done
 echo "zookeeper available"
 
 ## start kafka
@@ -36,16 +35,17 @@ kafka-server-start.sh -daemon "$server_properties_path" --override num.partition
 
 ## wait for kafka
 echo "waiting for kafka to start"
-until  nc -vz localhost 9092
-do
-  sleep 1
+until nc -vz localhost 9092; do
+    sleep 1
 done
 echo "kafka available"
-
 
 cabal build --offline all
 cabal test --offline all
 
 # cleanup
 kafka-server-stop.sh
-ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs  zkServer.sh stop zoo_sample.cfg
+ZOOPIDFILE=/tmp/zookeeper-logs/pid ZOO_LOG_DIR=/tmp/zookeeper-logs zkServer.sh stop zoo_sample.cfg
+pushd nri-postgresql
+source cleanup-postgres.sh
+popd

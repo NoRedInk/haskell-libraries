@@ -16,17 +16,15 @@ jobs:
       matrix:
         runner:
           - os: macos-14 # macos sonoma on m1; 3 vcpu, 7 GB memory
-            base-nixpkgs-channel: nixpkgs-23.11-darwin
+            base-nixpkgs-channel: nixpkgs-24.05-darwin
           - os: ubuntu-22.04 # linux x86_64; 4 vcpu, 16 GB memory
-            base-nixpkgs-channel: nixos-23.11
+            base-nixpkgs-channel: nixos-24.05
         ghc:
-          - ghc-9-2
-          - ghc-9-4
           - ghc-9-6
     runs-on: ${{ matrix.runner.os }}
     steps:
       - name: Install Nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@v30
         with:
           nix_path: nixpkgs=channel:${{ matrix.runner.base-nixpkgs-channel }}
           extra_nix_config: |
@@ -37,7 +35,7 @@ jobs:
         run: nix-env -f '<nixpkgs>' -iA cachix
 
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 

@@ -32,7 +32,7 @@ Documentation comments use the [Haddock][haddock] format to ensure they are rend
 
 ### Testing compilation
 
-Our default `shell.nix` sets up an environment around the most recent version of GHC that we support. CI also runs tests against a couple of older versions of GHC. To test using any of these versions locally:
+Our default `shell.nix` sets up an environment around the most recent version of GHC that we support. CI used to support running tests against a different versions of GHC. To test using any of these versions locally:
 
 ```sh
 cachix use nri              # set up cache so the next step goes faster
