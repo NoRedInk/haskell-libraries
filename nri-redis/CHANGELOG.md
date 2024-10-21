@@ -1,3 +1,6 @@
+# 0.2.0.2
+- Adds `sismember`
+
 # 0.2.0.1
 
 - Drop support for `aeson-1.x`

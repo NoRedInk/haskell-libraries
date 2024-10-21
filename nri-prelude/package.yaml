@@ -5,7 +5,7 @@ homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-prelude#r
 author: NoRedInk
 version: 0.6.1.2
 maintainer: haskell-open-source@noredink.com
-copyright: 2023 NoRedInk Corp.
+copyright: 2024 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/nri-prelude
 license-file: LICENSE
 category: Web

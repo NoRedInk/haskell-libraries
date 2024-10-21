@@ -13,7 +13,7 @@ homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-red
 bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
 author:         NoRedInk
 maintainer:     haskell-open-source@noredink.com
-copyright:      2023 NoRedInk Corp.
+copyright:      2024 NoRedInk Corp.
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
