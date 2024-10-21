@@ -26,7 +26,7 @@ jobs:
     runs-on: ${{ matrix.runner.os }}
     steps:
       - name: Install Nix
-        uses: cachix/install-nix-action@v26
+        uses: cachix/install-nix-action@v30
         with:
           nix_path: nixpkgs=channel:${{ matrix.runner.base-nixpkgs-channel }}
           extra_nix_config: |
@@ -37,7 +37,7 @@ jobs:
         run: nix-env -f '<nixpkgs>' -iA cachix
 
       - name: Check out repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
