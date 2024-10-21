@@ -305,6 +305,10 @@ doRawQuery query =
       Database.Redis.srem (toB key) (NonEmpty.toList vals)
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
+    Internal.Sismember key val ->
+            Database.Redis.sismember (toB key) val
+            |> PreparedQuery
+            |> map Ok
     Internal.Smembers key ->
       Database.Redis.smembers (toB key)
         |> PreparedQuery

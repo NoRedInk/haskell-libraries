@@ -111,6 +111,7 @@ cmds query'' =
     Sadd key vals -> [unwords ("SADD" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
     Scard key -> [unwords ["SCARD", key]]
     Srem key vals -> [unwords ("SREM" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
+    Sismember key _ -> [unwords ["SISMEMBER", key , "*****"]]
     Smembers key -> [unwords ["SMEMBERS", key]]
     Zadd key vals -> [unwords ("ZADD" : key : List.concatMap (\(_, val) -> ["*****", Text.fromFloat val]) (Dict.toList vals))]
     Zrange key start stop -> [unwords ["ZRANGE", key, Text.fromInt start, Text.fromInt stop]]
@@ -167,6 +168,7 @@ data Query a where
   Sadd :: Text -> NonEmpty ByteString -> Query Int
   Scard :: Text -> Query Int
   Srem :: Text -> NonEmpty ByteString -> Query Int
+  Sismember :: Text -> ByteString -> Query Bool
   Smembers :: Text -> Query (List ByteString)
   Zadd :: Text -> Dict.Dict ByteString Float -> Query Int
   Zrange :: Text -> Int -> Int -> Query [ByteString]
@@ -312,6 +314,7 @@ mapKeys fn query' =
     Sadd key vals -> Task.map (\newKey -> Sadd newKey vals) (fn key)
     Scard key -> Task.map Scard (fn key)
     Srem key vals -> Task.map (\newKey -> Srem newKey vals) (fn key)
+    Sismember key val -> Task.map (\newKey -> Sismember newKey val) (fn key)
     Smembers key -> Task.map Smembers (fn key)
     Zadd key vals -> Task.map (\newKey -> Zadd newKey vals) (fn key)
     Zrange key start stop -> Task.map (\newKey -> Zrange newKey start stop) (fn key)
@@ -354,6 +357,7 @@ mapReturnedKeys fn query' =
     Sadd key vals -> Sadd key vals
     Scard key -> Scard key
     Srem key vals -> Srem key vals
+    Sismember key val -> Sismember key val
     Smembers key -> Smembers key
     Zadd key vals -> Zadd key vals
     Zrange key start stop -> Zrange key start stop
@@ -411,6 +415,7 @@ keysTouchedByQuery query' =
     Sadd key _ -> Set.singleton key
     Scard key -> Set.singleton key
     Srem key _ -> Set.singleton key
+    Sismember key _ -> Set.singleton key
     Smembers key -> Set.singleton key
     Zadd key _ -> Set.singleton key
     Zrange key _ _ -> Set.singleton key
