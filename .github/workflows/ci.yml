@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - "trunk"
+  merge_group:
 
   # We also provide a way to run this manually, if needed.
   workflow_dispatch:
