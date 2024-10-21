@@ -5,7 +5,7 @@ homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-log-explo
 author: NoRedInk
 version: 0.2.0.1
 maintainer: haskell-open-source@noredink.com
-copyright: 2023 NoRedInk Corp.
+copyright: 2024 NoRedInk Corp.
 github: NoRedInk/haskell-libraries
 license-file: LICENSE
 category: Web
