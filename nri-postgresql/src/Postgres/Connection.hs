@@ -53,12 +53,15 @@ connectionIO settings = do
   doAnything <- Platform.doAnythingHandler
   pool <-
     map Pool
-      <| Data.Pool.createPool
-        (pgConnect database `Exception.catch` handleError (toConnectionString database))
-        pgDisconnect
-        stripes
-        maxIdleTime
-        size
+      <| Data.Pool.newPool
+        ( Data.Pool.defaultPoolConfig
+            (pgConnect database `Exception.catch` handleError (toConnectionString database))
+            pgDisconnect
+            (Prelude.realToFrac maxIdleTime)
+            (stripes * size)
+            |> Data.Pool.setNumStripes (Just stripes)
+        )
+
   Prelude.pure
     ( Connection
         doAnything
