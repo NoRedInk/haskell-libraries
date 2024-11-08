@@ -22,6 +22,7 @@ module Fuzz
     result,
     list,
     array,
+    shuffle,
 
     -- * Working with Fuzzers
     Fuzzer,
@@ -132,6 +133,12 @@ array :: Fuzzer a -> Fuzzer (Array.Array a)
 array itemFuzzer =
   list itemFuzzer
     |> map Array.fromList
+
+-- | Given a list of a type, create a fuzzer of random permutation of that list.
+shuffle :: List a -> Fuzzer (List a)
+shuffle list =
+  Gen.shuffle list
+    |> Fuzzer
 
 -- | Choose one of the given fuzzers at random. Each fuzzer has an equal chance
 -- of being chosen; to customize the probabilities, use 'frequency'.
