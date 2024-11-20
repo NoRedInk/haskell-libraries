@@ -1,3 +1,7 @@
+# 0.5.0.2
+
+- Loosen types for `Http.Mock` helpers to allow for arbitrary error types
+
 # 0.5.0.1
 
 - Drop support for `aeson-1.x`
