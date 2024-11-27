@@ -20,5 +20,32 @@ TracingSpan
   , succeeded = Succeeded
   , containsFailures = False
   , allocated = 0
-  , children = []
+  , children =
+      [ TracingSpan
+          { name = "Redis Query"
+          , started = MonotonicTime { inMicroseconds = 0 }
+          , finished = MonotonicTime { inMicroseconds = 0 }
+          , frame =
+              Just
+                ( "query"
+                , SrcLoc
+                    { srcLocPackage = "main"
+                    , srcLocModule = "Spec.Redis"
+                    , srcLocFile = "test/Spec/Redis.hs"
+                    , srcLocStartLine = 138
+                    , srcLocStartCol = 13
+                    , srcLocEndLine = 138
+                    , srcLocEndCol = 24
+                    }
+                )
+          , details =
+              Just
+                "{\"commands\":[\"PING\"],\"host\":\"localhost\",\"port\":6379}"
+          , summary = Just "PING"
+          , succeeded = Succeeded
+          , containsFailures = False
+          , allocated = 0
+          , children = []
+          }
+      ]
   }
