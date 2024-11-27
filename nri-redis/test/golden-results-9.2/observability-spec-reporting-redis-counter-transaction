@@ -32,9 +32,9 @@ TracingSpan
                     { srcLocPackage = "main"
                     , srcLocModule = "Spec.Redis"
                     , srcLocFile = "test/Spec/Redis.hs"
-                    , srcLocStartLine = 112
+                    , srcLocStartLine = 129
                     , srcLocStartCol = 9
-                    , srcLocEndLine = 112
+                    , srcLocEndLine = 129
                     , srcLocEndCol = 34
                     }
                 )

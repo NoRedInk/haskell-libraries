@@ -23,7 +23,7 @@ import qualified Prelude
 -- put this at the top of the file so that adding tests doesn't push
 -- the line number of the source location of this file down, which would
 -- change golden test results
-spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForTask :: (Show e) => Task e () -> Expect.Expectation' Platform.TracingSpan
 spanForTask task =
   Expect.fromIO <| do
     spanVar <- MVar.newEmptyMVar
@@ -39,13 +39,30 @@ spanForTask task =
         MVar.takeMVar spanVar
           |> map constantValuesForVariableFields
 
+spanForFailingTask :: Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForFailingTask task =
+  Expect.fromIO <| do
+    spanVar <- MVar.newEmptyMVar
+    res <-
+      Platform.rootTracingSpanIO
+        "test-request"
+        (MVar.putMVar spanVar)
+        "test-root"
+        (\log -> Task.attempt log task)
+    case res of
+      Err _ ->
+        MVar.takeMVar spanVar
+          |> map constantValuesForVariableFields
+      Ok _ ->
+        Prelude.fail "Expected task to fail"
+
 tests :: TestHandlers -> Test.Test
-tests TestHandlers {handler, autoExtendExpireHandler} =
+tests TestHandlers {handler, autoExtendExpireHandler, handlerWithMinimalExpire} =
   Test.describe
     "Redis Library"
     [ Test.describe "query tests using handler" (queryTests handler),
       Test.describe "query tests using auto extend expire handler" (queryTests autoExtendExpireHandler),
-      Test.describe "observability tests" (observabilityTests handler)
+      Test.describe "observability tests" (observabilityTests handler handlerWithMinimalExpire)
     ]
 
 -- We want to test all of our potential makeApi alternatives because it's easy
@@ -56,8 +73,8 @@ tests TestHandlers {handler, autoExtendExpireHandler} =
 -- value "test/Main.hs". If it points to one of the src files of the redis
 -- library it means stack frames for redis query in bugsnag, newrelic, etc will
 -- not point to the application code making the query!
-observabilityTests :: Redis.Handler' x -> List Test.Test
-observabilityTests handler =
+observabilityTests :: Redis.Handler' x -> Redis.Handler' x -> List Test.Test
+observabilityTests handler handlerWithMinimalExpire =
   [ Test.test "Redis.query reports the span data we expect" <| \() -> do
       span <-
         Redis.query handler (Redis.ping api)
@@ -113,7 +130,20 @@ observabilityTests handler =
           |> spanForTask
       span
         |> Debug.toString
-        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-counter-transaction")
+        |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-counter-transaction"),
+    Test.describe
+      "with 0 ms timeout"
+      [ Test.test "Redis.query reports the span data we expect" <| \() -> do
+          span <-
+            Redis.query handlerWithMinimalExpire (Redis.ping api)
+              |> spanForFailingTask
+          span
+            |> Debug.toString
+            |> Expect.all
+              [ Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-timeout-reporting-redis-query"),
+                \spanText -> Expect.true (Text.contains "Redis Query" spanText)
+              ]
+      ]
   ]
 
 queryTests :: Redis.Handler' x -> List Test.Test

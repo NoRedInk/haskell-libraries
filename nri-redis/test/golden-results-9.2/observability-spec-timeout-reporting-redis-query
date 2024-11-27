@@ -9,9 +9,9 @@ TracingSpan
             { srcLocPackage = "main"
             , srcLocModule = "Spec.Redis"
             , srcLocFile = "test/Spec/Redis.hs"
-            , srcLocStartLine = 31
+            , srcLocStartLine = 47
             , srcLocStartCol = 7
-            , srcLocEndLine = 31
+            , srcLocEndLine = 47
             , srcLocEndCol = 33
             }
         )
@@ -27,15 +27,15 @@ TracingSpan
           , finished = MonotonicTime { inMicroseconds = 0 }
           , frame =
               Just
-                ( "transaction"
+                ( "query"
                 , SrcLoc
                     { srcLocPackage = "main"
                     , srcLocModule = "Spec.Redis"
                     , srcLocFile = "test/Spec/Redis.hs"
-                    , srcLocStartLine = 101
-                    , srcLocStartCol = 9
-                    , srcLocEndLine = 101
-                    , srcLocEndCol = 31
+                    , srcLocStartLine = 138
+                    , srcLocStartCol = 13
+                    , srcLocEndLine = 138
+                    , srcLocEndCol = 24
                     }
                 )
           , details =

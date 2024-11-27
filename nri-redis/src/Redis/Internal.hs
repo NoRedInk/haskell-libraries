@@ -23,7 +23,7 @@ module Redis.Internal
     eval,
     foldWithScan,
     -- internal tools
-    traceQuery,
+    wrapQuery,
     maybesToDict,
     keysTouchedByQuery,
   )
@@ -111,7 +111,7 @@ cmds query'' =
     Sadd key vals -> [unwords ("SADD" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
     Scard key -> [unwords ["SCARD", key]]
     Srem key vals -> [unwords ("SREM" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
-    Sismember key _ -> [unwords ["SISMEMBER", key , "*****"]]
+    Sismember key _ -> [unwords ["SISMEMBER", key, "*****"]]
     Smembers key -> [unwords ["SMEMBERS", key]]
     Zadd key vals -> [unwords ("ZADD" : key : List.concatMap (\(_, val) -> ["*****", Text.fromFloat val]) (Dict.toList vals))]
     Zrange key start stop -> [unwords ["ZRANGE", key, Text.fromInt start, Text.fromInt stop]]
@@ -230,9 +230,9 @@ data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
 -- A handler that can only be parametrized by a value of this kind.
 -- Meaning that we use the values of the type parameter at a type level.
 data Handler' (x :: HasAutoExtendExpire) = Handler'
-  { doQuery :: Stack.HasCallStack => forall a. Query a -> Task Error a,
-    doTransaction :: Stack.HasCallStack => forall a. Query a -> Task Error a,
-    doEval :: Stack.HasCallStack => forall a. Database.Redis.RedisResult a => Script.Script a -> Task Error a,
+  { doQuery :: (Stack.HasCallStack) => forall a. Query a -> Task Error a,
+    doTransaction :: (Stack.HasCallStack) => forall a. Query a -> Task Error a,
+    doEval :: (Stack.HasCallStack) => forall a. (Database.Redis.RedisResult a) => Script.Script a -> Task Error a,
     namespace :: Text,
     maxKeySize :: Settings.MaxKeySize
   }
@@ -253,7 +253,7 @@ type HandlerAutoExtendExpire = Handler' 'AutoExtendExpire
 -- Note: A 'Query' in this library can consist of one or more queries in sequence.
 -- if a 'Query' contains multiple queries, it may make more sense, if possible
 -- to run them using 'transaction'
-query :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
+query :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -265,7 +265,7 @@ query handler query' =
 --
 -- In redis terms, this is wrappping the 'Query' in `MULTI` and `EXEC
 -- see redis transaction semantics here: https://redis.io/topics/transactions
-transaction :: Stack.HasCallStack => Handler' x -> Query a -> Task Error a
+transaction :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
@@ -424,7 +424,7 @@ keysTouchedByQuery query' =
     Zrevrank key _ -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
 
-maybesToDict :: Ord key => List key -> List (Maybe a) -> Dict.Dict key a
+maybesToDict :: (Ord key) => List key -> List (Maybe a) -> Dict.Dict key a
 maybesToDict keys values =
   List.map2 (,) keys values
     |> List.filterMap
@@ -435,7 +435,15 @@ maybesToDict keys values =
       )
     |> Dict.fromList
 
-traceQuery :: Stack.HasCallStack => [Text] -> Text -> Maybe Int -> Task e a -> Task e a
+wrapQuery :: (Stack.HasCallStack) => Settings.QueryTimeout -> [Text] -> Text -> Maybe Int -> Task Error a -> Task Error a
+wrapQuery queryTimeout commands host port task =
+  traceQuery commands host port <| case queryTimeout of
+    Settings.NoQueryTimeout ->
+      task
+    Settings.TimeoutQueryAfterMilliseconds timeoutMs ->
+      Task.timeout (toFloat timeoutMs) TimeoutError task
+
+traceQuery :: (Stack.HasCallStack) => [Text] -> Text -> Maybe Int -> Task Error a -> Task Error a
 traceQuery commands host port task =
   let info =
         RedisCommands.emptyDetails

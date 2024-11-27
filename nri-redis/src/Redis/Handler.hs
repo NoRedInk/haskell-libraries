@@ -30,12 +30,6 @@ handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings = do
   (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
   namespacedHandler
-    |> ( \handler' ->
-           case Settings.queryTimeout settings of
-             Settings.NoQueryTimeout -> handler'
-             Settings.TimeoutQueryAfterMilliseconds milliseconds ->
-               timeoutAfterMilliseconds (toFloat milliseconds) handler'
-       )
     |> Prelude.pure
 
 -- | Produce a namespaced handler for Redis access.
@@ -44,12 +38,6 @@ handlerAutoExtendExpire :: Text -> Settings.Settings -> Data.Acquire.Acquire Int
 handlerAutoExtendExpire namespace settings = do
   (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
   namespacedHandler
-    |> ( \handler' ->
-           case Settings.queryTimeout settings of
-             Settings.NoQueryTimeout -> handler'
-             Settings.TimeoutQueryAfterMilliseconds milliseconds ->
-               timeoutAfterMilliseconds (toFloat milliseconds) handler'
-       )
     |> ( \handler' -> case Settings.defaultExpiry settings of
            Settings.NoDefaultExpiry ->
              -- We create the handler as part of starting the application. Throwing
@@ -68,20 +56,6 @@ handlerAutoExtendExpire namespace settings = do
                |> Prelude.pure
        )
     |> liftIO
-
-timeoutAfterMilliseconds :: Float -> Internal.Handler' x -> Internal.Handler' x
-timeoutAfterMilliseconds milliseconds handler' =
-  handler'
-    { Internal.doQuery =
-        Stack.withFrozenCallStack (Internal.doQuery handler')
-          >> Task.timeout milliseconds Internal.TimeoutError,
-      Internal.doTransaction =
-        Stack.withFrozenCallStack (Internal.doTransaction handler')
-          >> Task.timeout milliseconds Internal.TimeoutError,
-      Internal.doEval =
-        Stack.withFrozenCallStack (Internal.doEval handler')
-          >> Task.timeout milliseconds Internal.TimeoutError
-    }
 
 defaultExpiryKeysAfterSeconds :: Int -> Internal.HandlerAutoExtendExpire -> Internal.HandlerAutoExtendExpire
 defaultExpiryKeysAfterSeconds secs handler' =
@@ -121,11 +95,12 @@ acquireHandler namespace settings = do
             Database.Redis.UnixSocket _ -> Nothing
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
+  let queryTimeout = (Settings.queryTimeout settings)
   pure
     ( Internal.Handler'
         { Internal.doQuery = \query ->
             let PreparedQuery {redisCtx} = doRawQuery query
-             in Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything redisCtx,
+             in Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything queryTimeout redisCtx,
           Internal.doTransaction = \query ->
             let PreparedQuery {redisCtx} = doRawQuery query
                 redisCmd = Database.Redis.multiExec redisCtx
@@ -137,9 +112,9 @@ acquireHandler namespace settings = do
                           Database.Redis.TxAborted -> Right (Err Internal.TransactionAborted)
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Text.fromList err)))
                     )
-                  |> Stack.withFrozenCallStack (platformRedis (Internal.cmds query) connection anything),
+                  |> Stack.withFrozenCallStack (platformRedis (Internal.cmds query) connection anything queryTimeout),
           Internal.doEval = \script' ->
-            Stack.withFrozenCallStack (platformRedisScript script' connection anything),
+            Stack.withFrozenCallStack (platformRedisScript script' connection anything queryTimeout),
           Internal.namespace = namespace,
           Internal.maxKeySize = Settings.maxKeySize settings
         },
@@ -306,9 +281,9 @@ doRawQuery query =
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
     Internal.Sismember key val ->
-            Database.Redis.sismember (toB key) val
-            |> PreparedQuery
-            |> map Ok
+      Database.Redis.sismember (toB key) val
+        |> PreparedQuery
+        |> map Ok
     Internal.Smembers key ->
       Database.Redis.smembers (toB key)
         |> PreparedQuery
@@ -362,13 +337,14 @@ data Connection = Connection
   }
 
 platformRedis ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   [Text] ->
   Connection ->
   Platform.DoAnythingHandler ->
+  Settings.QueryTimeout ->
   Database.Redis.Redis (Either Database.Redis.Reply (Result Internal.Error a)) ->
   Task Internal.Error a
-platformRedis cmds connection anything action =
+platformRedis cmds connection anything queryTimeout action =
   Database.Redis.runRedis (connectionHedis connection) action
     |> map toResult
     |> map
@@ -379,7 +355,7 @@ platformRedis cmds connection anything action =
       )
     |> handleExceptions
     |> Platform.doAnything anything
-    |> Stack.withFrozenCallStack Internal.traceQuery cmds (connectionHost connection) (connectionPort connection)
+    |> Stack.withFrozenCallStack Internal.wrapQuery queryTimeout cmds (connectionHost connection) (connectionPort connection)
 
 toResult :: Either Database.Redis.Reply a -> Result Internal.Error a
 toResult reply =
@@ -406,17 +382,18 @@ platformRedisScript ::
   Script.Script a ->
   Connection ->
   Platform.DoAnythingHandler ->
+  Settings.QueryTimeout ->
   Task Internal.Error a
-platformRedisScript script connection anything = do
+platformRedisScript script connection anything queryTimeout = do
   -- Try EVALSHA
-  evalsha script connection anything
+  evalsha script connection anything queryTimeout
     |> Task.onError
       ( \err ->
           case err of
             Internal.RedisError "NOSCRIPT No matching script. Please use EVAL." -> do
               -- If it fails with NOSCRIPT, load the script and try again
-              loadScript script connection anything
-              evalsha script connection anything
+              loadScript script connection anything queryTimeout
+              evalsha script connection anything queryTimeout
             _ -> Task.fail err
       )
 
@@ -425,8 +402,9 @@ evalsha ::
   Script.Script a ->
   Connection ->
   Platform.DoAnythingHandler ->
+  Settings.QueryTimeout ->
   Task Internal.Error a
-evalsha script connection anything =
+evalsha script connection anything queryTimeout =
   Database.Redis.evalsha
     (toB (Script.luaScriptHash script))
     (map toB (Script.keys script))
@@ -435,15 +413,16 @@ evalsha script connection anything =
     |> map toResult
     |> handleExceptions
     |> Platform.doAnything anything
-    |> Stack.withFrozenCallStack Internal.traceQuery [Script.evalShaString script] (connectionHost connection) (connectionPort connection)
+    |> Stack.withFrozenCallStack Internal.wrapQuery queryTimeout [Script.evalShaString script] (connectionHost connection) (connectionPort connection)
 
 loadScript ::
   Stack.HasCallStack =>
   Script.Script a ->
   Connection ->
   Platform.DoAnythingHandler ->
+  Settings.QueryTimeout ->
   Task Internal.Error ()
-loadScript script connection anything = do
+loadScript script connection anything queryTimeout = do
   Database.Redis.scriptLoad (toB (Script.luaScript script))
     |> Database.Redis.runRedis (connectionHedis connection)
     |> map toResult
@@ -451,7 +430,7 @@ loadScript script connection anything = do
     -- The result is the hash, which we already have. No sense in decoding it.
     |> map (map (\_ -> ()))
     |> Platform.doAnything anything
-    |> Stack.withFrozenCallStack Internal.traceQuery [Script.scriptLoadString script] (connectionHost connection) (connectionPort connection)
+    |> Stack.withFrozenCallStack Internal.wrapQuery queryTimeout [Script.scriptLoadString script] (connectionHost connection) (connectionPort connection)
 
 toB :: Text -> Data.ByteString.ByteString
 toB = Data.Text.Encoding.encodeUtf8
