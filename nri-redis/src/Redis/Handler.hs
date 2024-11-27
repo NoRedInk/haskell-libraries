@@ -4,6 +4,8 @@
 module Redis.Handler
   ( handler,
     handlerAutoExtendExpire,
+    withQueryTimeoutMilliseconds,
+    withoutQueryTimeout,
   )
 where
 
@@ -56,6 +58,16 @@ handlerAutoExtendExpire namespace settings = do
                |> Prelude.pure
        )
     |> liftIO
+
+-- | Sets a timeout for the query in milliseconds.
+withQueryTimeoutMilliseconds :: Int -> Internal.Handler' x -> Internal.Handler' x
+withQueryTimeoutMilliseconds timeoutMs handler' =
+  handler' {Internal.queryTimeout = Settings.TimeoutQueryAfterMilliseconds timeoutMs}
+
+-- | Disables timeout for query in milliseconds
+withoutQueryTimeout :: Internal.Handler' x -> Internal.Handler' x
+withoutQueryTimeout handler' =
+  handler' {Internal.queryTimeout = Settings.NoQueryTimeout}
 
 defaultExpiryKeysAfterSeconds :: Int -> Internal.HandlerAutoExtendExpire -> Internal.HandlerAutoExtendExpire
 defaultExpiryKeysAfterSeconds secs handler' =
