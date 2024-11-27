@@ -230,11 +230,12 @@ data HasAutoExtendExpire = NoAutoExtendExpire | AutoExtendExpire
 -- A handler that can only be parametrized by a value of this kind.
 -- Meaning that we use the values of the type parameter at a type level.
 data Handler' (x :: HasAutoExtendExpire) = Handler'
-  { doQuery :: (Stack.HasCallStack) => forall a. Query a -> Task Error a,
-    doTransaction :: (Stack.HasCallStack) => forall a. Query a -> Task Error a,
-    doEval :: (Stack.HasCallStack) => forall a. (Database.Redis.RedisResult a) => Script.Script a -> Task Error a,
+  { doQuery :: (Stack.HasCallStack) => forall a. Settings.QueryTimeout -> Query a -> Task Error a,
+    doTransaction :: (Stack.HasCallStack) => forall a. Settings.QueryTimeout -> Query a -> Task Error a,
+    doEval :: (Stack.HasCallStack) => forall a. (Database.Redis.RedisResult a) => Settings.QueryTimeout -> Script.Script a -> Task Error a,
     namespace :: Text,
-    maxKeySize :: Settings.MaxKeySize
+    maxKeySize :: Settings.MaxKeySize,
+    queryTimeout :: Settings.QueryTimeout
   }
 
 -- | This is a type alias of a handler parametrized by a value that indicates
@@ -257,7 +258,7 @@ query :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 query handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
-    |> Task.andThen (Stack.withFrozenCallStack (doQuery handler))
+    |> Task.andThen (Stack.withFrozenCallStack (doQuery handler) (queryTimeout handler))
 
 -- | Run a redis Query in a transaction. If the query contains several Redis
 -- commands they're all executed together, and Redis will guarantee other
@@ -269,12 +270,12 @@ transaction :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 transaction handler query' =
   namespaceQuery (namespace handler ++ ":") query'
     |> Task.andThen (ensureMaxKeySize handler)
-    |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler))
+    |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler) (queryTimeout handler))
 
 eval :: (Stack.HasCallStack, Database.Redis.RedisResult a) => Handler' x -> Script.Script a -> Task Error a
 eval handler script =
   Script.mapKeys (\key -> Task.succeed (namespace handler ++ ":" ++ key)) script
-    |> Task.andThen (Stack.withFrozenCallStack (doEval handler))
+    |> Task.andThen (Stack.withFrozenCallStack (doEval handler) (queryTimeout handler))
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
 namespaceQuery prefix query' =

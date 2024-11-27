@@ -67,15 +67,15 @@ defaultExpiryKeysAfterSeconds secs handler' =
           |> Internal.sequence
           |> Internal.map2 (\res _ -> res) query'
    in handler'
-        { Internal.doQuery = \query' ->
+        { Internal.doQuery = \queryTimeout query' ->
             wrapWithExpire query'
-              |> Stack.withFrozenCallStack (Internal.doQuery handler'),
-          Internal.doTransaction = \query' ->
+              |> Stack.withFrozenCallStack (Internal.doQuery handler') queryTimeout,
+          Internal.doTransaction = \queryTimeout query' ->
             wrapWithExpire query'
-              |> Stack.withFrozenCallStack (Internal.doTransaction handler'),
-          Internal.doEval = \script' ->
+              |> Stack.withFrozenCallStack (Internal.doTransaction handler') queryTimeout,
+          Internal.doEval = \queryTimeout script' ->
             -- We can't guarantee auto-expire for EVAL, so we just run it as-is
-            Stack.withFrozenCallStack (Internal.doEval handler' script')
+            Stack.withFrozenCallStack (Internal.doEval handler' queryTimeout script')
         }
 
 acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler' x, Connection)
@@ -95,13 +95,12 @@ acquireHandler namespace settings = do
             Database.Redis.UnixSocket _ -> Nothing
     pure Connection {connectionHedis, connectionHost, connectionPort}
   anything <- Platform.doAnythingHandler
-  let queryTimeout = (Settings.queryTimeout settings)
   pure
     ( Internal.Handler'
-        { Internal.doQuery = \query ->
+        { Internal.doQuery = \queryTimeout query ->
             let PreparedQuery {redisCtx} = doRawQuery query
              in Stack.withFrozenCallStack platformRedis (Internal.cmds query) connection anything queryTimeout redisCtx,
-          Internal.doTransaction = \query ->
+          Internal.doTransaction = \queryTimeout query ->
             let PreparedQuery {redisCtx} = doRawQuery query
                 redisCmd = Database.Redis.multiExec redisCtx
              in redisCmd
@@ -113,10 +112,11 @@ acquireHandler namespace settings = do
                           Database.Redis.TxError err -> Right (Err (Internal.RedisError (Text.fromList err)))
                     )
                   |> Stack.withFrozenCallStack (platformRedis (Internal.cmds query) connection anything queryTimeout),
-          Internal.doEval = \script' ->
+          Internal.doEval = \queryTimeout script' ->
             Stack.withFrozenCallStack (platformRedisScript script' connection anything queryTimeout),
           Internal.namespace = namespace,
-          Internal.maxKeySize = Settings.maxKeySize settings
+          Internal.maxKeySize = Settings.maxKeySize settings,
+          Internal.queryTimeout = Settings.queryTimeout settings
         },
       connection
     )
@@ -416,7 +416,7 @@ evalsha script connection anything queryTimeout =
     |> Stack.withFrozenCallStack Internal.wrapQuery queryTimeout [Script.evalShaString script] (connectionHost connection) (connectionPort connection)
 
 loadScript ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   Script.Script a ->
   Connection ->
   Platform.DoAnythingHandler ->
