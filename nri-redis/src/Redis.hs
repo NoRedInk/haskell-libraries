@@ -18,6 +18,8 @@ module Redis
     Settings.decoder,
     Settings.decoderWithEnvVarPrefix,
     Settings.decoderWithCustomConnectionString,
+    Handler.withQueryTimeoutMilliseconds,
+    Handler.withoutQueryTimeout,
 
     -- * Creating a redis API
     jsonApi,

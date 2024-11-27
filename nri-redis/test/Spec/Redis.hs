@@ -57,12 +57,12 @@ spanForFailingTask task =
         Prelude.fail "Expected task to fail"
 
 tests :: TestHandlers -> Test.Test
-tests TestHandlers {handler, autoExtendExpireHandler, handlerWithMinimalExpire} =
+tests TestHandlers {handler, autoExtendExpireHandler} =
   Test.describe
     "Redis Library"
     [ Test.describe "query tests using handler" (queryTests handler),
       Test.describe "query tests using auto extend expire handler" (queryTests autoExtendExpireHandler),
-      Test.describe "observability tests" (observabilityTests handler handlerWithMinimalExpire)
+      Test.describe "observability tests" (observabilityTests handler)
     ]
 
 -- We want to test all of our potential makeApi alternatives because it's easy
@@ -73,8 +73,8 @@ tests TestHandlers {handler, autoExtendExpireHandler, handlerWithMinimalExpire} 
 -- value "test/Main.hs". If it points to one of the src files of the redis
 -- library it means stack frames for redis query in bugsnag, newrelic, etc will
 -- not point to the application code making the query!
-observabilityTests :: Redis.Handler' x -> Redis.Handler' x -> List Test.Test
-observabilityTests handler handlerWithMinimalExpire =
+observabilityTests :: Redis.Handler' x -> List Test.Test
+observabilityTests handler =
   [ Test.test "Redis.query reports the span data we expect" <| \() -> do
       span <-
         Redis.query handler (Redis.ping api)
@@ -135,7 +135,7 @@ observabilityTests handler handlerWithMinimalExpire =
       "with 0 ms timeout"
       [ Test.test "Redis.query reports the span data we expect" <| \() -> do
           span <-
-            Redis.query handlerWithMinimalExpire (Redis.ping api)
+            Redis.query (Redis.withQueryTimeoutMilliseconds 0 handler) (Redis.ping api)
               |> spanForFailingTask
           span
             |> Debug.toString
