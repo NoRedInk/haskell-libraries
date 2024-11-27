@@ -1,4 +1,10 @@
+# 0.2.0.3 unreleased
+
+- [bugfix] When a query times out, its context is no longer removed from the Stack
+- query timeout setting can be modified at runtime
+
 # 0.2.0.2
+
 - Adds `sismember`
 
 # 0.2.0.1
