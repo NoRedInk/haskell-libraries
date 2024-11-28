@@ -18,6 +18,7 @@ import qualified Data.Text.Encoding
 import qualified Database.Redis
 import qualified Dict
 import qualified GHC.Stack as Stack
+import qualified Log
 import qualified Platform
 import qualified Redis.Internal as Internal
 import qualified Redis.Script as Script
@@ -60,14 +61,18 @@ handlerAutoExtendExpire namespace settings = do
     |> liftIO
 
 -- | Sets a timeout for the query in milliseconds.
-withQueryTimeoutMilliseconds :: Int -> Internal.Handler' x -> Internal.Handler' x
+withQueryTimeoutMilliseconds :: Int -> Internal.Handler' x -> Task () (Internal.Handler' x)
 withQueryTimeoutMilliseconds timeoutMs handler' =
-  handler' {Internal.queryTimeout = Settings.TimeoutQueryAfterMilliseconds timeoutMs}
+  (handler' {Internal.queryTimeout = Settings.TimeoutQueryAfterMilliseconds timeoutMs})
+    |> Task.succeed
+    |> Log.withContext "setting redis query timeout" [Log.context "timeoutMilliseconds" (Text.fromInt timeoutMs)]
 
 -- | Disables timeout for query in milliseconds
-withoutQueryTimeout :: Internal.Handler' x -> Internal.Handler' x
+withoutQueryTimeout :: Internal.Handler' x -> Task () (Internal.Handler' x)
 withoutQueryTimeout handler' =
-  handler' {Internal.queryTimeout = Settings.NoQueryTimeout}
+  (handler' {Internal.queryTimeout = Settings.NoQueryTimeout})
+    |> Task.succeed
+    |> Log.withContext "setting no redis query timeout" []
 
 defaultExpiryKeysAfterSeconds :: Int -> Internal.HandlerAutoExtendExpire -> Internal.HandlerAutoExtendExpire
 defaultExpiryKeysAfterSeconds secs handler' =

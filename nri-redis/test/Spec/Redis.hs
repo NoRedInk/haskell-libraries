@@ -23,7 +23,7 @@ import qualified Prelude
 -- put this at the top of the file so that adding tests doesn't push
 -- the line number of the source location of this file down, which would
 -- change golden test results
-spanForTask :: (Show e) => Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForTask :: (Show e) => Task e a -> Expect.Expectation' Platform.TracingSpan
 spanForTask task =
   Expect.fromIO <| do
     spanVar <- MVar.newEmptyMVar
@@ -134,15 +134,30 @@ observabilityTests handler =
     Test.describe
       "with 0 ms timeout"
       [ Test.test "Redis.query reports the span data we expect" <| \() -> do
+          handlerThatExpiresImmediately <- Expect.succeeds (Redis.withQueryTimeoutMilliseconds 0 handler)
           span <-
-            Redis.query (Redis.withQueryTimeoutMilliseconds 0 handler) (Redis.ping api)
+            Redis.query handlerThatExpiresImmediately (Redis.ping api)
               |> spanForFailingTask
           span
             |> Debug.toString
             |> Expect.all
-              [ Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-timeout-reporting-redis-query"),
+              [ Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-redis-query-timeout"),
                 \spanText -> Expect.true (Text.contains "Redis Query" spanText)
-              ]
+              ],
+        Test.test "Redis.withQueryTimeoutMilliseconds reports the span data we expect" <| \() -> do
+          span <-
+            Redis.withQueryTimeoutMilliseconds 0 handler
+              |> spanForTask
+          span
+            |> Debug.toString
+            |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-with-query-timout"),
+        Test.test "Redis.withoutQueryTimeout reports the span data we expect" <| \() -> do
+          spanSettingTimeout <-
+            Redis.withoutQueryTimeout handler
+              |> spanForTask
+          spanSettingTimeout
+            |> Debug.toString
+            |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-reporting-without-query-timout")
       ]
   ]
 

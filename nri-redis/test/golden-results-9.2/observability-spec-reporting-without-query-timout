@@ -1,0 +1,49 @@
+TracingSpan
+  { name = "test-root"
+  , started = MonotonicTime { inMicroseconds = 0 }
+  , finished = MonotonicTime { inMicroseconds = 0 }
+  , frame =
+      Just
+        ( "rootTracingSpanIO"
+        , SrcLoc
+            { srcLocPackage = "main"
+            , srcLocModule = "Spec.Redis"
+            , srcLocFile = "test/Spec/Redis.hs"
+            , srcLocStartLine = 31
+            , srcLocStartCol = 7
+            , srcLocEndLine = 31
+            , srcLocEndCol = 33
+            }
+        )
+  , details = Nothing
+  , summary = Nothing
+  , succeeded = Succeeded
+  , containsFailures = False
+  , allocated = 0
+  , children =
+      [ TracingSpan
+          { name = "setting no redis query timeout"
+          , started = MonotonicTime { inMicroseconds = 0 }
+          , finished = MonotonicTime { inMicroseconds = 0 }
+          , frame =
+              Just
+                ( "withContext"
+                , SrcLoc
+                    { srcLocPackage = "main"
+                    , srcLocModule = "Redis.Handler"
+                    , srcLocFile = "src/Redis/Handler.hs"
+                    , srcLocStartLine = 75
+                    , srcLocStartCol = 8
+                    , srcLocEndLine = 75
+                    , srcLocEndCol = 23
+                    }
+                )
+          , details = Just "{}"
+          , summary = Just "setting no redis query timeout"
+          , succeeded = Succeeded
+          , containsFailures = False
+          , allocated = 0
+          , children = []
+          }
+      ]
+  }
