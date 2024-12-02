@@ -1,4 +1,4 @@
-# 0.2.0.3 unreleased
+# 0.2.0.3
 
 - [bugfix] When a query times out, its context is no longer removed from the Stack
 - query timeout setting can be modified at runtime
