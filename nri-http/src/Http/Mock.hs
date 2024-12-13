@@ -82,7 +82,7 @@ stub responders stubbedTestBody = do
         Internal.Handler
           ( \req -> do
               (log, res) <- tryRespond responders req
-              Data.IORef.modifyIORef' logRef (\prev -> log : prev)
+              Data.IORef.atomicModifyIORef' logRef (\prev -> (log : prev, ()))
                 |> map Ok
                 |> Platform.doAnything doAnything
               Prelude.pure res
