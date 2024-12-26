@@ -16,11 +16,11 @@ module Http.Mock
   )
 where
 
+import qualified Control.Concurrent.MVar as MVar
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy
 import qualified Data.Dynamic as Dynamic
-import qualified Data.IORef
 import Data.String (fromString)
 import qualified Data.Text.Encoding
 import qualified Debug
@@ -76,21 +76,28 @@ stub ::
   (Internal.Handler -> Expect.Expectation) ->
   Expect.Expectation' (List a)
 stub responders stubbedTestBody = do
-  logRef <- Expect.fromIO (Data.IORef.newIORef [])
+  logRef <- Expect.fromIO (MVar.newMVar [])
   doAnything <- Expect.fromIO Platform.doAnythingHandler
   let mockHandler =
         Internal.Handler
           ( \req -> do
               (log, res) <- tryRespond responders req
-              Data.IORef.modifyIORef' logRef (\prev -> log : prev)
-                |> map Ok
-                |> Platform.doAnything doAnything
-              Prelude.pure res
+              -- `modifyMVar_` and `withMVar` aren't completely atomic so those
+              -- could introduce a source of flake if used.  that said, `takeMVar` +
+              -- `putMVar` aren't exception-safe.  this is fine for the simple
+              -- usecase of just prepending to the contained list but if this logic
+              -- ever needs to include potentially-exception-causing code we'll need
+              -- to think a bit harder
+              -- (ref: https://hackage.haskell.org/package/base-4.21.0.0/docs/Control-Concurrent-MVar.html#v:withMVar)
+              Platform.doAnything doAnything <| do
+                prev <- MVar.takeMVar logRef
+                MVar.putMVar logRef (log : prev)
+                Prelude.pure (Ok res)
           )
           (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
           (\_ -> Debug.todo "We don't mock third party HTTP calls yet")
   Expect.around (\f -> f mockHandler) (Stack.withFrozenCallStack stubbedTestBody)
-  Expect.fromIO (Data.IORef.readIORef logRef)
+  Expect.fromIO (MVar.readMVar logRef)
     |> map List.reverse
 
 -- | Read the body of the request as text. Useful to check what data got

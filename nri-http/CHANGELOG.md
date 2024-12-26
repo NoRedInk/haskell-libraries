@@ -1,3 +1,7 @@
+# 0.5.0.3
+
+- Use an `MVar` instead of `IORef` for mocked requests to hopefully reduce flake in cases where concurrent (mocked) requests are being made
+
 # 0.5.0.2
 
 - Loosen types for `Http.Mock` helpers to allow for arbitrary error types
