@@ -11,6 +11,7 @@ module Kafka.Worker.Partition
     SeekCmd (..),
     CommitOffsets (..),
     MessageFormat (..),
+    ProcessAttemptsCount (..),
     -- just exported for tests
     microSecondsDelayForAttempt,
     OnStartup (OnStartup),
@@ -95,7 +96,7 @@ newtype OnCleanup = OnCleanup (Prelude.IO ())
 data MessageCallback where
   MessageCallback ::
     (Show e, Aeson.ToJSON msg, Aeson.FromJSON msg) =>
-    (Consumer.ConsumerRecord () () -> msg -> Task e SeekCmd) ->
+    (Consumer.ConsumerRecord () () -> ProcessAttemptsCount -> msg -> Task e SeekCmd) ->
     MessageCallback
 
 data CommitOffsets
@@ -255,7 +256,7 @@ processMsgLoop skipOrNot messageFormat commitOffsets observabilityHandler state 
             Platform.setTracingSpanDetailsIO log details
             handleFailures log <| do
               msg <- decodeMessage messageFormat record
-              runCallback record {Consumer.crKey = (), Consumer.crValue = ()} msg
+              runCallback record {Consumer.crKey = (), Consumer.crValue = ()} processAttempts msg
                 |> Task.mapError WorkerCallbackFailed
                 |> Task.onError
                   ( \err -> do
@@ -282,7 +283,7 @@ microSecondsDelayForAttempt attempts =
   2 Prelude.^ (min attempts 10) * 1_000_000
 
 handleFailures ::
-  Show e =>
+  (Show e) =>
   Platform.LogHandler ->
   Task (WorkerError e) a ->
   Prelude.IO ()

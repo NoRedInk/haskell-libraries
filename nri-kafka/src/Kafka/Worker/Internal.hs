@@ -71,6 +71,7 @@ data PartitionOffset = PartitionOffset
     -- | The partition's offset.
     offset :: Int
   }
+  deriving (Show)
 
 -- | Create a subscription for a topic.
 --
@@ -92,7 +93,7 @@ subscription topic callback =
     { topic = Kafka.Topic topic,
       onMessage =
         Partition.MessageCallback
-          ( \_ msg -> do
+          ( \_ _ msg -> do
               callback msg
               Task.succeed Partition.NoSeek
           ),
@@ -118,14 +119,14 @@ subscription topic callback =
 -- >              sql
 -- >                "SELECT partition, offset FROM offsets WHERE partition = %"
 -- >                [partitions] )
--- >           (\msg -> Debug.todo "Process your message here!")
+-- >           (\retryCount msg -> Debug.todo "Process your message here!")
 -- >   process settings subscription
 subscriptionManageOwnOffsets ::
   (Aeson.FromJSON msg, Aeson.ToJSON msg) =>
   Text ->
   CommitToKafkaAsWell ->
   ([Int] -> Task Text (List PartitionOffset)) ->
-  (PartitionOffset -> msg -> Task Text Partition.SeekCmd) ->
+  (PartitionOffset -> Partition.ProcessAttemptsCount -> msg -> Task Text Partition.SeekCmd) ->
   TopicSubscription
 subscriptionManageOwnOffsets topic commitToKafkaAsWell fetchOffsets callback =
   TopicSubscription
@@ -133,7 +134,7 @@ subscriptionManageOwnOffsets topic commitToKafkaAsWell fetchOffsets callback =
       commitToKafkaAsWell,
       onMessage =
         Partition.MessageCallback
-          ( \record msg -> do
+          ( \record retryCount msg -> do
               let offsetParams =
                     PartitionOffset
                       { partitionId =
@@ -141,7 +142,7 @@ subscriptionManageOwnOffsets topic commitToKafkaAsWell fetchOffsets callback =
                             |> partitionIdToInt,
                         offset = Consumer.unOffset (Consumer.crOffset record)
                       }
-              callback offsetParams msg
+              callback offsetParams retryCount msg
           ),
       offsetSource =
         Elsewhere
