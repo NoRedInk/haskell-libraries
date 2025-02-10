@@ -9,7 +9,7 @@ import qualified Prelude
 main :: Prelude.IO ()
 main = do
   -- macos runners seem to be slow and fail on several kafka integration tests
-  System.Environment.setEnv "NRI_TEST_TIMEOUT" "20000"
+  System.Environment.setEnv "NRI_TEST_TIMEOUT" "240000"
   Test.run tests
 
 tests :: Test.Test
