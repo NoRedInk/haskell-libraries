@@ -39,6 +39,8 @@ module Redis
     set,
     setex,
     setnx,
+    ttl,
+    Internal.TTLResponse (..),
 
     -- * Running Redis queries
     Internal.query,
@@ -143,7 +145,11 @@ data Api key a = Api
     -- performed. SETNX is short for "SET if Not eXists".
     --
     -- https://redis.io/commands/setnx
-    setnx :: key -> a -> Internal.Query Bool
+    setnx :: key -> a -> Internal.Query Bool,
+    -- | Get the TTL (Time To Live / expiry time) for a key, in seconds.
+    --
+    -- https://redis.io/commands/ttl
+    ttl :: key -> Internal.Query Internal.TTLResponse
   }
 
 -- | Creates a json API mapping a 'key' to a json-encodable-decodable type
@@ -189,5 +195,6 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       set = \key value -> Internal.Set (toKey key) (codecEncoder value),
       setex = \key seconds value -> Internal.Setex (toKey key) seconds (codecEncoder value),
-      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value)
+      setnx = \key value -> Internal.Setnx (toKey key) (codecEncoder value),
+      ttl = \key -> Internal.WithResult Internal.ttlResponseDecoder (Internal.Ttl (toKey key))
     }
