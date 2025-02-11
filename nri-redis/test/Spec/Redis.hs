@@ -62,7 +62,8 @@ tests TestHandlers {handler, autoExtendExpireHandler} =
     "Redis Library"
     [ Test.describe "query tests using handler" (queryTests handler),
       Test.describe "query tests using auto extend expire handler" (queryTests autoExtendExpireHandler),
-      Test.describe "observability tests" (observabilityTests handler)
+      Test.describe "observability tests" (observabilityTests handler),
+      Test.describe "ttl tests" (ttlTests handler autoExtendExpireHandler)
     ]
 
 -- We want to test all of our potential makeApi alternatives because it's easy
@@ -467,6 +468,23 @@ queryTests redisHandler =
   ]
   where
     testNS = addNamespace "testNamespace" redisHandler
+
+ttlTests :: Redis.Handler -> Redis.HandlerAutoExtendExpire -> List Test.Test
+ttlTests handler autoExtendExpireHandler =
+  let testNS = addNamespace "ttlTestNamespace" handler
+      testNSWithExpiry = addNamespace "ttlTestNamespace" autoExtendExpireHandler
+   in [ Test.test "ttl reads key w/o ttl" <| \() -> do
+          Redis.set api "no-expiry" "value" |> Redis.query testNS |> Expect.succeeds
+          result <- Redis.ttl api "no-expiry" |> Redis.query testNS |> Expect.succeeds
+          Expect.equal result Redis.NeverExpires,
+        Test.test "ttl reads key w/ ttl" <| \() -> do
+          Redis.set api "expires" "value" |> Redis.query testNSWithExpiry |> Expect.succeeds
+          result <- Redis.ttl api "expires" |> Redis.query testNSWithExpiry |> Expect.succeeds
+          Expect.equal result (Redis.ExpiresInSeconds 1),
+        Test.test "ttl reports missing key" <| \() -> do
+          result <- Redis.ttl api "not-found" |> Redis.query testNSWithExpiry |> Expect.succeeds
+          Expect.equal result Redis.TTLKeyNotFound
+      ]
 
 addNamespace :: Text -> Redis.Handler' x -> Redis.Handler' x
 addNamespace namespace handler' =
