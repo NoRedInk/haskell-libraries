@@ -148,6 +148,8 @@ data Api key a = Api
     setnx :: key -> a -> Internal.Query Bool,
     -- | Get the TTL (Time To Live / expiry time) for a key, in seconds.
     --
+    -- __Important__: When using `HandlerAutoExtendExpire`, this command will **NOT** auto-extend expiry.
+    --
     -- https://redis.io/commands/ttl
     ttl :: key -> Internal.Query Internal.TTLResponse
   }
