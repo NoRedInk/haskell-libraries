@@ -4,6 +4,7 @@ module Helpers
     stopWorker,
     test,
     sendSync,
+    spawnWorkerManagingOwnOffsets,
   )
 where
 
@@ -78,6 +79,42 @@ spawnWorker handler' topic callback =
     Async.link async
     Prelude.pure (Worker async)
 
+spawnWorkerManagingOwnOffsets ::
+  (Aeson.ToJSON msg, Aeson.FromJSON msg) =>
+  TestHandler ->
+  Internal.Topic ->
+  (Worker.PartitionOffset -> Worker.ProcessAttemptsCount -> msg -> STM.STM Worker.SeekCmd) ->
+  Expect.Expectation' Worker
+spawnWorkerManagingOwnOffsets handler' topic callback =
+  Expect.fromIO <| do
+    settings <-
+      case Environment.decodeDefaults Worker.Settings.decoder of
+        Ok settings' -> Prelude.pure settings'
+        Err err -> Prelude.fail (Text.toList err)
+    async <-
+      Kafka.Worker.Internal.processWithoutShutdownEnsurance
+        settings
+        (Consumer.ConsumerGroupId "group")
+        ( Worker.subscriptionManageOwnOffsets
+            (Internal.unTopic topic)
+            Worker.CommitToKafkaAsWell
+            ( \partitions ->
+                partitions
+                  |> List.map (\id -> Worker.PartitionOffset {Worker.partitionId = id, Worker.offset = 0})
+                  |> Task.succeed
+            )
+            ( \partitionOffset retryCount msg -> do
+                callback partitionOffset retryCount msg
+                  |> STM.atomically
+                  |> map Ok
+                  |> Platform.doAnything (doAnything handler')
+            )
+        )
+        |> Async.race_ (returnWhenTerminating handler')
+        |> Async.async
+    Async.link async
+    Prelude.pure (Worker async)
+
 -- | Stops a single worker
 stopWorker :: Worker -> Expect.Expectation
 stopWorker (Worker async) =
@@ -119,7 +156,7 @@ testHandler Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeou
       Prelude.pure TestHandler {producer, doAnything, terminator}
 
 -- | puts a message synchronously onto a topic-partition
-sendSync :: Aeson.ToJSON a => TestHandler -> Internal.Topic -> Int -> a -> Expect.Expectation
+sendSync :: (Aeson.ToJSON a) => TestHandler -> Internal.Topic -> Int -> a -> Expect.Expectation
 sendSync handler topicName partitionId msg' =
   Platform.tracingSpan
     "Sync send Kafka messages"
@@ -175,7 +212,7 @@ record topicName partitionId val =
 
 -- | test helper, that yields a new @Kafka.Topic@ and @TestHandler@
 test ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   Text ->
   ((Internal.Topic, TestHandler) -> Expect.Expectation) ->
   Test.Test

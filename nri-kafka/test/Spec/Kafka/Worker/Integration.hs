@@ -4,6 +4,7 @@ import qualified Control.Concurrent.STM as STM
 import qualified Dict
 import qualified Expect
 import qualified Helpers
+import qualified Kafka.Worker as Worker
 import qualified Set
 import qualified Test
 import qualified Prelude
@@ -55,7 +56,25 @@ tests =
                     [ (1, [2, 1]),
                       (2, [2, 1])
                     ]
+                ),
+          Helpers.test "Self-managing workers get retry count info" <| \(topic, handler) -> do
+            Helpers.sendSync handler topic 1 1
+            msgsTVar <- atomically (STM.newTVar Set.empty)
+            _ <-
+              Helpers.spawnWorkerManagingOwnOffsets
+                handler
+                topic
+                ( \partitionOffset (Worker.ProcessAttemptsCount retryCount) msg -> do
+                    STM.modifyTVar' msgsTVar (Set.insert (msg, retryCount))
+                    if retryCount < 1
+                      then STM.throwSTM (Prelude.userError "retry please")
+                      else
+                        Prelude.pure
+                          <| Worker.SeekToOffset ((Worker.offset partitionOffset) + 1)
                 )
+            msgs' <- waitFor msgsTVar (\items -> Set.size items == 1)
+            -- Assert that the message was recorded on its first retry
+            msgs' |> Expect.equal (Set.fromList [(1, 1)])
         ]
     ]
 
@@ -70,7 +89,7 @@ waitFor tVar pred =
       then Prelude.pure val
       else STM.retry
 
-groupDictAndMap :: Ord b => (a -> (b, c)) -> List a -> Dict.Dict b (List c)
+groupDictAndMap :: (Ord b) => (a -> (b, c)) -> List a -> Dict.Dict b (List c)
 groupDictAndMap f =
   List.foldr
     ( \x ->

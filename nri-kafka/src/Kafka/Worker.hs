@@ -27,6 +27,7 @@ module Kafka.Worker
     Internal.receiveRawMessages,
     Internal.PartitionOffset (..),
     Partition.SeekCmd (..),
+    Partition.ProcessAttemptsCount (..),
     Internal.CommitToKafkaAsWell (..),
   )
 where
