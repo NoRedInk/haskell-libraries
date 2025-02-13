@@ -11,6 +11,7 @@ module Redis.Internal
     HandlerAutoExtendExpire,
     HasAutoExtendExpire (..),
     Query (..),
+    TTLResponse (..),
     Database.Redis.Cursor,
     Database.Redis.cursor0,
     cmds,
@@ -26,6 +27,7 @@ module Redis.Internal
     wrapQuery,
     maybesToDict,
     keysTouchedByQuery,
+    ttlResponseDecoder,
   )
 where
 
@@ -113,6 +115,7 @@ cmds query'' =
     Srem key vals -> [unwords ("SREM" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
     Sismember key _ -> [unwords ["SISMEMBER", key, "*****"]]
     Smembers key -> [unwords ["SMEMBERS", key]]
+    Ttl key -> [unwords ["TTL", key]]
     Zadd key vals -> [unwords ("ZADD" : key : List.concatMap (\(_, val) -> ["*****", Text.fromFloat val]) (Dict.toList vals))]
     Zrange key start stop -> [unwords ["ZRANGE", key, Text.fromInt start, Text.fromInt stop]]
     ZrangeByScoreWithScores key start stop -> [unwords ["ZRANGE", key, "BYSCORE", Text.fromFloat start, Text.fromFloat stop, "WITHSCORES"]]
@@ -170,6 +173,7 @@ data Query a where
   Srem :: Text -> NonEmpty ByteString -> Query Int
   Sismember :: Text -> ByteString -> Query Bool
   Smembers :: Text -> Query (List ByteString)
+  Ttl :: Text -> Query Int
   Zadd :: Text -> Dict.Dict ByteString Float -> Query Int
   Zrange :: Text -> Int -> Int -> Query [ByteString]
   ZrangeByScoreWithScores :: Text -> Float -> Float -> Query [(ByteString, Float)]
@@ -317,6 +321,7 @@ mapKeys fn query' =
     Srem key vals -> Task.map (\newKey -> Srem newKey vals) (fn key)
     Sismember key val -> Task.map (\newKey -> Sismember newKey val) (fn key)
     Smembers key -> Task.map Smembers (fn key)
+    Ttl key -> Task.map Ttl (fn key)
     Zadd key vals -> Task.map (\newKey -> Zadd newKey vals) (fn key)
     Zrange key start stop -> Task.map (\newKey -> Zrange newKey start stop) (fn key)
     ZrangeByScoreWithScores key start stop -> Task.map (\newKey -> ZrangeByScoreWithScores newKey start stop) (fn key)
@@ -360,6 +365,7 @@ mapReturnedKeys fn query' =
     Srem key vals -> Srem key vals
     Sismember key val -> Sismember key val
     Smembers key -> Smembers key
+    Ttl key -> Ttl key
     Zadd key vals -> Zadd key vals
     Zrange key start stop -> Zrange key start stop
     ZrangeByScoreWithScores key start stop -> ZrangeByScoreWithScores key start stop
@@ -418,6 +424,9 @@ keysTouchedByQuery query' =
     Srem key _ -> Set.singleton key
     Sismember key _ -> Set.singleton key
     Smembers key -> Set.singleton key
+    -- TTL is meant to just check the TTL. Let's not report the key back
+    -- so it doesn't auto-extending the TTL.
+    Ttl _ -> Set.empty
     Zadd key _ -> Set.singleton key
     Zrange key _ _ -> Set.singleton key
     ZrangeByScoreWithScores key _ _ -> Set.singleton key
@@ -485,6 +494,21 @@ foldWithScan handler keyMatchPattern approxCountPerBatch processKeyBatch initAcc
           then Task.succeed nextAccumulator
           else go nextAccumulator nextCursor
    in go initAccumulator Database.Redis.cursor0
+
+data TTLResponse = TTLKeyNotFound | NeverExpires | ExpiresInSeconds Int
+  deriving (Show, Eq)
+
+ttlResponseDecoder :: Int -> Result Error TTLResponse
+ttlResponseDecoder ttl =
+  if ttl >= 0
+    then Ok (ExpiresInSeconds ttl)
+    else
+      if ttl == -2
+        then Ok TTLKeyNotFound
+        else
+          if ttl == -1
+            then Ok NeverExpires
+            else Err (DecodingError ("Unexpected TTL value: " ++ Text.fromInt ttl))
 
 --------------------------------------
 -- Orphaned instances for RedisResult

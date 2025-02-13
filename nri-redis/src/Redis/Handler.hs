@@ -305,6 +305,10 @@ doRawQuery query =
       Database.Redis.smembers (toB key)
         |> PreparedQuery
         |> map Ok
+    Internal.Ttl key ->
+      Database.Redis.ttl (toB key)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
     Internal.Zadd key vals ->
       Dict.toList vals
         |> List.map (\(a, b) -> (b, a))
