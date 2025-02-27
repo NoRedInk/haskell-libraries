@@ -21,7 +21,7 @@ jobs:
           - os: ubuntu-22.04 # linux x86_64; 4 vcpu, 16 GB memory
             base-nixpkgs-channel: nixos-24.11
         ghc:
-          - ghc-9-6
+          - ghc-9-8
     runs-on: ${{ matrix.runner.os }}
     steps:
       - name: Install Nix
