@@ -6,7 +6,7 @@
         Just
           ( "info"
           , SrcLoc
-              { srcLocPackage = "main"
+              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 174
@@ -30,7 +30,7 @@
         Just
           ( "info"
           , SrcLoc
-              { srcLocPackage = "main"
+              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 177
@@ -54,7 +54,7 @@
         Just
           ( "info"
           , SrcLoc
-              { srcLocPackage = "main"
+              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 176
@@ -78,7 +78,7 @@
         Just
           ( "withContext"
           , SrcLoc
-              { srcLocPackage = "main"
+              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 173
@@ -101,7 +101,7 @@
                 Just
                   ( "info"
                   , SrcLoc
-                      { srcLocPackage = "main"
+                      { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
                       , srcLocModule = "LogSpec"
                       , srcLocFile = "tests/LogSpec.hs"
                       , srcLocStartLine = 173

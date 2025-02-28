@@ -30,6 +30,54 @@
                             "started": 0,
                             "succeeded": "Succeeded",
                             "summary": null
+                        },
+                        {
+                            "allocated": 1,
+                            "children": [],
+                            "containsFailures": false,
+                            "details": null,
+                            "finished": 0,
+                            "frame": null,
+                            "name": "name",
+                            "started": 0,
+                            "succeeded": "Succeeded",
+                            "summary": null
+                        },
+                        {
+                            "allocated": 1,
+                            "children": [],
+                            "containsFailures": false,
+                            "details": null,
+                            "finished": 0,
+                            "frame": null,
+                            "name": "name",
+                            "started": 0,
+                            "succeeded": "Succeeded",
+                            "summary": null
+                        },
+                        {
+                            "allocated": 1,
+                            "children": [],
+                            "containsFailures": false,
+                            "details": null,
+                            "finished": 0,
+                            "frame": null,
+                            "name": "name",
+                            "started": 0,
+                            "succeeded": "Succeeded",
+                            "summary": null
+                        },
+                        {
+                            "allocated": 1,
+                            "children": [],
+                            "containsFailures": false,
+                            "details": null,
+                            "finished": 0,
+                            "frame": null,
+                            "name": "name",
+                            "started": 0,
+                            "succeeded": "Succeeded",
+                            "summary": null
                         }
                     ],
                     "containsFailures": false,
@@ -57,13 +105,13 @@
     "finished": 0,
     "frame": {
         "endCol": 50,
-        "endLine": 459,
+        "endLine": 488,
         "file": "tests/TestSpec.hs",
         "module": "TestSpec",
         "name": "report",
-        "package": "main",
+        "package": "nri-prelude-0.6.1.2-inplace-tests",
         "startCol": 22,
-        "startLine": 459
+        "startLine": 488
     },
     "name": "test run",
     "started": 0,

@@ -6,12 +6,12 @@
         Just
           ( "withContext"
           , SrcLoc
-              { srcLocPackage = "main"
+              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 94
+              , srcLocStartLine = 113
               , srcLocStartCol = 20
-              , srcLocEndLine = 94
+              , srcLocEndLine = 113
               , srcLocEndCol = 31
               }
           )
@@ -29,12 +29,12 @@
                 Just
                   ( "withContext"
                   , SrcLoc
-                      { srcLocPackage = "main"
+                      { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
                       , srcLocModule = "LogSpec"
                       , srcLocFile = "tests/LogSpec.hs"
-                      , srcLocStartLine = 93
+                      , srcLocStartLine = 112
                       , srcLocStartCol = 20
-                      , srcLocEndLine = 93
+                      , srcLocEndLine = 112
                       , srcLocEndCol = 31
                       }
                   )

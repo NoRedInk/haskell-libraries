@@ -1,21 +1,21 @@
 [ TracingSpan
-    { name = "door is blocked"
+    { name = "user cut themselves on the modal"
     , started = MonotonicTime { inMicroseconds = 0 }
     , finished = MonotonicTime { inMicroseconds = 0 }
     , frame =
         Just
-          ( "error"
+          ( "warn"
           , SrcLoc
-              { srcLocPackage = "main"
+              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
-              , srcLocStartLine = 66
+              , srcLocStartLine = 53
               , srcLocStartCol = 15
-              , srcLocEndLine = 66
-              , srcLocEndCol = 20
+              , srcLocEndLine = 53
+              , srcLocEndCol = 19
               }
           )
-    , details = Just "{\"level\":\"Error\",\"house number\":5}"
+    , details = Just "{\"level\":\"Warn\",\"modal\":\"SURPRISE!\"}"
     , summary = Nothing
     , succeeded = Failed
     , containsFailures = True

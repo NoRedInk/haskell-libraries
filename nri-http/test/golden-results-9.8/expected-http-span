@@ -6,42 +6,42 @@ TracingSpan
       Just
         ( "rootTracingSpanIO"
         , SrcLoc
-            { srcLocPackage = "main"
-            , srcLocModule = "Spec.Redis"
-            , srcLocFile = "test/Spec/Redis.hs"
-            , srcLocStartLine = 47
+            { srcLocPackage = "nri-http-0.6.0.0-inplace-spec"
+            , srcLocModule = "Main"
+            , srcLocFile = "test/Main.hs"
+            , srcLocStartLine = 234
             , srcLocStartCol = 7
-            , srcLocEndLine = 47
+            , srcLocEndLine = 234
             , srcLocEndCol = 33
             }
         )
   , details = Nothing
-  , summary = Nothing
+  , summary = Just "mock-uri"
   , succeeded = Succeeded
   , containsFailures = False
   , allocated = 0
   , children =
       [ TracingSpan
-          { name = "Redis Query"
+          { name = "Outgoing HTTP Request"
           , started = MonotonicTime { inMicroseconds = 0 }
           , finished = MonotonicTime { inMicroseconds = 0 }
           , frame =
               Just
-                ( "query"
+                ( "tracingSpanIO"
                 , SrcLoc
-                    { srcLocPackage = "main"
-                    , srcLocModule = "Spec.Redis"
-                    , srcLocFile = "test/Spec/Redis.hs"
-                    , srcLocStartLine = 140
-                    , srcLocStartCol = 13
-                    , srcLocEndLine = 140
-                    , srcLocEndCol = 24
+                    { srcLocPackage = "nri-http-0.6.0.0-inplace-spec"
+                    , srcLocModule = "Http"
+                    , srcLocFile = "src/Http.hs"
+                    , srcLocStartLine = 433
+                    , srcLocStartCol = 11
+                    , srcLocEndLine = 433
+                    , srcLocEndCol = 33
                     }
                 )
           , details =
               Just
-                "{\"commands\":[\"PING\"],\"host\":\"localhost\",\"port\":6379}"
-          , summary = Just "PING"
+                "{\"method\":\"GET\",\"host\":\"mock-uri\",\"path\":\"/\",\"query string\":\"\",\"headers\":{}}"
+          , summary = Just "mock-uri"
           , succeeded = Succeeded
           , containsFailures = False
           , allocated = 0

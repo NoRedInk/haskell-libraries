@@ -6,7 +6,7 @@ TracingSpan
       Just
         ( "rootTracingSpanIO"
         , SrcLoc
-            { srcLocPackage = "main"
+            { srcLocPackage = "nri-redis-0.3.0.0-inplace-tests"
             , srcLocModule = "Spec.Redis"
             , srcLocFile = "test/Spec/Redis.hs"
             , srcLocStartLine = 31
@@ -27,15 +27,15 @@ TracingSpan
           , finished = MonotonicTime { inMicroseconds = 0 }
           , frame =
               Just
-                ( "query"
+                ( "transaction"
                 , SrcLoc
-                    { srcLocPackage = "main"
+                    { srcLocPackage = "nri-redis-0.3.0.0-inplace-tests"
                     , srcLocModule = "Spec.Redis"
                     , srcLocFile = "test/Spec/Redis.hs"
-                    , srcLocStartLine = 123
+                    , srcLocStartLine = 130
                     , srcLocStartCol = 9
-                    , srcLocEndLine = 123
-                    , srcLocEndCol = 28
+                    , srcLocEndLine = 130
+                    , srcLocEndCol = 34
                     }
                 )
           , details =
