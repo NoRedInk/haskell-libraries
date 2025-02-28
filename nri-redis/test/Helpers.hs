@@ -37,4 +37,4 @@ getHandlers = do
 --
 -- We keep this here in case similar is true in later versions of GHC.
 goldenResultsDir :: Text
-goldenResultsDir = "test/golden-results-9.2"
+goldenResultsDir = "test/golden-results-9.8"

@@ -55,7 +55,7 @@ type Expect a = Expect' Error a
 
 -- | Logic for interpreting a response body.
 data Expect' x a where
-  ExpectJson :: Aeson.FromJSON a => Expect a
+  ExpectJson :: (Aeson.FromJSON a) => Expect a
   ExpectText :: Expect Text
   ExpectWhatever :: Expect ()
   ExpectTextResponse :: (Response Text -> Result x a) -> Expect' x a

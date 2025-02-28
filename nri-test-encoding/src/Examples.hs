@@ -36,7 +36,7 @@ data Example = Example
 
 -- | Create an example for a type. Examples consists of a description and an
 -- encoded value.
-example :: Data.Aeson.ToJSON a => Text -> a -> Examples
+example :: (Data.Aeson.ToJSON a) => Text -> a -> Examples
 example description x =
   Example
     { description,

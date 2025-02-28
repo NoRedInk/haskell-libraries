@@ -22,11 +22,9 @@ where
 
 import Data.Function ((&))
 import qualified Data.List
-
 import qualified GHC.Hs
 import qualified GHC.Parser.Annotation
 import qualified GHC.Plugins
-
 import NriPrelude.Plugin.GhcVersionDependent (setIDeclImplicit, withParsedResult)
 import qualified Set
 import Prelude
@@ -51,13 +49,8 @@ plugin =
 addImplicitImports ::
   [GHC.Plugins.CommandLineOption] ->
   GHC.Plugins.ModSummary ->
-#if __GLASGOW_HASKELL__ >= 904
   GHC.Plugins.ParsedResult ->
   GHC.Plugins.Hsc GHC.Plugins.ParsedResult
-#else
-  GHC.Hs.HsParsedModule ->
-  GHC.Plugins.Hsc GHC.Hs.HsParsedModule
-#endif
 addImplicitImports _ _ parsed =
   Prelude.pure $
     withParsedResult parsed $ \parsed' ->

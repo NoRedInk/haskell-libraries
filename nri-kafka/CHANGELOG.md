@@ -1,3 +1,8 @@
+# 0.3.0.0
+
+- Drop support for GHC 9.2.x
+- Support GHC 9.8.3, `bytestring-0.12.x.x`, `text-2.1.x`, `aeson-2.2.x.x`
+
 # 0.2.0.1
 
 - Drop support for `aeson-1.x`

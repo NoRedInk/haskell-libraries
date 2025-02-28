@@ -4,29 +4,22 @@
 -- versions of GHC.  This module uses the CPP extension to import the
 -- right values dependent on the version of GHC.
 
-module NriPrelude.Plugin.GhcVersionDependent (
-  setIDeclImplicit,
-  withParsedResult
-) where
+module NriPrelude.Plugin.GhcVersionDependent
+  ( setIDeclImplicit,
+    withParsedResult,
+  )
+where
 
+import qualified GHC.Driver.Plugins
 import qualified GHC.Hs
-import qualified GHC.Hs.ImpExp 
+import qualified GHC.Hs.ImpExp
 import Prelude
 
-#if __GLASGOW_HASKELL__ >= 904
-import qualified GHC.Driver.Plugins
-#endif
-
-#if __GLASGOW_HASKELL__ >= 904
 withParsedResult :: GHC.Driver.Plugins.ParsedResult -> (GHC.Hs.HsParsedModule -> GHC.Hs.HsParsedModule) -> GHC.Driver.Plugins.ParsedResult
 withParsedResult parsed f =
   parsed
     { GHC.Driver.Plugins.parsedResultModule = f (GHC.Driver.Plugins.parsedResultModule parsed)
     }
-#else
-withParsedResult :: GHC.Hs.HsParsedModule -> (GHC.Hs.HsParsedModule -> GHC.Hs.HsParsedModule) -> GHC.Hs.HsParsedModule
-withParsedResult parsed f = f parsed
-#endif
 
 #if __GLASGOW_HASKELL__ >= 906
 setIDeclImplicit :: Bool -> GHC.Hs.ImpExp.ImportDecl GHC.Hs.GhcPs -> GHC.Hs.ImpExp.ImportDecl GHC.Hs.GhcPs

@@ -28,7 +28,7 @@ import qualified Prelude
 --       , ("treasure.coords.y", "14"   )
 --       , ("treasure.worth"   , "Tons!")
 --       ]
-toHashMap :: Aeson.ToJSON a => a -> HashMap.HashMap Text Text
+toHashMap :: (Aeson.ToJSON a) => a -> HashMap.HashMap Text Text
 toHashMap x =
   case Aeson.toJSON x of
     Aeson.Object object ->

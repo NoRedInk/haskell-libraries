@@ -196,21 +196,21 @@ type Float = Prelude.Double
 -- to be sure exactly what type of number you are dealing with. When you try to
 -- /infer/ these conversions (as Scala does) it can be even more confusing. Elm
 -- has opted for a design that makes all conversions explicit.
-(+) :: Prelude.Num number => number -> number -> number
+(+) :: (Prelude.Num number) => number -> number -> number
 (+) =
   (Prelude.+)
 
 -- | Subtract numbers like @4 - 3 == 1@.
 --
 -- See @'(+)'@ for docs on the @number@ type variable.
-(-) :: Prelude.Num number => number -> number -> number
+(-) :: (Prelude.Num number) => number -> number -> number
 (-) =
   (Prelude.-)
 
 -- | Multiply numbers like @2 * 3 == 6@.
 --
 -- See @'(+)'@ for docs on the @number@ type variable.
-(*) :: Prelude.Num number => number -> number -> number
+(*) :: (Prelude.Num number) => number -> number -> number
 (*) =
   (Prelude.*)
 
@@ -317,7 +317,7 @@ truncate =
 -- Breaking from Elm, this relies on Haskell's @Eq@ typeclass. For example:
 --
 -- > data Foo = Bar | Baz deriving (Eq)
-(==) :: Prelude.Eq a => a -> a -> Bool
+(==) :: (Prelude.Eq a) => a -> a -> Bool
 (==) =
   (Prelude.==)
 
@@ -326,23 +326,23 @@ truncate =
 -- Like with @(==)@, this relies on Haskell's @Eq@ typeclass.
 --
 -- So @(a /= b)@ is the same as @(not (a == b))@.
-(/=) :: Prelude.Eq a => a -> a -> Bool
+(/=) :: (Prelude.Eq a) => a -> a -> Bool
 (/=) =
   (Prelude./=)
 
-(<) :: Prelude.Ord comparable => comparable -> comparable -> Bool
+(<) :: (Prelude.Ord comparable) => comparable -> comparable -> Bool
 (<) =
   (Prelude.<)
 
-(>) :: Prelude.Ord comparable => comparable -> comparable -> Bool
+(>) :: (Prelude.Ord comparable) => comparable -> comparable -> Bool
 (>) =
   (Prelude.>)
 
-(<=) :: Prelude.Ord comparable => comparable -> comparable -> Bool
+(<=) :: (Prelude.Ord comparable) => comparable -> comparable -> Bool
 (<=) =
   (Prelude.<=)
 
-(>=) :: Prelude.Ord comparable => comparable -> comparable -> Bool
+(>=) :: (Prelude.Ord comparable) => comparable -> comparable -> Bool
 (>=) =
   (Prelude.>=)
 
@@ -350,7 +350,7 @@ truncate =
 --
 -- > max 42 12345678 == 12345678
 -- > max "abc" "xyz" == "xyz"
-max :: Prelude.Ord comparable => comparable -> comparable -> comparable
+max :: (Prelude.Ord comparable) => comparable -> comparable -> comparable
 max =
   Prelude.max
 
@@ -358,7 +358,7 @@ max =
 --
 -- > min 42 12345678 == 42
 -- > min "abc" "xyz" == "abc"
-min :: Prelude.Ord comparable => comparable -> comparable -> comparable
+min :: (Prelude.Ord comparable) => comparable -> comparable -> comparable
 min =
   Prelude.min
 
@@ -369,7 +369,7 @@ min =
 -- > compare 3 4 == LT
 -- > compare 4 4 == EQ
 -- > compare 5 4 == GT
-compare :: Prelude.Ord comparable => comparable -> comparable -> Order
+compare :: (Prelude.Ord comparable) => comparable -> comparable -> Order
 compare =
   Prelude.compare
 
@@ -424,7 +424,7 @@ xor =
 --
 -- > "hello" ++ "world" == "helloworld"
 -- > [1,1,2] ++ [3,5,8] == [1,1,2,3,5,8]
-(++) :: Prelude.Semigroup appendable => appendable -> appendable -> appendable
+(++) :: (Prelude.Semigroup appendable) => appendable -> appendable -> appendable
 (++) =
   (Prelude.<>)
 
@@ -462,7 +462,7 @@ remainderBy =
 --    negate 42 == -42
 --    negate -42 == 42
 --    negate 0 == 0
-negate :: Prelude.Num number => number -> number
+negate :: (Prelude.Num number) => number -> number
 negate =
   Prelude.negate
 
@@ -473,7 +473,7 @@ negate =
 -- > abs -4   == 4
 -- > abs -8.5 == 8.5
 -- > abs 3.14 == 3.14
-abs :: Prelude.Num number => number -> number
+abs :: (Prelude.Num number) => number -> number
 abs =
   Prelude.abs
 
@@ -483,7 +483,7 @@ abs =
 -- > 100     if x < 100
 -- >  x      if 100 <= x < 200
 -- > 200     if 200 <= x
-clamp :: Prelude.Ord number => number -> number -> number -> number
+clamp :: (Prelude.Ord number) => number -> number -> number -> number
 clamp low high number
   | number < low = low
   | number > high = high

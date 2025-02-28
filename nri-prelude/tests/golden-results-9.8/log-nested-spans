@@ -6,7 +6,7 @@
         Just
           ( "withContext"
           , SrcLoc
-              { srcLocPackage = "main"
+              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 81
@@ -29,7 +29,7 @@
                 Just
                   ( "withContext"
                   , SrcLoc
-                      { srcLocPackage = "main"
+                      { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
                       , srcLocModule = "LogSpec"
                       , srcLocFile = "tests/LogSpec.hs"
                       , srcLocStartLine = 80
@@ -52,7 +52,7 @@
                         Just
                           ( "info"
                           , SrcLoc
-                              { srcLocPackage = "main"
+                              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
                               , srcLocModule = "LogSpec"
                               , srcLocFile = "tests/LogSpec.hs"
                               , srcLocStartLine = 79

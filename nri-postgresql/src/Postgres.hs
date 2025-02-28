@@ -122,7 +122,7 @@ rollbackAllSafe conn c =
 -- >       Err err -> Task.fail err
 -- >   )
 doQuery ::
-  HasCallStack =>
+  (HasCallStack) =>
   Connection ->
   Query.Query row ->
   (Result Query.Error [row] -> Task e a) ->
@@ -249,8 +249,8 @@ doIO conn io =
   Platform.doAnything (Connection.doAnything conn) (io |> map Ok)
 
 -- useful typeclass instances
-instance PGTypes.PGType "jsonb" => PGTypes.PGType "jsonb[]" where
+instance (PGTypes.PGType "jsonb") => PGTypes.PGType "jsonb[]" where
   type PGVal "jsonb[]" = PGArray.PGArray (PGTypes.PGVal "jsonb")
 
-instance PGTypes.PGType "jsonb" => PGArray.PGArrayType "jsonb[]" where
+instance (PGTypes.PGType "jsonb") => PGArray.PGArrayType "jsonb[]" where
   type PGElemType "jsonb[]" = "jsonb"

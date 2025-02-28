@@ -15,7 +15,7 @@ import qualified Platform
 -- yields a mock Kafka handler, and returns an expectation wrapping a list of
 -- messages that would have been written if the handler was real
 stub ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   (Internal.Handler -> Expect.Expectation) ->
   Expect.Expectation' (List Kafka.Msg)
 stub stubbed = do

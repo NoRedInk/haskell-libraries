@@ -182,10 +182,10 @@ silentHandler = Internal.mkHandler "" (Internal.Clock (pure 0)) (\_ -> pure ()) 
 -- throw an exception in @Control.Exception@, because it results in better logs
 -- for those who'll need to investigate these problems.
 unsafeThrowException ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   Text ->
   Task e a
 unsafeThrowException title =
-  Internal.Task
-    <| \_ ->
+  Internal.Task <|
+    \_ ->
       Exception.throwString (Data.Text.unpack title)

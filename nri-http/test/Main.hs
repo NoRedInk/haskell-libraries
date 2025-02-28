@@ -211,7 +211,7 @@ withServerIO log app run = do
 -- immediately returns that request so you can run expectations against it.
 --
 -- Useful if you want to check properties of requests you send.
-expectRequest :: Show e => (Http.Handler -> Text -> Task e a) -> Expect.Expectation' Wai.Request
+expectRequest :: (Show e) => (Http.Handler -> Text -> Task e a) -> Expect.Expectation' Wai.Request
 expectRequest run = do
   let app req _respond = Exception.throwIO (FirstRequest req)
   log <- Expect.succeeds Platform.logHandler
@@ -226,7 +226,7 @@ newtype FirstRequest = FirstRequest Wai.Request deriving (Show)
 
 instance Exception.Exception FirstRequest
 
-spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForTask :: (Show e) => Task e () -> Expect.Expectation' Platform.TracingSpan
 spanForTask task = do
   spanVar <- Expect.fromIO MVar.newEmptyMVar
   res <-

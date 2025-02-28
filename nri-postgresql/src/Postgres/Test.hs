@@ -24,7 +24,7 @@ import qualified Prelude
 --     Postgres.Test.test "My Postgres test" <| \Postgres -> do
 --        -- test stuff!
 test ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   Text ->
   (Postgres.Connection -> Expect.Expectation) ->
   Test.Test

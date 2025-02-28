@@ -138,7 +138,7 @@ byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
 byteStringApi = makeApi Codec.byteStringCodec
 
 makeApi ::
-  Ord a =>
+  (Ord a) =>
   Codec.Codec a ->
   (key -> Text) ->
   Api key a

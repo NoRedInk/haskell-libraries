@@ -134,7 +134,7 @@ byteStringApi :: (key -> Text) -> Api key ByteString.ByteString
 byteStringApi = makeApi Codec.byteStringCodec
 
 makeApi ::
-  Ord a =>
+  (Ord a) =>
   Codec.Codec a ->
   (key -> Text) ->
   Api key a
@@ -154,7 +154,6 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
         Internal.Smembers (toKey key)
           |> Internal.WithResult (Prelude.traverse codecDecoder)
           |> Internal.map Set.fromList,
-    sismember = \key val->
-            Internal.Sismember (toKey key) (codecEncoder val)
-
+      sismember = \key val ->
+        Internal.Sismember (toKey key) (codecEncoder val)
     }

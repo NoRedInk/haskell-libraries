@@ -95,8 +95,8 @@ length =
 -- > initialize 4 (always 0)  == fromList [0,0,0,0]
 initialize :: Int -> (Int -> a) -> Array a
 initialize n f =
-  Array
-    <| Data.Vector.generate
+  Array <|
+    Data.Vector.generate
       (Prelude.fromIntegral n)
       (Prelude.fromIntegral >> f)
 
@@ -108,8 +108,8 @@ initialize n f =
 -- Notice that @repeat 3 x@ is the same as @initialize 3 (always x)@.
 repeat :: Int -> a -> Array a
 repeat n e =
-  Array
-    <| Data.Vector.replicate (Prelude.fromIntegral n) e
+  Array <|
+    Data.Vector.replicate (Prelude.fromIntegral n) e
 
 -- | Create an array from a 'List'.
 fromList :: List a -> Array a

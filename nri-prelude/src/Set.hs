@@ -57,12 +57,12 @@ singleton =
   Data.Set.singleton
 
 -- | Insert a value into a set.
-insert :: Ord comparable => comparable -> Set comparable -> Set comparable
+insert :: (Ord comparable) => comparable -> Set comparable -> Set comparable
 insert =
   Data.Set.insert
 
 -- | Remove a value from a set. If the value is not found, no changes are made.
-remove :: Ord comparable => comparable -> Set comparable -> Set comparable
+remove :: (Ord comparable) => comparable -> Set comparable -> Set comparable
 remove =
   Data.Set.delete
 
@@ -72,7 +72,7 @@ isEmpty =
   Data.Set.null
 
 -- | Determine if a value is in a set.
-member :: Ord comparable => comparable -> Set comparable -> Bool
+member :: (Ord comparable) => comparable -> Set comparable -> Bool
 member =
   Data.Set.member
 
@@ -86,7 +86,7 @@ size =
 --
 -- In Elm it's not possible to have two comparable elements that are not equal, but
 -- it is possible in Haskell.
-union :: Ord comparable => Set comparable -> Set comparable -> Set comparable
+union :: (Ord comparable) => Set comparable -> Set comparable -> Set comparable
 union =
   Data.Set.union
 
@@ -95,13 +95,13 @@ union =
 --
 -- In Elm it's not possible to have two comparable elements that are not equal, but
 -- it is possible in Haskell.
-intersect :: Ord comparable => Set comparable -> Set comparable -> Set comparable
+intersect :: (Ord comparable) => Set comparable -> Set comparable -> Set comparable
 intersect =
   Data.Set.intersection
 
 -- | Get the difference between the first set and the second. Keeps values
 -- that do not appear in the second set.
-diff :: Ord comparable => Set comparable -> Set comparable -> Set comparable
+diff :: (Ord comparable) => Set comparable -> Set comparable -> Set comparable
 diff =
   Data.Set.difference
 
@@ -111,7 +111,7 @@ toList =
   Data.Set.toAscList
 
 -- | Convert a list into a set, removing any duplicates.
-fromList :: Ord comparable => List comparable -> Set comparable
+fromList :: (Ord comparable) => List comparable -> Set comparable
 fromList =
   Data.Set.fromList
 
@@ -126,7 +126,7 @@ foldr =
   Data.Set.foldr'
 
 -- | Map a function onto a set, creating a new set with no duplicates.
-map :: Ord comparable2 => (comparable -> comparable2) -> Set comparable -> Set comparable2
+map :: (Ord comparable2) => (comparable -> comparable2) -> Set comparable -> Set comparable2
 map =
   Data.Set.map
 

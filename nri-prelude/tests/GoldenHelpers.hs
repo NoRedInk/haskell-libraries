@@ -13,13 +13,12 @@ import Data.Text (Text)
 -- > foo
 -- >   bar
 -- >   baz
--- 
+--
 -- In GHC 8.10.x (and possibly GHC 9.0.x?) `srcLocEndLine` and `srcLocEndCol`
 -- would correspond to the `z` at the end of `baz`.  Unfortunately, in GHC 9.2.x
 -- it corresponds to the second `o` at the end of `foo`.
 --
 -- We keep this helper around so that if this happens again for future GHC versions
 -- we can have different golden results for different GHC versions as necessary.
-
 goldenResultsDir :: Text
-goldenResultsDir = "tests/golden-results-9.2"
+goldenResultsDir = "tests/golden-results-9.8"

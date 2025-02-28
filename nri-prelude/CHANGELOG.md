@@ -1,7 +1,7 @@
 # Unreleased
 
-- Drop support for GHC 8.10.7, `aeson-1.x`
-- Support GHC 9.6.5
+- Drop support for GHC 8.10.7, GHC 9.2.x `aeson-1.x`
+- Support GHC 9.6.5, GHC 9.8.3, `bytestring-0.12.x.x`, `text-2.1.x`, `aeson-2.2.x.x`
 - Allow specifying where devlogs for log-explorer go through `NRI_DEV_LOG` environment variable.
 - Added `putText` and `putTextLn` functions for thread-safe console printing.
 - Allow `hedgehog-1.4.x`

@@ -21,7 +21,7 @@ tests =
 --
 -- We lean on `show` for equality since `Database.Redis.ConnectInfo` doesn't have
 -- an `Eq` instance (but does have a `Show` instance)
-expectEqualShow :: Show a => a -> a -> Expect.Expectation
+expectEqualShow :: (Show a) => a -> a -> Expect.Expectation
 expectEqualShow x y = Expect.equal (show x) (show y)
 
 decoderTests :: Test.Test

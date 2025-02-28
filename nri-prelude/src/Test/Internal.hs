@@ -154,7 +154,7 @@ describe description tests =
 --
 -- This functionality is similar to "pending" tests in other frameworks, except
 -- that a todo test is considered failing but a pending test often is not.
-todo :: Stack.HasCallStack => Text -> Test
+todo :: (Stack.HasCallStack) => Text -> Test
 todo name =
   Test
     [ SingleTest
@@ -176,7 +176,7 @@ todo name =
 -- >     \_ ->
 -- >         List.length []
 -- >             |> Expect.equal 0
-test :: Stack.HasCallStack => Text -> (() -> Expectation) -> Test
+test :: (Stack.HasCallStack) => Text -> (() -> Expectation) -> Test
 test name expectation =
   Test
     [ SingleTest
@@ -260,7 +260,7 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
         }
     ]
 
-fuzzBody :: Show a => Fuzzer a -> (a -> Expectation) -> Expectation
+fuzzBody :: (Show a) => Fuzzer a -> (a -> Expectation) -> Expectation
 fuzzBody (Fuzzer gen) expectation = do
   Expectation
     <| Platform.Internal.Task
@@ -552,7 +552,7 @@ onException f (Platform.Internal.Task run') =
           |> Exception.handleAny (Task.attempt log << f)
     )
 
-getFrame :: Stack.HasCallStack => Text -> Stack.SrcLoc
+getFrame :: (Stack.HasCallStack) => Text -> Stack.SrcLoc
 getFrame testName =
   case Stack.callStack |> Stack.getCallStack |> List.head of
     Just (_, srcLoc) ->
@@ -566,7 +566,7 @@ getFrame testName =
         |> TestRunnerMessedUp
         |> Exception.impureThrow
 
-groupBy :: Ord key => (a -> key) -> [a] -> Dict.Dict key [a]
+groupBy :: (Ord key) => (a -> key) -> [a] -> Dict.Dict key [a]
 groupBy key xs =
   List.foldr
     ( \x acc ->
@@ -594,16 +594,16 @@ append (Expectation task1) (Expectation task2) =
 -- never each other, to ensure a single unnested 'expectation' entry from
 -- appearing in log-explorer traces.
 
-pass :: Stack.HasCallStack => Text -> a -> Expectation' a
+pass :: (Stack.HasCallStack) => Text -> a -> Expectation' a
 pass name a = Stack.withFrozenCallStack traceExpectation name (Task.succeed a)
 
-failAssertion :: Stack.HasCallStack => Text -> Text -> Expectation' a
+failAssertion :: (Stack.HasCallStack) => Text -> Text -> Expectation' a
 failAssertion name err =
   FailedAssertion err (Stack.withFrozenCallStack getFrame name)
     |> Task.fail
     |> Stack.withFrozenCallStack traceExpectation name
 
-traceExpectation :: Stack.HasCallStack => Text -> Task Failure a -> Expectation' a
+traceExpectation :: (Stack.HasCallStack) => Text -> Task Failure a -> Expectation' a
 traceExpectation name task =
   Stack.withFrozenCallStack
     Platform.tracingSpan

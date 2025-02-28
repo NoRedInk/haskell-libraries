@@ -181,7 +181,7 @@ reverse =
 --
 -- > member 9 [1,2,3,4] == False
 -- > member 4 [1,2,3,4] == True
-member :: Prelude.Eq a => a -> List a -> Bool
+member :: (Prelude.Eq a) => a -> List a -> Bool
 member =
   Data.List.elem
 
@@ -207,7 +207,7 @@ any =
 --
 -- > maximum [1,4,2] == Just 4
 -- > maximum []      == Nothing
-maximum :: Ord a => List a -> Maybe a
+maximum :: (Ord a) => List a -> Maybe a
 maximum list =
   case list of
     [] ->
@@ -219,7 +219,7 @@ maximum list =
 --
 -- > minimum [3,2,1] == Just 1
 -- > minimum []      == Nothing
-minimum :: Ord a => List a -> Maybe a
+minimum :: (Ord a) => List a -> Maybe a
 minimum list =
   case list of
     [] ->
@@ -230,14 +230,14 @@ minimum list =
 -- | Get the sum of the list elements.
 --
 -- > sum [1,2,3,4] == 10
-sum :: Num a => List a -> a
+sum :: (Num a) => List a -> a
 sum =
   Data.Foldable.sum
 
 -- | Get the product of the list elements.
 --
 -- > product [1,2,3,4] == 24
-product :: Num a => List a -> a
+product :: (Num a) => List a -> a
 product =
   Data.Foldable.product
 
@@ -319,7 +319,7 @@ map5 =
 -- | Sort values from lowest to highest
 --
 -- > sort [3,1,5] == [1,3,5]
-sort :: Ord a => List a -> List a
+sort :: (Ord a) => List a -> List a
 sort =
   Data.List.sort
 
@@ -333,7 +333,7 @@ sort =
 -- > sortBy .height [chuck,alice,bob] == [alice,chuck,bob]
 -- >
 -- > sortBy String.length ["mouse","cat"] == ["cat","mouse"]
-sortBy :: Ord b => (a -> b) -> List a -> List a
+sortBy :: (Ord b) => (a -> b) -> List a -> List a
 sortBy =
   Data.List.sortOn
 

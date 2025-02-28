@@ -113,7 +113,7 @@ getTextBody req =
 -- submitted inside a 'stub' function.
 --
 -- This will return an error if parsing the JSON body fails.
-getJsonBody :: Aeson.FromJSON a => Internal.Request' e expect -> Result Text a
+getJsonBody :: (Aeson.FromJSON a) => Internal.Request' e expect -> Result Text a
 getJsonBody req =
   case Aeson.eitherDecodeStrict (getBytesBody req) of
     Prelude.Left err -> Err (Text.fromList err)
@@ -178,7 +178,7 @@ tryRespond (Stub respond : rest) req =
     |> Maybe.andThen Dynamic.fromDynamic
     |> Maybe.withDefault (tryRespond rest req)
 
-printType :: Dynamic.Typeable expect => proxy expect -> Text
+printType :: (Dynamic.Typeable expect) => proxy expect -> Text
 printType expect =
   Type.Reflection.someTypeRep expect
     |> Debug.toString

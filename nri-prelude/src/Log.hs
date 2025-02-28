@@ -31,8 +31,8 @@ where
 
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
-import qualified GHC.Stack as Stack
 import Data.Aeson.Key (fromText)
+import qualified GHC.Stack as Stack
 import NriPrelude
 import qualified Platform
 import qualified Platform.Internal as Internal
@@ -47,7 +47,7 @@ import qualified Prelude
 -- information that might be relevant for debugging.
 --
 -- > debug "Computation partially succeeded" [context "answer" 2]
-debug :: Stack.HasCallStack => Text -> [Context] -> Task e ()
+debug :: (Stack.HasCallStack) => Text -> [Context] -> Task e ()
 debug message contexts =
   Stack.withFrozenCallStack
     log
@@ -63,7 +63,7 @@ debug message contexts =
 -- information that might be relevant for debugging.
 --
 -- > info "I added 1 and 1" [context "answer" 2]
-info :: Stack.HasCallStack => Text -> [Context] -> Task e ()
+info :: (Stack.HasCallStack) => Text -> [Context] -> Task e ()
 info message contexts =
   Stack.withFrozenCallStack
     log
@@ -79,7 +79,7 @@ info message contexts =
 -- information that might be relevant for debugging.
 --
 -- > warn "This field was sent, but we're gonna deprecate it!" []
-warn :: Stack.HasCallStack => Text -> [Context] -> Task e ()
+warn :: (Stack.HasCallStack) => Text -> [Context] -> Task e ()
 warn message contexts =
   Stack.withFrozenCallStack
     log
@@ -94,7 +94,7 @@ warn message contexts =
 -- information that might be relevant for debugging.
 --
 -- > error "The user tried to request this thing, but they aren't allowed!" []
-error :: Stack.HasCallStack => Text -> [Context] -> Task e ()
+error :: (Stack.HasCallStack) => Text -> [Context] -> Task e ()
 error message contexts =
   Stack.withFrozenCallStack
     log
@@ -122,7 +122,7 @@ error message contexts =
 -- the stack trace, since it is used fairly often already. It will not be complete either, but
 -- it's the best we can do without too much trouble.
 withContext ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   Text ->
   [Context] ->
   Task e b ->
@@ -235,7 +235,7 @@ instance Aeson.ToJSON LogLevel
 -- ReportAsFailed marks the request as a failure in logging, but has no impact on the resulting Task. E.g. will not trigger a 500 error but will report an error to, e.g. BugSnag.
 data ReportStatus = ReportAsFailed | ReportAsSucceeded
 
-log :: Stack.HasCallStack => Text -> ReportStatus -> [Context] -> Task e ()
+log :: (Stack.HasCallStack) => Text -> ReportStatus -> [Context] -> Task e ()
 log msg reportStatus contexts =
   Internal.tracingSpan msg <| do
     Platform.setTracingSpanDetails (LogContexts contexts)

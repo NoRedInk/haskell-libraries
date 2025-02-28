@@ -6,7 +6,7 @@ TracingSpan
       Just
         ( "rootTracingSpanIO"
         , SrcLoc
-            { srcLocPackage = "main"
+            { srcLocPackage = "nri-postgresql-0.3.0.0-inplace-tests"
             , srcLocModule = "ObservabilitySpec"
             , srcLocFile = "test/ObservabilitySpec.hs"
             , srcLocStartLine = 54
@@ -29,7 +29,7 @@ TracingSpan
               Just
                 ( "doQuery"
                 , SrcLoc
-                    { srcLocPackage = "main"
+                    { srcLocPackage = "nri-postgresql-0.3.0.0-inplace-tests"
                     , srcLocModule = "ObservabilitySpec"
                     , srcLocFile = "test/ObservabilitySpec.hs"
                     , srcLocStartLine = 35
@@ -54,7 +54,7 @@ TracingSpan
                       Just
                         ( "withContext"
                         , SrcLoc
-                            { srcLocPackage = "main"
+                            { srcLocPackage = "nri-postgresql-0.3.0.0-inplace-tests"
                             , srcLocModule = "Postgres"
                             , srcLocFile = "src/Postgres.hs"
                             , srcLocStartLine = 225

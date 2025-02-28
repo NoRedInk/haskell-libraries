@@ -6,12 +6,12 @@ TracingSpan
       Just
         ( "rootTracingSpanIO"
         , SrcLoc
-            { srcLocPackage = "main"
+            { srcLocPackage = "nri-redis-0.3.0.0-inplace-tests"
             , srcLocModule = "Spec.Redis"
             , srcLocFile = "test/Spec/Redis.hs"
-            , srcLocStartLine = 31
+            , srcLocStartLine = 47
             , srcLocStartCol = 7
-            , srcLocEndLine = 31
+            , srcLocEndLine = 47
             , srcLocEndCol = 33
             }
         )
@@ -29,13 +29,13 @@ TracingSpan
               Just
                 ( "query"
                 , SrcLoc
-                    { srcLocPackage = "main"
+                    { srcLocPackage = "nri-redis-0.3.0.0-inplace-tests"
                     , srcLocModule = "Spec.Redis"
                     , srcLocFile = "test/Spec/Redis.hs"
-                    , srcLocStartLine = 81
-                    , srcLocStartCol = 9
-                    , srcLocEndLine = 81
-                    , srcLocEndCol = 20
+                    , srcLocStartLine = 140
+                    , srcLocStartCol = 13
+                    , srcLocEndLine = 140
+                    , srcLocEndCol = 24
                     }
                 )
           , details =

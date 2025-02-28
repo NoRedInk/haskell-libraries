@@ -602,7 +602,8 @@ annotateSearch maybeEditor span =
   case maybeEditor of
     Nothing -> (NoMatch, span)
     Just editor ->
-      if getEditContents editor /= ""
+      if getEditContents editor
+        /= ""
         && Text.contains
           (Data.Text.toCaseFold <| getEditContents editor)
           (Data.Text.toCaseFold <| rawSummary (original span))
@@ -1022,7 +1023,8 @@ viewSpanDetails Span {original} =
             Just summary -> viewDetail "summary" summary,
           viewDetail
             "duration"
-            ( ( Platform.finished original - Platform.started original
+            ( ( Platform.finished original
+                  - Platform.started original
                   |> Platform.inMicroseconds
                   |> Prelude.fromIntegral
                   |> (\n -> n `Prelude.div` 1000)

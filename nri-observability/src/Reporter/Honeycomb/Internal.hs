@@ -137,7 +137,8 @@ deriveSampleRate rootSpan settings =
 -- https://www.wolframalpha.com/input/?i=plot+1%2Fmax%281%2F1000%2C+min%281%2C+%281%2F1000%29+*+%281.5+%5E+%28x+%2F+30%29%29%29%29+from+x%3D1+to+x%3D300
 sampleRateForDuration :: Float -> Float -> Float -> Float
 sampleRateForDuration baseRate requestDurationMs apdexTMs =
-  baseRate * (1.5 ^ (requestDurationMs / apdexTMs))
+  baseRate
+    * (1.5 ^ (requestDurationMs / apdexTMs))
     |> clamp baseRate 1
 
 calculateApdex :: Settings -> Platform.TracingSpan -> Float
@@ -443,7 +444,7 @@ newtype Span = Span (Dict.Dict Text JsonEncodable)
   deriving (Aeson.ToJSON, Show)
 
 data JsonEncodable where
-  JsonEncodable :: Aeson.ToJSON a => a -> JsonEncodable
+  JsonEncodable :: (Aeson.ToJSON a) => a -> JsonEncodable
 
 instance Aeson.ToJSON JsonEncodable where
   toEncoding (JsonEncodable x) = Aeson.toEncoding x
@@ -455,7 +456,7 @@ instance Show JsonEncodable where
 emptySpan :: Span
 emptySpan = Span Dict.empty
 
-addField :: Aeson.ToJSON a => Text -> a -> Span -> Span
+addField :: (Aeson.ToJSON a) => Text -> a -> Span -> Span
 addField key val (Span span) = Span (Dict.insert key (JsonEncodable val) span)
 
 newtype SpanId = SpanId Text

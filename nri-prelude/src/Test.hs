@@ -50,7 +50,7 @@ import qualified Prelude
 -- >
 -- > main :: IO ()
 -- > main = Test.run  (Test.todo "write your tests here!")
-run :: Stack.HasCallStack => Internal.Test -> Prelude.IO ()
+run :: (Stack.HasCallStack) => Internal.Test -> Prelude.IO ()
 run suite = do
   -- Work around `hGetContents: invalid argument (invalid byte sequence)` bug on
   -- Nix: https://github.com/dhall-lang/dhall-haskell/issues/865
@@ -84,7 +84,7 @@ reportStdout :: Internal.SuiteResult -> Prelude.IO ()
 reportStdout results =
   Test.Reporter.Stdout.report System.IO.stdout results
 
-reportLogfile :: Stack.HasCallStack => Internal.SuiteResult -> Prelude.IO ()
+reportLogfile :: (Stack.HasCallStack) => Internal.SuiteResult -> Prelude.IO ()
 reportLogfile results =
   Stack.withFrozenCallStack
     Test.Reporter.Logfile.report
