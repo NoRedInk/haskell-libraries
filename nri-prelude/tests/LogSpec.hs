@@ -187,7 +187,7 @@ data TestException = TestException deriving (Show)
 
 instance Exception.Exception TestException
 
-newHandler :: Stack.HasCallStack => Prelude.IO (Prelude.IO [Internal.TracingSpan], Internal.LogHandler)
+newHandler :: (Stack.HasCallStack) => Prelude.IO (Prelude.IO [Internal.TracingSpan], Internal.LogHandler)
 newHandler = do
   recordedTracingSpans <- IORef.newIORef []
   handler <-

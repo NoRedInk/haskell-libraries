@@ -86,12 +86,12 @@ empty =
 -- > get "Tom"   animals == Just Cat
 -- > get "Jerry" animals == Just Mouse
 -- > get "Spike" animals == Nothing
-get :: Ord comparable => comparable -> Dict comparable v -> Maybe v
+get :: (Ord comparable) => comparable -> Dict comparable v -> Maybe v
 get =
   Data.Map.Strict.lookup
 
 -- | Determine if a key is in a dictionary.
-member :: Ord comparable => comparable -> Dict comparable v -> Bool
+member :: (Ord comparable) => comparable -> Dict comparable v -> Bool
 member =
   Data.Map.Strict.member
 
@@ -109,18 +109,18 @@ isEmpty =
 
 -- | Insert a key-value pair into a dictionary. Replaces value when there is
 -- a collision.
-insert :: Ord comparable => comparable -> v -> Dict comparable v -> Dict comparable v
+insert :: (Ord comparable) => comparable -> v -> Dict comparable v -> Dict comparable v
 insert =
   Data.Map.Strict.insert
 
 -- | Remove a key-value pair from a dictionary. If the key is not found,
 -- no changes are made.
-remove :: Ord comparable => comparable -> Dict comparable v -> Dict comparable v
+remove :: (Ord comparable) => comparable -> Dict comparable v -> Dict comparable v
 remove =
   Data.Map.Strict.delete
 
 -- | Update the value of a dictionary for a specific key with a given function.
-update :: Ord comparable => comparable -> (Maybe v -> Maybe v) -> Dict comparable v -> Dict comparable v
+update :: (Ord comparable) => comparable -> (Maybe v -> Maybe v) -> Dict comparable v -> Dict comparable v
 update targetKey alter dictionary =
   let maybeItemToSet =
         Data.Map.Strict.lookup targetKey dictionary |> alter
@@ -139,18 +139,18 @@ singleton =
 
 -- | Combine two dictionaries. If there is a collision, preference is given
 -- to the first dictionary.
-union :: Ord comparable => Dict comparable v -> Dict comparable v -> Dict comparable v
+union :: (Ord comparable) => Dict comparable v -> Dict comparable v -> Dict comparable v
 union =
   Data.Map.Strict.union
 
 -- | Keep a key-value pair when its key appears in the second dictionary.
 -- Preference is given to values in the first dictionary.
-intersect :: Ord comparable => Dict comparable v -> Dict comparable v -> Dict comparable v
+intersect :: (Ord comparable) => Dict comparable v -> Dict comparable v -> Dict comparable v
 intersect =
   Data.Map.Strict.intersection
 
 -- | Keep a key-value pair when its key does not appear in the second dictionary.
-diff :: Ord comparable => Dict comparable a -> Dict comparable b -> Dict comparable a
+diff :: (Ord comparable) => Dict comparable a -> Dict comparable b -> Dict comparable a
 diff =
   Data.Map.Strict.difference
 
@@ -164,7 +164,7 @@ diff =
 -- You then traverse all the keys from lowest to highest, building up whatever
 -- you want.
 merge ::
-  Ord comparable =>
+  (Ord comparable) =>
   (comparable -> a -> result -> result) ->
   (comparable -> a -> b -> result -> result) ->
   (comparable -> b -> result -> result) ->
@@ -255,5 +255,5 @@ toList :: Dict k v -> List (k, v)
 toList = Data.Map.Strict.toList
 
 -- | Convert an association list into a dictionary.
-fromList :: Ord comparable => List (comparable, v) -> Dict comparable v
+fromList :: (Ord comparable) => List (comparable, v) -> Dict comparable v
 fromList = Data.Map.Strict.fromList

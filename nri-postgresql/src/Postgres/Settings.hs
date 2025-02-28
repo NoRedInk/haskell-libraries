@@ -318,9 +318,11 @@ toPGDatabase
           -- https://www.postgresql.org/docs/9.6/libpq-connect.html#LIBPQ-CONNECT-HOST
           if Text.startsWith "/" host
             then
-              Text.toList host </> ".s.PGSQL." ++ show port
-                |> SockAddrUnix
-                |> Right
+              Text.toList host
+                </> ".s.PGSQL."
+                  ++ show port
+                  |> SockAddrUnix
+                  |> Right
             else Left (Text.toList host, show port)
       }
     where

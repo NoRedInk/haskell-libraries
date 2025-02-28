@@ -208,7 +208,7 @@ throttle (Settings.ThrottleAt maxMsgsPerSecondPerPartition) maxPollIntervalMs ne
     then Control.Concurrent.threadDelay microSecondsToSleep
     else Prelude.pure ()
 
-groupDictAndMap :: Ord b => (a -> (b, c)) -> List a -> Dict.Dict b (List c)
+groupDictAndMap :: (Ord b) => (a -> (b, c)) -> List a -> Dict.Dict b (List c)
 groupDictAndMap f =
   List.foldr
     ( \x ->

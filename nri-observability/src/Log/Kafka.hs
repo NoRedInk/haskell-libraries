@@ -121,5 +121,5 @@ instance Aeson.ToJSON Contents where
 -- > instance Aeson.ToJSON MyMessagePayload
 -- >
 -- > contents = mkContents MyMessagePayload { counter = 5 }
-mkContents :: Aeson.ToJSON a => a -> Contents
+mkContents :: (Aeson.ToJSON a) => a -> Contents
 mkContents = Contents

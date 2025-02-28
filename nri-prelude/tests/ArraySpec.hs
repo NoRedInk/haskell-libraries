@@ -38,7 +38,8 @@ initTests =
           |> toList
           |> Expect.equal (List.range 0 (size_ - 1)),
       fuzz size "push" <| \size_ ->
-        size_ - 1
+        size_
+          - 1
           |> List.range 0
           |> List.foldl push empty
           |> Expect.equal (initialize size_ identity),

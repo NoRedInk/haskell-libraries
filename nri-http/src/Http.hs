@@ -167,7 +167,7 @@ stringBody mimeType text =
 
 -- | Put some JSON value in the body of your Request. This will automatically
 -- add the Content-Type: application/json header.
-jsonBody :: Aeson.ToJSON body => body -> Body
+jsonBody :: (Aeson.ToJSON body) => body -> Body
 jsonBody json =
   Internal.Body
     { Internal.bodyContents = Aeson.encode json,
@@ -325,7 +325,7 @@ mkMetadata response =
 
 -- |
 -- Expect the response body to be JSON.
-expectJson :: Aeson.FromJSON a => Expect a
+expectJson :: (Aeson.FromJSON a) => Expect a
 expectJson = Internal.ExpectJson
 
 -- |

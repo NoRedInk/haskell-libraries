@@ -93,7 +93,7 @@ import qualified Prelude
 -- >
 -- >             Err err ->
 -- >                 Expect.fail err
-pass :: Stack.HasCallStack => Expectation
+pass :: (Stack.HasCallStack) => Expectation
 pass = Stack.withFrozenCallStack Internal.pass "Expect.pass" ()
 
 -- | Fails with the given message.
@@ -111,7 +111,7 @@ pass = Stack.withFrozenCallStack Internal.pass "Expect.pass" ()
 -- >
 -- >             Err err ->
 -- >                 Expect.fail err
-fail :: Stack.HasCallStack => Text -> Expectation
+fail :: (Stack.HasCallStack) => Text -> Expectation
 fail msg =
   Stack.withFrozenCallStack Internal.failAssertion "Expect.fail" msg
 
@@ -120,7 +120,7 @@ fail msg =
 -- > "something"
 -- >     |> Expect.equal "something else"
 -- >     |> Expect.onFail "thought those two strings would be the same"
-onFail :: Stack.HasCallStack => Text -> Expectation -> Expectation
+onFail :: (Stack.HasCallStack) => Text -> Expectation -> Expectation
 onFail msg (Internal.Expectation task) =
   task
     |> Task.onError
@@ -369,7 +369,7 @@ withinHelper tolerance expected actual =
 -- > Expected the list to be empty.
 -- >
 -- > -}
-true :: Stack.HasCallStack => Bool -> Expectation
+true :: (Stack.HasCallStack) => Bool -> Expectation
 true x =
   if x
     then Stack.withFrozenCallStack Internal.pass "Expect.true" ()
@@ -392,7 +392,7 @@ true x =
 -- > Expected the list not to be empty.
 -- >
 -- > -}
-false :: Stack.HasCallStack => Bool -> Expectation
+false :: (Stack.HasCallStack) => Bool -> Expectation
 false x =
   if x
     then Stack.withFrozenCallStack Internal.failAssertion "Expect.false" "I expected a False but got True"
@@ -425,7 +425,7 @@ false x =
 -- > ╵
 -- > -10
 -- > -}
-all :: Stack.HasCallStack => List (subject -> Expectation) -> subject -> Expectation
+all :: (Stack.HasCallStack) => List (subject -> Expectation) -> subject -> Expectation
 all expectations subject =
   List.foldl
     ( \expectation acc ->
@@ -522,7 +522,7 @@ err res =
 -- encodings. When a test fails we can throw away the file, rerun the test, and
 -- use @git diff golden-results/complicated-object.txt@ to check whether the
 -- changes are acceptable.
-equalToContentsOf :: Stack.HasCallStack => Text -> Text -> Expectation
+equalToContentsOf :: (Stack.HasCallStack) => Text -> Text -> Expectation
 equalToContentsOf filepath' actual = do
   let filepath = Data.Text.unpack filepath'
   exists <-

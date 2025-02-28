@@ -17,7 +17,7 @@ import qualified Tuple
 import qualified Prelude
 
 report ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   (Platform.TracingSpan -> Prelude.IO ()) ->
   Internal.SuiteResult ->
   Prelude.IO ()
@@ -113,7 +113,7 @@ groupIntoNamespaces namespacedSpans =
                   ]
       )
 
-groupBy :: Ord b => (a -> b) -> List a -> Dict.Dict b (List a)
+groupBy :: (Ord b) => (a -> b) -> List a -> Dict.Dict b (List a)
 groupBy f list =
   List.foldr
     ( \x ->

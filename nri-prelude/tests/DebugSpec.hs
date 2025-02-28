@@ -42,6 +42,6 @@ todoTests =
   ]
 
 -- | Extracts the first line of a given text string if it exists. Otherwise returns Nothing.
-firstLine :: Show a => a -> Maybe Text
+firstLine :: (Show a) => a -> Maybe Text
 firstLine =
   Debug.toString >> Text.lines >> head

@@ -275,7 +275,9 @@ doBreadcrumb timer span =
         case Platform.frame span of
           Nothing -> Nothing
           Just (_, frame) ->
-            Stack.srcLocFile frame ++ ":" ++ Prelude.show (Stack.srcLocStartLine frame)
+            Stack.srcLocFile frame
+              ++ ":"
+              ++ Prelude.show (Stack.srcLocStartLine frame)
               |> Text.fromList
               |> HashMap.singleton "stack frame"
               |> Just
@@ -465,7 +467,7 @@ toStackFrame functionName frame =
       Bugsnag.stackFrame_inProject = Just True
     }
 
-typeName :: forall a. Typeable.Typeable a => a -> Text
+typeName :: forall a. (Typeable.Typeable a) => a -> Text
 typeName _ =
   Typeable.typeRep (Proxy.Proxy :: Proxy.Proxy a)
     |> Prelude.show

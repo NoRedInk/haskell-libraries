@@ -46,7 +46,7 @@ tests postgres =
             "test/golden-results/observability-spec-postgres-reporting-ghc-9"
     ]
 
-spanForTask :: Show e => Task e () -> Expect.Expectation' Platform.TracingSpan
+spanForTask :: (Show e) => Task e () -> Expect.Expectation' Platform.TracingSpan
 spanForTask task =
   Expect.fromIO <| do
     spanVar <- MVar.newEmptyMVar

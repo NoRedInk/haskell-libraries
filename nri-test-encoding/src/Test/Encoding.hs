@@ -11,12 +11,14 @@ import Test (Test, test)
 import qualified Text
 
 -- | Creates tests for some examples
-examplesToTest :: Stack.HasCallStack => Text -> Text -> Examples.Examples -> Test
+examplesToTest :: (Stack.HasCallStack) => Text -> Text -> Examples.Examples -> Test
 examplesToTest name fileName examples =
   test name <| \() ->
     Expect.equalToContentsOf
-      ( "test" </> "golden-results" </> Text.toList fileName
-          |> FilePath.makeValid
-          |> Text.fromList
+      ( "test"
+          </> "golden-results"
+          </> Text.toList fileName
+            |> FilePath.makeValid
+            |> Text.fromList
       )
       (Examples.render examples)

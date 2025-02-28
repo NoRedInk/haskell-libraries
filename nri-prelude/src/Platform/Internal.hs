@@ -171,23 +171,23 @@ instance Aeson.ToJSON TracingSpan where
       ( "name"
           .= name span
           ++ "started"
-          .= started span
+            .= started span
           ++ "finished"
-          .= finished span
+            .= finished span
           ++ "frame"
-          .= map SrcLocForEncoding (frame span)
+            .= map SrcLocForEncoding (frame span)
           ++ "details"
-          .= details span
+            .= details span
           ++ "summary"
-          .= summary span
+            .= summary span
           ++ "succeeded"
-          .= succeeded span
+            .= succeeded span
           ++ "containsFailures"
-          .= containsFailures span
+            .= containsFailures span
           ++ "allocated"
-          .= allocated span
+            .= allocated span
           ++ "children"
-          .= children span
+            .= children span
       )
 
 instance Aeson.FromJSON TracingSpan where
@@ -239,19 +239,19 @@ instance Aeson.ToJSON SrcLocForEncoding where
       ( "name"
           .= name
           ++ "package"
-          .= Stack.srcLocPackage loc
+            .= Stack.srcLocPackage loc
           ++ "module"
-          .= Stack.srcLocModule loc
+            .= Stack.srcLocModule loc
           ++ "file"
-          .= Stack.srcLocFile loc
+            .= Stack.srcLocFile loc
           ++ "startLine"
-          .= Stack.srcLocStartLine loc
+            .= Stack.srcLocStartLine loc
           ++ "startCol"
-          .= Stack.srcLocStartCol loc
+            .= Stack.srcLocStartCol loc
           ++ "endLine"
-          .= Stack.srcLocEndLine loc
+            .= Stack.srcLocEndLine loc
           ++ "endCol"
-          .= Stack.srcLocEndCol loc
+            .= Stack.srcLocEndCol loc
       )
 
 instance Aeson.FromJSON SrcLocForEncoding where
@@ -485,7 +485,7 @@ class (Typeable.Typeable e, Aeson.ToJSON e) => TracingSpanDetails e where
 -- | A helper type used for @renderTracingSpanDetails@. Used to wrap rendering
 -- functions so they have the same type and can be put in a list together.
 data Renderer a where
-  Renderer :: TracingSpanDetails s => (s -> a) -> Renderer a
+  Renderer :: (TracingSpanDetails s) => (s -> a) -> Renderer a
 
 -- | In reporting logic we'd like to case on the different types a
 -- 'SomeTracingSpanDetails' can contain and write logic for each one. This
@@ -544,14 +544,14 @@ data LogHandler = LogHandler
     -- debugging information using a handler we'll know which tracingSpan
     -- the information belongs to. This function creates a new handler for
     -- a child tracingSpan of the current handler.
-    startChildTracingSpan :: Stack.HasCallStack => Text -> IO LogHandler,
+    startChildTracingSpan :: (Stack.HasCallStack) => Text -> IO LogHandler,
     -- | This allows creating a new `LogHandler` with the same behaviour as
     -- the root of this LogHandler. Remember that every tracingSpan gets its
     -- own handler, and that tracingSpans form a tree. Allowing a tracingSpan
     -- which copies the behaviour of the root allows long-lived constructs to
     -- treat its children as a new root. For example, a webserver could use
     -- this to create a new tracingSpan for each request.
-    startNewRoot :: Stack.HasCallStack => Text -> IO LogHandler,
+    startNewRoot :: (Stack.HasCallStack) => Text -> IO LogHandler,
     -- | There's common fields all tracingSpans have such as a name and
     -- start and finish times. On top of that each tracingSpan can define a
     -- custom type containing useful custom data. This function allows us
@@ -560,7 +560,7 @@ data LogHandler = LogHandler
     -- tracingSpan, but then we'd miss out on useful details that only
     -- become known as the tracingSpan runs, for example the response code
     -- of an HTTP request.
-    setTracingSpanDetailsIO :: forall d. TracingSpanDetails d => d -> IO (),
+    setTracingSpanDetailsIO :: forall d. (TracingSpanDetails d) => d -> IO (),
     -- | Set a summary for the current tracingSpan. This is shown in tools
     -- used to inspect spans as a stand-in for the full tracingSpan details
     -- in places where we only have room to show a little text.
@@ -585,7 +585,7 @@ data LogHandler = LogHandler
 -- library the @rootTracingSpanIO@ is the more user-friendly way to get hands
 -- on a @LogHandler@.
 mkHandler ::
-  Stack.HasCallStack =>
+  (Stack.HasCallStack) =>
   Text ->
   Clock ->
   -- Finalizer for this loghandler
@@ -639,7 +639,7 @@ mkHandler requestId clock onFinish onFinishRoot' name' = do
 -- >   deriving (Aeson.ToJSON)
 -- >
 -- > instance TracingSpanDetails BookPick
-setTracingSpanDetails :: TracingSpanDetails d => d -> Task e ()
+setTracingSpanDetails :: (TracingSpanDetails d) => d -> Task e ()
 setTracingSpanDetails details =
   Task
     ( \handler ->
@@ -675,7 +675,7 @@ markTracingSpanFailed =
   Task (map Ok << markTracingSpanFailedIO)
 
 -- | Create an initial @TracingSpan@ with some initial values.
-startTracingSpan :: Stack.HasCallStack => Clock -> Text -> IO TracingSpan
+startTracingSpan :: (Stack.HasCallStack) => Clock -> Text -> IO TracingSpan
 startTracingSpan clock name = do
   started <- monotonicTimeInMsec clock
   pure
@@ -765,7 +765,7 @@ updateIORef ref f = IORef.atomicModifyIORef' ref (\x -> (f x, ()))
 --
 -- This will help provide better debugging information if something goes wrong
 -- inside the wrapped task.
-tracingSpan :: Stack.HasCallStack => Text -> Task e a -> Task e a
+tracingSpan :: (Stack.HasCallStack) => Text -> Task e a -> Task e a
 tracingSpan name (Task run) =
   Task
     ( \handler ->
@@ -784,7 +784,7 @@ tracingSpan name (Task run) =
 --
 -- This can help in flushing logs; by replacing the parent span, we also
 -- "inherit" its finalization point
-newRoot :: Stack.HasCallStack => Text -> Task e a -> Task e a
+newRoot :: (Stack.HasCallStack) => Text -> Task e a -> Task e a
 newRoot name (Task run) =
   Task
     ( \handler ->
@@ -802,7 +802,7 @@ newRoot name (Task run) =
 -- > tracingSpanIO handler "code dance" <| \childHandler -> do
 -- >   waltzPassLeft childHandler
 -- >   clockwiseTurn childHandler 60
-tracingSpanIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
+tracingSpanIO :: (Stack.HasCallStack) => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 tracingSpanIO handler name run =
   Exception.bracketWithError
     (Stack.withFrozenCallStack (startChildTracingSpan handler name))
@@ -816,7 +816,7 @@ tracingSpanIO handler name run =
 -- > newRootIO handler "code dance" <| \childHandler -> do
 -- >   waltzPassLeft childHandler
 -- >   clockwiseTurn childHandler 60
-newRootIO :: Stack.HasCallStack => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
+newRootIO :: (Stack.HasCallStack) => LogHandler -> Text -> (LogHandler -> IO a) -> IO a
 newRootIO handler name run = do
   Exception.bracketWithError
     (Stack.withFrozenCallStack (startNewRoot handler name))
@@ -830,7 +830,7 @@ newRootIO handler name run = do
 -- > rootTracingSpanIO "request-23" Prelude.print "incoming request" <| \handler ->
 -- >   handleRequest
 -- >   |> Task.perform handler
-rootTracingSpanIO :: Stack.HasCallStack => Text -> (TracingSpan -> IO ()) -> Text -> (LogHandler -> IO a) -> IO a
+rootTracingSpanIO :: (Stack.HasCallStack) => Text -> (TracingSpan -> IO ()) -> Text -> (LogHandler -> IO a) -> IO a
 rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError

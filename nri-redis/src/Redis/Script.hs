@@ -70,7 +70,7 @@ instance {-# INCOHERENT #-} HasScriptParam ScriptParam where
 --
 -- It is what forces us to hav UndecidableInstances enabled.
 instance
-  GHC.TypeLits.TypeError ('GHC.TypeLits.Text "[script| ${..} ] interpolation only supports Key or Literal inputs.") =>
+  (GHC.TypeLits.TypeError ('GHC.TypeLits.Text "[script| ${..} ] interpolation only supports Key or Literal inputs.")) =>
   HasScriptParam x
   where
   getScriptParam = Prelude.error "This won't ever hit bc this generates a compile-time error."
@@ -129,7 +129,7 @@ toEvaluatedToken token =
     ScriptText text -> [|EvaluatedText text|]
     ScriptVariable var -> pure <| (TH.VarE 'evaluateScriptParam) `TH.AppE` (varToExp var)
 
-evaluateScriptParam :: HasScriptParam a => a -> EvaluatedToken
+evaluateScriptParam :: (HasScriptParam a) => a -> EvaluatedToken
 evaluateScriptParam scriptParam =
   case getScriptParam scriptParam of
     Key a ->

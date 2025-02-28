@@ -221,7 +221,7 @@ instance Applicative Decoder where
       }
     where
       readFromEnvironment' ::
-        Semigroup err =>
+        (Semigroup err) =>
         (env -> Result err (a -> config)) ->
         (env -> Result err a) ->
         env ->

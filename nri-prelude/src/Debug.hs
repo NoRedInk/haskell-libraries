@@ -27,7 +27,7 @@ import Prelude (Show, error)
 -- down to the value's @Show@ instance, but for strings this typically escapes
 -- characters. If you say @toString "he said, \\"hi\\""@ it will show @"he said,
 -- \\"hi\\""@ rather than @he said, "hi"@.
-toString :: Show a => a -> Text
+toString :: (Show a) => a -> Text
 toString =
   Text.Show.Pretty.ppShow >> pack
 
@@ -38,7 +38,7 @@ toString =
 --
 -- It is often possible to sprinkle this around to see if values are what you
 -- expect. It is kind of old-school to do it this way, but it works!
-log :: Show a => Text -> a -> a
+log :: (Show a) => Text -> a -> a
 log message value =
   Debug.Trace.trace (unpack (concat [message, ": ", toString value])) value
 
@@ -62,6 +62,6 @@ log message value =
 --
 -- When you call this it throws an exception with the message you give. That
 -- exception is catchable... but don't.
-todo :: Stack.HasCallStack => Text -> a
+todo :: (Stack.HasCallStack) => Text -> a
 todo =
   Stack.withFrozenCallStack (unpack >> error)

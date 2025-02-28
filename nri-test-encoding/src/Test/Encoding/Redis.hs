@@ -33,7 +33,9 @@ frozenTest _ =
         Typeable.typeRep proxy
           |> Typeable.typeRepTyCon
       typeName =
-        Typeable.tyConModule tyCon ++ "." ++ Typeable.tyConName tyCon
+        Typeable.tyConModule tyCon
+          ++ "."
+          ++ Typeable.tyConName tyCon
           |> Text.fromList
    in Examples.examples proxy
         |> Test.Encoding.examplesToTest typeName ("redis-encoding-" ++ typeName)
