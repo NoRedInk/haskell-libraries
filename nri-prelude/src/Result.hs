@@ -24,6 +24,7 @@ module Result
 where
 
 import Basics
+import GHC.Generics (Generic)
 import qualified Internal.Shortcut as Shortcut
 import Maybe (Maybe (..))
 import Prelude (fmap)
@@ -34,7 +35,7 @@ import qualified Prelude
 data Result error value
   = Ok value
   | Err error
-  deriving (Prelude.Show, Eq)
+  deriving (Prelude.Show, Eq, Generic)
 
 instance Prelude.Functor (Result error) where
   fmap func result =
