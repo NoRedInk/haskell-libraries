@@ -30,7 +30,11 @@ jobs:
         uses: easimon/maximize-build-space@v10
         with:
           # you can try to increase this if the ubuntu runner runs out of space.
-          # prob can't push it too far above 30GB though
+          # prob can't push it too far above 30GB though.  the github actions runners
+          # have a small disk size, and if we want more we'll have to look into
+          # larger runners or self-hosted runners.  caveat - larger runners aren't
+          # included in our enterprise plan and _will_ cost extra!
+          # https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#machine-sizes-for-larger-runners
           root-reserve-mb: 30720
           remove-dotnet: 'true'
           remove-android: 'true'
