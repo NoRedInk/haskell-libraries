@@ -20,7 +20,10 @@ module Observability
 where
 
 import qualified Conduit
+import Control.Concurrent.Async (async, wait)
+import Control.Concurrent.STM.TQueue (newTQueueIO, readTQueue, writeTQueue)
 import qualified Control.Exception.Safe as Exception
+import Control.Monad.STM (atomically)
 import qualified Data.Aeson as Aeson
 import qualified Environment
 import qualified List
@@ -43,6 +46,10 @@ newtype Handler = Handler
   }
   deriving (Prelude.Semigroup, Prelude.Monoid)
 
+data Msg
+  = Report Text Platform.TracingSpan
+  | Close
+
 -- | Function for creating an observability handler. The settings we pass in
 -- determine which platforms we'll report information to.
 handler :: Settings -> Conduit.Acquire Handler
@@ -52,7 +59,29 @@ handler settings = do
     firstReporter : otherReporters -> do
       firstHandler <- toHandler reportNothingHandler settings firstReporter
       otherHandlers <- traverse (toHandler firstHandler settings) otherReporters
-      Prelude.pure (Prelude.mconcat (firstHandler : otherHandlers))
+      let innerHandler = Prelude.mconcat (firstHandler : otherHandlers)
+
+      queue <- Conduit.liftIO newTQueueIO
+      let loop = do
+            msg <- atomically (readTQueue queue)
+            case msg of
+              Close -> Prelude.pure ()
+              Report requestId span -> do
+                report innerHandler requestId span
+                loop
+      loopId <- Conduit.liftIO <| async loop
+
+      Conduit.mkAcquire
+        ( Prelude.pure
+            <| Handler
+              ( \requestId span ->
+                  atomically (writeTQueue queue (Report requestId span))
+              )
+        )
+        ( \_ -> do
+            atomically (writeTQueue queue Close)
+            wait loopId
+        )
 
 reportNothingHandler :: Handler
 reportNothingHandler = Handler (\_ _ -> Prelude.pure ())

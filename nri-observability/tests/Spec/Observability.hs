@@ -22,11 +22,10 @@ tests =
         let reporter2 = fakeReporter (\_ -> appendLog "reporter2" log)
         let settings = settings' {Observability.enabledReporters = [reporter1, reporter2]}
         reports <-
-          Expect.fromIO
-            ( Conduit.withAcquire (Observability.handler settings) <| \handler -> do
-                Observability.report handler "request-id-1234" emptyTracingSpan
-                IORef.readIORef log
-            )
+          Expect.fromIO <| do
+            Conduit.withAcquire (Observability.handler settings) <| \handler -> do
+              Observability.report handler "request-id-1234" emptyTracingSpan
+            IORef.readIORef log
         reports
           |> Expect.equal ["reporter1", "reporter2"],
       test "The first reporter reports sync exceptions thrown by the other reporters" <| \_ -> do
@@ -36,11 +35,10 @@ tests =
         let reporter2 = fakeReporter (\_ -> Exception.throwString "failed!")
         let settings = settings' {Observability.enabledReporters = [reporter1, reporter2]}
         reports <-
-          Expect.fromIO
-            ( Conduit.withAcquire (Observability.handler settings) <| \handler -> do
-                Observability.report handler "request-id-1234" emptyTracingSpan
-                IORef.readIORef log
-            )
+          Expect.fromIO <| do
+            Conduit.withAcquire (Observability.handler settings) <| \handler -> do
+              Observability.report handler "request-id-1234" emptyTracingSpan
+            IORef.readIORef log
         reports
           |> Expect.equal ["reporter1: example", "reporter1: Failed to report span to fake"],
       test "The first reporter reports async exceptions thrown by the other reporters" <| \_ -> do
@@ -55,8 +53,10 @@ tests =
                 )
         let settings = settings' {Observability.enabledReporters = [reporter1, reporter2]}
         reports <-
-          Expect.fromIO <| Conduit.withAcquire (Observability.handler settings) <| \handler -> do
-            Observability.report handler "request-id-1234" emptyTracingSpan
+          Expect.fromIO <| do
+            ( Conduit.withAcquire (Observability.handler settings) <| \handler -> do
+                Observability.report handler "request-id-1234" emptyTracingSpan
+              )
               |> Exception.handleAsync (\(Exception.AsyncExceptionWrapper _) -> Prelude.pure ())
             IORef.readIORef log
         reports
@@ -69,11 +69,10 @@ tests =
         let reporter3 = fakeReporter (\span -> appendLog ("reporter3: " ++ Platform.name span) log)
         let settings = settings' {Observability.enabledReporters = [reporter1, reporter2, reporter3]}
         reports <-
-          Expect.fromIO
-            ( Conduit.withAcquire (Observability.handler settings) <| \handler -> do
-                Observability.report handler "request-id-1234" emptyTracingSpan
-                IORef.readIORef log
-            )
+          Expect.fromIO <| do
+            Conduit.withAcquire (Observability.handler settings) <| \handler -> do
+              Observability.report handler "request-id-1234" emptyTracingSpan
+            IORef.readIORef log
         reports
           |> Expect.equal ["reporter1: example", "reporter1: Failed to report span to fake", "reporter3: example"]
     ]

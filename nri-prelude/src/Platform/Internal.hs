@@ -834,7 +834,7 @@ rootTracingSpanIO :: (Stack.HasCallStack) => Text -> (TracingSpan -> IO ()) -> T
 rootTracingSpanIO requestId onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError
-    (Stack.withFrozenCallStack mkHandler requestId clock' (onFinish >> reportSafely) Nothing name)
+    (Stack.withFrozenCallStack mkHandler requestId clock' onFinish Nothing name)
     (Prelude.flip finishTracingSpan)
     runIO
 
