@@ -11,6 +11,7 @@ module Test.Internal where
 
 import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception.Safe as Exception
+import Control.Monad (when)
 import qualified Control.Monad.IO.Class
 import qualified Data.Either
 import qualified Data.IORef as IORef
@@ -32,6 +33,7 @@ import qualified Set
 import qualified System.Environment
 import System.FilePath (FilePath)
 import qualified Task
+import qualified Text
 import Text.Read (readMaybe)
 import qualified Tuple
 import qualified Prelude
@@ -505,11 +507,19 @@ runSingle test' =
   Platform.Internal.Task
     ( \_ -> do
         spanVar <- MVar.newEmptyMVar
+        -- Here we use the source location as the span name so that we can
+        -- easily wait for the correct span to be reported.
+        -- Other spans might be reported, for example, if the test uses `Platform.newRoot`,
+        -- but those spans should be ignored.
+        let spanName = Text.fromList <| Stack.prettySrcLoc (loc test')
         res <-
           Platform.Internal.rootTracingSpanIO
             ""
-            (MVar.putMVar spanVar)
-            "test"
+            ( \span -> do
+                when (Platform.Internal.name span == spanName)
+                  <| MVar.putMVar spanVar span
+            )
+            spanName
             ( \log ->
                 body test'
                   |> unExpectation
@@ -526,7 +536,8 @@ runSingle test' =
         span' <- MVar.takeMVar spanVar
         let span =
               span'
-                { Platform.Internal.summary = Just (name test'),
+                { Platform.Internal.name = "test",
+                  Platform.Internal.summary = Just (name test'),
                   Platform.Internal.frame = Just ("", loc test'),
                   Platform.Internal.succeeded = case testRest of
                     Succeeded -> Platform.Internal.Succeeded
