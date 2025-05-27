@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 -- | A module dedicated to observability, that is reporting information about
 -- what the program is doing in production to help us debugging it.
@@ -20,7 +21,11 @@ module Observability
 where
 
 import qualified Conduit
+import Control.Concurrent.Async (async)
+import Control.Concurrent.STM (atomically, check)
+import Control.Concurrent.STM.TVar (modifyTVar, newTVarIO, readTVar)
 import qualified Control.Exception.Safe as Exception
+import Control.Monad (void)
 import qualified Data.Aeson as Aeson
 import qualified Environment
 import qualified List
@@ -30,8 +35,10 @@ import qualified Reporter.Dev as Dev
 import qualified Reporter.File as File
 import qualified Reporter.Honeycomb as Honeycomb
 import qualified Set
+import qualified System.Mem as Mem
+import qualified System.Timeout as Timeout
 import qualified Text
-import Prelude (pure, traverse)
+import Prelude (flip, pure, traverse)
 import qualified Prelude
 
 -- | A handler for reporting to logging/monitoring/observability platforms.
@@ -52,7 +59,57 @@ handler settings = do
     firstReporter : otherReporters -> do
       firstHandler <- toHandler reportNothingHandler settings firstReporter
       otherHandlers <- traverse (toHandler firstHandler settings) otherReporters
-      Prelude.pure (Prelude.mconcat (firstHandler : otherHandlers))
+      let innerHandler = Prelude.mconcat (firstHandler : otherHandlers)
+      reportCounter <- Conduit.liftIO <| newTVarIO (0 :: Int)
+
+      Conduit.mkAcquire
+        ( Prelude.pure
+            <| Handler
+              ( \requestId span -> do
+                  atomically (modifyTVar reportCounter (+ 1))
+
+                  -- Spawning a separate thread for the reporting logic ensures the main request
+                  -- thread doesn't need to wait with responding to the user until reporting
+                  -- logic finishes. It also ensures exceptions thrown in reporting logic won't
+                  -- result in failure responses to requests.
+                  void <| async <| do
+                    -- Setting an allocation limit helps protect us from reporting logic using
+                    -- lots of CPU time and negatively affecting application performance.
+                    Mem.setAllocationCounter reportingAllocationLimitInBytes
+                    Mem.enableAllocationLimit
+
+                    report innerHandler requestId span
+                      -- This thread is spawned without anybody watching how it does. We set a
+                      -- maximum running time here to ensure it eventually completes.
+                      |> Timeout.timeout reportingTimeoutInMicroSeconds
+                      |> (flip Exception.finally) (atomically <| modifyTVar reportCounter (+ (-1)))
+              )
+        )
+        ( \_ -> do
+            -- Wait for all reporting threads to finish before cleaning up.
+            atomically <| do
+              count <- readTVar reportCounter
+              check (count == 0)
+        )
+
+-- | The maximum amount of bytes the reporting logic is allowed to allocate.
+-- Note that this is more of a limit on CPU time then maximum live memory. See
+-- the documentation on `setAllocationCounter` for more details:
+--
+-- https://hackage.haskell.org/package/base-4.14.0.0/docs/System-Mem.html#v:enableAllocationLimit
+--
+-- The current value is a somewhat arbitrary initial value, intentionally not
+-- very strict. The hope is experience will help us tighten this value a bit.
+reportingAllocationLimitInBytes :: Int
+reportingAllocationLimitInBytes = 1024 * 1024 * 1024
+
+-- | The maximum amount of time reporting logic is allowed to run for a single
+-- request.
+--
+-- The current value is a somewhat arbitrary initial value, intentionally not
+-- very strict. The hope is experience will help us tighten this value a bit.
+reportingTimeoutInMicroSeconds :: Prelude.Int
+reportingTimeoutInMicroSeconds = 5_000_000
 
 reportNothingHandler :: Handler
 reportNothingHandler = Handler (\_ _ -> Prelude.pure ())
