@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Main (main) where
 
 import Data.Aeson
@@ -54,16 +56,68 @@ instance HasExamples Bar where
           description = "description"
         }
 
+data Baz = Baz
+  { title :: Text,
+    description :: Text
+  }
+  deriving (Generic)
+
+instance ToJSON Baz
+
+instance HasExamples Baz where
+  examples _ =
+    example
+      "Baz"
+      Baz
+        { title = "title",
+          description = "description"
+        }
+
+data Qux = Qux
+  { title :: Text,
+    description :: Text
+  }
+  deriving (Generic)
+
+instance ToJSON Qux
+
+instance HasExamples Qux where
+  examples _ =
+    example
+      "Qux"
+      Qux
+        { title = "title",
+          description = "description"
+        }
+
 data Routes route = Routes
   { foo ::
       route
         :- "foos"
-          :> Capture ":id" Int
+          :> Capture "id" Int
           :> Get '[JSON] Foo,
     bars ::
       route
         :- "bars"
-          :> Get '[JSON] [Bar]
+          :> Get '[JSON] [Bar],
+    baz :: route :- NamedRoutes BazRoutes
+  }
+  deriving (Generic)
+
+data BazRoutes route = BazRoutes
+  { baz ::
+      route
+        :- "baz"
+          :> Get '[JSON] Baz,
+    qux :: route :- "quxs" :> Capture "id" Int :> NamedRoutes QuxRoutes
+  }
+  deriving (Generic)
+
+newtype QuxRoutes route = QuxRoutes
+  { qux ::
+      route
+        :- "details"
+          :> Get '[JSON] Qux
   }
   deriving (Generic)
 

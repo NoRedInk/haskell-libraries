@@ -1,2 +1,4 @@
 'GET bars response [ Bar ]
-'GET foos/::id response Foo
+'GET baz response Baz
+'GET foos/:id response Foo
+'GET quxs/:id/details response Qux
