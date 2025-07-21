@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Test helpers to ensure we don't change types or encodings of types
@@ -27,6 +28,7 @@ import qualified Servant
 import Servant.API
   ( Capture',
     Header',
+    NamedRoutes,
     QueryFlag,
     QueryParam',
     QueryParams,
@@ -206,6 +208,9 @@ class IsApi a where
 
 instance (IsApi a, IsApi b) => IsApi (a :<|> b) where
   crawl _ = crawl (Proxy :: Proxy a) ++ crawl (Proxy :: Proxy b)
+
+instance (IsApi (ToServantApi a)) => IsApi (NamedRoutes a) where
+  crawl _ = crawl (Proxy :: Proxy (ToServantApi a))
 
 instance (KnownSymbol s, IsApi a) => IsApi (s :> a) where
   crawl _ =
