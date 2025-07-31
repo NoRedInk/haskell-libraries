@@ -62,7 +62,7 @@ in pkgs.mkShell {
     (workaround140774 pkgs.haskellPackages.ghcid)
     (workaround140774 pkgs.haskellPackages.niv)
     (workaround140774 pkgs.haskellPackages.ormolu)
-    pkgs.apacheKafka # for nri-kafka
+    pkgs.apacheKafka_3_8 # for nri-kafka
     pkgs.cabal-install
     pkgs.cachix
     pkgs.gnumake

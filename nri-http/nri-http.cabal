@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.36.1.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -20,7 +20,7 @@ build-type:     Simple
 extra-source-files:
     README.md
     LICENSE
-    test/golden-results-9.2/expected-http-span
+    test/golden-results-9.8/expected-http-span
 
 source-repository head
   type: git

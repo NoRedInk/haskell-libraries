@@ -1,3 +1,7 @@
+# 0.3.0.1
+
+- Support `network-3.3.x.x`
+
 # 0.3.0.0
 
 - Drop support for GHC 9.2.x
