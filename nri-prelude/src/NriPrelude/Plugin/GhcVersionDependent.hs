@@ -21,7 +21,6 @@ withParsedResult parsed f =
     { GHC.Driver.Plugins.parsedResultModule = f (GHC.Driver.Plugins.parsedResultModule parsed)
     }
 
-#if __GLASGOW_HASKELL__ >= 906
 setIDeclImplicit :: Bool -> GHC.Hs.ImpExp.ImportDecl GHC.Hs.GhcPs -> GHC.Hs.ImpExp.ImportDecl GHC.Hs.GhcPs
 setIDeclImplicit isImplicit importDecl =
   -- no idea what `XImportDeclPass` _is_, btw.  just following types
@@ -33,7 +32,3 @@ setIDeclImplicit isImplicit importDecl =
         { GHC.Hs.ImpExp.ideclExt =
             xImportDeclPass {GHC.Hs.ImpExp.ideclImplicit = isImplicit}
         }
-#else
-setIDeclImplicit :: Bool -> GHC.Hs.ImpExp.ImportDecl GHC.Hs.GhcPs -> GHC.Hs.ImpExp.ImportDecl GHC.Hs.GhcPs
-setIDeclImplicit isImplicit importDecl = importDecl {GHC.Hs.ImpExp.ideclImplicit = isImplicit}
-#endif

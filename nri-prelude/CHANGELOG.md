@@ -1,6 +1,6 @@
 # Unreleased
 
-- Drop support for GHC 8.10.7, GHC 9.2.x `aeson-1.x`
+- Drop support for GHC 8.10.7, GHC 9.2.x, GHC 9.4.x, `aeson-1.x`
 - Support GHC 9.6.5, GHC 9.8.4, `bytestring-0.12.x.x`, `text-2.1.x`, `aeson-2.2.x.x`, `safe-coloured-text-0.3.x.x`, `safe-coloured-text-terminfo-0.3.x.x`, `lens-5.3.x`, `hedgehog-1.5.x`, `auto-update-0.2.x`
 - Allow specifying where devlogs for log-explorer go through `NRI_DEV_LOG` environment variable.
 - Added `putText` and `putTextLn` functions for thread-safe console printing.
