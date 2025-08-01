@@ -21,7 +21,7 @@ jobs:
           - os: ubuntu-22.04 # linux x86_64; 4 vcpu, 16 GB memory
             base-nixpkgs-channel: nixos-25.05
         ghc:
-          - ghc-9-10
+          - ghc-9-12
     runs-on: ${{ matrix.runner.os }}
     steps:
       # see write-up @ https://github.com/marketplace/actions/maximize-build-disk-space
