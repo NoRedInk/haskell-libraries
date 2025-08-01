@@ -1,0 +1,6 @@
+foo
+CallStack (from HasCallStack):
+  todo, called at tests/TestSpec.hs:177:20 in nri-prelude-0.6.1.2-inplace-tests:TestSpec
+HasCallStack backtrace:
+  todo, called at tests/TestSpec.hs:177:20 in nri-prelude-0.6.1.2-inplace-tests:TestSpec
+

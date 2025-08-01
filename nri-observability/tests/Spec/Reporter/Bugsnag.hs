@@ -9,6 +9,7 @@ import qualified Data.Time.LocalTime as LocalTime
 import qualified Dict
 import qualified Expect
 import qualified GHC.Stack as Stack
+import GoldenHelpers (goldenResultsDir)
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
 import qualified Log.RedisCommands as RedisCommands
@@ -441,4 +442,4 @@ encodesTo filename span =
     |> Data.Aeson.Encode.Pretty.encodePretty
     |> Data.ByteString.Lazy.toStrict
     |> Data.Text.Encoding.decodeUtf8
-    |> Expect.equalToContentsOf ("tests/golden-results/" ++ filename ++ ".json")
+    |> Expect.equalToContentsOf (goldenResultsDir ++ "/" ++ filename ++ ".json")

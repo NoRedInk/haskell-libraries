@@ -1,3 +1,8 @@
+# 0.7.0.0
+
+- Support GHC 9.10.2, GHC 9.12.2
+- Drop support for GHC 9.4.x
+
 # 0.6.0.0
 
 - Drop support for GHC 9.2.x

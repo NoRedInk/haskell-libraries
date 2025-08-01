@@ -1,0 +1,29 @@
+{
+    "breadcrumbs": [
+        {
+            "metaData": {
+                "commands.0": "GET somekey",
+                "duration in milliseconds": "0.0",
+                "host": "cache.noredink.com",
+                "port": "6379.0"
+            },
+            "name": "some span",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "request"
+        }
+    ],
+    "exceptions": [
+        {
+            "errorClass": "some span",
+            "stacktrace": []
+        }
+    ],
+    "metaData": {
+        "request": {
+            "megabytes allocated": 0,
+            "request id": "request-id-1234",
+            "response time in ms": 0
+        }
+    },
+    "unhandled": false
+}

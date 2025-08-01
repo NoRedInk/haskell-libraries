@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Spec.Reporter.Dev (tests) where
 
 import qualified Control.Exception.Safe as Exception
@@ -5,6 +7,7 @@ import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Builder
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Expect
+import GoldenHelpers (goldenResultsDir)
 import qualified Log.HttpRequest as HttpRequest
 import qualified Platform
 import qualified Platform.Timer as Timer
@@ -45,7 +48,7 @@ logTest :: Text -> Platform.TracingSpan -> Test.Test
 logTest name span =
   Test.test name <| \_ -> do
     let logfile = Text.replace " " "-" name
-    let logpath = "tests/golden-results/dev-reporter-" ++ logfile
+    let logpath = goldenResultsDir ++ "/dev-reporter-" ++ logfile
     span
       |> Dev.mkLog timer
       |> Data.Text.Lazy.Builder.toLazyText

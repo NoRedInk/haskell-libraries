@@ -1,0 +1,21 @@
+{
+    "breadcrumbs": [],
+    "exceptions": [
+        {
+            "errorClass": "log message",
+            "stacktrace": []
+        }
+    ],
+    "metaData": {
+        "custom": {
+            "number": 4,
+            "text": "Hi!"
+        },
+        "request": {
+            "megabytes allocated": 0,
+            "request id": "request-id-1234",
+            "response time in ms": 0
+        }
+    },
+    "unhandled": false
+}

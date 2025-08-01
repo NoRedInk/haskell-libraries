@@ -4,5 +4,5 @@ let
   commonHaskellOverrides = import ./nix/common-haskell-overrides.nix { inherit sources pkgs; };
 in import nix/mk-shell.nix {
   pkgs = pkgs;
-  haskellPackages = pkgs.haskell.packages.ghc948.extend commonHaskellOverrides;
+  haskellPackages = pkgs.haskell.packages.ghc9102.extend commonHaskellOverrides;
 }

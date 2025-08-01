@@ -1,3 +1,8 @@
+# 0.4.0.0
+
+- Support GHC 9.10.2, GHC 9.12.2, `filepath-1.5.x`
+- Drop support for GHC 9.4.x
+
 # 0.3.0.0
 
 - Drop support for GHC 9.2.x

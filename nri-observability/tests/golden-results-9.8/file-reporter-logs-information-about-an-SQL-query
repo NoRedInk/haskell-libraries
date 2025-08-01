@@ -1,0 +1,23 @@
+{
+    "allocated_mb": 0.0,
+    "details": {
+        "database": "nri",
+        "database type": "PostgreSQL",
+        "host": "http://antsonline.com",
+        "port": 5432,
+        "queried relation": "ants",
+        "query": "Secret *****",
+        "query template": "SELECT name FROM ants WHERE id = ${id}",
+        "rows returned": 5,
+        "sql operation": "SELECT"
+    },
+    "duration_ms": 0.0,
+    "env": "narnia",
+    "hostname": "some-host",
+    "name": "",
+    "namespace": [
+        "app"
+    ],
+    "request-id": "request-id",
+    "start_utc": "1970-01-01T00:00:00Z"
+}

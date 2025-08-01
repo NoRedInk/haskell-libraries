@@ -1,0 +1,29 @@
+{
+    "breadcrumbs": [
+        {
+            "metaData": {
+                "duration in milliseconds": "0.0"
+            },
+            "name": "some span",
+            "timestamp": "1970-01-01T00:00:00Z",
+            "type": "manual"
+        }
+    ],
+    "exceptions": [
+        {
+            "errorClass": "some context",
+            "stacktrace": []
+        }
+    ],
+    "metaData": {
+        "custom": {
+            "number": 4
+        },
+        "request": {
+            "megabytes allocated": 0,
+            "request id": "request-id-1234",
+            "response time in ms": 0
+        }
+    },
+    "unhandled": false
+}
