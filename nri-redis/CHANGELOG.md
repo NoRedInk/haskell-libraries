@@ -1,6 +1,7 @@
-# 0.3.0.1
+# 0.4.0.0
 
 - Support GHC 9.10.2, GHC 9.12.2, `megaparsec-9.7.x`, `containers-0.7.x`
+- Drop support for GHC 9.4.x
 
 # 0.3.0.0
 

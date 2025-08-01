@@ -5,7 +5,7 @@ cabal-version: 1.18
 -- see: https://github.com/sol/hpack
 
 name:           nri-postgresql
-version:        0.3.0.1
+version:        0.4.0.0
 synopsis:       Make queries against Postgresql.
 description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme>.
 category:       Web
@@ -62,12 +62,12 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
       attoparsec >=0.13.0.0 && <0.15
-    , base >=4.17 && <4.22
+    , base >=4.18 && <4.22
     , bytestring >=0.10.8.2 && <0.13
     , filepath >=1.4.2.1 && <1.6
     , network >=3.1.0.0 && <3.3
-    , nri-env-parser >=0.1.0.0 && <0.4
-    , nri-observability >=0.1.0.0 && <0.4
+    , nri-env-parser >=0.1.0.0 && <0.5
+    , nri-observability >=0.1.0.0 && <0.5
     , nri-prelude >=0.1.0.0 && <0.7
     , postgresql-typed ==0.6.*
     , resource-pool >=0.2.0.0 && <0.5
@@ -120,12 +120,12 @@ test-suite tests
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
       attoparsec >=0.13.0.0 && <0.15
-    , base >=4.17 && <4.22
+    , base >=4.18 && <4.22
     , bytestring >=0.10.8.2 && <0.13
     , filepath >=1.4.2.1 && <1.6
     , network >=3.1.0.0 && <3.3
-    , nri-env-parser >=0.1.0.0 && <0.4
-    , nri-observability >=0.1.0.0 && <0.4
+    , nri-env-parser >=0.1.0.0 && <0.5
+    , nri-observability >=0.1.0.0 && <0.5
     , nri-prelude >=0.1.0.0 && <0.7
     , postgresql-typed ==0.6.*
     , resource-pool >=0.2.0.0 && <0.5

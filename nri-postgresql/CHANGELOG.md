@@ -1,6 +1,7 @@
 # 0.3.0.1
 
-- Support GHC 9.10.2, GHC 9.12.2, `network-3.3.x.x`, `filepath-1.5.x`, `template-haskell-2.22.x.x`
+- Support GHC 9.10.2, GHC 9.12.2, `network-3.3.x.x`, `filepath-1.5.x`, `template-haskell-2.23.x.x`
+- Drop support for GHC 9.4.x
 
 # 0.3.0.0
 
