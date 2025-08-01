@@ -1,1 +1,1 @@
-shell-ghc-9-8.nix
+shell-ghc-9-10.nix

@@ -13,8 +13,10 @@ self: super:
     vty =
       pkgs.haskell.lib.doJailbreak (self.callHackage "vty" "5.38" { });
 
-    # latest master supports ghc 9.4.x
-    tasty-test-reporter = packageFromSources "tasty-test-reporter";
+    # latest master supports ghc 9.4.x, but has packages bounds not compatible
+    # with ghc 9.10.x
+    tasty-test-reporter =
+      pkgs.haskell.lib.doJailbreak (packageFromSources "tasty-test-reporter");
 
     # required by tasty-test-reporter
     ansi-terminal = self.callHackage "ansi-terminal" "1.0.2" { };
