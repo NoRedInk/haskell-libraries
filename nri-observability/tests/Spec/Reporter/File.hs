@@ -9,6 +9,7 @@ import qualified Data.Text.Lazy.Encoding
 import qualified Data.Time.LocalTime as LocalTime
 import qualified Dict
 import qualified Expect
+import GoldenHelpers (goldenResultsDir)
 import qualified Log.HttpRequest as HttpRequest
 import qualified Log.RedisCommands as RedisCommands
 import qualified Log.SqlQuery as SqlQuery
@@ -151,7 +152,7 @@ logTest name span =
       Ok reEncoded ->
         Text.join "\n" reEncoded
           |> Expect.equalToContentsOf
-            ( Text.fromList "tests/golden-results/file-reporter-"
+            ( goldenResultsDir ++ "/file-reporter-"
                 ++ Text.replace " " "-" name
             )
 

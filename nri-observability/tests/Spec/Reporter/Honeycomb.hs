@@ -13,6 +13,7 @@ import qualified Data.Time.LocalTime as LocalTime
 import qualified Dict
 import qualified Expect
 import qualified GHC.Stack as Stack
+import GoldenHelpers (goldenResultsDir)
 import qualified Log
 import qualified Log.HttpRequest as HttpRequest
 import qualified Log.Kafka as Kafka
@@ -331,7 +332,7 @@ tests =
               sampleRates
               |> (:) ("apdex T: " ++ Text.fromFloat apdexTMs ++ "ms")
               |> Text.join "\n"
-              |> Expect.equalToContentsOf "test/golden-results/observability-spec-honeycomb-sampling"
+              |> Expect.equalToContentsOf (goldenResultsDir ++ "/observability-spec-honeycomb-sampling")
         ],
       describe
         "deriveSampleRate"
@@ -446,4 +447,4 @@ encodesTo filename events =
     |> Data.Aeson.Encode.Pretty.encodePretty
     |> Data.ByteString.Lazy.toStrict
     |> Data.Text.Encoding.decodeUtf8
-    |> Expect.equalToContentsOf ("test/golden-results/" ++ filename ++ ".json")
+    |> Expect.equalToContentsOf (goldenResultsDir ++ "/" ++ filename ++ ".json")
