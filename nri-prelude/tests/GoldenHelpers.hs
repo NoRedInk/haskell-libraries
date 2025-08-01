@@ -19,13 +19,16 @@ import Data.Text (Text)
 -- would correspond to the `z` at the end of `baz`.  Unfortunately, in GHC 9.2.x
 -- it corresponds to the second `o` at the end of `foo`.
 --
--- In GHC 9.10.x, stack trace output formatting is a little different.
+-- In GHC 9.10.x, stack trace output formatting is a little different, and it changed
+-- slightly again in GHC 9.12.x
 --
 -- We keep this helper around so that if this happens again for future GHC versions
 -- we can have different golden results for different GHC versions as necessary.
 goldenResultsDir :: Text
 
-# if __GLASGOW_HASKELL__ >= 910
+# if __GLASGOW_HASKELL__ >= 912
+goldenResultsDir = "tests/golden-results-9.12"
+# elif __GLASGOW_HASKELL__ >= 910
 goldenResultsDir = "tests/golden-results-9.10"
 # else
 goldenResultsDir = "tests/golden-results-9.8"

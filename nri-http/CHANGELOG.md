@@ -1,6 +1,6 @@
 # 0.6.0.1
 
-- Support GHC 9.10.2
+- Support GHC 9.10.2, GHC 9.12.2
 
 # 0.6.0.0
 

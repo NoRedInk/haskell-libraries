@@ -50,7 +50,7 @@ library
       TypeOperators
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
   build-depends:
-      base >=4.17 && <4.21
+      base >=4.17 && <4.22
     , modern-uri >=0.3.1.0 && <0.4
     , network-uri >=2.6.2.0 && <2.8
     , nri-prelude >=0.1.0.0 && <0.7
@@ -83,7 +83,7 @@ test-suite tests
       ExtendedDefaultRules
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -fno-warn-type-defaults
   build-depends:
-      base >=4.17 && <4.21
+      base >=4.17 && <4.22
     , modern-uri >=0.3.1.0 && <0.4
     , network-uri >=2.6.2.0 && <2.8
     , nri-prelude >=0.1.0.0 && <0.7

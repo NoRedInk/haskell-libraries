@@ -23,8 +23,9 @@ module GoldenHelpers (goldenResultsDir) where
 -- we can have different golden results for different GHC versions as necessary.
 goldenResultsDir :: Text
 
-# if __GLASGOW_HASKELL__ >= 910
+# if __GLASGOW_HASKELL__ == 910
 goldenResultsDir = "tests/golden-results-9.10"
 # else
+-- seems to be fine for ghc 9.12?
 goldenResultsDir = "tests/golden-results-9.8"
 # endif
