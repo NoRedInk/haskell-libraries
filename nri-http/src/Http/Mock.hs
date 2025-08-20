@@ -178,7 +178,7 @@ tryRespond (Stub respond : rest) req =
     |> Maybe.andThen Dynamic.fromDynamic
     |> Maybe.withDefault (tryRespond rest req)
 
-printType :: (Dynamic.Typeable expect) => proxy expect -> Text
+printType :: (Dynamic.Typeable expect) => expect -> Text
 printType expect =
-  Type.Reflection.someTypeRep expect
+  Type.Reflection.typeOf expect
     |> Debug.toString
