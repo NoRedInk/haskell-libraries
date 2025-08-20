@@ -17,6 +17,9 @@ nri-http/nri-http.cabal: nri-http/package.yaml
 ghcid-nri-http: nri-http/nri-http.cabal
 	cd nri-http && ghcid
 
+ghcid-nri-http-test: nri-http/nri-http.cabal
+	cd nri-http && ghcid --command "cabal repl nri-http:test:spec" --test Main.main
+
 nri-kafka/nri-kafka.cabal: nri-kafka/package.yaml
 	hpack nri-kafka
 
