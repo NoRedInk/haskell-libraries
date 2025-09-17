@@ -207,6 +207,9 @@ data Reporter where
     } ->
     Reporter
 
+instance Prelude.Show Reporter where
+  show reporter = "Reporter { name: " ++ Text.toList (reporterName reporter) ++ " }"
+
 -- | A list containing all the reporters we support. Reporters are ordered in
 -- increasing chance of failure, so we can pick the safest one for reporting on
 -- failures in other reporters.

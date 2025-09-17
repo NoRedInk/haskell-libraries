@@ -81,3 +81,13 @@ tests:
       - -fno-warn-type-defaults
     default-extensions:
       - ExtendedDefaultRules
+executables:
+  memory-leak-test:
+    source-dirs: scripts/memory-leak-test
+    main: Main.hs
+    dependencies:
+      - nri-observability
+    ghc-options:
+      - -threaded
+      - -rtsopts "-with-rtsopts=-N -T -s"
+      - -O2
