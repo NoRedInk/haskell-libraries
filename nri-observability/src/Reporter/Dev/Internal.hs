@@ -76,7 +76,8 @@ data Handler = Handler
     -- is empty. We have a logging thread running separately that takes logs
     -- from the MVar and prints them to stdout one at a time.
     writeLock :: MVar.MVar Builder.Builder,
-    loggingThread :: Async.Async ()
+    loggingThread :: Async.Async (),
+    advertiseLogExplorer :: Async.Async ()
   }
 
 -- | Create a 'Handler'. Do this once when your application starts and reuse
@@ -86,8 +87,9 @@ handler = do
   writeLock <- MVar.newEmptyMVar
   counter <- MVar.newMVar 0
   loggingThread <- Async.async (logLoop counter writeLock)
+  advertiseLogExplorer <- Async.async (advertiseLoop counter)
   timer <- Timer.mkTimer
-  Prelude.pure Handler {timer, writeLock, loggingThread}
+  Prelude.pure Handler {timer, writeLock, loggingThread, advertiseLogExplorer}
 
 -- | Clean up your handler after you're done with it. Call this before your
 -- application shuts down.
@@ -102,14 +104,16 @@ logLoop counter lock = do
   Builder.toLazyText line
     |> Data.Text.Lazy.toStrict
     |> putTextLn
-  ownCount <- MVar.modifyMVar counter (\n -> Prelude.pure (n + 1, n + 1))
-  Async.concurrently_
-    (logLoop counter lock)
-    ( do
-        -- After a few seconds of inactivity, advertise for log-explorer.
-        Control.Concurrent.threadDelay 3_000_000 {- 3 seconds -}
-        currentCount <- MVar.readMVar counter
-        if ownCount == currentCount
-          then putTextLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
-          else Prelude.pure ()
-    )
+  MVar.modifyMVar_ counter (\n -> Prelude.pure (n + 1))
+  logLoop counter lock
+
+advertiseLoop :: MVar.MVar Int -> Prelude.IO ()
+advertiseLoop counter = do
+  lastCount <- MVar.readMVar counter
+  Control.Concurrent.threadDelay 3_000_000 {- 3 seconds -}
+  currentCount <- MVar.readMVar counter
+  if lastCount == currentCount && currentCount > 0
+    then do
+      putTextLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
+      advertiseLoop counter
+    else advertiseLoop counter
