@@ -9,51 +9,20 @@ This script is an attempt to reproduce the leak in a controlled environment.
 ## Running
 
 ```sh
-cabal run memory-leak-test
+LOG_ENABLED_LOGGERS="stdout" cabal run --enable-profiling memory-leak-test -- +RTS -hy -l-au > /dev/null
 ```
 
-At the end of execution you will see a summary of memory usage.
+This will:
+- Run using the `stdout` logger only, so we don't write millions of events to `log-explorer`.
+- Enable GHC to copile with profiling enabled
+- Collect heap profile data grouped by data type (use `-hm` to group by module)
+- Use the new eventlog output format (`-l-au`)
+- Discard stdout
 
-## Execution logs
+After running for a good while, you can inspect the eventlog with:
 
-### w/ waj's PR
-
-#### ids: 100_000 (sequence)
-
-```
-10,450,960,160 bytes allocated in the heap
-   159,580,640 bytes copied during GC
-     5,992,320 bytes maximum residency (109 sample(s))
-     2,179,200 bytes maximum slop
-            81 MiB total memory in use (1 MiB lost due to fragmentation)
-```
-#### ids: 10_000 (sequence)
-
-```
- 1,045,693,312 bytes allocated in the heap
-    36,096,416 bytes copied during GC
-     1,654,336 bytes maximum residency (64 sample(s))
-       885,664 bytes maximum slop
-            71 MiB total memory in use (1 MiB lost due to fragmentation)
+```sh
+nix-shell -p haskellPackages.eventlog2html --run "eventlog2html memory-leak-test.eventlog"
 ```
 
-### w/o waj's PR
-
-#### ids: 10_000 (sequence)
-```
- 901,761,584 bytes allocated in the heap
-  38,123,856 bytes copied during GC
-   1,630,936 bytes maximum residency (69 sample(s))
-     810,240 bytes maximum slop
-          70 MiB total memory in use (0 MiB lost due to fragmentation)
-```
-
-#### ids: 10_000 (mapConcurrently)
-
-```
- 1,212,006,112 bytes allocated in the heap
-   331,789,960 bytes copied during GC
-   378,212,016 bytes maximum residency (8 sample(s))
-     3,235,704 bytes maximum slop
-           706 MiB total memory in use (14 MiB lost due to fragmentation)
-```
+Then open `memory-leak-test.eventlog.html` in your browser.
