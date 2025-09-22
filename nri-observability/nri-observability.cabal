@@ -108,7 +108,7 @@ executable memory-leak-test
       ScopedTypeVariables
       Strict
       TypeOperators
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T -s" -O2
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -rtsopts "-with-rtsopts=-N -T" -O2
   build-depends:
       aeson >=2.0 && <2.3
     , aeson-pretty >=0.8.0 && <0.9
