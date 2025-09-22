@@ -28,15 +28,6 @@ main = do
   Conduit.withAcquire (Observability.handler settings') <| \handler -> do
     forM_ [1..(floor (1_000_000 / fromIntegral threads))] <| \n -> do
       runRequests handler ids
-  -- give async threads 5s to finish
-  -- threadDelay 5_000_000
-
-runTest :: Int -> Observability.Handler -> IO ()
-runTest n handler = do
-  if n >= 50_000 then pure () else do
-    let ids = [n..n+threads] |> List.map Text.fromInt
-    runRequests handler ids
-    runTest (n + threads) handler
 
 runRequests :: Observability.Handler -> [Text] -> IO ()
 runRequests handler =
