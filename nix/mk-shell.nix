@@ -49,6 +49,7 @@ in pkgs.mkShell {
         servant-auth-server
         servant-server
         stm
+        strict-stm
         terminal-size
         text
         text-zipper
