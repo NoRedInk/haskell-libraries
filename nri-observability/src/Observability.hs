@@ -22,8 +22,8 @@ where
 
 import qualified Conduit
 import Control.Concurrent.Async (async)
-import Control.Concurrent.STM (atomically, check)
-import Control.Concurrent.STM.TVar (modifyTVar, newTVarIO, readTVar)
+import Control.Concurrent.Class.MonadSTM.Strict (atomically, check)
+import Control.Concurrent.Class.MonadSTM.Strict.TVar (modifyTVar, newTVarIO, readTVar)
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
 import qualified Data.Aeson as Aeson
