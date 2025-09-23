@@ -152,7 +152,8 @@ logTest name span =
       Ok reEncoded ->
         Text.join "\n" reEncoded
           |> Expect.equalToContentsOf
-            ( goldenResultsDir ++ "/file-reporter-"
+            ( goldenResultsDir
+                ++ "/file-reporter-"
                 ++ Text.replace " " "-" name
             )
 
