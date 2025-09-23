@@ -22,8 +22,8 @@ where
 
 import qualified Conduit
 import Control.Concurrent.Async (async)
-import Control.Concurrent.STM (atomically, check)
-import Control.Concurrent.STM.TVar (modifyTVar, newTVarIO, readTVar)
+import Control.Concurrent.Class.MonadSTM.Strict (atomically, check)
+import Control.Concurrent.Class.MonadSTM.Strict.TVar (modifyTVar, newTVarIO, readTVar)
 import qualified Control.Exception.Safe as Exception
 import Control.Monad (void)
 import qualified Data.Aeson as Aeson
@@ -206,6 +206,9 @@ data Reporter where
       reporterReport :: handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
     } ->
     Reporter
+
+instance Prelude.Show Reporter where
+  show reporter = "Reporter { name: " ++ Text.toList (reporterName reporter) ++ " }"
 
 -- | A list containing all the reporters we support. Reporters are ordered in
 -- increasing chance of failure, so we can pick the safest one for reporting on

@@ -36,4 +36,8 @@ self: super:
 
     # for now, pin hw-kafka-client to 4.0.3; nixpkgs@release-25.05 provides 5.3.0
     hw-kafka-client = self.callHackage "hw-kafka-client" "4.0.3" { };
+
+    # marked broken in nixpkgs
+    # current version requires io-classes >=1.5 && <1.6
+    strict-stm = pkgs.haskell.lib.doJailbreak (self.callHackage "strict-stm" "1.5.0.0" { });
   }
