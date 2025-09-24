@@ -171,7 +171,7 @@ requestId = map Internal.requestId logHandler
 
 -- | A log handler that doesn't log anything.
 silentHandler :: IO Internal.LogHandler
-silentHandler = Internal.mkHandler "" (Internal.Clock (pure 0)) (\_ -> pure ()) Nothing ""
+silentHandler = pure Internal.nullHandler
 
 -- | Throw a runtime exception that cannot be caught. This function, like
 -- @Debug.todo@, breaks type level guarantees and should be avoided. Where

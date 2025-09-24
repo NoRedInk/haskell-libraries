@@ -616,6 +616,25 @@ mkHandler requestId clock onFinish onFinishRoot' name' = do
         finishTracingSpan = finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef >> andThen onFinish
       }
 
+-- | Helper that creates a handler that does nothing. This is intended to power
+-- basically @Platform.silentHandler@ and nothing else. We provide this to make
+-- @Platform.silentHandler@ as efficient as possible, skipping all side effects.
+--
+-- The underlying desire for an IO-free `silentHandler`, aside from principles,
+-- is we saw space leaks carrying @TracingSpan@ and @TracingSpanDetails@ we
+-- couldn't understand, which went away when we switched to this no-op handler.
+nullHandler :: LogHandler
+nullHandler = do
+  LogHandler
+    { requestId = "",
+      startChildTracingSpan = \_ -> pure nullHandler,
+      startNewRoot = \_ -> pure nullHandler,
+      setTracingSpanDetailsIO = \_ -> pure (),
+      setTracingSpanSummaryIO = \_ -> pure (),
+      markTracingSpanFailedIO = pure (),
+      finishTracingSpan = \_ -> pure ()
+    }
+
 -- | Set the details for a tracingSpan created using the @tracingSpan@
 -- function. Like @tracingSpan@ this is intended for use in writing libraries
 -- that define custom types of effects, such as database queries or http
