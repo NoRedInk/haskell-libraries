@@ -619,6 +619,10 @@ mkHandler requestId clock onFinish onFinishRoot' name' = do
 -- | Helper that creates a handler that does nothing. This is intended to power
 -- basically @Platform.silentHandler@ and nothing else. We provide this to make
 -- @Platform.silentHandler@ as efficient as possible, skipping all side effects.
+--
+-- The underlying desire for an IO-free `silentHandler`, aside from principles,
+-- is we saw space leaks carrying @TracingSpan@ and @TracingSpanDetails@ we
+-- couldn't understand, which went away when we switched to this no-op handler.
 nullHandler :: LogHandler
 nullHandler = do
   LogHandler
