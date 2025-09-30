@@ -112,12 +112,19 @@ advertiseLoop counter lastAdvertisedCount = do
   lastCount <- MVar.readMVar counter
   Control.Concurrent.threadDelay 3_000_000 {- 3 seconds -}
   currentCount <- MVar.readMVar counter
-  -- if after 3 seconds the count hasn't changed, we've stopped logging for a bit
-  let stoppedLogging = lastCount == currentCount
-  -- we don't want to advertise multiple times while we're idle
-  let haventAdvertisedAtCurrentCount = lastAdvertisedCount /= Just currentCount
-  if stoppedLogging && haventAdvertisedAtCurrentCount
+  if shouldAdvertise lastCount currentCount lastAdvertisedCount
     then do
       putTextLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
       advertiseLoop counter (Just currentCount)
     else advertiseLoop counter lastAdvertisedCount
+
+shouldAdvertise :: Int -> Int -> Maybe Int -> Bool
+shouldAdvertise lastCount currentCount lastAdvertisedCount =
+  let -- we don't want to advertise on launch
+      justLaunched = lastAdvertisedCount == Nothing && currentCount == 0
+      -- if after N seconds the count hasn't changed, we've stopped logging for a bit
+      stoppedLogging = lastCount == currentCount
+      -- we don't want to advertise multiple times while we're idle
+      alreadyAdvertised =
+        lastAdvertisedCount == Just currentCount
+   in stoppedLogging && not alreadyAdvertised && not justLaunched
