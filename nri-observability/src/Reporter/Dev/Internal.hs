@@ -87,7 +87,7 @@ handler = do
   writeLock <- MVar.newEmptyMVar
   counter <- MVar.newMVar 0
   loggingThread <- Async.async (logLoop counter writeLock)
-  advertiseLogExplorer <- Async.async (advertiseLoop counter)
+  advertiseLogExplorer <- Async.async (advertiseLoop counter Nothing)
   timer <- Timer.mkTimer
   Prelude.pure Handler {timer, writeLock, loggingThread, advertiseLogExplorer}
 
@@ -107,13 +107,24 @@ logLoop counter lock = do
   MVar.modifyMVar_ counter (\n -> Prelude.pure (n + 1))
   logLoop counter lock
 
-advertiseLoop :: MVar.MVar Int -> Prelude.IO ()
-advertiseLoop counter = do
+advertiseLoop :: MVar.MVar Int -> Maybe Int -> Prelude.IO ()
+advertiseLoop counter lastAdvertisedCount = do
   lastCount <- MVar.readMVar counter
   Control.Concurrent.threadDelay 3_000_000 {- 3 seconds -}
   currentCount <- MVar.readMVar counter
-  if lastCount == currentCount && currentCount > 0
+  if shouldAdvertise lastCount currentCount lastAdvertisedCount
     then do
       putTextLn "🕵️ Need more detail? Try running the `log-explorer` command!\n"
-      advertiseLoop counter
-    else advertiseLoop counter
+      advertiseLoop counter (Just currentCount)
+    else advertiseLoop counter lastAdvertisedCount
+
+shouldAdvertise :: Int -> Int -> Maybe Int -> Bool
+shouldAdvertise lastCount currentCount lastAdvertisedCount =
+  let -- we don't want to advertise on launch
+      justLaunched = lastAdvertisedCount == Nothing && currentCount == 0
+      -- if after N seconds the count hasn't changed, we've stopped logging for a bit
+      stoppedLogging = lastCount == currentCount
+      -- we don't want to advertise multiple times while we're idle
+      alreadyAdvertised =
+        lastAdvertisedCount == Just currentCount
+   in stoppedLogging && not alreadyAdvertised && not justLaunched

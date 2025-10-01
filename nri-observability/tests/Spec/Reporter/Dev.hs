@@ -19,30 +19,36 @@ tests :: Test.Test
 tests =
   Test.describe
     "Observability.Dev"
-    [ logTest
-        "log span without details or children"
-        emptyTracingSpan
-          { Platform.name = "root-span",
-            Platform.started = ms 5
-          },
-      logTest
-        "log span with exception"
-        emptyTracingSpan
-          { Platform.name = "root-span",
-            Platform.succeeded = Platform.FailedWith (Exception.SomeException (CustomException "toast!"))
-          },
-      logTest
-        "logs information about an incoming http request"
-        emptyTracingSpan
-          { Platform.details =
-              HttpRequest.emptyDetails
-                { HttpRequest.endpoint = Just "/hats/:hat_id"
-                }
-                |> HttpRequest.Incoming
-                |> Platform.toTracingSpanDetails
-                |> Just
-          }
+    [ Test.describe "log tests" logTests,
+      Test.describe "advertise tests" advertiseTests
     ]
+
+logTests :: [Test.Test]
+logTests =
+  [ logTest
+      "log span without details or children"
+      emptyTracingSpan
+        { Platform.name = "root-span",
+          Platform.started = ms 5
+        },
+    logTest
+      "log span with exception"
+      emptyTracingSpan
+        { Platform.name = "root-span",
+          Platform.succeeded = Platform.FailedWith (Exception.SomeException (CustomException "toast!"))
+        },
+    logTest
+      "logs information about an incoming http request"
+      emptyTracingSpan
+        { Platform.details =
+            HttpRequest.emptyDetails
+              { HttpRequest.endpoint = Just "/hats/:hat_id"
+              }
+              |> HttpRequest.Incoming
+              |> Platform.toTracingSpanDetails
+              |> Just
+        }
+  ]
 
 logTest :: Text -> Platform.TracingSpan -> Test.Test
 logTest name span =
@@ -77,3 +83,21 @@ emptyTracingSpan =
       Platform.allocated = 0,
       Platform.children = []
     }
+
+advertiseTests :: [Test.Test]
+advertiseTests =
+  [ Test.test "does not advertises on launch" <| \_ -> do
+      Dev.shouldAdvertise 0 0 Nothing |> Expect.equal False,
+    Test.test "does not advertise if still logging (on launch)" <| \_ -> do
+      Dev.shouldAdvertise 0 10 Nothing |> Expect.equal False,
+    Test.test "does not advertise if still logging" <| \_ -> do
+      Dev.shouldAdvertise 0 10 (Just 0) |> Expect.equal False,
+    Test.test "does not readvertise" <| \_ -> do
+      Dev.shouldAdvertise 1 1 (Just 1) |> Expect.equal False,
+    Test.test "does not advertise if still logging (on launch)" <| \_ -> do
+      Dev.shouldAdvertise 0 10 Nothing |> Expect.equal False,
+    Test.test "does not advertise if still logging" <| \_ -> do
+      Dev.shouldAdvertise 0 10 (Just 0) |> Expect.equal False,
+    Test.test "only advertises if counter hasn't changed and we haven't advertised it yet" <| \_ -> do
+      Dev.shouldAdvertise 10 10 (Just 0) |> Expect.equal True
+  ]
