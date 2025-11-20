@@ -19,8 +19,8 @@ module Test
     -- * Running test
     run,
     runWithSettings,
-    Settings (..),
-    defaultSettings,
+    TestSettings (..),
+    defaultTestSettings,
   )
 where
 
@@ -43,15 +43,15 @@ import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Prelude
 
-data Settings = Settings
+data TestSettings = TestSettings
   { output :: Maybe System.IO.Handle,
     junitPath :: Maybe Prelude.String,
     writeDevLog :: Bool
   }
 
-defaultSettings :: Settings
-defaultSettings =
-  Settings
+defaultTestSettings :: TestSettings
+defaultTestSettings =
+  TestSettings
     { output = Just System.IO.stdout,
       junitPath = Nothing,
       writeDevLog = True
@@ -69,10 +69,10 @@ defaultSettings =
 run :: (Stack.HasCallStack) => Internal.Test -> Prelude.IO ()
 run suite = do
   args <- System.Environment.getArgs
-  let settings = defaultSettings {junitPath = getJunitPath args}
+  let settings = defaultTestSettings {junitPath = getJunitPath args}
   runWithSettings settings suite
 
-runWithSettings :: (Stack.HasCallStack) => Settings -> Internal.Test -> Prelude.IO ()
+runWithSettings :: (Stack.HasCallStack) => TestSettings -> Internal.Test -> Prelude.IO ()
 runWithSettings settings suite = do
   -- Work around `hGetContents: invalid argument (invalid byte sequence)` bug on
   -- Nix: https://github.com/dhall-lang/dhall-haskell/issues/865
