@@ -18,10 +18,12 @@ module Test
 
     -- * Running test
     run,
+    runWithSettings,
+    Settings (..),
+    defaultSettings,
   )
 where
 
-import qualified Control.Concurrent.Async as Async
 import qualified GHC.IO.Encoding
 import qualified GHC.Stack as Stack
 import NriPrelude
@@ -41,6 +43,20 @@ import qualified Test.Reporter.Logfile
 import qualified Test.Reporter.Stdout
 import qualified Prelude
 
+data Settings = Settings
+  { output :: Maybe System.IO.Handle,
+    junitPath :: Maybe Prelude.String,
+    writeDevLog :: Bool
+  }
+
+defaultSettings :: Settings
+defaultSettings =
+  Settings
+    { output = Just System.IO.stdout,
+      junitPath = Nothing,
+      writeDevLog = True
+    }
+
 -- | Turn a test suite into a program that can be executed in Haskell. Use like
 -- this:
 --
@@ -52,6 +68,12 @@ import qualified Prelude
 -- > main = Test.run  (Test.todo "write your tests here!")
 run :: (Stack.HasCallStack) => Internal.Test -> Prelude.IO ()
 run suite = do
+  args <- System.Environment.getArgs
+  let settings = defaultSettings {junitPath = getJunitPath args}
+  runWithSettings settings suite
+
+runWithSettings :: (Stack.HasCallStack) => Settings -> Internal.Test -> Prelude.IO ()
+runWithSettings settings suite = do
   -- Work around `hGetContents: invalid argument (invalid byte sequence)` bug on
   -- Nix: https://github.com/dhall-lang/dhall-haskell/issues/865
   GHC.IO.Encoding.setLocaleEncoding System.IO.utf8
@@ -65,24 +87,31 @@ run suite = do
       System.Exit.exitFailure
     Ok request ->
       Prelude.pure request
-  (results, logExplorerAvailable) <-
-    Async.concurrently
-      (Task.perform log (Internal.run request suite))
-      isLogExplorerAvailable
-  Async.mapConcurrently_
-    identity
-    [ reportStdout results,
-      Stack.withFrozenCallStack reportLogfile results,
-      reportJunit args results
-    ]
-  if logExplorerAvailable
-    then putTextLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
-    else putTextLn "\nInstall the log-explorer tool to inspect logs collected during test runs. Find it at github.com/NoRedInk/haskell-libraries."
+
+  results <- Task.perform log (Internal.run request suite)
+
+  case output settings of
+    Just outputHandle -> reportConsole outputHandle results
+    Nothing -> Prelude.pure ()
+
+  case junitPath settings of
+    Nothing -> Prelude.pure ()
+    Just path -> reportJunit path results
+
+  if writeDevLog settings
+    then do
+      logExplorerAvailable <- isLogExplorerAvailable
+      if logExplorerAvailable
+        then putTextLn "\nRun log-explorer in your shell to inspect logs collected during this test run."
+        else putTextLn "\nInstall the log-explorer tool to inspect logs collected during test runs. Find it at github.com/NoRedInk/haskell-libraries."
+      Stack.withFrozenCallStack reportLogfile results
+    else Prelude.pure ()
+
   Test.Reporter.ExitCode.report results
 
-reportStdout :: Internal.SuiteResult -> Prelude.IO ()
-reportStdout results =
-  Test.Reporter.Stdout.report System.IO.stdout results
+reportConsole :: System.IO.Handle -> Internal.SuiteResult -> Prelude.IO ()
+reportConsole outputHandle results =
+  Test.Reporter.Stdout.report outputHandle results
 
 reportLogfile :: (Stack.HasCallStack) => Internal.SuiteResult -> Prelude.IO ()
 reportLogfile results =
@@ -91,18 +120,16 @@ reportLogfile results =
     Platform.DevLog.writeSpanToDevLog
     results
 
-reportJunit :: [Prelude.String] -> Internal.SuiteResult -> Prelude.IO ()
-reportJunit args results =
-  case getPath args of
-    Nothing -> Prelude.pure ()
-    Just path -> Test.Reporter.Junit.report path results
+reportJunit :: Prelude.String -> Internal.SuiteResult -> Prelude.IO ()
+reportJunit path results =
+  Test.Reporter.Junit.report path results
 
-getPath :: [Prelude.String] -> Maybe Prelude.String
-getPath args =
+getJunitPath :: [Prelude.String] -> Maybe Prelude.String
+getJunitPath args =
   case args of
     [] -> Nothing
     "--xml" : path : _ -> Just path
-    _ : rest -> getPath rest
+    _ : rest -> getJunitPath rest
 
 isLogExplorerAvailable :: Prelude.IO Bool
 isLogExplorerAvailable = do
