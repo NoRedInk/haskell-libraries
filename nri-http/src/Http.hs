@@ -6,6 +6,11 @@ module Http
   ( -- * Handlers
     Handler,
     handler,
+    handlerWith,
+
+    -- * Settings
+    HttpSettings (..),
+    defaultHttpSettings,
 
     -- * Requests
     get,
@@ -57,6 +62,7 @@ import Data.String (fromString)
 import qualified Data.Text.Encoding
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
+import Data.Version (showVersion)
 import qualified Dict
 import Http.Internal (Body, Expect, Expect', Handler)
 import qualified Http.Internal as Internal
@@ -65,22 +71,44 @@ import qualified Maybe
 import qualified Network.HTTP.Client as HTTP
 import qualified Network.HTTP.Client.Internal as HTTP.Internal
 import qualified Network.HTTP.Client.TLS as TLS
+import qualified Network.HTTP.Types.Header as Header
 import qualified Network.HTTP.Types.Status as Status
 import qualified Network.URI
+import Paths_nri_http (version)
 import qualified Platform
 import qualified Task
 import Prelude (Either (Left, Right), IO, fromIntegral, pure)
 
+-- | Settings that influence HTTP requests.
+data HttpSettings = HttpSettings
+  { -- | The User-Agent header to include in requests.
+    userAgent :: Text,
+    -- | The default timeout for requests, in microseconds.
+    defaultTimeout :: Int
+  }
+
+-- | The default 'HttpSettings'.
+defaultHttpSettings :: HttpSettings
+defaultHttpSettings =
+  HttpSettings
+    { userAgent = "nri-http/" ++ Text.fromList (showVersion version),
+      defaultTimeout = 30 * 1000 * 1000
+    }
+
 -- | Create a 'Handler' for making HTTP requests.
 handler :: Conduit.Acquire Handler
-handler = do
+handler = handlerWith defaultHttpSettings
+
+-- | Create a 'Handler' for making HTTP requests with specific settings.
+handlerWith :: HttpSettings -> Conduit.Acquire Handler
+handlerWith settings = do
   doAnything <- liftIO Platform.doAnythingHandler
   manager <- TLS.newTlsManager
   pure
     <| Internal.Handler
-      (_request doAnything manager)
-      (_withThirdParty manager)
-      (_withThirdPartyIO manager)
+      (_request settings doAnything manager)
+      (_withThirdParty settings manager)
+      (_withThirdPartyIO settings manager)
 
 -- | Third party libraries that make HTTP requests often take a 'HTTP.Manager'.
 -- This helper allows us to call such a library using a 'Handler'.
@@ -92,9 +120,9 @@ withThirdParty :: Handler -> (HTTP.Manager -> Task e a) -> Task e a
 withThirdParty Internal.Handler {Internal.handlerWithThirdParty = wtp} library =
   wtp library
 
-_withThirdParty :: HTTP.Manager -> (HTTP.Manager -> Task e a) -> Task e a
-_withThirdParty manager library = do
-  requestManager <- prepareManagerForRequest manager
+_withThirdParty :: HttpSettings -> HTTP.Manager -> (HTTP.Manager -> Task e a) -> Task e a
+_withThirdParty settings manager library = do
+  requestManager <- prepareManagerForRequest settings manager
   library requestManager
 
 -- | Like `withThirdParty`, but runs in `IO`.
@@ -102,9 +130,9 @@ withThirdPartyIO :: Platform.LogHandler -> Handler -> (HTTP.Manager -> IO a) -> 
 withThirdPartyIO log Internal.Handler {Internal.handlerWithThirdPartyIO = wtp} library =
   wtp log library
 
-_withThirdPartyIO :: HTTP.Manager -> Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
-_withThirdPartyIO manager log library = do
-  requestManager <- prepareManagerForRequest manager |> Task.perform log
+_withThirdPartyIO :: HttpSettings -> HTTP.Manager -> Platform.LogHandler -> (HTTP.Manager -> IO a) -> IO a
+_withThirdPartyIO settings manager log library = do
+  requestManager <- prepareManagerForRequest settings manager |> Task.perform log
   library requestManager
 
 -- QUICKS
@@ -197,33 +225,33 @@ request ::
   Task x expect
 request Internal.Handler {Internal.handlerRequest} settings = handlerRequest settings
 
-_request :: Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request' x expect -> Task x expect
-_request doAnythingHandler manager settings = do
-  requestManager <- prepareManagerForRequest manager
+_request :: HttpSettings -> Platform.DoAnythingHandler -> HTTP.Manager -> Internal.Request' x expect -> Task x expect
+_request settings doAnythingHandler manager req = do
+  requestManager <- prepareManagerForRequest settings manager
   Platform.doAnything doAnythingHandler <| do
     response <-
       Exception.try <| do
         basicRequest <-
-          HTTP.parseUrlThrow <| Text.toList (Internal.url settings)
+          HTTP.parseUrlThrow <| Text.toList (Internal.url req)
         let finalRequest =
               basicRequest
-                { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.method settings),
-                  HTTP.requestHeaders = case Internal.bodyContentType (Internal.body settings) of
+                { HTTP.method = Data.Text.Encoding.encodeUtf8 (Internal.method req),
+                  HTTP.requestHeaders = case Internal.bodyContentType (Internal.body req) of
                     Nothing ->
-                      Internal.headers settings
+                      Internal.headers req
                         |> List.map Internal.unHeader
                     Just mimeType ->
                       ("content-type", mimeType)
-                        : List.map Internal.unHeader (Internal.headers settings),
-                  HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.bodyContents (Internal.body settings),
+                        : List.map Internal.unHeader (Internal.headers req),
+                  HTTP.requestBody = HTTP.RequestBodyLBS <| Internal.bodyContents (Internal.body req),
                   HTTP.responseTimeout =
-                    Internal.timeout settings
-                      |> Maybe.withDefault (30 * 1000 * 1000)
+                    Internal.timeout req
+                      |> Maybe.withDefault (defaultTimeout settings)
                       |> fromIntegral
                       |> HTTP.responseTimeoutMicro
                 }
         HTTP.httpLbs finalRequest requestManager
-    pure <| handleResponse (Internal.expect settings) response
+    pure <| handleResponse (Internal.expect req) response
 
 handleResponse :: Expect' x a -> Either HTTP.HttpException (HTTP.Response Data.ByteString.Lazy.ByteString) -> Result x a
 handleResponse expect response =
@@ -364,8 +392,8 @@ type Error = Internal.Error
 -- this code breaking in future versions of the `http-client` package. There's
 -- an outstanding PR for motivating these Manager modification functions are
 -- moved to the stable API: https://github.com/snoyberg/http-client/issues/426
-prepareManagerForRequest :: HTTP.Manager -> Task e HTTP.Manager
-prepareManagerForRequest manager = do
+prepareManagerForRequest :: HttpSettings -> HTTP.Manager -> Task e HTTP.Manager
+prepareManagerForRequest settings manager = do
   log <- Platform.logHandler
   requestId <- Platform.requestId
   pure
@@ -373,10 +401,11 @@ prepareManagerForRequest manager = do
       { -- To be able to correlate events and logs belonging to a single
         -- original user request we pass around a request ID on HTTP requests
         -- between services. Below we add this request ID to all outgoing HTTP
-        -- requests.
+        -- requests. Also we add a User-Agent header to all outgoing requests.
         HTTP.Internal.mModifyRequest = \req ->
           HTTP.Internal.mModifyRequest manager req
-            |> andThen (modifyRequest requestId),
+            |> map (addRequestIdHeader requestId)
+            |> map (addUserAgentHeader),
         -- We trace outgoing HTTP requests. This comes down to measuring how
         -- long they take and passing that information to some dashboard. This
         -- dashboard can then draw nice graphs showing how the time responding
@@ -388,17 +417,23 @@ prepareManagerForRequest manager = do
             |> wrapException log req
       }
   where
-    modifyRequest :: Text -> HTTP.Request -> IO HTTP.Request
-    modifyRequest requestId req =
+    addHeader :: Header.Header -> HTTP.Request -> HTTP.Request
+    addHeader hdr req =
+      let hasHeader = List.any (\(name, _) -> name == Tuple.first hdr) (HTTP.requestHeaders req)
+       in if hasHeader
+            then req
+            else req {HTTP.requestHeaders = hdr : HTTP.requestHeaders req}
+
+    addRequestIdHeader :: Text -> HTTP.Request -> HTTP.Request
+    addRequestIdHeader requestId req =
       case requestId of
-        "" -> pure req
-        _ ->
-          pure
-            req
-              { HTTP.requestHeaders =
-                  ("x-request-id", Data.Text.Encoding.encodeUtf8 requestId)
-                    : HTTP.requestHeaders req
-              }
+        "" -> req
+        _ -> addHeader ("X-Request-ID", Data.Text.Encoding.encodeUtf8 requestId) req
+
+    addUserAgentHeader :: HTTP.Request -> HTTP.Request
+    addUserAgentHeader =
+      addHeader (Header.hUserAgent, Data.Text.Encoding.encodeUtf8 (userAgent settings))
+
     wrapException :: forall a. Platform.LogHandler -> HTTP.Request -> IO a -> IO a
     wrapException log req io =
       let uri = HTTP.getUri req
