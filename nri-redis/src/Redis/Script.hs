@@ -133,14 +133,14 @@ evaluateScriptParam :: (HasScriptParam a) => a -> EvaluatedToken
 evaluateScriptParam scriptParam =
   case getScriptParam scriptParam of
     Key a ->
-      EvaluatedVariable
-        <| EvaluatedParam
+      EvaluatedVariable <|
+        EvaluatedParam
           { kind = RedisKey,
             value = unquoteString (Debug.toString a)
           }
     Literal a ->
-      EvaluatedVariable
-        <| EvaluatedParam
+      EvaluatedVariable <|
+        EvaluatedParam
           { kind = ArbitraryValue,
             value = unquoteString (Debug.toString a)
           }

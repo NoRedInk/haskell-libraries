@@ -264,8 +264,8 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
 
 fuzzBody :: (Show a) => Fuzzer a -> (a -> Expectation) -> Expectation
 fuzzBody (Fuzzer gen) expectation = do
-  Expectation
-    <| Platform.Internal.Task
+  Expectation <|
+    Platform.Internal.Task
       ( \_log -> do
           -- For the moment we're not recording traces in fuzz tests. Because
           -- the test body runs a great many times, we'd record a ton of data
@@ -516,8 +516,8 @@ runSingle test' =
           Platform.Internal.rootTracingSpanIO
             ""
             ( \span -> do
-                when (Platform.Internal.name span == spanName)
-                  <| MVar.putMVar spanVar span
+                when (Platform.Internal.name span == spanName) <|
+                  MVar.putMVar spanVar span
             )
             spanName
             ( \log ->
@@ -584,8 +584,8 @@ groupBy key xs =
         Dict.update
           (key x)
           ( \val ->
-              Just
-                <| case val of
+              Just <|
+                case val of
                   Nothing -> [x]
                   Just ys -> x : ys
           )

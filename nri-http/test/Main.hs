@@ -216,8 +216,8 @@ expectRequest run = do
   let app req _respond = Exception.throwIO (FirstRequest req)
   log <- Expect.succeeds Platform.logHandler
   either <- Expect.fromIO <| Exception.try (withServerIO log app run)
-  Expect.succeeds
-    <| case either of
+  Expect.succeeds <|
+    case either of
       Prelude.Left (FirstRequest req) -> Task.succeed req
       Prelude.Right (Ok _) -> Task.fail "Expected a request, but none was received."
       Prelude.Right (Err err) -> Task.fail (Debug.toString err)

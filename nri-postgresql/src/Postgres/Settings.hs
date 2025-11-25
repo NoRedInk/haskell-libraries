@@ -320,9 +320,9 @@ toPGDatabase
             then
               Text.toList host
                 </> ".s.PGSQL."
-                  ++ show port
-                  |> SockAddrUnix
-                  |> Right
+                ++ show port
+                |> SockAddrUnix
+                |> Right
             else Left (Text.toList host, show port)
       }
     where

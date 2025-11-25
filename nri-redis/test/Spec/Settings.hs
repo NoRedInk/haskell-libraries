@@ -242,7 +242,7 @@ decoderWithCustomConnectionStringTests =
 
 parseConnectInfoElseFailTest :: String -> Expect.Expectation' ConnectInfo
 parseConnectInfoElseFailTest uri = do
-  Expect.succeeds
-    <| case parseConnectInfo uri of
+  Expect.succeeds <|
+    case parseConnectInfo uri of
       Left err -> Task.fail <| "you wrote this test wrong, got err: " ++ Text.fromList err
       Right connectInfo -> pure connectInfo

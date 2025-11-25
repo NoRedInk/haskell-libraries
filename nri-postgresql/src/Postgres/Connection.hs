@@ -52,8 +52,8 @@ connectionIO settings = do
           |> Prelude.fromIntegral
   doAnything <- Platform.doAnythingHandler
   pool <-
-    map Pool
-      <| Data.Pool.newPool
+    map Pool <|
+      Data.Pool.newPool
         ( Data.Pool.defaultPoolConfig
             (pgConnect database `Exception.catch` handleError (toConnectionString database))
             pgDisconnect

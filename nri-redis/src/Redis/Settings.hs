@@ -160,8 +160,8 @@ parseRedisSocketSchemeURI uri =
    in do
         uriPathText <- uriPathTextFromURI
         dbNum <- dbNumFromParams (URI.uriQuery uri)
-        pure
-          <| defaultConnectInfo
+        pure <|
+          defaultConnectInfo
             { connectPort = UnixSocket (Text.toList uriPathText),
               connectDatabase = dbNum,
               connectAuth = maybePasswordFromURI

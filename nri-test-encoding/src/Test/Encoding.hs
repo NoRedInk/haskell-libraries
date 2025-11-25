@@ -18,7 +18,7 @@ examplesToTest name fileName examples =
       ( "test"
           </> "golden-results"
           </> Text.toList fileName
-            |> FilePath.makeValid
-            |> Text.fromList
+          |> FilePath.makeValid
+          |> Text.fromList
       )
       (Examples.render examples)

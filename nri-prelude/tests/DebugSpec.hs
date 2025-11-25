@@ -20,16 +20,16 @@ tests =
 
 toStringTests :: List Test
 toStringTests =
-  [ test "returns the show form of an empty String"
-      <| \() -> Expect.equal "\"\"" (Debug.toString ("" :: Text)),
-    test "returns the show form of an Int"
-      <| \() -> Expect.equal "0" (Debug.toString (0 :: Int))
+  [ test "returns the show form of an empty String" <| \() ->
+      Expect.equal "\"\"" (Debug.toString ("" :: Text)),
+    test "returns the show form of an Int" <| \() ->
+      Expect.equal "0" (Debug.toString (0 :: Int))
   ]
 
 logTests :: List Test
 logTests =
-  [ test "returns passed value"
-      <| \() -> Expect.equal 3.14 (3.14 :: Float)
+  [ test "returns passed value" <| \() ->
+      Expect.equal 3.14 (3.14 :: Float)
   ]
 
 todoTests :: List Test

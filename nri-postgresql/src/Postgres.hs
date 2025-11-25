@@ -65,8 +65,8 @@ transaction conn func =
       --
       end :: Platform.Succeeded -> PGConnection -> Task x ()
       end succeeded c =
-        doIO conn
-          <| case succeeded of
+        doIO conn <|
+          case succeeded of
             Platform.Succeeded -> pgCommit c
             Platform.Failed -> pgRollback c
             Platform.FailedWith _ -> pgRollback c
@@ -222,14 +222,14 @@ withConnection :: Connection -> (PGConnection -> Task e a) -> Task e a
 withConnection conn func =
   let acquire :: Data.Pool.Pool conn -> Task x (conn, Data.Pool.LocalPool conn)
       acquire pool =
-        Log.withContext "acquiring Postgres connection from pool" []
-          <| doIO conn
-          <| Data.Pool.takeResource pool
+        Log.withContext "acquiring Postgres connection from pool" [] <|
+          doIO conn <|
+            Data.Pool.takeResource pool
       --
       release :: Data.Pool.Pool conn -> Platform.Succeeded -> (conn, Data.Pool.LocalPool conn) -> Task y ()
       release pool succeeded (c, localPool) =
-        doIO conn
-          <| case succeeded of
+        doIO conn <|
+          case succeeded of
             Platform.Succeeded ->
               Data.Pool.putResource localPool c
             Platform.Failed ->

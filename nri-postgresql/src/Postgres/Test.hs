@@ -29,9 +29,8 @@ test ::
   (Postgres.Connection -> Expect.Expectation) ->
   Test.Test
 test description body =
-  Test.serialize "postgres"
-    <| Stack.withFrozenCallStack Test.test description
-    <| \_ ->
+  Test.serialize "postgres" <|
+    Stack.withFrozenCallStack Test.test description <| \_ ->
       Expect.around
         ( \task' -> do
             conn <- getTestConnection

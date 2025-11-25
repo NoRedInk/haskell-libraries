@@ -63,8 +63,8 @@ handler settings = do
       reportCounter <- Conduit.liftIO <| newTVarIO (0 :: Int)
 
       Conduit.mkAcquire
-        ( Prelude.pure
-            <| Handler
+        ( Prelude.pure <|
+            Handler
               ( \requestId span -> do
                   atomically (modifyTVar reportCounter (+ 1))
 

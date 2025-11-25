@@ -142,8 +142,8 @@ routesToText routes =
           [ case queryParams route of
               [] -> Nothing
               queryParams' ->
-                Just
-                  <| Text.concat
+                Just <|
+                  Text.concat
                     ( routeName route
                         : "?"
                         : [Text.join "&" (List.map printQueryParam queryParams')]
@@ -151,15 +151,15 @@ routesToText routes =
             case headers route of
               [] -> Nothing
               headers' ->
-                Just
-                  <| Text.join
+                Just <|
+                  Text.join
                     " "
                     ( routeName route
                         : "headers"
                         : List.map printHeaders headers'
                     ),
-            Just
-              <| Text.join
+            Just <|
+              Text.join
                 " "
                 [ routeName route,
                   "response",
@@ -168,8 +168,8 @@ routesToText routes =
             case requestBody route of
               Nothing -> Nothing
               Just body ->
-                Just
-                  <| Text.join
+                Just <|
+                  Text.join
                     " "
                     [ routeName route,
                       "request",

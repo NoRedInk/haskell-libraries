@@ -223,8 +223,8 @@ test description body =
       ( \task' ->
           Platform.bracketWithError
             ( -- create handler
-              Platform.doAnything doAnything
-                <| case Environment.decodeDefaults Settings.decoder of
+              Platform.doAnything doAnything <|
+                case Environment.decodeDefaults Settings.decoder of
                   Ok settings ->
                     map
                       Ok

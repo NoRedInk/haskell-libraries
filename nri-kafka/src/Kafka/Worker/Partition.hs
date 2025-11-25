@@ -162,12 +162,12 @@ spawnWorkerThread skipOrNot messageFormat commitOffsets observabilityHandler ana
   -- partition as soon as this function returns, even if the processing thread
   -- we start below still needs boot.
   partition <-
-    map Partition
-      <| TVar.newTVarIO
-      <| case commitOffsets of
-        ToKafka -> Assigned Seq.empty
-        Elsewhere offset -> AwaitingSeekTo offset
-        ElsewhereButToKafkaAsWell offset -> AwaitingSeekTo offset
+    map Partition <|
+      TVar.newTVarIO <|
+        case commitOffsets of
+          ToKafka -> Assigned Seq.empty
+          Elsewhere offset -> AwaitingSeekTo offset
+          ElsewhereButToKafkaAsWell offset -> AwaitingSeekTo offset
   onStartup partition
   Exception.finally
     (processMsgLoop skipOrNot messageFormat commitOffsets observabilityHandler State {analytics, stopping, partition} consumer callback)
@@ -441,8 +441,8 @@ peekRecord state =
     StopThread
     ( do
         next <-
-          STM.atomically
-            <| do
+          STM.atomically <|
+            do
               let (Partition partition') = partition state
               backlog' <- TVar.readTVar partition'
               case backlog' of
@@ -529,8 +529,8 @@ append item (Partition partition) =
 length :: Partition -> Prelude.IO (Maybe Int)
 length (Partition partition) = do
   backlog <- TVar.readTVarIO partition
-  Prelude.pure
-    <| case backlog of
+  Prelude.pure <|
+    case backlog of
       AwaitingSeekTo _ -> Nothing
       Stopping -> Nothing
       Assigned queue ->

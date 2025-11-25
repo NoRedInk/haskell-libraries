@@ -142,80 +142,80 @@ generatePGEnum hsTypeName databaseTypeName mapping = do
 
   -- Note: We make sure to capture IO errors and re-throw them below in the Q monad so that our test framework can capture them
   (maybePGEnumValues :: Either Control.Exception.IOException (List Text)) <-
-    TH.runIO
-      <| Control.Exception.try
-      <| withTPGConnection
-        ( \connection -> do
-            -- Check if the databaseTypeName exists on the PG database and is an enum
-            -- See https://www.postgresql.org/docs/current/catalog-pg-type.html
-            typeType <-
-              pgSimpleQuery
-                connection
-                ( BSL.fromChunks
-                    [ "SELECT typtype",
-                      " FROM pg_catalog.pg_type",
-                      " JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace",
-                      " WHERE pg_type.typname = '",
-                      Encoding.encodeUtf8 type_enum_name,
-                      "'",
-                      " AND pg_namespace.nspname = '",
-                      Encoding.encodeUtf8 type_schema_name,
-                      "'"
-                    ]
-                )
-                |> fmap
-                  ( \(_, rows) ->
-                      rows
-                        |> List.filterMap
-                          ( \cols ->
-                              case cols of
-                                [enumlabel] ->
-                                  Just (pgDecodeRep enumlabel)
-                                _ ->
-                                  Nothing
-                          )
+    TH.runIO <|
+      Control.Exception.try <|
+        withTPGConnection
+          ( \connection -> do
+              -- Check if the databaseTypeName exists on the PG database and is an enum
+              -- See https://www.postgresql.org/docs/current/catalog-pg-type.html
+              typeType <-
+                pgSimpleQuery
+                  connection
+                  ( BSL.fromChunks
+                      [ "SELECT typtype",
+                        " FROM pg_catalog.pg_type",
+                        " JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace",
+                        " WHERE pg_type.typname = '",
+                        Encoding.encodeUtf8 type_enum_name,
+                        "'",
+                        " AND pg_namespace.nspname = '",
+                        Encoding.encodeUtf8 type_schema_name,
+                        "'"
+                      ]
                   )
+                  |> fmap
+                    ( \(_, rows) ->
+                        rows
+                          |> List.filterMap
+                            ( \cols ->
+                                case cols of
+                                  [enumlabel] ->
+                                    Just (pgDecodeRep enumlabel)
+                                  _ ->
+                                    Nothing
+                            )
+                    )
 
-            _ <- case typeType of
-              [] ->
-                fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " does not exist on the database.")
-              -- 'e' means enum type
-              ['e'] ->
-                pure ()
-              _ ->
-                fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " is not an enum type.")
+              _ <- case typeType of
+                [] ->
+                  fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " does not exist on the database.")
+                -- 'e' means enum type
+                ['e'] ->
+                  pure ()
+                _ ->
+                  fail ("Type " ++ quote (Text.toList databaseTypeName) ++ " is not an enum type.")
 
-            enumLabels <-
-              pgSimpleQuery
-                connection
-                ( BSL.fromChunks
-                    [ "SELECT enumlabel",
-                      " FROM pg_catalog.pg_enum",
-                      " WHERE enumtypid = '",
-                      Encoding.encodeUtf8 databaseTypeName,
-                      "'::regtype",
-                      " ORDER BY enumsortorder"
-                    ]
-                )
-                |> fmap
-                  ( \(_, rows) ->
-                      rows
-                        |> List.filterMap
-                          ( \cols ->
-                              case cols of
-                                [enumlabel] ->
-                                  Just (pgDecodeRep enumlabel)
-                                _ ->
-                                  Nothing
-                          )
+              enumLabels <-
+                pgSimpleQuery
+                  connection
+                  ( BSL.fromChunks
+                      [ "SELECT enumlabel",
+                        " FROM pg_catalog.pg_enum",
+                        " WHERE enumtypid = '",
+                        Encoding.encodeUtf8 databaseTypeName,
+                        "'::regtype",
+                        " ORDER BY enumsortorder"
+                      ]
                   )
+                  |> fmap
+                    ( \(_, rows) ->
+                        rows
+                          |> List.filterMap
+                            ( \cols ->
+                                case cols of
+                                  [enumlabel] ->
+                                    Just (pgDecodeRep enumlabel)
+                                  _ ->
+                                    Nothing
+                            )
+                    )
 
-            case enumLabels of
-              [] ->
-                fail ("Enum type " ++ quote (Text.toList databaseTypeName) ++ " does not contain any values.")
-              vs ->
-                pure vs
-        )
+              case enumLabels of
+                [] ->
+                  fail ("Enum type " ++ quote (Text.toList databaseTypeName) ++ " does not contain any values.")
+                vs ->
+                  pure vs
+          )
 
   (pgEnumValues :: List Text) <-
     case maybePGEnumValues of
