@@ -352,37 +352,37 @@ update model msg =
             _ -> model
         )
     EditorEvent vtyEvent ->
-      andThen continueAfterUserInteraction
-        <| withPageEvent model
-        <| \page -> do
-          case page of
-            NoDataPage (EditFilter editor) _ -> do
-              newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-              editRootSpanFilter (setCurrent newEditor editor) (rootSpanPage model)
-                |> RootSpanPage
-                |> Prelude.pure
-            NoDataPage _ _ -> Prelude.pure page
-            RootSpanPage rootSpanPageData ->
-              case filter rootSpanPageData of
-                EditFilter editor -> do
-                  newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-                  editRootSpanFilter (setCurrent newEditor editor) rootSpanPageData
-                    |> RootSpanPage
-                    |> Prelude.pure
-                _ -> Prelude.pure page
-            SpanBreakdownPage spanBreakdownPageData ->
-              case search spanBreakdownPageData of
-                EditSearch editor -> do
-                  newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
-                  spanBreakdownPageData
-                    { search = EditSearch (setCurrent newEditor editor),
-                      spans =
-                        spans spanBreakdownPageData
-                          |> Prelude.fmap (Tuple.second >> annotateSearch (Just newEditor))
-                    }
-                    |> SpanBreakdownPage
-                    |> Prelude.pure
-                _ -> Prelude.pure page
+      andThen continueAfterUserInteraction <|
+        withPageEvent model <|
+          \page -> do
+            case page of
+              NoDataPage (EditFilter editor) _ -> do
+                newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
+                editRootSpanFilter (setCurrent newEditor editor) (rootSpanPage model)
+                  |> RootSpanPage
+                  |> Prelude.pure
+              NoDataPage _ _ -> Prelude.pure page
+              RootSpanPage rootSpanPageData ->
+                case filter rootSpanPageData of
+                  EditFilter editor -> do
+                    newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
+                    editRootSpanFilter (setCurrent newEditor editor) rootSpanPageData
+                      |> RootSpanPage
+                      |> Prelude.pure
+                  _ -> Prelude.pure page
+              SpanBreakdownPage spanBreakdownPageData ->
+                case search spanBreakdownPageData of
+                  EditSearch editor -> do
+                    newEditor <- Edit.handleEditorEvent vtyEvent (currentValue editor)
+                    spanBreakdownPageData
+                      { search = EditSearch (setCurrent newEditor editor),
+                        spans =
+                          spans spanBreakdownPageData
+                            |> Prelude.fmap (Tuple.second >> annotateSearch (Just newEditor))
+                      }
+                      |> SpanBreakdownPage
+                      |> Prelude.pure
+                  _ -> Prelude.pure page
     Next ->
       withPageEvent
         model
@@ -806,8 +806,8 @@ editorWithCursor :: Edit.Editor Text Name -> List Text -> Brick.Widget Name
 editorWithCursor editor t =
   let (_, cursorPos) = TZ.cursorPosition (editor ^. Edit.editContentsL)
       (before, after) = Data.Text.splitAt cursorPos (Prelude.mconcat t)
-   in Brick.hBox
-        <| case Data.Text.uncons after of
+   in Brick.hBox <|
+        case Data.Text.uncons after of
           Just (x, rest) ->
             [ Brick.txt before,
               Brick.withAttr "selected" <| Brick.txt <| Data.Text.singleton x,

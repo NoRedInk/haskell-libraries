@@ -519,8 +519,8 @@ handler settings = do
           if skipLogging
             then Prelude.pure SampledOut
             else
-              Prelude.pure
-                <| SendToHoneycomb
+              Prelude.pure <|
+                SendToHoneycomb
                   SharedTraceData
                     { timer,
                       sampleRate,

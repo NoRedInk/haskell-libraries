@@ -393,8 +393,8 @@ rebalanceCallback skipOrNot messageFormat observability callback offsetSource co
                 callback
                 state
                 partitionKey
-              STM.atomically
-                <| TVar.modifyTVar' (rebalanceInfo state) (Dict.insert partitionKey (Assign, now))
+              STM.atomically <|
+                TVar.modifyTVar' (rebalanceInfo state) (Dict.insert partitionKey (Assign, now))
           )
         |> map (\_ -> ())
     Consumer.RebalanceAssign _ -> Prelude.pure ()
@@ -604,12 +604,12 @@ pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state pausedPartitions
   -- See https://github.com/confluentinc/librdkafka/blob/c282ba2423b2694052393c8edb0399a5ef471b3f/CHANGELOG.md?plain=1#L90-L95
   --
   -- We have a small app to reproduce the bug. Check out scripts/pause-resume-bug/README.md
-  unless (Set.isEmpty newlyPaused && Set.isEmpty newlyResumed)
-    <| MVar.withMVar consumerLock
-    <| \_ -> do
-      _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
-      _ <- Consumer.resumePartitions consumer (Set.toList newlyResumed)
-      Prelude.pure ()
+  unless (Set.isEmpty newlyPaused && Set.isEmpty newlyResumed) <|
+    MVar.withMVar consumerLock <|
+      \_ -> do
+        _ <- Consumer.pausePartitions consumer (Set.toList newlyPaused)
+        _ <- Consumer.resumePartitions consumer (Set.toList newlyResumed)
+        Prelude.pure ()
   Control.Concurrent.threadDelay 1_000_000 {- 1 second -}
   pauseAndAnalyticsLoop maxBufferSize consumer consumerLock state desiredPausedPartitions
 
@@ -621,8 +621,8 @@ pausedPartitionKeys (Settings.MaxMsgsPerPartitionBufferedLocally maxBufferSize) 
     |> Prelude.traverse
       ( \(key, partition) -> do
           maybeLen <- Partition.length partition
-          Prelude.pure
-            <| case maybeLen of
+          Prelude.pure <|
+            case maybeLen of
               Nothing -> Nothing
               Just length ->
                 if length > maxBufferSize

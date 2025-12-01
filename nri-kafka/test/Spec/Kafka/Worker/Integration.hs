@@ -69,8 +69,8 @@ tests =
                     if retryCount < 1
                       then STM.throwSTM (Prelude.userError "retry please")
                       else
-                        Prelude.pure
-                          <| Worker.SeekToOffset ((Worker.offset partitionOffset) + 1)
+                        Prelude.pure <|
+                          Worker.SeekToOffset ((Worker.offset partitionOffset) + 1)
                 )
             msgs' <- waitFor msgsTVar (\items -> Set.size items == 1)
             -- Assert that the message was recorded on its first retry

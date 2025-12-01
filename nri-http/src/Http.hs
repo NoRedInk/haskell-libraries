@@ -104,8 +104,8 @@ handlerWith :: HttpSettings -> Conduit.Acquire Handler
 handlerWith settings = do
   doAnything <- liftIO Platform.doAnythingHandler
   manager <- TLS.newTlsManager
-  pure
-    <| Internal.Handler
+  pure <|
+    Internal.Handler
       (_request settings doAnything manager)
       (_withThirdParty settings manager)
       (_withThirdPartyIO settings manager)

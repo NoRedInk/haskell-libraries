@@ -262,8 +262,8 @@ sendHelperAsync producer doAnything onDeliveryCallback msg' = do
             record'
             ( \deliveryReport -> do
                 log <- Platform.silentHandler
-                Task.perform log
-                  <| case deliveryReport of
+                Task.perform log <|
+                  case deliveryReport of
                     Producer.DeliverySuccess _producerRecord _offset -> onDeliveryCallback
                     _ -> Task.succeed ()
             )

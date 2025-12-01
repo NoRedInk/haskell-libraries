@@ -577,8 +577,8 @@ assert pred funcName expected actual =
       let expectedText = Data.Text.pack (Text.Show.Pretty.ppShow actual)
       let actualText = Data.Text.pack (Text.Show.Pretty.ppShow expected)
       let numLines text = List.length (Data.Text.lines text)
-      Stack.withFrozenCallStack Internal.failAssertion funcName
-        <| Diff.pretty
+      Stack.withFrozenCallStack Internal.failAssertion funcName <|
+        Diff.pretty
           Diff.Config
             { Diff.separatorText = Just funcName,
               Diff.wrapping = Diff.Wrap terminalWidth,
@@ -658,8 +658,8 @@ fails task =
     |> Task.onError (\err' -> Task.succeed (Ok err'))
     |> Task.andThen
       ( \res ->
-          Internal.unExpectation
-            <| case res of
+          Internal.unExpectation <|
+            case res of
               Ok a ->
                 Stack.withFrozenCallStack
                   Internal.pass

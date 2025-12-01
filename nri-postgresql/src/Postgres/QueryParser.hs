@@ -40,8 +40,8 @@ data QueryMeta = QueryMeta
 
 parser :: Parser QueryMeta
 parser =
-  keepLooking
-    <| asum
+  keepLooking <|
+    asum
       [ delete,
         insert,
         select,

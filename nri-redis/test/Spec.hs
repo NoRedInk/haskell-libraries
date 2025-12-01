@@ -9,8 +9,8 @@ import qualified Prelude
 main :: Prelude.IO ()
 main =
   Conduit.withAcquire Helpers.getHandlers <| \testHandlers ->
-    Test.run
-      <| Test.describe
+    Test.run <|
+      Test.describe
         "nri-redis"
         [ Spec.Redis.tests testHandlers,
           Spec.Settings.tests,

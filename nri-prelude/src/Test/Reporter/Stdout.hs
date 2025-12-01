@@ -48,8 +48,8 @@ renderReport results =
         Internal.OnlysPassed passed skipped ->
           let amountPassed = List.length passed
               amountSkipped = List.length skipped
-           in Prelude.pure
-                <| List.concat
+           in Prelude.pure <|
+                List.concat
                   [ List.concatMap
                       ( \only ->
                           prettyPath yellow only
@@ -73,8 +73,8 @@ renderReport results =
         Internal.PassedWithSkipped passed skipped ->
           let amountPassed = List.length passed
               amountSkipped = List.length skipped
-           in Prelude.pure
-                <| List.concat
+           in Prelude.pure <|
+                List.concat
                   [ List.concatMap
                       ( \only ->
                           prettyPath yellow only
@@ -105,10 +105,10 @@ renderReport results =
           let failures = List.map (map (\(Internal.FailedSpan _ failure) -> failure)) failed
           srcLocs <- Prelude.traverse Test.Reporter.Internal.readSrcLoc failures
           let failuresSrcs = List.map renderFailureInFile srcLocs
-          Prelude.pure
-            <| List.concat
-              [ List.concat
-                  <| List.map2
+          Prelude.pure <|
+            List.concat
+              [ List.concat <|
+                  List.map2
                     ( \srcLines test ->
                         prettyPath red test
                           ++ srcLines
@@ -148,8 +148,8 @@ prettyPath :: (Text.Colour.Chunk -> Text.Colour.Chunk) -> Internal.SingleTest a 
 prettyPath style test =
   let loc = Internal.loc test
    in List.concat
-        [ [ grey
-              <| chunk
+        [ [ grey <|
+              chunk
                 ( "↓ "
                     ++ Text.fromList (Stack.srcLocFile loc)
                     ++ ":"
@@ -158,8 +158,8 @@ prettyPath style test =
                 )
           ],
           [ grey
-              ( chunk
-                  <| Prelude.foldMap
+              ( chunk <|
+                  Prelude.foldMap
                     (\text -> "↓ " ++ text ++ "\n")
                     (Internal.describes test)
               ),
@@ -170,8 +170,8 @@ prettyPath style test =
 
 testFailure :: Internal.SingleTest Internal.Failure -> Text.Colour.Chunk
 testFailure test =
-  chunk
-    <| case Internal.body test of
+  chunk <|
+    case Internal.body test of
       Internal.FailedAssertion msg _ -> msg
       Internal.ThrewException exception ->
         "Test threw an exception\n"

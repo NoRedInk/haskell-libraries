@@ -366,8 +366,8 @@ queryTests redisHandler =
       let firstKey = "scanTest::key1"
       let firstValue = "value 1"
       let nonEmptyDict =
-            NonEmptyDict.init firstKey firstValue
-              <| Dict.fromList
+            NonEmptyDict.init firstKey firstValue <|
+              Dict.fromList
                 [ ("scanTest::key2", "value 2"),
                   ("scanTest::key3", "value 3"),
                   ("scanTest::key4", "value 4")
@@ -390,8 +390,8 @@ queryTests redisHandler =
       let firstKey = "scanDeleteTest::key1"
       let firstValue = "value 1"
       let nonEmptyDict =
-            NonEmptyDict.init firstKey firstValue
-              <| Dict.fromList
+            NonEmptyDict.init firstKey firstValue <|
+              Dict.fromList
                 [ ("scanDeleteTest::key2", "value 2"),
                   ("scanDeleteTest::key3", "value 3"),
                   ("scanDeleteTest::key4", "value 4")
