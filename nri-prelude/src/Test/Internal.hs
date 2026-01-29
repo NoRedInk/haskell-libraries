@@ -405,9 +405,8 @@ runExpectation log expectation = do
 -- Useful in combination with 'runExpectation'.
 fromIOResult :: Prelude.IO (Result Failure a) -> Expectation' a
 fromIOResult io =
-    Platform.Internal.Task (\_ -> io)
+  Platform.Internal.Task (\_ -> io)
     |> Expectation
-
 
 run :: Request -> Test -> Task e SuiteResult
 run request (Test all) = do
