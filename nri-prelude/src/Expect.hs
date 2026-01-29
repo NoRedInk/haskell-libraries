@@ -56,6 +56,7 @@ module Expect
 
     -- * Fancy Expectations
     Internal.fromIO,
+    Internal.runExpectation,
     Internal.Expectation',
     around,
   )

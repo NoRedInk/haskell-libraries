@@ -394,6 +394,20 @@ fromIO io =
   Platform.Internal.Task (\_ -> map Ok io)
     |> Expectation
 
+-- | Run an expectation directly in IO.
+-- On success, returns the result. On failure, throws the Failure as an exception.
+runExpectation :: Expectation' a -> Prelude.IO a
+runExpectation expectation = do
+  log <- Platform.silentHandler
+  result <-
+    unExpectation expectation
+      |> Task.map Ok
+      |> Task.onError (Task.succeed << Err)
+      |> Task.perform log
+  case result of
+    Ok a -> Prelude.pure a
+    Err failure -> Exception.throwIO failure
+
 run :: Request -> Test -> Task e SuiteResult
 run request (Test all) = do
   let grouped = groupBy label all
