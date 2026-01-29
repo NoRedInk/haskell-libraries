@@ -400,9 +400,7 @@ runExpectation :: Platform.LogHandler -> Expectation' a -> Prelude.IO a
 runExpectation log expectation = do
   result <-
     unExpectation expectation
-      |> Task.map Ok
-      |> Task.onError (Task.succeed << Err)
-      |> Task.perform log
+      |> Task.attempt log
   case result of
     Ok a -> Prelude.pure a
     Err failure -> Exception.throwIO failure
