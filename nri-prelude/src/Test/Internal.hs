@@ -396,9 +396,8 @@ fromIO io =
 
 -- | Run an expectation directly in IO.
 -- On success, returns the result. On failure, throws the Failure as an exception.
-runExpectation :: Expectation' a -> Prelude.IO a
-runExpectation expectation = do
-  log <- Platform.silentHandler
+runExpectation :: Platform.LogHandler -> Expectation' a -> Prelude.IO a
+runExpectation log expectation = do
   result <-
     unExpectation expectation
       |> Task.map Ok

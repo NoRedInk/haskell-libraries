@@ -673,15 +673,17 @@ runExpectationTests =
   describe
     "runExpectation"
     [ test "returns the value on success" <| \_ -> do
+        log <- Expect.fromIO Platform.silentHandler
         result <-
           Expect.fromIO
-            ( Internal.runExpectation (Expect.succeeds (Task.succeed 42))
+            ( Internal.runExpectation log (Expect.succeeds (Task.succeed 42))
             )
         Expect.equal 42 result,
       test "throws Failure exception on assertion failure" <| \_ -> do
+        log <- Expect.fromIO Platform.silentHandler
         result <-
           Expect.fromIO
-            ( Exception.try (Internal.runExpectation (Expect.fail "test failure"))
+            ( Exception.try (Internal.runExpectation log (Expect.fail "test failure"))
             )
         case result of
           Prelude.Left (Internal.FailedAssertion msg _) ->
