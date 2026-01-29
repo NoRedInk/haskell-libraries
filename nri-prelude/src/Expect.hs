@@ -59,6 +59,7 @@ module Expect
     Internal.runExpectation,
     Internal.fromIOResult,
     Internal.Expectation',
+    Internal.Failure,
     around,
   )
 where
