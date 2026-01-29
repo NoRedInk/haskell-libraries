@@ -394,6 +394,24 @@ fromIO io =
   Platform.Internal.Task (\_ -> map Ok io)
     |> Expectation
 
+-- | Run an expectation directly in IO.
+-- Some external testing libraries required using a resource in an IO continution like `(\resource -> IO a) -> IO a`.
+-- For example see warp's `testWithApplication`.
+--
+-- This function allows you to convert an expectation to IO inside of such a continuation.  You will likely want to
+-- transform the result back to an expectation with `fromIOResult`.
+runExpectation :: Platform.LogHandler -> Expectation' a -> Prelude.IO (Result Failure a)
+runExpectation log expectation = do
+  unExpectation expectation
+    |> Task.attempt log
+
+-- | Convert an IO action that returns a Result into an expectation.
+-- Useful in combination with 'runExpectation'.
+fromIOResult :: Prelude.IO (Result Failure a) -> Expectation' a
+fromIOResult io =
+  Platform.Internal.Task (\_ -> io)
+    |> Expectation
+
 run :: Request -> Test -> Task e SuiteResult
 run request (Test all) = do
   let grouped = groupBy label all

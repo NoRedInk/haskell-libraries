@@ -56,7 +56,10 @@ module Expect
 
     -- * Fancy Expectations
     Internal.fromIO,
+    Internal.runExpectation,
+    Internal.fromIOResult,
     Internal.Expectation',
+    Internal.Failure,
     around,
   )
 where

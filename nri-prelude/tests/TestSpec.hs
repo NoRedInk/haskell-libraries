@@ -36,7 +36,8 @@ tests =
       stdoutReporter,
       logfileReporter,
       cliParser,
-      deadlockPrevention
+      deadlockPrevention,
+      runExpectationTests
     ]
 
 api :: Test
@@ -666,3 +667,23 @@ withoutDurationLine text =
     |> Text.lines
     |> List.filter (\line -> line |> Text.startsWith "Duration: " |> not)
     |> Text.join "\n"
+
+runExpectationTests :: Test
+runExpectationTests =
+  describe
+    "runExpectation"
+    [ test "returns the value on success" <| \_ -> do
+        log <- Expect.fromIO Platform.silentHandler
+        result <-
+          Expect.fromIO
+            ( Internal.runExpectation log (Expect.succeeds (Task.succeed 42))
+            )
+        Expect.ok result,
+      test "throws Failure exception on assertion failure" <| \_ -> do
+        log <- Expect.fromIO Platform.silentHandler
+        result <-
+          Expect.fromIO
+            ( Internal.runExpectation log (Expect.fail "test failure")
+            )
+        Expect.err result
+    ]

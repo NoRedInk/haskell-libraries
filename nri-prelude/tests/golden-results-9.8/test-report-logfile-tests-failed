@@ -105,13 +105,13 @@
     "finished": 0,
     "frame": {
         "endCol": 50,
-        "endLine": 488,
+        "endLine": 489,
         "file": "tests/TestSpec.hs",
         "module": "TestSpec",
         "name": "report",
         "package": "nri-prelude-0.6.1.2-inplace-tests",
         "startCol": 22,
-        "startLine": 488
+        "startLine": 489
     },
     "name": "test run",
     "started": 0,
