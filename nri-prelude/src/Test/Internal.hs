@@ -395,7 +395,11 @@ fromIO io =
     |> Expectation
 
 -- | Run an expectation directly in IO.
--- On success, returns the result. On failure, throws the Failure as an exception.
+-- Some external testing libraries required using a resource in an IO continution like `(\resource -> IO a) -> IO a`.
+-- For example see warp's `testWithApplication`.
+--
+-- This function allows you to convert an expectation to IO inside of such a continuation.  You will likely want to
+-- transform the result back to an expectation with `fromIOResult`.
 runExpectation :: Platform.LogHandler -> Expectation' a -> Prelude.IO (Result Failure a)
 runExpectation log expectation = do
   unExpectation expectation
