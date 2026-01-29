@@ -680,14 +680,14 @@ runExpectationTests =
         Expect.equal 42 result,
       test "throws Failure exception on assertion failure" <| \_ -> do
         result <-
-                Expect.fromIO
-                ( Exception.try (Internal.runExpectation (Expect.fail "test failure"))
-                )
+          Expect.fromIO
+            ( Exception.try (Internal.runExpectation (Expect.fail "test failure"))
+            )
         case result of
-            Prelude.Left (Internal.FailedAssertion msg _) ->
-                Expect.true (Text.contains "test failure" msg)
-            Prelude.Left _ ->
-                Expect.fail "Expected FailedAssertion but got different Failure"
-            Prelude.Right () ->
-                Expect.fail "Expected exception but runExpectation succeeded"
+          Prelude.Left (Internal.FailedAssertion msg _) ->
+            Expect.true (Text.contains "test failure" msg)
+          Prelude.Left _ ->
+            Expect.fail "Expected FailedAssertion but got different Failure"
+          Prelude.Right () ->
+            Expect.fail "Expected exception but runExpectation succeeded"
     ]
