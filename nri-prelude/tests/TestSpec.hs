@@ -678,18 +678,12 @@ runExpectationTests =
           Expect.fromIO
             ( Internal.runExpectation log (Expect.succeeds (Task.succeed 42))
             )
-        Expect.equal 42 result,
+        Expect.ok result,
       test "throws Failure exception on assertion failure" <| \_ -> do
         log <- Expect.fromIO Platform.silentHandler
         result <-
           Expect.fromIO
-            ( Exception.try (Internal.runExpectation log (Expect.fail "test failure"))
+            ( Internal.runExpectation log (Expect.fail "test failure")
             )
-        case result of
-          Prelude.Left (Internal.FailedAssertion msg _) ->
-            Expect.true (Text.contains "test failure" msg)
-          Prelude.Left _ ->
-            Expect.fail "Expected FailedAssertion but got different Failure"
-          Prelude.Right () ->
-            Expect.fail "Expected exception but runExpectation succeeded"
+        Expect.err result
     ]

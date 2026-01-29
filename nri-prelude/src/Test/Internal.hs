@@ -396,14 +396,18 @@ fromIO io =
 
 -- | Run an expectation directly in IO.
 -- On success, returns the result. On failure, throws the Failure as an exception.
-runExpectation :: Platform.LogHandler -> Expectation' a -> Prelude.IO a
+runExpectation :: Platform.LogHandler -> Expectation' a -> Prelude.IO (Result Failure a)
 runExpectation log expectation = do
-  result <-
-    unExpectation expectation
-      |> Task.attempt log
-  case result of
-    Ok a -> Prelude.pure a
-    Err failure -> Exception.throwIO failure
+  unExpectation expectation
+    |> Task.attempt log
+
+-- | Convert an IO action that returns a Result into an expectation.
+-- Useful in combination with 'runExpectation'.
+fromIOResult :: Prelude.IO (Result Failure a) -> Expectation' a
+fromIOResult io =
+    Platform.Internal.Task (\_ -> io)
+    |> Expectation
+
 
 run :: Request -> Test -> Task e SuiteResult
 run request (Test all) = do
