@@ -50,7 +50,7 @@ tests:
       - safe-exceptions >= 0.1.7.0 && < 1.3
       - text >= 1.2.3.1 && < 2.2
       - wai >= 3.2.0 && < 3.3
-      - warp >= 3.3.0 && < 3.4
+      - warp >= 3.3.0 && < 3.5
     main: Main.hs
     source-dirs:
       - src
