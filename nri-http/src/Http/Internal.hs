@@ -67,7 +67,7 @@ data Expect' x a where
 -- - 'Timeout' means it took too long to get a response.
 -- - 'NetworkError' means the user turned off their wifi, went in a cave, etc.
 -- - 'BadStatus' means you got a response back, but the status code indicates failure. Includes the status code and the beginning of the response body.
--- - 'BadBody' means you got a response back with a nice status code, but the body of the response was something unexpected. The 'BadBodyReason' contains the decoding error, response metadata, and response body for debugging.
+-- - 'BadBody' means you got a response back with a nice status code, but the body of the response was something unexpected. The 'BadBodyReason' contains the decoding error, response metadata, and response body for debugging. These values may include sensitive information (for example, authentication headers or PII), so take care not to log or expose them without appropriate redaction or truncation.
 data Error
   = BadUrl Text
   | Timeout
