@@ -6,12 +6,12 @@ TracingSpan
       Just
         ( "rootTracingSpanIO"
         , SrcLoc
-            { srcLocPackage = "nri-http-0.6.0.0-inplace-spec"
+            { srcLocPackage = "nri-http-0.7.0.0-inplace-spec"
             , srcLocModule = "Main"
             , srcLocFile = "test/Main.hs"
-            , srcLocStartLine = 234
+            , srcLocStartLine = 238
             , srcLocStartCol = 7
-            , srcLocEndLine = 234
+            , srcLocEndLine = 238
             , srcLocEndCol = 33
             }
         )
@@ -29,12 +29,12 @@ TracingSpan
               Just
                 ( "tracingSpanIO"
                 , SrcLoc
-                    { srcLocPackage = "nri-http-0.6.0.0-inplace-spec"
+                    { srcLocPackage = "nri-http-0.7.0.0-inplace-spec"
                     , srcLocModule = "Http"
                     , srcLocFile = "src/Http.hs"
-                    , srcLocStartLine = 433
+                    , srcLocStartLine = 483
                     , srcLocStartCol = 11
-                    , srcLocEndLine = 433
+                    , srcLocEndLine = 483
                     , srcLocEndCol = 33
                     }
                 )
