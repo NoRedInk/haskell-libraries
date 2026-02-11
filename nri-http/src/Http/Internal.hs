@@ -72,7 +72,7 @@ data Error
   = BadUrl Text
   | Timeout
   | NetworkError Text
-  | BadStatus Int
+  | BadStatus Int Text
   | BadBody BadBodyReason
   deriving (Generic, Eq, Show)
 

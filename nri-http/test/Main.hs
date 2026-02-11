@@ -42,7 +42,7 @@ tests =
                 Http.get http url Http.expectWhatever
                   |> Expect.fails
               err
-                |> Expect.equal (Http.BadStatus 400)
+                |> Expect.equal (Http.BadStatus 400 "")
           ),
       test "Given a request made using `get` that expects a JSON response when the response includes the right JSON it is returned decoded" <| \() ->
         withServer
@@ -63,7 +63,7 @@ tests =
                   |> Expect.fails
               case err of
                 Http.BadBody reason ->
-                  Http.Internal.decodingError reason
+                  Http.decodingError reason
                     |> Expect.equal "Error in $: parsing Text failed, expected String, but encountered Number"
                 other ->
                   Expect.fail <| "Expected BadBody, got: " ++ (Text.fromList <| Prelude.show other)

@@ -300,12 +300,18 @@ exceptionToError exception =
       Internal.BadUrl (Text.fromList message)
     HTTP.HttpExceptionRequest _ content ->
       case content of
-        HTTP.StatusCodeException res _ ->
-          res
-            |> HTTP.responseStatus
-            |> Status.statusCode
-            |> fromIntegral
-            |> Internal.BadStatus
+        HTTP.StatusCodeException res startOfBody ->
+          let body =
+                startOfBody
+                  |> Data.ByteString.Lazy.fromStrict
+                  |> Data.Text.Lazy.Encoding.decodeUtf8
+                  |> Data.Text.Lazy.toStrict
+              statusCode =
+                res
+                  |> HTTP.responseStatus
+                  |> Status.statusCode
+                  |> fromIntegral
+           in Internal.BadStatus statusCode body
         HTTP.ResponseTimeout ->
           Internal.Timeout
         HTTP.ConnectionTimeout ->
