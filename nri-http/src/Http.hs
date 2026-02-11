@@ -61,6 +61,7 @@ import qualified Data.CaseInsensitive as CI
 import qualified Data.Dynamic as Dynamic
 import Data.String (fromString)
 import qualified Data.Text.Encoding
+import qualified Data.Text.Encoding.Error
 import qualified Data.Text.Lazy
 import qualified Data.Text.Lazy.Encoding
 import Data.Version (showVersion)
@@ -268,7 +269,7 @@ handleResponse expect response =
                         Internal.BadBodyReason
                           { Internal.decodingError = Text.fromList err,
                             Internal.responseMetadata = mkMetadata okResponse,
-                            Internal.responseBody = Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes
+                            Internal.responseBody = Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8With Data.Text.Encoding.Error.lenientDecode bytes
                           }
                     )
                 Right x -> Ok x
@@ -304,7 +305,7 @@ exceptionToError exception =
           let body =
                 startOfBody
                   |> Data.ByteString.Lazy.fromStrict
-                  |> Data.Text.Lazy.Encoding.decodeUtf8
+                  |> Data.Text.Lazy.Encoding.decodeUtf8With Data.Text.Encoding.Error.lenientDecode
                   |> Data.Text.Lazy.toStrict
               statusCode =
                 res
