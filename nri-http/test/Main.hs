@@ -62,9 +62,14 @@ tests =
                 Http.get http url (Http.expectJson :: Http.Expect Text)
                   |> Expect.fails
               case err of
-                Http.BadBody reason ->
+                Http.BadBody reason -> do
                   Http.decodingError reason
                     |> Expect.equal "Error in $: parsing Text failed, expected String, but encountered Number"
+                  Http.responseBody reason
+                    |> Expect.equal "12"
+                  Http.responseMetadata reason
+                    |> Http.metadataStatusCode
+                    |> Expect.equal 200
                 other ->
                   Expect.fail <| "Expected BadBody, got: " ++ (Text.fromList <| Prelude.show other)
           ),
