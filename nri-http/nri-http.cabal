@@ -98,7 +98,7 @@ test-suite spec
       TypeOperators
       ExtendedDefaultRules
       NumericUnderscores
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -fno-warn-type-defaults
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded -fno-warn-type-defaults
   build-depends:
       aeson >=2.0 && <2.3
     , base >=4.18 && <4.22

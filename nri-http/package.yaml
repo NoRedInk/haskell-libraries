@@ -55,11 +55,11 @@ tests:
     source-dirs:
       - src
       - test
-    # We intentionally do not add threaded ghc-options for tests. These would
-    # cause tests to run in parallel, which introduces flakiness in this test
-    # suite. The suite creates a number of web servers that are supposed to get
-    # unique ports, but if we start them in parallel this will not always work.
+    # Note: We used to intentionally not include -threaded here to avoid flakiness in the tests
+    # At some point tests stopped working completely without -threaded tho.
+    # See blame history for context.
     ghc-options:
+      - -threaded
       - -fno-warn-type-defaults
 default-extensions:
   - DataKinds
