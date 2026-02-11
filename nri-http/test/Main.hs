@@ -79,7 +79,7 @@ tests =
                 |> Expect.equal (Http.BadUrl "Invalid URL")
           ),
       test "When a request is made using `get` with a json body the `Content-Type` header is set to `application/json`" <| \() -> do
-        request <-
+        (request, _body) <-
           expectRequest
             ( \http url ->
                 Http.post http url (Http.jsonBody ()) Http.expectWhatever
@@ -89,15 +89,14 @@ tests =
           |> Data.List.lookup "content-type"
           |> Expect.equal (Just "application/json"),
       test "When a request is made using `get` with a json body the JSON is encoded correctly" <| \() -> do
-        request <-
+        (_request, body) <-
           expectRequest
             ( \http url ->
                 Http.post http url (Http.jsonBody [1, 2, 3 :: Int]) Http.expectWhatever
             )
-        body <- Expect.fromIO (Wai.strictRequestBody request)
         Expect.equal "[1,2,3]" body,
       test "When a request is made using `get` with a string body the `Content-Type` header is set to provided mime type" <| \() -> do
-        request <-
+        (request, _body) <-
           expectRequest
             ( \http url ->
                 Http.post http url (Http.stringBody "element/fire" "WOOSH") Http.expectWhatever
@@ -215,18 +214,20 @@ withServerIO log app run = do
 -- immediately returns that request so you can run expectations against it.
 --
 -- Useful if you want to check properties of requests you send.
-expectRequest :: (Show e) => (Http.Handler -> Text -> Task e a) -> Expect.Expectation' Wai.Request
+expectRequest :: (Show e) => (Http.Handler -> Text -> Task e a) -> Expect.Expectation' (Wai.Request, Data.ByteString.Lazy.ByteString)
 expectRequest run = do
-  let app req _respond = Exception.throwIO (FirstRequest req)
+  let app req _respond = do
+        body <- Wai.strictRequestBody req
+        Exception.throwIO (FirstRequest req body)
   log <- Expect.succeeds Platform.logHandler
   either <- Expect.fromIO <| Exception.try (withServerIO log app run)
   Expect.succeeds <|
     case either of
-      Prelude.Left (FirstRequest req) -> Task.succeed req
+      Prelude.Left (FirstRequest req body) -> Task.succeed (req, body)
       Prelude.Right (Ok _) -> Task.fail "Expected a request, but none was received."
       Prelude.Right (Err err) -> Task.fail (Debug.toString err)
 
-newtype FirstRequest = FirstRequest Wai.Request deriving (Show)
+data FirstRequest = FirstRequest Wai.Request Data.ByteString.Lazy.ByteString deriving (Show)
 
 instance Exception.Exception FirstRequest
 

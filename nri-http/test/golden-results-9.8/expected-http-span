@@ -9,9 +9,9 @@ TracingSpan
             { srcLocPackage = "nri-http-0.7.0.0-inplace-spec"
             , srcLocModule = "Main"
             , srcLocFile = "test/Main.hs"
-            , srcLocStartLine = 238
+            , srcLocStartLine = 239
             , srcLocStartCol = 7
-            , srcLocEndLine = 238
+            , srcLocEndLine = 239
             , srcLocEndCol = 33
             }
         )
