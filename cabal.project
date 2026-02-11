@@ -8,3 +8,5 @@ packages:
   nri-http/nri-http.cabal
   nri-postgresql/nri-postgresql.cabal
   nri-kafka/nri-kafka.cabal
+
+tests: True
