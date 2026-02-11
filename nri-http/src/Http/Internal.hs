@@ -66,8 +66,8 @@ data Expect' x a where
 -- - 'BadUrl' means you did not provide a valid URL.
 -- - 'Timeout' means it took too long to get a response.
 -- - 'NetworkError' means the user turned off their wifi, went in a cave, etc.
--- - 'BadStatus' means you got a response back, but the status code indicates failure.
--- - 'BadBody' means you got a response back with a nice status code, but the body of the response was something unexpected. The 'Text' in this cse is the debugging message that explains what went wrong with your JSONT decoder or whatever.
+-- - 'BadStatus' means you got a response back, but the status code indicates failure. Includes the status code and the beginning of the response body.
+-- - 'BadBody' means you got a response back with a nice status code, but the body of the response was something unexpected. The 'BadBodyReason' contains the decoding error, response metadata, and response body for debugging.
 data Error
   = BadUrl Text
   | Timeout
