@@ -73,12 +73,21 @@ data Error
   | Timeout
   | NetworkError Text
   | BadStatus Int
-  | BadBody Text
+  | BadBody BadBodyReason
   deriving (Generic, Eq, Show)
 
 instance Exception.Exception Error
 
 instance Aeson.ToJSON Error
+
+data BadBodyReason = BadBodyReason
+  { decodingError :: Text,
+    responseMetadata :: Metadata,
+    responseBody :: Text
+  }
+  deriving (Generic, Eq, Show)
+
+instance Aeson.ToJSON BadBodyReason
 
 -- | A 'Response' can come back a couple different ways:
 --

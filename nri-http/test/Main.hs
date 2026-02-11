@@ -61,8 +61,12 @@ tests =
               err <-
                 Http.get http url (Http.expectJson :: Http.Expect Text)
                   |> Expect.fails
-              err
-                |> Expect.equal (Http.BadBody "Error in $: parsing Text failed, expected String, but encountered Number")
+              case err of
+                Http.BadBody reason ->
+                  Http.Internal.decodingError reason
+                    |> Expect.equal "Error in $: parsing Text failed, expected String, but encountered Number"
+                other ->
+                  Expect.fail <| "Expected BadBody, got: " ++ (Text.fromList <| Prelude.show other)
           ),
       test "When a request is made using `get` to an invalid URL we fail with a BadUrl error" <| \() ->
         withServer

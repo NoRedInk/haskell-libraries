@@ -19,6 +19,7 @@ module Http
     Internal.Request' (..),
     Internal.Request,
     Internal.Error (..),
+    Internal.BadBodyReason (..),
 
     -- * Header
     Internal.Header,
@@ -261,7 +262,15 @@ handleResponse expect response =
        in case expect of
             Internal.ExpectJson ->
               case Aeson.eitherDecode bytes of
-                Left err -> Err (Internal.BadBody (Text.fromList err))
+                Left err ->
+                  Err
+                    ( Internal.BadBody <|
+                        Internal.BadBodyReason
+                          { Internal.decodingError = Text.fromList err,
+                            Internal.responseMetadata = mkMetadata okResponse,
+                            Internal.responseBody = Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes
+                          }
+                    )
                 Right x -> Ok x
             Internal.ExpectText -> Ok (Data.Text.Lazy.toStrict <| Data.Text.Lazy.Encoding.decodeUtf8 bytes)
             Internal.ExpectWhatever -> Ok ()
