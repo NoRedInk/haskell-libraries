@@ -195,6 +195,7 @@ newHandler = do
       Internal.mkHandler
       ""
       (Internal.Clock (Prelude.pure 0))
+      Internal.silentTrack
       (\span -> IORef.modifyIORef recordedTracingSpans (\cs -> cs ++ Internal.children span))
       Nothing
       ""

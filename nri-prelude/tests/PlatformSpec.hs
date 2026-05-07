@@ -3,10 +3,12 @@ module PlatformSpec (tests) where
 import qualified Control.Concurrent.MVar as MVar
 import Control.Monad.Catch (catchAll)
 import Data.Aeson as Aeson
+import qualified Data.IORef as IORef
 import qualified Expect
 import qualified Log
 import NriPrelude
 import qualified Platform
+import qualified Platform.Internal
 import Task
 import Test (Test, describe, test)
 import qualified Prelude
@@ -31,7 +33,20 @@ tests =
           runTaskAndExpectTacingSpan <| Log.error "error" []
 
         Expect.true (isSucceeded span)
-        Expect.true (Platform.containsFailures span)
+        Expect.true (Platform.containsFailures span),
+      test "trackAnalyticsEventIO threaded by rootTracingSpanIO is invoked from a child span" <| \_ -> do
+        ref <- Expect.fromIO (IORef.newIORef [])
+        let track v = IORef.atomicModifyIORef' ref (\xs -> (v : xs, ()))
+        Expect.fromIO
+          <| Platform.rootTracingSpanIO "test-req" track (\_ -> Prelude.pure ()) "root"
+          <| \log -> do
+            child <- Platform.Internal.startChildTracingSpan log "child-span"
+            Platform.Internal.trackAnalyticsEventIO child (Aeson.toJSON ("hello" :: Text))
+        observed <- Expect.fromIO (IORef.readIORef ref)
+        observed |> Expect.equal [Aeson.toJSON ("hello" :: Text)],
+      test "nullHandler.trackAnalyticsEventIO is a silent no-op" <| \_ ->
+        Expect.fromIO
+          <| Platform.Internal.trackAnalyticsEventIO Platform.Internal.nullHandler Aeson.Null
     ]
 
 newtype CustomTracingSpanDetails = CustomTracingSpanDetails Text
@@ -48,6 +63,7 @@ runTaskAndExpectTacingSpan task =
       catchAll
         ( Platform.rootTracingSpanIO
             ""
+            Platform.silentTrack
             (MVar.putMVar spanVar)
             "test"
             (\log -> Task.attempt log task)

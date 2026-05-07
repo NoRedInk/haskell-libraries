@@ -35,6 +35,7 @@ runRequests handler =
     ( \requestId -> do
         Platform.rootTracingSpanIO
           requestId
+          Platform.silentTrack
           (handler.report requestId)
           ("Running task" ++ requestId)
           ( \log -> do
