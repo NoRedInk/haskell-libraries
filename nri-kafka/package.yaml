@@ -73,6 +73,21 @@ executables:
           buildable: true
         else:
           buildable: false
+  sync-write-benchmark:
+    source-dirs: scripts/sync-write-benchmark
+    main: Main
+    dependencies:
+      - nri-kafka
+    ghc-options:
+      - -threaded
+      - -rtsopts "-with-rtsopts=-N -T"
+      - -O2
+    when:
+      - condition: flag(sync-write-benchmark)
+        then:
+          buildable: true
+        else:
+          buildable: false
 default-extensions:
   - DataKinds
   - DeriveGeneric
@@ -101,5 +116,8 @@ ghc-options:
   - -fplugin=NriPrelude.Plugin
 flags:
   pause-resume-bug:
+    default: false
+    manual: false
+  sync-write-benchmark:
     default: false
     manual: false
