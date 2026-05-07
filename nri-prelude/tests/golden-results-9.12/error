@@ -6,7 +6,7 @@
         Just
           ( "error"
           , SrcLoc
-              { srcLocPackage = "nri-prelude-0.6.1.2-inplace-tests"
+              { srcLocPackage = "nri-prelude-0.7.0.0-inplace-tests"
               , srcLocModule = "LogSpec"
               , srcLocFile = "tests/LogSpec.hs"
               , srcLocStartLine = 66

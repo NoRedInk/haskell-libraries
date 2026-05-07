@@ -8,6 +8,7 @@ import qualified Expect
 import qualified Log
 import NriPrelude
 import qualified Platform
+import qualified Platform.Analytics.Internal
 import qualified Platform.Internal
 import Task
 import Test (Test, describe, test)
@@ -46,7 +47,20 @@ tests =
         observed |> Expect.equal [Aeson.toJSON ("hello" :: Text)],
       test "nullHandler.trackAnalyticsEventIO is a silent no-op" <| \_ ->
         Expect.fromIO
-          <| Platform.Internal.trackAnalyticsEventIO Platform.Internal.nullHandler Aeson.Null
+          <| Platform.Internal.trackAnalyticsEventIO Platform.Internal.nullHandler Aeson.Null,
+      test "Platform.Analytics.Internal.trackEvent invokes the current LogHandler's analytics callback with toJSON of the event" <| \_ -> do
+        ref <- Expect.fromIO (IORef.newIORef [])
+        let track v = IORef.atomicModifyIORef' ref (\xs -> (v : xs, ()))
+        let event = Aeson.object ["kind" Aeson..= ("LessonStarted" :: Text)]
+        result <-
+          Expect.fromIO
+            <| Platform.rootTracingSpanIO "test-req" track (\_ -> Prelude.pure ()) "root"
+            <| \log -> Task.attempt log (Platform.Analytics.Internal.trackEvent event)
+        case result of
+          Ok () -> Expect.pass
+          Err _ -> Expect.fail "trackEvent task failed"
+        observed <- Expect.fromIO (IORef.readIORef ref)
+        observed |> Expect.equal [event]
     ]
 
 newtype CustomTracingSpanDetails = CustomTracingSpanDetails Text

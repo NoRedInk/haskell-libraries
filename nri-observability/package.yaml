@@ -26,7 +26,7 @@ dependencies:
   - http-client-tls >= 0.3.0 && < 0.4
   - hostname >= 1.0 && < 1.1
   - nri-env-parser >= 0.1.0.0 && < 0.5
-  - nri-prelude >= 0.1.0.0 && < 0.7
+  - nri-prelude >= 0.1.0.0 && < 0.8
   - random >= 1.1 && < 1.3
   - unordered-containers >= 0.2.0.0 && < 0.3
   - safe-exceptions >= 0.1.7.0 && < 1.3

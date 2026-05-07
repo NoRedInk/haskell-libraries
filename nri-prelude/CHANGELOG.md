@@ -1,3 +1,10 @@
+# 0.7.0.0
+
+- **Breaking:** `Platform.rootTracingSpanIO` and the internal `mkHandler` now take an additional `Aeson.Value -> IO ()` callback for analytics event delivery. Existing callers should pass `Platform.silentTrack` to preserve previous behavior.
+- New: `Platform.Analytics.Internal.trackEvent`. The `.Internal` suffix is intentional — wrap it in your own typed `track` API. This module is NOT re-exported from `Platform`.
+- New: `Platform.silentTrack` (a no-op `Aeson.Value -> IO ()`).
+- New: `LogHandler.trackAnalyticsEventIO` field. `nullHandler` defaults this to `silentTrack`.
+
 # Unreleased
 
 - Drop support for GHC 8.10.7, GHC 9.2.x, GHC 9.4.x, `aeson-1.x`
