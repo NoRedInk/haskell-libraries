@@ -8,3 +8,4 @@ packages:
   nri-http/nri-http.cabal
   nri-postgresql/nri-postgresql.cabal
   nri-kafka/nri-kafka.cabal
+  nri-analytics/nri-analytics.cabal

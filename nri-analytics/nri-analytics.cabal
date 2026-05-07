@@ -1,0 +1,95 @@
+cabal-version: 1.18
+
+-- This file has been generated from package.yaml by hpack version 0.37.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           nri-analytics
+version:        0.1.0.0
+synopsis:       Deliver typed analytics events to the NoRedInk events service.
+description:    Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-analytics#readme>.
+category:       Web
+homepage:       https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-analytics#readme
+bug-reports:    https://github.com/NoRedInk/haskell-libraries/issues
+author:         NoRedInk
+maintainer:     haskell-open-source@noredink.com
+copyright:      2026 NoRedInk Corp.
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-doc-files:
+    README.md
+    LICENSE
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/NoRedInk/haskell-libraries
+  subdir: nri-analytics
+
+library
+  exposed-modules:
+      Analytics
+  other-modules:
+      Analytics.Internal
+  hs-source-dirs:
+      src
+  default-extensions:
+      DeriveGeneric
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin
+  build-depends:
+      aeson >=2.0 && <2.3
+    , base >=4.18 && <4.22
+    , bytestring >=0.10.8.2 && <0.13
+    , conduit >=1.3.0 && <1.4
+    , http-client >=0.6.0 && <0.8
+    , http-client-tls >=0.3.0 && <0.4
+    , nri-env-parser >=0.1.0.0 && <0.5
+    , nri-prelude >=0.7.0.0 && <0.8
+    , safe-exceptions >=0.1.7.0 && <1.3
+    , text >=1.2.3.1 && <2.2
+  default-language: Haskell2010
+
+test-suite tests
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Spec.Analytics
+      Analytics
+      Analytics.Internal
+      Paths_nri_analytics
+  hs-source-dirs:
+      tests
+      src
+  default-extensions:
+      DeriveGeneric
+      FlexibleInstances
+      GeneralizedNewtypeDeriving
+      NamedFieldPuns
+      NoImplicitPrelude
+      OverloadedStrings
+      PartialTypeSignatures
+      ScopedTypeVariables
+      Strict
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wpartial-fields -Wredundant-constraints -Wincomplete-uni-patterns -fplugin=NriPrelude.Plugin -threaded
+  build-depends:
+      aeson >=2.0 && <2.3
+    , base >=4.18 && <4.22
+    , bytestring >=0.10.8.2 && <0.13
+    , conduit >=1.3.0 && <1.4
+    , http-client >=0.6.0 && <0.8
+    , http-client-tls >=0.3.0 && <0.4
+    , nri-analytics
+    , nri-env-parser >=0.1.0.0 && <0.5
+    , nri-prelude >=0.7.0.0 && <0.8
+    , safe-exceptions >=0.1.7.0 && <1.3
+    , text >=1.2.3.1 && <2.2
+  default-language: Haskell2010
