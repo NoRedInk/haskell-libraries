@@ -16,6 +16,7 @@ import qualified Data.Time.Clock as Clock
 import qualified Data.Time.Format.ISO8601 as ISO8601
 import qualified Data.UUID
 import qualified Data.UUID.V4 as UUID
+import qualified Log
 import qualified Network.HTTP.Client as HTTP
 import NriPrelude
 import qualified Prelude
@@ -30,8 +31,10 @@ data Settings = Settings
     -- | Per-request HTTP timeout. The request thread blocks for at most
     -- this long before the event is dropped.
     timeoutMicros :: Int,
-    -- | Bearer token used in the Authorization header.
-    authToken :: Text
+    -- | Bearer token used in the Authorization header. Wrapped in
+    -- `Log.Secret` so accidental logging or `Show`-deriving doesn't
+    -- leak it.
+    authToken :: Log.Secret Text
   }
 
 -- | Live handle for delivering events. The `sendEvent` callback is what
@@ -55,7 +58,7 @@ buildRequest s value = do
       { HTTP.method = "POST",
         HTTP.requestHeaders =
           [ ("Content-Type", "application/json"),
-            ("Authorization", "Bearer " ++ Data.Text.Encoding.encodeUtf8 (authToken s))
+            ("Authorization", "Bearer " ++ Data.Text.Encoding.encodeUtf8 (Log.unSecret (authToken s)))
           ],
         HTTP.requestBody = HTTP.RequestBodyLBS (Aeson.encode value),
         HTTP.responseTimeout = HTTP.responseTimeoutMicro (Prelude.fromIntegral (timeoutMicros s))

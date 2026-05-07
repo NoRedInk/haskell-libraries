@@ -8,7 +8,9 @@ import qualified Data.Text
 import qualified Dict
 import qualified Environment
 import qualified Expect
+import qualified Log
 import qualified Network.HTTP.Client as HTTP
+import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import NriPrelude
 import Test (Test, describe, test)
 import qualified Prelude
@@ -24,7 +26,7 @@ tests =
               Internal.Settings
                 { Internal.eventsServiceUrl = "https://events.example.com",
                   Internal.timeoutMicros = 250000,
-                  Internal.authToken = "secret-token"
+                  Internal.authToken = Log.mkSecret "secret-token"
                 }
         req <- Expect.fromIO <| Internal.buildRequest settings (Aeson.object [])
         let headers = HTTP.requestHeaders req
@@ -59,7 +61,19 @@ tests =
               |> Expect.equal "https://events.example.com"
             Internal.timeoutMicros s
               |> Expect.equal 300000
-            Internal.authToken s
+            Log.unSecret (Internal.authToken s)
               |> Expect.equal "the-token"
-          Err err -> Expect.fail (Data.Text.pack (Prelude.show err))
+          Err err -> Expect.fail (Data.Text.pack (Prelude.show err)),
+      test "sendEventIO swallows exceptions when delivery fails" <| \_ -> do
+        -- Construct a settings pointing at an unreachable URL; verify that
+        -- sendEventIO catches the resulting exception and returns () so
+        -- analytics failure cannot propagate into the surrounding request.
+        manager <- Expect.fromIO HTTP.TLS.newTlsManager
+        let settings =
+              Internal.Settings
+                { Internal.eventsServiceUrl = "http://127.0.0.1:1",
+                  Internal.timeoutMicros = 50000,
+                  Internal.authToken = Log.mkSecret ""
+                }
+        Expect.fromIO <| Internal.sendEventIO manager settings (Aeson.object [("k", Aeson.String "v")])
     ]

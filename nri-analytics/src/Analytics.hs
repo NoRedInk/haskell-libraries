@@ -24,6 +24,7 @@ import qualified Analytics.Internal as Internal
 import qualified Conduit
 import qualified Data.Aeson as Aeson
 import qualified Environment
+import qualified Log
 import qualified Network.HTTP.Client.TLS as HTTP.TLS
 import NriPrelude
 import Prelude (IO, pure)
@@ -45,7 +46,7 @@ silentHandler =
         Internal.Settings
           { Internal.eventsServiceUrl = "",
             Internal.timeoutMicros = 0,
-            Internal.authToken = ""
+            Internal.authToken = Log.mkSecret ""
           },
       Internal.httpManager = Nothing
     }
@@ -90,7 +91,7 @@ timeoutMicrosDecoder =
       }
     Environment.int
 
-authTokenDecoder :: Environment.Decoder Text
+authTokenDecoder :: Environment.Decoder (Log.Secret Text)
 authTokenDecoder =
   Environment.variable
     Environment.Variable
@@ -98,4 +99,4 @@ authTokenDecoder =
         Environment.description = "Bearer token for the events service.",
         Environment.defaultValue = ""
       }
-    Environment.text
+    (Environment.secret Environment.text)
