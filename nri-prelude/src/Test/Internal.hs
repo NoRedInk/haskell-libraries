@@ -533,6 +533,7 @@ runSingle test' =
         res <-
           Platform.Internal.rootTracingSpanIO
             ""
+            Platform.Internal.silentTrack
             ( \span -> do
                 when (Platform.Internal.name span == spanName) <|
                   MVar.putMVar spanVar span

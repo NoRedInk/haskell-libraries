@@ -573,8 +573,19 @@ data LogHandler = LogHandler
     -- platform(s) are used. Once we're done collecting data for child
     -- tracingSpans we'll want to add the "completed" child tracingSpan to
     -- its parent.
-    finishTracingSpan :: Maybe Exception.SomeException -> IO ()
+    finishTracingSpan :: Maybe Exception.SomeException -> IO (),
+    -- | Deliver an analytics event payload to the configured analytics
+    -- backend. The prelude knows nothing about the backend; it only
+    -- threads this opaque callback from `rootTracingSpanIO` through
+    -- every child `LogHandler`. See `Platform.Analytics.Internal.trackEvent`
+    -- for the user-facing wrapper. Default: `silentTrack`.
+    trackAnalyticsEventIO :: Aeson.Value -> IO ()
   }
+
+-- | A no-op analytics callback. Used as the default for `nullHandler`
+-- and for platforms that have not opted in to analytics tracking yet.
+silentTrack :: Aeson.Value -> IO ()
+silentTrack _ = pure ()
 
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
@@ -584,13 +595,15 @@ mkHandler ::
   (Stack.HasCallStack) =>
   Text ->
   Clock ->
+  -- | Analytics callback, propagated to every descendant `LogHandler`.
+  (Aeson.Value -> IO ()) ->
   -- Finalizer for this loghandler
   (TracingSpan -> IO ()) ->
   -- Root finalizer
   Maybe (TracingSpan -> IO ()) ->
   Text ->
   IO LogHandler
-mkHandler requestId clock onFinish onFinishRoot' name' = do
+mkHandler requestId clock trackEventIO onFinish onFinishRoot' name' = do
   let onFinishRoot = Maybe.withDefault onFinish onFinishRoot'
   tracingSpanRef <-
     Stack.withFrozenCallStack startTracingSpan clock name'
@@ -599,8 +612,8 @@ mkHandler requestId clock onFinish onFinishRoot' name' = do
   pure
     LogHandler
       { requestId,
-        startChildTracingSpan = mkHandler requestId clock (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
-        startNewRoot = mkHandler requestId clock onFinishRoot Nothing,
+        startChildTracingSpan = mkHandler requestId clock trackEventIO (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
+        startNewRoot = mkHandler requestId clock trackEventIO onFinishRoot Nothing,
         setTracingSpanDetailsIO = \details' ->
           updateIORef
             tracingSpanRef
@@ -613,7 +626,8 @@ mkHandler requestId clock onFinish onFinishRoot' name' = do
           updateIORef
             tracingSpanRef
             (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed, containsFailures = True}),
-        finishTracingSpan = finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef >> andThen onFinish
+        finishTracingSpan = finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef >> andThen onFinish,
+        trackAnalyticsEventIO = trackEventIO
       }
 
 -- | Helper that creates a handler that does nothing. This is intended to power
@@ -632,7 +646,8 @@ nullHandler = do
       setTracingSpanDetailsIO = \_ -> pure (),
       setTracingSpanSummaryIO = \_ -> pure (),
       markTracingSpanFailedIO = pure (),
-      finishTracingSpan = \_ -> pure ()
+      finishTracingSpan = \_ -> pure (),
+      trackAnalyticsEventIO = silentTrack
     }
 
 -- | Set the details for a tracingSpan created using the @tracingSpan@
@@ -842,14 +857,22 @@ newRootIO handler name run = do
 -- Instead of taking a parent handler it takes a continuation that will be
 -- called with this root tracingSpan after it has run.
 --
--- > rootTracingSpanIO "request-23" Prelude.print "incoming request" <| \handler ->
+-- > rootTracingSpanIO "request-23" silentTrack Prelude.print "incoming request" <| \handler ->
 -- >   handleRequest
 -- >   |> Task.perform handler
-rootTracingSpanIO :: (Stack.HasCallStack) => Text -> (TracingSpan -> IO ()) -> Text -> (LogHandler -> IO a) -> IO a
-rootTracingSpanIO requestId onFinish name runIO = do
+rootTracingSpanIO ::
+  (Stack.HasCallStack) =>
+  Text ->
+  -- | Analytics callback. Pass `silentTrack` for platforms that don't track.
+  (Aeson.Value -> IO ()) ->
+  (TracingSpan -> IO ()) ->
+  Text ->
+  (LogHandler -> IO a) ->
+  IO a
+rootTracingSpanIO requestId trackEventIO onFinish name runIO = do
   clock' <- mkClock
   Exception.bracketWithError
-    (Stack.withFrozenCallStack mkHandler requestId clock' onFinish Nothing name)
+    (Stack.withFrozenCallStack mkHandler requestId clock' trackEventIO onFinish Nothing name)
     (Prelude.flip finishTracingSpan)
     runIO
 

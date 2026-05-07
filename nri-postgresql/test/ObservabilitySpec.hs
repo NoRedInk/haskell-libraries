@@ -53,6 +53,7 @@ spanForTask task =
     res <-
       Platform.rootTracingSpanIO
         "test-request"
+        Platform.silentTrack
         (MVar.putMVar spanVar)
         "test-root"
         (\log -> Task.attempt log task)

@@ -13,6 +13,7 @@ module Platform
     logHandler,
     requestId,
     silentHandler,
+    Internal.silentTrack,
 
     -- * Creating custom tracingSpans in libraries
     Internal.tracingSpan,
