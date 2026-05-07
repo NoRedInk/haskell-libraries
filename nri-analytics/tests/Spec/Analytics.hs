@@ -3,6 +3,7 @@ module Spec.Analytics (tests) where
 import qualified Analytics
 import qualified Analytics.Internal as Internal
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Text
 import qualified Dict
 import qualified Environment
@@ -33,6 +34,18 @@ tests =
           |> Expect.equal (Just "application/json")
         Prelude.lookup "Authorization" headers
           |> Expect.equal (Just "Bearer secret-token"),
+      test "stampEnvelope adds event_id and event_timestamp keys" <| \_ -> do
+        result <- Expect.fromIO <| Internal.stampEnvelope (Aeson.object [("foo", Aeson.String "bar")])
+        case result of
+          Aeson.Object km -> do
+            case KeyMap.lookup "event_id" km of
+              Just (Aeson.String _) -> Expect.pass
+              _ -> Expect.fail "event_id missing or wrong shape"
+            case KeyMap.lookup "event_timestamp" km of
+              Just (Aeson.String _) -> Expect.pass
+              _ -> Expect.fail "event_timestamp missing or wrong shape"
+            Expect.equal (KeyMap.lookup "foo" km) (Just (Aeson.String "bar"))
+          _ -> Expect.fail "expected Object",
       test "decoder loads settings from env vars" <| \_ -> do
         let env =
               Dict.fromList

@@ -3,13 +3,19 @@ module Analytics.Internal
     Settings (..),
     buildRequest,
     sendEventIO,
+    stampEnvelope,
   )
 where
 
 import qualified Control.Exception.Safe as Exception
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Text
 import qualified Data.Text.Encoding
+import qualified Data.Time.Clock as Clock
+import qualified Data.Time.Format.ISO8601 as ISO8601
+import qualified Data.UUID
+import qualified Data.UUID.V4 as UUID
 import qualified Network.HTTP.Client as HTTP
 import NriPrelude
 import qualified Prelude
@@ -62,9 +68,27 @@ buildRequest s value = do
 sendEventIO :: HTTP.Manager -> Settings -> Aeson.Value -> IO ()
 sendEventIO manager s value =
   Exception.handleAny logAndDrop <| do
-    request <- buildRequest s value
+    enveloped <- stampEnvelope value
+    request <- buildRequest s enveloped
     _response <- HTTP.httpLbs request manager
     pure ()
   where
     logAndDrop :: Exception.SomeException -> IO ()
     logAndDrop _e = pure ()
+
+-- | Mint event_id (UUID v4) + event_timestamp (ISO 8601 UTC) and
+-- shallow-merge them onto the event JSON. Envelope keys win on
+-- collision. Non-object inbound values are wrapped under a `payload`
+-- key so the envelope still produces a valid object.
+stampEnvelope :: Aeson.Value -> IO Aeson.Value
+stampEnvelope inbound = do
+  uuid <- UUID.nextRandom
+  now <- Clock.getCurrentTime
+  let envelope =
+        KeyMap.fromList
+          [ ("event_id", Aeson.String (Data.UUID.toText uuid)),
+            ("event_timestamp", Aeson.String (Data.Text.pack (ISO8601.iso8601Show now)))
+          ]
+  pure <| case inbound of
+    Aeson.Object body -> Aeson.Object (KeyMap.union envelope body)
+    other -> Aeson.Object (KeyMap.insert "payload" other envelope)
