@@ -68,7 +68,7 @@ library
     , network >=3.1.0.0 && <3.3
     , nri-env-parser >=0.1.0.0 && <0.5
     , nri-observability >=0.1.0.0 && <0.5
-    , nri-prelude >=0.1.0.0 && <0.7
+    , nri-prelude >=0.7.0.0 && <0.8
     , postgresql-typed ==0.6.*
     , resource-pool >=0.2.0.0 && <0.5
     , resourcet >=1.2.0 && <1.4
@@ -126,7 +126,7 @@ test-suite tests
     , network >=3.1.0.0 && <3.3
     , nri-env-parser >=0.1.0.0 && <0.5
     , nri-observability >=0.1.0.0 && <0.5
-    , nri-prelude >=0.1.0.0 && <0.7
+    , nri-prelude >=0.7.0.0 && <0.8
     , postgresql-typed ==0.6.*
     , resource-pool >=0.2.0.0 && <0.5
     , resourcet >=1.2.0 && <1.4

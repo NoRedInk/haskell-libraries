@@ -28,7 +28,7 @@ dependencies:
   - modern-uri >= 0.3.1.0 && < 0.4
   - nri-env-parser >= 0.1.0.0 && < 0.5
   - nri-observability >= 0.1.0 && < 0.5
-  - nri-prelude >= 0.1.0.0 && < 0.7
+  - nri-prelude >= 0.7.0.0 && < 0.8
   - pcre-light >= 0.4.1.0 && < 0.4.2
   - resourcet >= 1.2.0 && < 1.4
   - safe-exceptions >= 0.1.7.0 && < 1.3

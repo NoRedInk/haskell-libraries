@@ -61,7 +61,7 @@
         "file": "tests/TestSpec.hs",
         "module": "TestSpec",
         "name": "report",
-        "package": "nri-prelude-0.6.1.2-inplace-tests",
+        "package": "nri-prelude-0.7.0.0-inplace-tests",
         "startCol": 22,
         "startLine": 430
     },

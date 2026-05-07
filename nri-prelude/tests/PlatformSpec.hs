@@ -8,6 +8,7 @@ import qualified Expect
 import qualified Log
 import NriPrelude
 import qualified Platform
+import qualified Platform.Analytics.Internal
 import qualified Platform.Internal
 import Task
 import Test (Test, describe, test)
@@ -34,19 +35,61 @@ tests =
 
         Expect.true (isSucceeded span)
         Expect.true (Platform.containsFailures span),
-      test "trackAnalyticsEventIO threaded by rootTracingSpanIO is invoked from a child span" <| \_ -> do
+      test "trackAnalyticsEvent threaded by rootTracingSpanIO is invoked from a child span" <| \_ -> do
         ref <- Expect.fromIO (IORef.newIORef [])
-        let track v = IORef.atomicModifyIORef' ref (\xs -> (v : xs, ()))
+        let track v =
+              Platform.Internal.Task
+                ( \_ -> do
+                    IORef.atomicModifyIORef' ref (\xs -> (v : xs, ()))
+                    Prelude.pure (Ok ())
+                )
         Expect.fromIO
           <| Platform.rootTracingSpanIO "test-req" track (\_ -> Prelude.pure ()) "root"
           <| \log -> do
             child <- Platform.Internal.startChildTracingSpan log "child-span"
-            Platform.Internal.trackAnalyticsEventIO child (Aeson.toJSON ("hello" :: Text))
+            let Platform.Internal.Task runTrack =
+                  Platform.Internal.trackAnalyticsEvent child (Aeson.toJSON ("hello" :: Text))
+            _ <- runTrack child
+            Prelude.pure ()
         observed <- Expect.fromIO (IORef.readIORef ref)
         observed |> Expect.equal [Aeson.toJSON ("hello" :: Text)],
-      test "nullHandler.trackAnalyticsEventIO is a silent no-op" <| \_ ->
-        Expect.fromIO
-          <| Platform.Internal.trackAnalyticsEventIO Platform.Internal.nullHandler Aeson.Null
+      test "nullHandler.trackAnalyticsEvent is a silent no-op" <| \_ -> do
+        let Platform.Internal.Task runTrack =
+              Platform.Internal.trackAnalyticsEvent Platform.Internal.nullHandler Aeson.Null
+        _ <- Expect.fromIO (runTrack Platform.Internal.nullHandler)
+        Expect.pass,
+      test "Platform.Analytics.Internal.trackEvent invokes the current LogHandler's analytics callback with toJSON of the event" <| \_ -> do
+        ref <- Expect.fromIO (IORef.newIORef [])
+        let track v =
+              Platform.Internal.Task
+                ( \_ -> do
+                    IORef.atomicModifyIORef' ref (\xs -> (v : xs, ()))
+                    Prelude.pure (Ok ())
+                )
+        let event = Aeson.object ["kind" Aeson..= ("LessonStarted" :: Text)]
+        result <-
+          Expect.fromIO
+            <| Platform.rootTracingSpanIO "test-req" track (\_ -> Prelude.pure ()) "root"
+            <| \log -> Task.attempt log (Platform.Analytics.Internal.trackEvent event)
+        case result of
+          Ok () -> Expect.pass
+          Err _ -> Expect.fail "trackEvent task failed"
+        observed <- Expect.fromIO (IORef.readIORef ref)
+        observed |> Expect.equal [event],
+      test "Platform.Analytics.Internal.trackEvent opens an analytics.track child span carrying the JSON payload as details" <| \_ -> do
+        spanVar <- Expect.fromIO MVar.newEmptyMVar
+        let event = Aeson.object ["kind" Aeson..= ("LessonStarted" :: Text)]
+        _ <-
+          Expect.fromIO
+            <| Platform.rootTracingSpanIO "test-req" Platform.silentTrack (MVar.putMVar spanVar) "root"
+            <| \log -> Task.attempt log (Platform.Analytics.Internal.trackEvent event)
+        root <- Expect.fromIO (MVar.takeMVar spanVar)
+        case Prelude.filter (\s -> Platform.Internal.name s == "analytics.track") (Platform.Internal.children root) of
+          [child] -> do
+            Platform.Internal.name child |> Expect.equal "analytics.track"
+            NriPrelude.map Aeson.toJSON (Platform.Internal.details child) |> Expect.equal (Just event)
+          [] -> Expect.fail "expected an analytics.track child span; found none"
+          _ -> Expect.fail "expected exactly one analytics.track child span"
     ]
 
 newtype CustomTracingSpanDetails = CustomTracingSpanDetails Text
