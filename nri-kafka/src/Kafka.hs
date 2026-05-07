@@ -30,7 +30,6 @@ module Kafka
 where
 
 import qualified Conduit
-import qualified Control.Concurrent
 import qualified Control.Concurrent.Async as Async
 import qualified Control.Concurrent.STM as STM
 import qualified Control.Concurrent.STM.TMVar as TMVar
@@ -176,13 +175,35 @@ startPollEventLoop producer = do
       |> Async.async
   Prelude.pure terminator
 
--- | We use a little trick here to poll events, by sending an empty message batch.
--- This will call the internal pollEvent function in hw-kafka-client.
+-- | Drains librdkafka's event queue (delivery reports, errors, stats) so
+-- per-message delivery callbacks fire promptly. 'Producer.flushProducer' is
+-- internally a loop over @rd_kafka_poll(rk, 100)@ that exits when the
+-- outbound queue is empty; each underlying poll blocks the OS thread up to
+-- 100ms but returns immediately when an event arrives, so latency-sensitive
+-- 'sendSync' callers wake on event rather than on a fixed clock tick. The
+-- previous implementation used a 100ms threadDelay between non-blocking
+-- drains, which added up to a 100ms (~50ms mean) wait per sync send.
+--
+-- We can't import 'Kafka.Internal.Shared.pollEvents' directly to pass our own
+-- timeout because that module is hidden in hw-kafka-client 4.x.
+-- 'flushProducer' is the closest exposed alternative; despite its name and
+-- the @closeProducer = flushProducer@ alias, it does not transition the
+-- producer to a closed state — it just flushes. It is safe to call
+-- repeatedly on a live producer.
+--
+-- Shutdown: this loop is cancelled by 'Async.race_' when the terminator
+-- TMVar is signalled. GHC can't deliver the async exception while the
+-- thread is parked in 'safe' FFI, but 'flushProducer' is not a single FFI
+-- call — it's a Haskell loop calling @rd_kafka_poll(rk, 100)@. Each poll
+-- returns within 100ms (when idle) or immediately (on event), and control
+-- briefly returns to Haskell between iterations, where any pending async
+-- exception is delivered and kills the thread. So shutdown is bounded by
+-- ~100ms even in the worst case (idle producer, no events flowing). The
+-- 'Async.race_' cleanup itself does not wait for the loser to finish dying,
+-- so we don't deadlock the release chain.
 pollEvents :: Producer.KafkaProducer -> Prelude.IO ()
 pollEvents producer = do
-  Producer.produceMessageBatch producer []
-    |> map (\_ -> ())
-  Control.Concurrent.threadDelay 100_000 {- 100ms -}
+  Producer.flushProducer producer
   pollEvents producer
 
 mkHandler :: Settings.Settings -> Producer.KafkaProducer -> Prelude.IO Internal.Handler
