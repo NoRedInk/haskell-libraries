@@ -60,7 +60,41 @@ tests =
           Ok () -> Expect.pass
           Err _ -> Expect.fail "trackEvent task failed"
         observed <- Expect.fromIO (IORef.readIORef ref)
-        observed |> Expect.equal [event]
+        observed |> Expect.equal [event],
+      test "trackEvent stamps the current request's session_id onto the payload" <| \_ -> do
+        ref <- Expect.fromIO (IORef.newIORef [])
+        let track v = IORef.atomicModifyIORef' ref (\xs -> (v : xs, ()))
+        let event = Aeson.object ["kind" Aeson..= ("LessonStarted" :: Text)]
+        let expected = Aeson.object ["kind" Aeson..= ("LessonStarted" :: Text), "session_id" Aeson..= ("sess-42" :: Text)]
+        Expect.fromIO
+          <| Platform.rootTracingSpanIO "test-req" track (\_ -> Prelude.pure ()) "root"
+          <| \log -> do
+            Platform.setSessionIdIO log (Just "sess-42")
+            _ <- Task.attempt log (Platform.Analytics.Internal.trackEvent event)
+            Prelude.pure ()
+        observed <- Expect.fromIO (IORef.readIORef ref)
+        observed |> Expect.equal [expected],
+      test "Platform.sessionId reflects the value written by setSessionIdIO" <| \_ -> do
+        result <-
+          Expect.fromIO
+            <| Platform.rootTracingSpanIO "test-req" Platform.silentTrack (\_ -> Prelude.pure ()) "root"
+            <| \log -> do
+              Platform.setSessionIdIO log (Just "sess-7")
+              Task.attempt log Platform.sessionId
+        case result of
+          Ok mSid -> mSid |> Expect.equal (Just "sess-7")
+          Err _ -> Expect.fail "sessionId task failed",
+      test "child handlers see the session id set on the root" <| \_ -> do
+        result <-
+          Expect.fromIO
+            <| Platform.rootTracingSpanIO "test-req" Platform.silentTrack (\_ -> Prelude.pure ()) "root"
+            <| \log -> do
+              Platform.setSessionIdIO log (Just "sess-shared")
+              child <- Platform.Internal.startChildTracingSpan log "child-span"
+              Task.attempt child Platform.sessionId
+        case result of
+          Ok mSid -> mSid |> Expect.equal (Just "sess-shared")
+          Err _ -> Expect.fail "sessionId task failed"
     ]
 
 newtype CustomTracingSpanDetails = CustomTracingSpanDetails Text

@@ -190,12 +190,14 @@ instance Exception.Exception TestException
 newHandler :: (Stack.HasCallStack) => Prelude.IO (Prelude.IO [Internal.TracingSpan], Internal.LogHandler)
 newHandler = do
   recordedTracingSpans <- IORef.newIORef []
+  sidRef <- IORef.newIORef Nothing
   handler <-
     Stack.withFrozenCallStack
       Internal.mkHandler
       ""
       (Internal.Clock (Prelude.pure 0))
       Internal.silentTrack
+      sidRef
       (\span -> IORef.modifyIORef recordedTracingSpans (\cs -> cs ++ Internal.children span))
       Nothing
       ""

@@ -14,6 +14,7 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encoding as Aeson.Encoding
 import qualified Data.IORef as IORef
 import qualified Data.Text
+import qualified System.IO.Unsafe
 import qualified Data.Typeable as Typeable
 import qualified GHC.Clock as Clock
 import GHC.Generics (Generic)
@@ -579,13 +580,31 @@ data LogHandler = LogHandler
     -- threads this opaque callback from `rootTracingSpanIO` through
     -- every child `LogHandler`. See `Platform.Analytics.Internal.trackEvent`
     -- for the user-facing wrapper. Default: `silentTrack`.
-    trackAnalyticsEventIO :: Aeson.Value -> IO ()
+    trackAnalyticsEventIO :: Aeson.Value -> IO (),
+    -- | Per-request session id, propagated to every child `LogHandler`
+    -- via shared `IORef`. Set once at request boundaries (typically a
+    -- WAI middleware on the application root) by writing through this
+    -- ref. `Platform.Analytics.Internal.trackEvent` reads the ref and
+    -- shallow-merges `session_id` onto each event payload, so callers
+    -- of `Analytics.track` don't have to thread the session id through
+    -- explicitly. Default: a per-handler ref containing `Nothing`.
+    sessionIdRef :: IORef.IORef (Maybe Text)
   }
 
 -- | A no-op analytics callback. Used as the default for `nullHandler`
 -- and for platforms that have not opted in to analytics tracking yet.
 silentTrack :: Aeson.Value -> IO ()
 silentTrack _ = pure ()
+
+-- | A shared sentinel `IORef` used by `nullHandler`. We need the field on
+-- `LogHandler` to be inhabited even in the null case, but `nullHandler`
+-- itself is a pure value, so we mint the ref once at module load via
+-- `unsafePerformIO`. Writes to it are no-ops in spirit (nothing reads
+-- back from a null handler in well-behaved code) but technically
+-- visible if multiple null handlers shared this ref.
+nullSessionIdRef :: IORef.IORef (Maybe Text)
+nullSessionIdRef = System.IO.Unsafe.unsafePerformIO (IORef.newIORef Nothing)
+{-# NOINLINE nullSessionIdRef #-}
 
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
@@ -597,13 +616,16 @@ mkHandler ::
   Clock ->
   -- | Analytics callback, propagated to every descendant `LogHandler`.
   (Aeson.Value -> IO ()) ->
+  -- | Session-id ref, shared with every descendant `LogHandler` so a
+  -- write at the request root is visible to all children.
+  IORef.IORef (Maybe Text) ->
   -- Finalizer for this loghandler
   (TracingSpan -> IO ()) ->
   -- Root finalizer
   Maybe (TracingSpan -> IO ()) ->
   Text ->
   IO LogHandler
-mkHandler requestId clock trackEventIO onFinish onFinishRoot' name' = do
+mkHandler requestId clock trackEventIO sidRef onFinish onFinishRoot' name' = do
   let onFinishRoot = Maybe.withDefault onFinish onFinishRoot'
   tracingSpanRef <-
     Stack.withFrozenCallStack startTracingSpan clock name'
@@ -612,8 +634,8 @@ mkHandler requestId clock trackEventIO onFinish onFinishRoot' name' = do
   pure
     LogHandler
       { requestId,
-        startChildTracingSpan = mkHandler requestId clock trackEventIO (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
-        startNewRoot = mkHandler requestId clock trackEventIO onFinishRoot Nothing,
+        startChildTracingSpan = mkHandler requestId clock trackEventIO sidRef (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
+        startNewRoot = mkHandler requestId clock trackEventIO sidRef onFinishRoot Nothing,
         setTracingSpanDetailsIO = \details' ->
           updateIORef
             tracingSpanRef
@@ -627,7 +649,8 @@ mkHandler requestId clock trackEventIO onFinish onFinishRoot' name' = do
             tracingSpanRef
             (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed, containsFailures = True}),
         finishTracingSpan = finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef >> andThen onFinish,
-        trackAnalyticsEventIO = trackEventIO
+        trackAnalyticsEventIO = trackEventIO,
+        sessionIdRef = sidRef
       }
 
 -- | Helper that creates a handler that does nothing. This is intended to power
@@ -643,6 +666,7 @@ nullHandler = do
     { requestId = "",
       startChildTracingSpan = \_ -> pure nullHandler,
       startNewRoot = \_ -> pure nullHandler,
+      sessionIdRef = nullSessionIdRef,
       setTracingSpanDetailsIO = \_ -> pure (),
       setTracingSpanSummaryIO = \_ -> pure (),
       markTracingSpanFailedIO = pure (),
@@ -871,8 +895,11 @@ rootTracingSpanIO ::
   IO a
 rootTracingSpanIO requestId trackEventIO onFinish name runIO = do
   clock' <- mkClock
+  -- Each request gets its own session-id ref. Children share it via
+  -- closure capture inside `mkHandler`.
+  sidRef <- IORef.newIORef Nothing
   Exception.bracketWithError
-    (Stack.withFrozenCallStack mkHandler requestId clock' trackEventIO onFinish Nothing name)
+    (Stack.withFrozenCallStack mkHandler requestId clock' trackEventIO sidRef onFinish Nothing name)
     (Prelude.flip finishTracingSpan)
     runIO
 

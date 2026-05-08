@@ -12,6 +12,8 @@ module Platform
     Internal.LogHandler,
     logHandler,
     requestId,
+    sessionId,
+    setSessionIdIO,
     silentHandler,
     Internal.silentTrack,
 
@@ -64,6 +66,7 @@ where
 import Basics
 import qualified Control.Exception.Safe as Exception
 import qualified Control.Monad.Catch as Catch
+import qualified Data.IORef as IORef
 import qualified Data.Text
 import qualified GHC.Stack as Stack
 import NriPrelude
@@ -169,6 +172,26 @@ logHandler = Internal.Task (pure << Ok)
 -- | Get the ID of the current request.
 requestId :: Task e Text
 requestId = map Internal.requestId logHandler
+
+-- | Read the current request's session id, set by `setSessionIdIO` at
+-- the request boundary (typically a WAI middleware on the application
+-- root). `Platform.Analytics.Internal.trackEvent` uses this to stamp
+-- `session_id` onto every analytics event automatically.
+sessionId :: Task e (Maybe Text)
+sessionId =
+  Internal.Task
+    ( \handler -> do
+        mSid <- IORef.readIORef (Internal.sessionIdRef handler)
+        pure (Ok mSid)
+    )
+
+-- | Set the current request's session id. Intended to be called once at
+-- the request boundary from IO (typically a WAI middleware that has
+-- access to the per-request `LogHandler`). All descendants of the same
+-- request share the underlying ref, so a single write is visible to
+-- every child handler and tracing span.
+setSessionIdIO :: Internal.LogHandler -> Maybe Text -> IO ()
+setSessionIdIO handler = IORef.writeIORef (Internal.sessionIdRef handler)
 
 -- | A log handler that doesn't log anything.
 silentHandler :: IO Internal.LogHandler
