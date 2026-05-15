@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         runner:
-          - os: macos-14 # macos sonoma on m1; 3 vcpu, 7 GB memory
+          - os: macos-26 # macos tahoe on m1; 3 vcpu, 7 GB memory
             base-nixpkgs-channel: nixpkgs-25.05-darwin
           - os: ubuntu-22.04 # linux x86_64; 4 vcpu, 16 GB memory
             base-nixpkgs-channel: nixos-25.05
@@ -24,33 +24,19 @@ jobs:
           - ghc-9-12
     runs-on: ${{ matrix.runner.os }}
     steps:
-      # see write-up @ https://github.com/marketplace/actions/maximize-build-disk-space
+      # GitHub-hosted ubuntu runners don't have enough free disk for the nix
+      # store; this removes preinstalled software to make room.
       - name: Reclaim space
         if: matrix.runner.os == 'ubuntu-22.04'
-        uses: easimon/maximize-build-space@v10
+        uses: jlumbroso/free-disk-space@v1.3.1
         with:
-          # you can try to increase this if the ubuntu runner runs out of space.
-          # prob can't push it too far above 30GB though.  the github actions runners
-          # have a small disk size, and if we want more we'll have to look into
-          # larger runners or self-hosted runners.  caveat - larger runners aren't
-          # included in our enterprise plan and _will_ cost extra!
-          # https://docs.github.com/en/actions/using-github-hosted-runners/using-larger-runners/about-larger-runners#machine-sizes-for-larger-runners
-          #
-          # alternately, we can think about moving the nix store off of root and onto
-          # the larger `/dev/sdb1` partition.
-          #
-          # all of the above - including moving the nix store, should you choose
-          # to do that - is ultimately very hacky and unfortunately dependent
-          # on lower-level implementation that we have very little control over.
-          # nothing is stopping github from e.g. changing disk layout, software
-          # contents, os packages, etc.  this is especially true if we use newer
-          # `ubuntu-xx.yy` runners.
-          root-reserve-mb: 30720
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true' # we use nix to provide this anyway
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: true
+          swap-storage: true
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
