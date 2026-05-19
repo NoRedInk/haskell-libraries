@@ -237,7 +237,7 @@ data Handler' (x :: HasAutoExtendExpire) = Handler'
   { doQuery :: (Stack.HasCallStack) => forall a. Settings.QueryTimeout -> Query a -> Task Error a,
     doTransaction :: (Stack.HasCallStack) => forall a. Settings.QueryTimeout -> Query a -> Task Error a,
     doEval :: (Stack.HasCallStack) => forall a. (Database.Redis.RedisResult a) => Settings.QueryTimeout -> Script.Script a -> Task Error a,
-    namespace :: Text,
+    namespace :: Maybe Text,
     maxKeySize :: Settings.MaxKeySize,
     queryTimeout :: Settings.QueryTimeout
   }
@@ -260,7 +260,7 @@ type HandlerAutoExtendExpire = Handler' 'AutoExtendExpire
 -- to run them using 'transaction'
 query :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 query handler query' =
-  namespaceQuery (namespace handler ++ ":") query'
+  namespaceQuery (namespacePrefix handler) query'
     |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack (doQuery handler) (queryTimeout handler))
 
@@ -272,14 +272,20 @@ query handler query' =
 -- see redis transaction semantics here: https://redis.io/topics/transactions
 transaction :: (Stack.HasCallStack) => Handler' x -> Query a -> Task Error a
 transaction handler query' =
-  namespaceQuery (namespace handler ++ ":") query'
+  namespaceQuery (namespacePrefix handler) query'
     |> Task.andThen (ensureMaxKeySize handler)
     |> Task.andThen (Stack.withFrozenCallStack (doTransaction handler) (queryTimeout handler))
 
 eval :: (Stack.HasCallStack, Database.Redis.RedisResult a) => Handler' x -> Script.Script a -> Task Error a
 eval handler script =
-  Script.mapKeys (\key -> Task.succeed (namespace handler ++ ":" ++ key)) script
+  Script.mapKeys (\key -> Task.succeed (namespacePrefix handler ++ key)) script
     |> Task.andThen (Stack.withFrozenCallStack (doEval handler) (queryTimeout handler))
+
+namespacePrefix :: Handler' x -> Text
+namespacePrefix handler =
+  case namespace handler of
+    Just ns -> ns ++ ":"
+    Nothing -> ""
 
 namespaceQuery :: Text -> Query a -> Task err (Query a)
 namespaceQuery prefix query' =

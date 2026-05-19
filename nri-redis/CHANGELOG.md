@@ -1,3 +1,9 @@
+# 0.4.1.0
+
+- Add `handlerWithoutNamespace` for creating Redis handlers that skip
+  namespace prefixing, for the cases where keys are shared with another
+  system that doesn't follow the same namespacing convention.
+
 # 0.4.0.0
 
 - Support GHC 9.10.2, GHC 9.12.2, `megaparsec-9.7.x`, `containers-0.7.x`

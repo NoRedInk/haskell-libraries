@@ -4,6 +4,7 @@
 module Redis.Handler
   ( handler,
     handlerAutoExtendExpire,
+    handlerWithoutNamespace,
     withQueryTimeoutMilliseconds,
     withoutQueryTimeout,
   )
@@ -31,15 +32,25 @@ import qualified Prelude
 -- | Produce a namespaced handler for Redis access.
 handler :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.Handler
 handler namespace settings = do
-  (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
+  (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler (Just namespace) settings) releaseHandler
   namespacedHandler
     |> Prelude.pure
+
+-- | Produce a Redis handler that does NOT prefix keys with a namespace.
+--
+-- Prefer 'handler' unless you have a specific reason to opt out of
+-- namespacing (e.g. reading/writing keys owned by another system). Using
+-- this constructor bypasses the namespace isolation that 'handler' enforces.
+handlerWithoutNamespace :: Settings.Settings -> Data.Acquire.Acquire Internal.Handler
+handlerWithoutNamespace settings = do
+  (h, _) <- Data.Acquire.mkAcquire (acquireHandler Nothing settings) releaseHandler
+  Prelude.pure h
 
 -- | Produce a namespaced handler for Redis access.
 -- This will ensure that we extend all keys accessed by a query by a configured default time (see Settings.defaultExpiry)
 handlerAutoExtendExpire :: Text -> Settings.Settings -> Data.Acquire.Acquire Internal.HandlerAutoExtendExpire
 handlerAutoExtendExpire namespace settings = do
-  (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler namespace settings) releaseHandler
+  (namespacedHandler, _) <- Data.Acquire.mkAcquire (acquireHandler (Just namespace) settings) releaseHandler
   namespacedHandler
     |> ( \handler' -> case Settings.defaultExpiry settings of
            Settings.NoDefaultExpiry ->
@@ -95,7 +106,7 @@ defaultExpiryKeysAfterSeconds secs handler' =
             Stack.withFrozenCallStack (Internal.doEval handler' queryTimeout script')
         }
 
-acquireHandler :: Text -> Settings.Settings -> IO (Internal.Handler' x, Connection)
+acquireHandler :: Maybe Text -> Settings.Settings -> IO (Internal.Handler' x, Connection)
 acquireHandler namespace settings = do
   connection <- do
     let connectionInfo = Settings.connectionInfo settings

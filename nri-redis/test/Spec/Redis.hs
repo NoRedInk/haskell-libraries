@@ -57,13 +57,14 @@ spanForFailingTask task =
         Prelude.fail "Expected task to fail"
 
 tests :: TestHandlers -> Test.Test
-tests TestHandlers {handler, autoExtendExpireHandler} =
+tests TestHandlers {handler, autoExtendExpireHandler, noNamespaceHandler} =
   Test.describe
     "Redis Library"
     [ Test.describe "query tests using handler" (queryTests handler),
       Test.describe "query tests using auto extend expire handler" (queryTests autoExtendExpireHandler),
       Test.describe "observability tests" (observabilityTests handler),
-      Test.describe "ttl tests" (ttlTests handler autoExtendExpireHandler)
+      Test.describe "ttl tests" (ttlTests handler autoExtendExpireHandler),
+      Test.describe "no-namespace handler tests" (noNamespaceTests noNamespaceHandler handler)
     ]
 
 -- We want to test all of our potential makeApi alternatives because it's easy
@@ -486,9 +487,57 @@ ttlTests handler autoExtendExpireHandler =
           Expect.equal result Redis.TTLKeyNotFound
       ]
 
+-- | Tests that pin down the contract of `handlerWithoutNamespace`: keys are
+-- neither prefixed on the way in nor stripped on the way out. The
+-- `nsHandler` argument is the regular namespaced `handler` (namespace
+-- `"tests"`); we use it to confirm prefixing happens on the namespaced side
+-- but not on the no-namespace side.
+noNamespaceTests :: Redis.Handler -> Redis.Handler -> List Test.Test
+noNamespaceTests noNs nsHandler =
+  [ Test.test "set via no-namespace handler stores the key under its literal name" <| \() -> do
+      -- Write at literal key "noNs::literalKey" using the no-namespace handler.
+      Redis.set api "noNs::literalKey" "value-no-ns" |> Redis.query noNs |> Expect.succeeds
+      -- The namespaced handler would look at "tests:noNs::literalKey", which
+      -- nothing has written to, so it should see Nothing.
+      result <- Redis.get api "noNs::literalKey" |> Redis.query nsHandler |> Expect.succeeds
+      Expect.equal result Nothing,
+    Test.test "get via no-namespace handler reads the literal key (no prefix added)" <| \() -> do
+      -- Namespaced handler writes "noNs::roundTrip" → redis sees "tests:noNs::roundTrip".
+      Redis.set api "noNs::roundTrip" "via-namespace" |> Redis.query nsHandler |> Expect.succeeds
+      -- The no-namespace handler can reach that same value by spelling out
+      -- the full prefixed key, since it adds no prefix of its own.
+      result <- Redis.get api "tests:noNs::roundTrip" |> Redis.query noNs |> Expect.succeeds
+      Expect.equal result (Just "via-namespace"),
+    Test.test "eval via no-namespace handler does not prefix script keys" <| \() -> do
+      let script = [Redis.script|return ${Redis.Key "noNs::evalKey"}|]
+      (result :: Text) <- Redis.eval noNs script |> Expect.succeeds
+      Expect.equal result "noNs::evalKey",
+    Test.test "foldWithScan via no-namespace handler returns keys verbatim" <| \() -> do
+      let scanPrefix = "noNs::scanTest::"
+      let firstKey = scanPrefix ++ "k1"
+      let nonEmptyDict =
+            NonEmptyDict.init firstKey "v1"
+              <| Dict.fromList [(scanPrefix ++ "k2", "v2")]
+      let expectedKeys =
+            NonEmptyDict.toDict nonEmptyDict
+              |> Dict.keys
+      Redis.mset api nonEmptyDict |> Redis.query noNs |> Expect.succeeds
+      let processBatch = \batchKeys acc ->
+            Task.succeed (List.foldl Set.insert acc batchKeys)
+      keySet <-
+        Redis.foldWithScan noNs (Just (scanPrefix ++ "*")) (Just 10) processBatch Set.empty
+          |> Expect.succeeds
+      keySet
+        |> Set.toList
+        |> Expect.equal expectedKeys
+  ]
+
 addNamespace :: Text -> Redis.Handler' x -> Redis.Handler' x
 addNamespace namespace handler' =
-  handler' {Internal.namespace = Internal.namespace handler' ++ ":" ++ namespace}
+  let combined = case Internal.namespace handler' of
+        Just existing -> existing ++ ":" ++ namespace
+        Nothing -> namespace
+   in handler' {Internal.namespace = Just combined}
 
 api :: Redis.Api Text Text
 api = Redis.textApi identity
