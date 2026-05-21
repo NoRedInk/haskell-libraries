@@ -11,7 +11,8 @@ import qualified Prelude
 
 data TestHandlers = TestHandlers
   { autoExtendExpireHandler :: Redis.HandlerAutoExtendExpire,
-    handler :: Redis.Handler
+    handler :: Redis.Handler,
+    noNamespaceHandler :: Redis.Handler
   }
 
 getHandlers :: Conduit.Acquire TestHandlers
@@ -19,7 +20,8 @@ getHandlers = do
   settings <- Conduit.liftIO (Environment.decode Settings.decoder)
   autoExtendExpireHandler <- Handler.handlerAutoExtendExpire "tests-auto-extend-expire" settings {Settings.defaultExpiry = Settings.ExpireKeysAfterSeconds 1}
   handler <- Handler.handler "tests" settings {Settings.defaultExpiry = Settings.NoDefaultExpiry}
-  Prelude.pure TestHandlers {autoExtendExpireHandler, handler}
+  noNamespaceHandler <- Handler.handlerWithoutNamespace settings {Settings.defaultExpiry = Settings.NoDefaultExpiry}
+  Prelude.pure TestHandlers {autoExtendExpireHandler, handler, noNamespaceHandler}
 
 -- | Historical context:
 -- Golden results are slightly different between GHC 9.2.x and 8.10.x due
