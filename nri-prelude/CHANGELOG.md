@@ -1,5 +1,11 @@
 # Unreleased
 
+# 0.7.0.0
+
+- **Breaking:** `Platform.rootTracingSpanIO` and the internal `mkHandler` now take an additional `Aeson.Value -> Task Never ()` callback for analytics event delivery. Existing callers should pass `Platform.silentTrack` to preserve previous behavior.
+- New: `Platform.Analytics.Internal.trackEvent`. The `.Internal` suffix is intentional — wrap it in your own typed `track` API. This module is NOT re-exported from `Platform`.
+- New: `Platform.silentTrack` (a no-op `Aeson.Value -> Task Never ()`). The `Task`-shaped callback gives wire-layer implementations access to the surrounding `LogHandler` for logging and tracing, so delivery errors flow through the normal observability pipeline.
+- New: `LogHandler.trackAnalyticsEvent` field. `nullHandler` defaults this to `silentTrack`.
 - Drop support for GHC 8.10.7, GHC 9.2.x, GHC 9.4.x, `aeson-1.x`
 - Support GHC 9.6.7, GHC 9.8.4, GHC 9.10.2, GHC 9.12.2, `bytestring-0.12.x.x`, `text-2.1.x`, `aeson-2.2.x.x`, `safe-coloured-text-0.3.x.x`, `safe-coloured-text-terminfo-0.3.x.x`, `lens-5.3.x`, `hedgehog-1.5.x`, `auto-update-0.2.x`, `containers-0.7.x`, `filepath-1.5.x`
 - Allow specifying where devlogs for log-explorer go through `NRI_DEV_LOG` environment variable.

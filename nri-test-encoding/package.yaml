@@ -23,7 +23,7 @@ dependencies:
   - servant-auth-server >= 0.4.9.0 && < 0.5
   - servant-server >= 0.20.2 && < 0.21
   - text >= 1.2.3.1 && < 2.2
-  - nri-prelude >= 0.1.0.0 && < 0.7
+  - nri-prelude >= 0.1.0.0 && < 0.8
   - nri-redis >= 0.1.0.0 && < 0.5
 library:
   exposed-modules:

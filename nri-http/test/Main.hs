@@ -233,6 +233,7 @@ spanForTask task = do
     Expect.fromIO <| do
       Platform.rootTracingSpanIO
         "test-request"
+        Platform.silentTrack
         (MVar.putMVar spanVar)
         "test-root"
         (\log -> Task.attempt log task)

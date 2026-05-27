@@ -456,6 +456,7 @@ cleanUp observabilityHandler rebalanceInfo stopping maybeException consumer = do
   -- at some point, k8s should report system crashes. In the mean time, we'll do it.
   Platform.rootTracingSpanIO
     requestId
+    Platform.silentTrack
     (Observability.report observabilityHandler requestId)
     "Kafka consumer shutting down"
     <| \log -> do

@@ -248,6 +248,7 @@ processMsgLoop skipOrNot messageFormat commitOffsets observabilityHandler state 
       (RequestId requestId, details) <- getTracingDetails (analytics state) processAttempts record
       Platform.rootTracingSpanIO
         requestId
+        Platform.silentTrack
         (Observability.report observabilityHandler requestId)
         "Assigned Kafka message"
         ( \log -> do
