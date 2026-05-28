@@ -1,3 +1,7 @@
+# 0.4.0.1
+
+- Require `nri-prelude >= 0.7.0.0`
+
 # 0.3.0.1
 
 - Support GHC 9.10.2, GHC 9.12.2, `network-3.3.x.x`, `filepath-1.5.x`, `template-haskell-2.23.x.x`
