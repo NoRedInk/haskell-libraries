@@ -3,7 +3,7 @@ synopsis: Make queries against Postgresql.
 description: Please see the README at <https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme>.
 homepage: https://github.com/NoRedInk/haskell-libraries/tree/trunk/nri-postgresql#readme
 author: NoRedInk
-version: 0.4.0.0
+version: 0.4.0.1
 maintainer: haskell-open-source@noredink.com
 copyright: 2024 NoRedInk Corp.
 github: NoRedInk/haskell-libraries/postgresql

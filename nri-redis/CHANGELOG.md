@@ -1,3 +1,7 @@
+# 0.4.1.1
+
+- Require `nri-prelude >= 0.7.0.0`
+
 # 0.4.1.0
 
 - Add `handlerWithoutNamespace` for creating Redis handlers that skip
