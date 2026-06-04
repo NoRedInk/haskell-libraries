@@ -30,14 +30,15 @@ and zero at `-N1`.
 
 - ~0.2–0.3% of runs at `-N12` (12-core); **0 at `-N1`/`-N2`**; the rate scales
   with `-N`.
-- Needs **both** >1 capability **and** a *variety of distinct decoders, each
-  doing a small but real parse*. Identical/duplicated decoders don't trip it,
-  nor do pure `Expect.pass` tests; ~12 *distinct* ones do. The document can be
-  tiny (each test decodes `"{}"`), but the parse must do real work: a dozen
-  distinct YAML decoders reproduce it, whereas a dozen distinct *aeson*
-  `eitherDecodeStrict' "{}"` decodes did **not** (0/10000) — that decode is
-  essentially free. So the driver is the number of distinct decoder CAFs forced
-  concurrently; we didn't map exactly which codecs/sizes qualify.
+- Needs **both** >1 capability **and** a *variety of distinct decoders*.
+  Identical/duplicated decoders don't trip it, nor do pure `Expect.pass` tests;
+  ~12 *distinct* YAML decoders do (each decodes a tiny `"{}"`).
+- **Appears specific to the YAML/libyaml decode path.** A pure-`aeson`
+  equivalent did **not** reproduce in any variant we tried (all 0/10000 at
+  `-N12`): trivial `eitherDecodeStrict' "{}"`, a rich 8-field nested record, and
+  20 distinct *recursive* types. So the trigger seems tied to something the
+  `yaml` package does (it parses via libyaml over FFI, with `unsafePerformIO`),
+  not to concurrent decoding in general. We did not exhaustively rule out aeson.
 - Wrapping the suite in `Test.serialize` avoids it (sequential execution) — the
   current workaround for affected suites.
 - The exception escapes **uncaught** (outside the per-test bodies that
