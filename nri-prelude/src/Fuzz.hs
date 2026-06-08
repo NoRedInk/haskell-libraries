@@ -198,6 +198,28 @@ frequency optionFuzzers =
     |> Gen.frequency
     |> Fuzzer
 
+-- | Modifies combinators which choose from a list of generators, like `oneOf` or `frequency`, so that they can be used in recursive scenarios.
+--
+-- @
+-- data Expr =
+--     Var String
+--   | Lam String Expr
+--   | App Expr Expr
+--
+-- expr :: Fuzzer Expr
+-- expr = Fuzz.recursize Fuzz.oneOf 
+--    [ Fuzz.map Var Fuzz.text ]
+--    [ Fuzz.map2 Lam Fuzz.text expr
+--    , Fuzz.map2 App expr expr
+--    ]
+-- @
+recursive :: ([Fuzzer a] -> Fuzzer a) -> [Fuzzer a] -> [Fuzzer a] -> Fuzzer a
+recursive choose nonRec rec_ = 
+  Gen.recursive (\ma -> choose (List.map Fuzzer m a) |> unFuzzer) 
+    (map unFuzzer nonRec) 
+    (map unFuzzer rec_)
+    |> Fuzzer
+
 -- | Turn a tuple of fuzzers into a fuzzer of tuples.
 tuple :: (Fuzzer a, Fuzzer b) -> Fuzzer (a, b)
 tuple (fuzzerA, fuzzerB) =
