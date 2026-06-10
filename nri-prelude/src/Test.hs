@@ -12,6 +12,7 @@ module Test
     Internal.fuzz,
     Internal.fuzz2,
     Internal.fuzz3,
+    Internal.hedgehog,
 
     -- * Serialize test execution
     Internal.serialize,

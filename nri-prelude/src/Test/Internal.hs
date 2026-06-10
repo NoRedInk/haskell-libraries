@@ -216,7 +216,7 @@ serialize groupKey (Test tests) =
 -- elsewhere called property-based tests, generative tests, or QuickCheck-style
 -- tests.
 fuzz :: (Stack.HasCallStack, Show a) => Fuzzer a -> Text -> (a -> Expectation) -> Test
-fuzz fuzzer name expectation =
+fuzz (Fuzzer gen) name expectation =
   Test
     [ SingleTest
         { describes = [],
@@ -224,7 +224,7 @@ fuzz fuzzer name expectation =
           loc = Stack.withFrozenCallStack getFrame name,
           group = Ungrouped,
           label = None,
-          body = fuzzBody fuzzer expectation
+          body = fuzzBody gen expectation
         }
     ]
 
@@ -240,7 +240,7 @@ fuzz2 (Fuzzer genA) (Fuzzer genB) name expectation =
           label = None,
           body =
             fuzzBody
-              (Fuzzer (map2 (,) genA genB))
+              (map2 (,) genA genB)
               (\(a, b) -> expectation a b)
         }
     ]
@@ -257,13 +257,28 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
           label = None,
           body =
             fuzzBody
-              (Fuzzer (map3 (,,) genA genB genC))
+              (map3 (,,) genA genB genC)
               (\(a, b, c) -> expectation a b c)
         }
     ]
 
-fuzzBody :: (Show a) => Fuzzer a -> (a -> Expectation) -> Expectation
-fuzzBody (Fuzzer gen) expectation = do
+-- | Run a fuzz test using a hedgehog generator
+hedgehog :: (Stack.HasCallStack, Show a) => Hedgehog.Gen a -> Text -> (a -> Expectation) -> Test
+hedgehog gen name expectation = 
+  Test
+    [ SingleTest
+        { describes = [],
+          name = name,
+          loc = Stack.withFrozenCallStack getFrame name,
+          group = Ungrouped,
+          label = None,
+          body = fuzzBody gen expectation
+        }
+    ]
+
+
+fuzzBody :: (Show a) => Hedgehog.Gen a -> (a -> Expectation) -> Expectation
+fuzzBody gen expectation = do
   Expectation <|
     Platform.Internal.Task
       ( \_log -> do
