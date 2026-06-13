@@ -1,6 +1,17 @@
 # Known issues
 
-## `sendSync` hangs forever on delivery failure
+## ~~`sendSync` hangs forever on delivery failure~~ (RESOLVED)
+
+**Resolved.** `Internal.deliveryReportToResult` now maps every delivery report
+to a `Result Internal.Error ()`, the `sendSync` terminator carries that result
+instead of a bare `Terminate`, and the callback signals it on both the success
+and failure branches. A failed delivery now surfaces as a descriptive
+`Task.fail` (`DeliveryFailed` for a broker-side failure, `NoMessageDelivered`
+for the message-less `NoMessageError` report) instead of parking the caller
+forever. `sendAsync` keeps its previous success-only callback contract. The
+dispatch is unit-tested in `test/Spec/Kafka.hs`.
+
+The original write-up is kept below for context.
 
 ### Where
 

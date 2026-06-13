@@ -251,6 +251,7 @@ test-suite tests
       Kafka.Worker.Settings
       Kafka.Worker.Stopping
       Helpers
+      Spec.Kafka
       Spec.Kafka.Worker.Integration
       Spec.Kafka.Worker.Partition
       Paths_nri_kafka

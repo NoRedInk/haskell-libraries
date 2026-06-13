@@ -215,18 +215,32 @@ mkHandler settings producer = do
           Platform.tracingSpan "Async send Kafka messages" <| do
             let details = Details (List.map Producer.unBrokerAddress (Settings.brokerAddresses settings)) msg'
             Platform.setTracingSpanDetails details
-            sendHelperAsync producer doAnything onDeliveryCallback msg'
+            -- Preserve the existing async contract: the caller's callback only
+            -- fires once the broker has confirmed delivery. Failures are not
+            -- forwarded to async callers (they would have to be reported out of
+            -- band), only to sync callers below.
+            let onDeliveryReport deliveryReport =
+                  case deliveryReport of
+                    Producer.DeliverySuccess _producerRecord _offset -> onDeliveryCallback
+                    _ -> Task.succeed ()
+            sendHelperAsync producer doAnything onDeliveryReport msg'
               |> Task.mapError Internal.errorToText,
         Internal.sendSync = \msg' ->
           Platform.tracingSpan "Sync send Kafka messages" <| do
             let details = Details (List.map Producer.unBrokerAddress (Settings.brokerAddresses settings)) msg'
             Platform.setTracingSpanDetails details
             terminator <- doSTM doAnything TMVar.newEmptyTMVar
-            let onDeliveryCallback = doSTM doAnything (TMVar.putTMVar terminator Terminate)
-            sendHelperAsync producer doAnything onDeliveryCallback msg'
+            -- The callback runs on every delivery report, so the terminator is
+            -- signalled exactly once whether delivery succeeds or fails. This
+            -- is what keeps a failed delivery from parking the caller forever.
+            let onDeliveryReport deliveryReport =
+                  doSTM doAnything (TMVar.putTMVar terminator (Internal.deliveryReportToResult deliveryReport))
+            sendHelperAsync producer doAnything onDeliveryReport msg'
               |> Task.mapError Internal.errorToText
-            Terminate <- doSTM doAnything (TMVar.readTMVar terminator)
-            Task.succeed ()
+            result <- doSTM doAnything (TMVar.readTMVar terminator)
+            case result of
+              Ok () -> Task.succeed ()
+              Err err -> Task.fail (Internal.errorToText err)
       }
 
 doSTM :: Platform.DoAnythingHandler -> STM.STM a -> Task e a
@@ -269,10 +283,10 @@ mkProducer Settings.Settings {Settings.brokerAddresses, Settings.deliveryTimeout
 sendHelperAsync ::
   Producer.KafkaProducer ->
   Platform.DoAnythingHandler ->
-  Task Never () ->
+  (Producer.DeliveryReport -> Task Never ()) ->
   Internal.Msg ->
   Task Internal.Error ()
-sendHelperAsync producer doAnything onDeliveryCallback msg' = do
+sendHelperAsync producer doAnything onDeliveryReport msg' = do
   record' <- record msg'
   Exception.handleAny
     (\exception -> Prelude.pure (Err (Internal.Uncaught exception)))
@@ -281,12 +295,12 @@ sendHelperAsync producer doAnything onDeliveryCallback msg' = do
           Producer.produceMessage'
             producer
             record'
+            -- librdkafka invokes this callback exactly once per message, on
+            -- both success and failure, so handing it the whole delivery
+            -- report lets callers be notified of either outcome.
             ( \deliveryReport -> do
                 log <- Platform.silentHandler
-                Task.perform log <|
-                  case deliveryReport of
-                    Producer.DeliverySuccess _producerRecord _offset -> onDeliveryCallback
-                    _ -> Task.succeed ()
+                Task.perform log (onDeliveryReport deliveryReport)
             )
         Prelude.pure <| case maybeFailedMessages of
           Prelude.Right _ -> Ok ()
