@@ -48,12 +48,43 @@ instance Show Encodable where
 -- | Errors.
 -- If you experience an 'Uncaught' exception, please wrap it here type here!
 data Error
-  = SendingFailed (Producer.ProducerRecord, Producer.KafkaError)
+  = -- | A message could not be enqueued for sending. This is a pre-flight
+    -- failure surfaced synchronously by librdkafka (e.g. the local producer
+    -- queue is full, or the message exceeds the configured maximum size); the
+    -- message was never handed to the broker.
+    SendingFailed (Producer.ProducerRecord, Producer.KafkaError)
+  | -- | A message was enqueued and handed to the broker, but delivery
+    -- ultimately failed (e.g. @delivery.timeout.ms@ exceeded, retries
+    -- exhausted, a non-retriable broker error, or no available partition
+    -- leader). This is reported asynchronously through the delivery callback,
+    -- after a successful enqueue.
+    DeliveryFailed (Producer.ProducerRecord, Producer.KafkaError)
+  | -- | librdkafka invoked the delivery callback to report a failure but did
+    -- not attach the original message, so there is no 'Producer.ProducerRecord'
+    -- to report — only the 'Producer.KafkaError'. In hw-kafka-client this is
+    -- the @NoMessageError@ delivery report, which is produced when the C
+    -- delivery callback fires with a null message pointer and the error code is
+    -- read from @errno@. It is an exceptional, library-level condition rather
+    -- than a normal per-message broker rejection (those arrive as
+    -- 'DeliveryFailed', which carries the record).
+    NoMessageDelivered Producer.KafkaError
   | Uncaught Exception.SomeException
   deriving (Show)
 
 errorToText :: Error -> Text
 errorToText err = Text.fromList (Prelude.show err)
+
+-- | Translate a librdkafka 'Producer.DeliveryReport' into a 'Result' the
+-- caller can act on: a success carries no payload, while the two failure
+-- reports map to the corresponding 'Error' constructors. Kept pure (no
+-- 'Producer.KafkaProducer', no IO) so the dispatch can be unit-tested without
+-- a running broker.
+deliveryReportToResult :: Producer.DeliveryReport -> Result Error ()
+deliveryReportToResult deliveryReport =
+  case deliveryReport of
+    Producer.DeliverySuccess _record _offset -> Ok ()
+    Producer.DeliveryFailure record kafkaError -> Err (DeliveryFailed (record, kafkaError))
+    Producer.NoMessageError kafkaError -> Err (NoMessageDelivered kafkaError)
 
 -- | A kafka topic
 newtype Topic = Topic {unTopic :: Text} deriving (Aeson.ToJSON, Show)

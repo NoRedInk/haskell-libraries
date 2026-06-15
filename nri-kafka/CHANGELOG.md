@@ -1,3 +1,8 @@
+# Unreleased
+
+- Fix `sendSync` hanging forever when a message fails to deliver. A failed
+  delivery now returns a descriptive `Task.fail` instead of parking the caller.
+
 # 0.4.0.1
 
 - Require `nri-prelude >= 0.7.0.0`

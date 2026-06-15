@@ -1,5 +1,6 @@
 module Main (main) where
 
+import qualified Spec.Kafka
 import qualified Spec.Kafka.Worker.Integration
 import qualified Spec.Kafka.Worker.Partition
 import qualified System.Environment
@@ -16,6 +17,7 @@ tests :: Test.Test
 tests =
   Test.describe
     "lib/kafka"
-    [ Spec.Kafka.Worker.Integration.tests,
+    [ Spec.Kafka.tests,
+      Spec.Kafka.Worker.Integration.tests,
       Spec.Kafka.Worker.Partition.tests
     ]
