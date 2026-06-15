@@ -35,7 +35,7 @@ tests =
 exampleRecord :: Producer.ProducerRecord
 exampleRecord =
   Producer.ProducerRecord
-    { Producer.prTopic = "the-topic",
+    { Producer.prTopic = Producer.TopicName "the-topic",
       Producer.prPartition = Producer.UnassignedPartition,
       Producer.prKey = Nothing,
       Producer.prValue = Nothing
