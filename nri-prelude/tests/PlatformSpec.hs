@@ -178,6 +178,36 @@ lateSpanReparentingTests =
           childNames rootSpan |> Expect.equal ["child", "parent"]
           Expect.true (Platform.containsFailures rootSpan)
         _ -> Expect.fail "expected exactly one reported root span",
+    test "child finishing after the root closed is reported as a separate root" <| \_ -> do
+      reported <-
+        Expect.fromIO <| do
+          reportedRef <- IORef.newIORef []
+          childVar <- MVar.newEmptyMVar
+          Platform.rootTracingSpanIO
+            "test-request"
+            Platform.silentTrack
+            (\span -> IORef.modifyIORef' reportedRef (\spans -> spans ++ [span]))
+            "root"
+            ( \root -> do
+                child <- Platform.Internal.startChildTracingSpan root "late-child"
+                MVar.putMVar childVar child
+            )
+          child <- MVar.takeMVar childVar
+          Platform.Internal.finishTracingSpan child Nothing
+          IORef.readIORef reportedRef
+      List.map Platform.Internal.name reported |> Expect.equal ["root", "late-child"]
+      case reported of
+        [rootSpan, _] -> childNames rootSpan |> Expect.equal []
+        _ -> Expect.fail "expected exactly two reported root spans",
+    test "repeated finalization attaches the span only once" <| \_ -> do
+      reported <-
+        reportedSpansFor <| \root -> do
+          parent <- Platform.Internal.startChildTracingSpan root "parent"
+          Platform.Internal.finishTracingSpan parent Nothing
+          Platform.Internal.finishTracingSpan parent Nothing
+      case reported of
+        [rootSpan] -> childNames rootSpan |> Expect.equal ["parent"]
+        _ -> Expect.fail "expected exactly one reported root span",
     test "late children inside Platform.newRoot reparent to the new root, not the surrounding trace" <| \_ -> do
       reported <-
         reportedSpansFor <| \root -> do
@@ -193,15 +223,6 @@ lateSpanReparentingTests =
           childNames newRootSpan |> Expect.equal ["inner-parent", "late-child"]
           childNames rootSpan |> Expect.equal []
         _ -> Expect.fail "expected exactly two reported root spans",
-    test "repeated finalization attaches the span only once" <| \_ -> do
-      reported <-
-        reportedSpansFor <| \root -> do
-          parent <- Platform.Internal.startChildTracingSpan root "parent"
-          Platform.Internal.finishTracingSpan parent Nothing
-          Platform.Internal.finishTracingSpan parent Nothing
-      case reported of
-        [rootSpan] -> childNames rootSpan |> Expect.equal ["parent"]
-        _ -> Expect.fail "expected exactly one reported root span",
     test "silent handler remains a no-op for late children" <| \_ -> do
       Expect.fromIO <| do
         child <- Platform.Internal.startChildTracingSpan Platform.Internal.nullHandler "child"

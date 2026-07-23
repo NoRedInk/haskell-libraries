@@ -612,7 +612,8 @@ newtype SpanTarget = SpanTarget (IORef.IORef SpanState)
 
 -- | The trace a handler belongs to. A late span -- one finishing after its
 -- intended parent already finished -- is reparented to 'rootTarget' if the
--- root is still open. That is preferable to silently dropping it, which is
+-- root is still open, and otherwise reported through 'reportRoot' as a
+-- separate root span. Either is preferable to silently dropping it, which is
 -- what used to happen when a captured handler outlived its span.
 data TraceRoot = TraceRoot
   { rootTarget :: SpanTarget,
@@ -667,16 +668,19 @@ modifyOpenSpan (SpanTarget ref) f =
       Closing -> (Closing, ())
       Finished -> (Finished, ())
 
--- | Hand off a completed non-root span: preferably to its intended parent, or
--- to the trace root if the parent has already finished.
+-- | Hand off a completed non-root span: preferably to its intended parent, to
+-- the trace root if the parent has already finished, or through the root
+-- reporter as a separate root span if the whole trace has already closed.
 completeChild :: TraceRoot -> SpanTarget -> TracingSpan -> IO ()
 completeChild traceRoot intendedParent child = do
   attached <- tryAttach intendedParent child
   if attached
     then pure ()
     else do
-      _ <- tryAttach (rootTarget traceRoot) child
-      pure ()
+      attachedToRoot <- tryAttach (rootTarget traceRoot) child
+      if attachedToRoot
+        then pure ()
+        else reportRoot traceRoot child
 
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
