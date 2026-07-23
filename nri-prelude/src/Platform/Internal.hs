@@ -610,13 +610,22 @@ data SpanState
 -- | The mutable attachment point for a single span.
 newtype SpanTarget = SpanTarget (IORef.IORef SpanState)
 
+-- | The trace a handler belongs to. A late span -- one finishing after its
+-- intended parent already finished -- is reparented to 'rootTarget' if the
+-- root is still open. That is preferable to silently dropping it, which is
+-- what used to happen when a captured handler outlived its span.
+data TraceRoot = TraceRoot
+  { rootTarget :: SpanTarget,
+    reportRoot :: TracingSpan -> IO ()
+  }
+
 newSpanTarget :: TracingSpan -> IO SpanTarget
 newSpanTarget tracingSpan' =
   map SpanTarget (IORef.newIORef (Open tracingSpan'))
 
 -- | Atomically close the attachment window of a span. Only the first caller
 -- receives the draft span, making repeated finalization a no-op. Children
--- attaching after this see 'Closing' and are rejected, so the final
+-- attaching after this see 'Closing' and get reparented, so the final
 -- timestamp (read after this) is never earlier than an included child's.
 beginFinish :: SpanTarget -> IO (Maybe TracingSpan)
 beginFinish (SpanTarget ref) =
@@ -633,7 +642,7 @@ markFinished (SpanTarget ref) =
 -- | Attach a completed child to a span, if that span is still accepting
 -- children. Together with 'beginFinish' this forms the linearization point of
 -- the attachment/finalization race: whichever atomic update wins determines
--- whether the child is included in the parent's snapshot or rejected.
+-- whether the child is included in the parent's snapshot or reparented.
 tryAttach :: SpanTarget -> TracingSpan -> IO Bool
 tryAttach (SpanTarget ref) child =
   IORef.atomicModifyIORef' ref <| \state ->
@@ -657,6 +666,17 @@ modifyOpenSpan (SpanTarget ref) f =
       Open tracingSpan' -> (Open (f tracingSpan'), ())
       Closing -> (Closing, ())
       Finished -> (Finished, ())
+
+-- | Hand off a completed non-root span: preferably to its intended parent, or
+-- to the trace root if the parent has already finished.
+completeChild :: TraceRoot -> SpanTarget -> TracingSpan -> IO ()
+completeChild traceRoot intendedParent child = do
+  attached <- tryAttach intendedParent child
+  if attached
+    then pure ()
+    else do
+      _ <- tryAttach (rootTarget traceRoot) child
+      pure ()
 
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
@@ -682,33 +702,25 @@ mkHandler requestId clock trackEvent' onFinish onFinishRoot' name' = do
   target <-
     Stack.withFrozenCallStack startTracingSpan clock name'
       |> andThen newSpanTarget
-  mkTracingHandler requestId clock trackEvent' onFinishRoot target onFinish
+  let traceRoot = TraceRoot {rootTarget = target, reportRoot = onFinishRoot}
+  mkTracingHandler requestId clock trackEvent' traceRoot target onFinish
 
--- | Construct the handler for a child span of the span behind `parentTarget`.
--- A child completing after its parent already finished is dropped.
+-- | Construct the handler for a child span of the span behind `parentTarget`,
+-- belonging to the trace of `traceRoot`.
 mkChildHandler ::
   (Stack.HasCallStack) =>
   Text ->
   Clock ->
   (Aeson.Value -> Task Never ()) ->
-  (TracingSpan -> IO ()) ->
+  TraceRoot ->
   SpanTarget ->
   Text ->
   IO LogHandler
-mkChildHandler requestId clock trackEvent' onFinishRoot parentTarget name' = do
+mkChildHandler requestId clock trackEvent' traceRoot parentTarget name' = do
   target <-
     Stack.withFrozenCallStack startTracingSpan clock name'
       |> andThen newSpanTarget
-  mkTracingHandler
-    requestId
-    clock
-    trackEvent'
-    onFinishRoot
-    target
-    ( \child -> do
-        _ <- tryAttach parentTarget child
-        pure ()
-    )
+  mkTracingHandler requestId clock trackEvent' traceRoot target (completeChild traceRoot parentTarget)
 
 -- | Shared plumbing of `mkHandler` and `mkChildHandler`: the two only differ
 -- in what happens to the completed span (report it as a trace root, or attach
@@ -717,17 +729,17 @@ mkTracingHandler ::
   Text ->
   Clock ->
   (Aeson.Value -> Task Never ()) ->
-  (TracingSpan -> IO ()) ->
+  TraceRoot ->
   SpanTarget ->
   (TracingSpan -> IO ()) ->
   IO LogHandler
-mkTracingHandler requestId clock trackEvent' onFinishRoot target complete = do
+mkTracingHandler requestId clock trackEvent' traceRoot target complete = do
   allocationCounterStartVal <- System.Mem.getAllocationCounter
   pure
     LogHandler
       { requestId,
-        startChildTracingSpan = mkChildHandler requestId clock trackEvent' onFinishRoot target,
-        startNewRoot = mkHandler requestId clock trackEvent' onFinishRoot Nothing,
+        startChildTracingSpan = mkChildHandler requestId clock trackEvent' traceRoot target,
+        startNewRoot = mkHandler requestId clock trackEvent' (reportRoot traceRoot) Nothing,
         setTracingSpanDetailsIO = \details' ->
           modifyOpenSpan
             target
