@@ -596,10 +596,75 @@ data LogHandler = LogHandler
 silentTrack :: Aeson.Value -> Task Never ()
 silentTrack _ = Task (\_ -> pure (Ok ()))
 
+-- | The lifecycle of the mutable state behind a single tracing span. A span
+-- starts 'Open', accepting child attachments and detail mutations. When
+-- finalization begins the span moves to 'Closing', atomically ending the
+-- attachment window, and to 'Finished' once its completed snapshot has been
+-- handed off. Only the 'Open' state carries data: after 'beginFinish' the
+-- draft span lives on the finalizing thread's stack, not in the 'IORef'.
+data SpanState
+  = Open TracingSpan
+  | Closing
+  | Finished
+
+-- | The mutable attachment point for a single span.
+newtype SpanTarget = SpanTarget (IORef.IORef SpanState)
+
+newSpanTarget :: TracingSpan -> IO SpanTarget
+newSpanTarget tracingSpan' =
+  map SpanTarget (IORef.newIORef (Open tracingSpan'))
+
+-- | Atomically close the attachment window of a span. Only the first caller
+-- receives the draft span, making repeated finalization a no-op. Children
+-- attaching after this see 'Closing' and are rejected, so the final
+-- timestamp (read after this) is never earlier than an included child's.
+beginFinish :: SpanTarget -> IO (Maybe TracingSpan)
+beginFinish (SpanTarget ref) =
+  IORef.atomicModifyIORef' ref <| \state ->
+    case state of
+      Open tracingSpan' -> (Closing, Just tracingSpan')
+      Closing -> (Closing, Nothing)
+      Finished -> (Finished, Nothing)
+
+markFinished :: SpanTarget -> IO ()
+markFinished (SpanTarget ref) =
+  IORef.atomicWriteIORef ref Finished
+
+-- | Attach a completed child to a span, if that span is still accepting
+-- children. Together with 'beginFinish' this forms the linearization point of
+-- the attachment/finalization race: whichever atomic update wins determines
+-- whether the child is included in the parent's snapshot or rejected.
+tryAttach :: SpanTarget -> TracingSpan -> IO Bool
+tryAttach (SpanTarget ref) child =
+  IORef.atomicModifyIORef' ref <| \state ->
+    case state of
+      Open parent ->
+        -- Note child tracingSpans are consed to the front of the list, so
+        -- children are ordered new-to-old.
+        (Open parent {children = child : children parent}, True)
+      Closing -> (Closing, False)
+      Finished -> (Finished, False)
+
+-- | Apply a mutation to a span that is still open. Spans that have begun
+-- finalization no longer change: mutating them would be invisible in the
+-- reported trace anyway, which matches the pre-lifecycle behavior where late
+-- mutations landed in a private 'IORef' after its contents had been copied
+-- out.
+modifyOpenSpan :: SpanTarget -> (TracingSpan -> TracingSpan) -> IO ()
+modifyOpenSpan (SpanTarget ref) f =
+  IORef.atomicModifyIORef' ref <| \state ->
+    case state of
+      Open tracingSpan' -> (Open (f tracingSpan'), ())
+      Closing -> (Closing, ())
+      Finished -> (Finished, ())
+
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
 -- library the @rootTracingSpanIO@ is the more user-friendly way to get hands
 -- on a @LogHandler@.
+--
+-- This constructs the handler for a root span, starting a new trace. Child
+-- handlers are constructed by `mkChildHandler` via `startChildTracingSpan`.
 mkHandler ::
   (Stack.HasCallStack) =>
   Text ->
@@ -614,28 +679,78 @@ mkHandler ::
   IO LogHandler
 mkHandler requestId clock trackEvent' onFinish onFinishRoot' name' = do
   let onFinishRoot = Maybe.withDefault onFinish onFinishRoot'
-  tracingSpanRef <-
+  target <-
     Stack.withFrozenCallStack startTracingSpan clock name'
-      |> andThen IORef.newIORef
+      |> andThen newSpanTarget
+  mkTracingHandler requestId clock trackEvent' onFinishRoot target onFinish
+
+-- | Construct the handler for a child span of the span behind `parentTarget`.
+-- A child completing after its parent already finished is dropped.
+mkChildHandler ::
+  (Stack.HasCallStack) =>
+  Text ->
+  Clock ->
+  (Aeson.Value -> Task Never ()) ->
+  (TracingSpan -> IO ()) ->
+  SpanTarget ->
+  Text ->
+  IO LogHandler
+mkChildHandler requestId clock trackEvent' onFinishRoot parentTarget name' = do
+  target <-
+    Stack.withFrozenCallStack startTracingSpan clock name'
+      |> andThen newSpanTarget
+  mkTracingHandler
+    requestId
+    clock
+    trackEvent'
+    onFinishRoot
+    target
+    ( \child -> do
+        _ <- tryAttach parentTarget child
+        pure ()
+    )
+
+-- | Shared plumbing of `mkHandler` and `mkChildHandler`: the two only differ
+-- in what happens to the completed span (report it as a trace root, or attach
+-- it to its parent).
+mkTracingHandler ::
+  Text ->
+  Clock ->
+  (Aeson.Value -> Task Never ()) ->
+  (TracingSpan -> IO ()) ->
+  SpanTarget ->
+  (TracingSpan -> IO ()) ->
+  IO LogHandler
+mkTracingHandler requestId clock trackEvent' onFinishRoot target complete = do
   allocationCounterStartVal <- System.Mem.getAllocationCounter
   pure
     LogHandler
       { requestId,
-        startChildTracingSpan = mkHandler requestId clock trackEvent' (appendTracingSpanToParent tracingSpanRef) (Just onFinishRoot),
+        startChildTracingSpan = mkChildHandler requestId clock trackEvent' onFinishRoot target,
         startNewRoot = mkHandler requestId clock trackEvent' onFinishRoot Nothing,
         setTracingSpanDetailsIO = \details' ->
-          updateIORef
-            tracingSpanRef
+          modifyOpenSpan
+            target
             (\tracingSpan' -> tracingSpan' {details = Just (toTracingSpanDetails details')}),
         setTracingSpanSummaryIO = \text ->
-          updateIORef
-            tracingSpanRef
+          modifyOpenSpan
+            target
             (\tracingSpan' -> tracingSpan' {summary = Just text}),
         markTracingSpanFailedIO =
-          updateIORef
-            tracingSpanRef
+          modifyOpenSpan
+            target
             (\tracingSpan' -> tracingSpan' {succeeded = succeeded tracingSpan' ++ Failed, containsFailures = True}),
-        finishTracingSpan = finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef >> andThen onFinish,
+        finishTracingSpan = \maybeException -> do
+          maybeDraft <- beginFinish target
+          case maybeDraft of
+            Nothing -> pure ()
+            Just draft -> do
+              completed <- finalizeTracingSpan clock allocationCounterStartVal draft maybeException
+              -- The span must read as finished before the completion callback
+              -- runs, so concurrent operations never see a reported span as
+              -- still accepting children, even if the callback throws.
+              markFinished target
+              complete completed,
         trackAnalyticsEvent = trackEvent'
       }
 
@@ -758,11 +873,10 @@ startTracingSpan clock name = do
       }
 
 -- | Some final properties to set on a tracingSpan before calling it done.
-finalizeTracingSpan :: Clock -> Int -> IORef.IORef TracingSpan -> Maybe Exception.SomeException -> IO TracingSpan
-finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef maybeException = do
+finalizeTracingSpan :: Clock -> Int -> TracingSpan -> Maybe Exception.SomeException -> IO TracingSpan
+finalizeTracingSpan clock allocationCounterStartVal tracingSpan' maybeException = do
   finished <- monotonicTimeInMsec clock
   allocationCounterEndVal <- System.Mem.getAllocationCounter
-  tracingSpan' <- IORef.readIORef tracingSpanRef
   pure
     tracingSpan'
       { finished,
@@ -781,16 +895,6 @@ finalizeTracingSpan clock allocationCounterStartVal tracingSpanRef maybeExceptio
         -- subtract in this order to get a positive number.
         allocated = allocationCounterStartVal - allocationCounterEndVal
       }
-
-appendTracingSpanToParent :: IORef.IORef TracingSpan -> TracingSpan -> IO ()
-appendTracingSpanToParent parentRef child =
-  updateIORef parentRef <| \parentTracingSpan ->
-    -- Note child tracingSpans are consed to the front of the list, so children
-    -- are ordered new-to-old.
-    parentTracingSpan {children = child : children parentTracingSpan}
-
-updateIORef :: IORef.IORef a -> (a -> a) -> IO ()
-updateIORef ref f = IORef.atomicModifyIORef' ref (\x -> (f x, ()))
 
 --
 -- SPAN CONSTRUCTION
