@@ -737,7 +737,7 @@ mkTracingHandler ::
   SpanTarget ->
   (TracingSpan -> IO ()) ->
   IO LogHandler
-mkTracingHandler requestId clock trackEvent' traceRoot target complete = do
+mkTracingHandler requestId clock trackEvent' traceRoot target onComplete = do
   allocationCounterStartVal <- System.Mem.getAllocationCounter
   pure
     LogHandler
@@ -766,7 +766,7 @@ mkTracingHandler requestId clock trackEvent' traceRoot target complete = do
               -- runs, so concurrent operations never see a reported span as
               -- still accepting children, even if the callback throws.
               markFinished target
-              complete completed,
+              onComplete completed,
         trackAnalyticsEvent = trackEvent'
       }
 
