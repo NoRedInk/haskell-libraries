@@ -600,10 +600,9 @@ silentTrack _ = Task (\_ -> pure (Ok ()))
 data SpanState
   = -- Initial state of a tracing span. Accepts children and detail mutations
     Open TracingSpan
-  | -- Span stops accepting children and its stats are being calculated
-    Closing
-  | -- Span has been finalized and will take no further changes
-    Finished
+  | -- Span has begun finalizing and will take no further changes. The span
+    -- data now lives with the finalizing caller, not in this state.
+    Closed
 
 -- | The mutable attachment point for a single span.
 newtype SpanTarget = SpanTarget (IORef.IORef SpanState)
@@ -629,13 +628,8 @@ beginFinish :: SpanTarget -> IO (Maybe TracingSpan)
 beginFinish (SpanTarget ref) =
   IORef.atomicModifyIORef' ref <| \state ->
     case state of
-      Open tracingSpan' -> (Closing, Just tracingSpan')
-      Closing -> (Closing, Nothing)
-      Finished -> (Finished, Nothing)
-
-markFinished :: SpanTarget -> IO ()
-markFinished (SpanTarget ref) =
-  IORef.atomicWriteIORef ref Finished
+      Open tracingSpan' -> (Closed, Just tracingSpan')
+      Closed -> (Closed, Nothing)
 
 -- | Attach a completed child to a span, if that span is still accepting
 -- children. Together with 'beginFinish' this forms the linearization point of
@@ -649,8 +643,7 @@ tryAttach (SpanTarget ref) child =
         -- Note child tracingSpans are consed to the front of the list, so
         -- children are ordered new-to-old.
         (Open parent {children = child : children parent}, True)
-      Closing -> (Closing, False)
-      Finished -> (Finished, False)
+      Closed -> (Closed, False)
 
 -- | Apply a mutation to a span that is still open. Spans that have begun
 -- finalization no longer change: mutating them would be invisible in the
@@ -660,8 +653,7 @@ modifyOpenSpan (SpanTarget ref) f =
   IORef.atomicModifyIORef' ref <| \state ->
     case state of
       Open tracingSpan' -> (Open (f tracingSpan'), ())
-      Closing -> (Closing, ())
-      Finished -> (Finished, ())
+      Closed -> (Closed, ())
 
 -- | Hand off a completed non-root span.
 completeChild :: TraceRoot -> SpanTarget -> TracingSpan -> IO ()
@@ -755,10 +747,6 @@ mkTracingHandler requestId clock trackEvent' traceRoot target onComplete = do
             Nothing -> pure ()
             Just draft -> do
               completed <- finalizeTracingSpan clock allocationCounterStartVal draft maybeException
-              -- The span must read as finished before the completion callback
-              -- runs, so concurrent operations never see a reported span as
-              -- still accepting children, even if the callback throws.
-              markFinished target
               onComplete completed,
         trackAnalyticsEvent = trackEvent'
       }
