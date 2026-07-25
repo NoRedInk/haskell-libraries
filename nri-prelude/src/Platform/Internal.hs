@@ -596,16 +596,14 @@ data LogHandler = LogHandler
 silentTrack :: Aeson.Value -> Task Never ()
 silentTrack _ = Task (\_ -> pure (Ok ()))
 
--- | The lifecycle of the mutable state behind a single tracing span. A span
--- starts 'Open', accepting child attachments and detail mutations. When
--- finalization begins the span moves to 'Closing', atomically ending the
--- attachment window, and to 'Finished' once its completed snapshot has been
--- handed off. Only the 'Open' state carries data: after 'beginFinish' the
--- draft span lives on the finalizing thread's stack, not in the 'IORef'.
+-- | The lifecycle of a tracing span
 data SpanState
-  = Open TracingSpan
-  | Closing
-  | Finished
+  = -- Initial state of a tracing span. Accepts children and detail mutations
+    Open TracingSpan
+  | -- Span stops accepting children and its stats are being calculated
+    Closing
+  | -- Span has been finalized and will take no further changes
+    Finished
 
 -- | The mutable attachment point for a single span.
 newtype SpanTarget = SpanTarget (IORef.IORef SpanState)
@@ -624,10 +622,9 @@ newSpanTarget :: TracingSpan -> IO SpanTarget
 newSpanTarget tracingSpan' =
   map SpanTarget (IORef.newIORef (Open tracingSpan'))
 
--- | Atomically close the attachment window of a span. Only the first caller
--- receives the draft span, making repeated finalization a no-op. Children
--- attaching after this see 'Closing' and get reparented, so the final
--- timestamp (read after this) is never earlier than an included child's.
+-- | Atomically close the attachment window of a span.
+--
+-- Atomicity here prevents adding new children to a finished span
 beginFinish :: SpanTarget -> IO (Maybe TracingSpan)
 beginFinish (SpanTarget ref) =
   IORef.atomicModifyIORef' ref <| \state ->
@@ -657,9 +654,7 @@ tryAttach (SpanTarget ref) child =
 
 -- | Apply a mutation to a span that is still open. Spans that have begun
 -- finalization no longer change: mutating them would be invisible in the
--- reported trace anyway, which matches the pre-lifecycle behavior where late
--- mutations landed in a private 'IORef' after its contents had been copied
--- out.
+-- reported trace anyway.
 modifyOpenSpan :: SpanTarget -> (TracingSpan -> TracingSpan) -> IO ()
 modifyOpenSpan (SpanTarget ref) f =
   IORef.atomicModifyIORef' ref <| \state ->
@@ -668,27 +663,25 @@ modifyOpenSpan (SpanTarget ref) f =
       Closing -> (Closing, ())
       Finished -> (Finished, ())
 
--- | Hand off a completed non-root span: preferably to its intended parent, to
--- the trace root if the parent has already finished, or through the root
--- reporter as a separate root span if the whole trace has already closed.
+-- | Hand off a completed non-root span.
 completeChild :: TraceRoot -> SpanTarget -> TracingSpan -> IO ()
 completeChild traceRoot intendedParent child = do
   attached <- tryAttach intendedParent child
   if attached
+    -- our parent was open, so we attached successfully
     then pure ()
     else do
+      -- parent was closed. try to attach to the root span
       attachedToRoot <- tryAttach (rootTarget traceRoot) child
       if attachedToRoot
         then pure ()
+        -- root was closed, report this as a new root
         else reportRoot traceRoot child
 
 -- | Helper that creates one of the handler's above. This is intended for
 -- internal use in this library only and not for exposing. Outside of this
 -- library the @rootTracingSpanIO@ is the more user-friendly way to get hands
 -- on a @LogHandler@.
---
--- This constructs the handler for a root span, starting a new trace. Child
--- handlers are constructed by `mkChildHandler` via `startChildTracingSpan`.
 mkHandler ::
   (Stack.HasCallStack) =>
   Text ->
