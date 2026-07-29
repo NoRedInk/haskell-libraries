@@ -1,6 +1,6 @@
 # 0.4.2.0
 
-- Adds `zcard`, `zrem`, and `zremrangebyscore` to `Redis.SortedSet`.
+- Adds `zcard`, `zrem`, and `zremRangeByScore` to `Redis.SortedSet`.
 
 # 0.4.1.1
 

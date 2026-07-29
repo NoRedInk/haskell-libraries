@@ -30,7 +30,7 @@ module Redis.SortedSet
     zrangeByScoreWithScores,
     zrank,
     zrem,
-    zremrangebyscore,
+    zremRangeByScore,
     zrevrank,
 
     -- * Running Redis queries
@@ -123,7 +123,7 @@ data Api key a = Api
     -- bounds (inclusive). Returns the number of members removed.
     --
     -- https://redis.io/commands/zremrangebyscore
-    zremrangebyscore :: key -> Float -> Float -> Internal.Query Int,
+    zremRangeByScore :: key -> Float -> Float -> Internal.Query Int,
     -- | Returns the rank of member in the sorted set stored at key, with the
     -- scores ordered from high to low. The rank (or index) is 0-based, which
     -- means that the member with the highest score has rank 0.
@@ -181,6 +181,6 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
             ),
       zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member),
       zrem = \key vals -> Internal.Zrem (toKey key) (NonEmpty.map codecEncoder vals),
-      zremrangebyscore = \key lower upper -> Internal.ZremRangeByScore (toKey key) lower upper,
+      zremRangeByScore = \key lower upper -> Internal.ZremRangeByScore (toKey key) lower upper,
       zrevrank = \key member -> Internal.Zrevrank (toKey key) (codecEncoder member)
     }
