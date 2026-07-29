@@ -29,6 +29,7 @@ module Redis.SortedSet
     zrange,
     zrangeByScoreWithScores,
     zrank,
+    zrem,
     zremrangebyscore,
     zrevrank,
 
@@ -113,6 +114,11 @@ data Api key a = Api
     --
     -- https://redis.io/commands/zrank
     zrank :: key -> a -> Internal.Query (Maybe Int),
+    -- | Removes the specified members from the sorted set. Members that are
+    -- not part of the set are ignored. Returns the number of members removed.
+    --
+    -- https://redis.io/commands/zrem
+    zrem :: key -> NonEmpty a -> Internal.Query Int,
     -- | Removes all members in the sorted set with a score between the two
     -- bounds (inclusive). Returns the number of members removed.
     --
@@ -174,6 +180,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
                 )
             ),
       zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member),
+      zrem = \key vals -> Internal.Zrem (toKey key) (NonEmpty.map codecEncoder vals),
       zremrangebyscore = \key lower upper -> Internal.Zremrangebyscore (toKey key) lower upper,
       zrevrank = \key member -> Internal.Zrevrank (toKey key) (codecEncoder member)
     }

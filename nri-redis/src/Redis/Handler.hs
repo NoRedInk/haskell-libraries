@@ -348,6 +348,10 @@ doRawQuery query =
       Database.Redis.zrank (toB key) member
         |> PreparedQuery
         |> map (Ok << map Prelude.fromIntegral)
+    Internal.Zrem key vals ->
+      Database.Redis.zrem (toB key) (NonEmpty.toList vals)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
     Internal.Zremrangebyscore key lower upper ->
       Database.Redis.zremrangebyscore (toB key) lower upper
         |> PreparedQuery

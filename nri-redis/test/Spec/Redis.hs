@@ -403,6 +403,23 @@ queryTests redisHandler =
       Redis.SortedSet.zrank sortedSetApi "zrank-works-nothing-stored" "foobar"
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal Nothing),
+    Test.test "zrem removes only the named members" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zrem-removes-named" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zrem-removes-named"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        Redis.SortedSet.zrem sortedSetApi "zrem-removes-named" ("one" :| ["not-a-member"])
+          |> Redis.query redisHandler
+          |> Expect.andCheck (Expect.equal 1)
+      Redis.SortedSet.zrange sortedSetApi "zrem-removes-named" 0 (-1)
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal ["two", "three"]),
     Test.test "scan iterates over all matching keys in batches" <| \() -> do
       let firstKey = "scanTest::key1"
       let firstValue = "value 1"
