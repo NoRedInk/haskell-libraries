@@ -181,6 +181,6 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
             ),
       zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member),
       zrem = \key vals -> Internal.Zrem (toKey key) (NonEmpty.map codecEncoder vals),
-      zremrangebyscore = \key lower upper -> Internal.Zremrangebyscore (toKey key) lower upper,
+      zremrangebyscore = \key lower upper -> Internal.ZremRangeByScore (toKey key) lower upper,
       zrevrank = \key member -> Internal.Zrevrank (toKey key) (codecEncoder member)
     }

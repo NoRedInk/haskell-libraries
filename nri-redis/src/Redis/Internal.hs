@@ -122,7 +122,7 @@ cmds query'' =
     ZrangeByScoreWithScores key start stop -> [unwords ["ZRANGE", key, "BYSCORE", Text.fromFloat start, Text.fromFloat stop, "WITHSCORES"]]
     Zrank key _ -> [unwords ["ZRANK", key, "*****"]]
     Zrem key vals -> [unwords ("ZREM" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
-    Zremrangebyscore key lower upper -> [unwords ["ZREMRANGEBYSCORE", key, Text.fromFloat lower, Text.fromFloat upper]]
+    ZremRangeByScore key lower upper -> [unwords ["ZREMRANGEBYSCORE", key, Text.fromFloat lower, Text.fromFloat upper]]
     Zrevrank key _ -> [unwords ["ZREVRANK", key, "*****"]]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
@@ -183,7 +183,7 @@ data Query a where
   ZrangeByScoreWithScores :: Text -> Float -> Float -> Query [(ByteString, Float)]
   Zrank :: Text -> ByteString -> Query (Maybe Int)
   Zrem :: Text -> NonEmpty ByteString -> Query Int
-  Zremrangebyscore :: Text -> Float -> Float -> Query Int
+  ZremRangeByScore :: Text -> Float -> Float -> Query Int
   Zrevrank :: Text -> ByteString -> Query (Maybe Int)
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
@@ -340,7 +340,7 @@ mapKeys fn query' =
     ZrangeByScoreWithScores key start stop -> Task.map (\newKey -> ZrangeByScoreWithScores newKey start stop) (fn key)
     Zrank key member -> Task.map (\newKey -> Zrank newKey member) (fn key)
     Zrem key vals -> Task.map (\newKey -> Zrem newKey vals) (fn key)
-    Zremrangebyscore key lower upper -> Task.map (\newKey -> Zremrangebyscore newKey lower upper) (fn key)
+    ZremRangeByScore key lower upper -> Task.map (\newKey -> ZremRangeByScore newKey lower upper) (fn key)
     Zrevrank key member -> Task.map (\newKey -> Zrevrank newKey member) (fn key)
     Pure x -> Task.succeed (Pure x)
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
@@ -387,7 +387,7 @@ mapReturnedKeys fn query' =
     ZrangeByScoreWithScores key start stop -> ZrangeByScoreWithScores key start stop
     Zrank key member -> Zrank key member
     Zrem key vals -> Zrem key vals
-    Zremrangebyscore key lower upper -> Zremrangebyscore key lower upper
+    ZremRangeByScore key lower upper -> ZremRangeByScore key lower upper
     Zrevrank key member -> Zrevrank key member
     Pure x -> Pure x
     Apply f x -> Apply (mapReturnedKeys fn f) (mapReturnedKeys fn x)
@@ -451,7 +451,7 @@ keysTouchedByQuery query' =
     ZrangeByScoreWithScores key _ _ -> Set.singleton key
     Zrank key _ -> Set.singleton key
     Zrem key _ -> Set.singleton key
-    Zremrangebyscore key _ _ -> Set.singleton key
+    ZremRangeByScore key _ _ -> Set.singleton key
     Zrevrank key _ -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
 
