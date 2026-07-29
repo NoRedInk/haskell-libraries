@@ -1,5 +1,7 @@
 # Unreleased
 
+- Fix: tracing spans finishing after their parent span already finished are no longer silently lost. They now attach to the still-open trace root, or are reported as a separate root span if the whole trace has already closed. This makes it safe to capture `Platform.logHandler` for deferred work (streamed response bodies, callbacks, fire-and-forget tasks). Parent finalization and child attachment are now atomic and race-safe, and repeated finalization of the same span is idempotent. Normal synchronous span nesting, the public API, and the serialized `TracingSpan` format are unchanged.
+
 # 0.7.0.0
 
 - **Breaking:** `Platform.rootTracingSpanIO` and the internal `mkHandler` now take an additional `Aeson.Value -> Task Never ()` callback for analytics event delivery. Existing callers should pass `Platform.silentTrack` to preserve previous behavior.
