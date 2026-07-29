@@ -337,6 +337,27 @@ queryTests redisHandler =
       Redis.SortedSet.zrange sortedSetApi "zrange-works" (-2) (-1)
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal ["two", "three"]),
+    Test.test "zcard returns the number of members" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zcard-returns-count" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zcard-returns-count"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      Redis.SortedSet.zcard sortedSetApi "zcard-returns-count"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal 3),
+    Test.test "zcard on a missing key returns 0" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zcard-missing-key" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      Redis.SortedSet.zcard sortedSetApi "zcard-missing-key"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal 0),
     Test.test "zrank works as expected" <| \() -> do
       _ <-
         Redis.SortedSet.del sortedSetApi ("zrank-works" :| [])

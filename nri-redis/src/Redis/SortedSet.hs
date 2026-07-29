@@ -25,6 +25,7 @@ module Redis.SortedSet
     expire,
     ping,
     zadd,
+    zcard,
     zrange,
     zrangeByScoreWithScores,
     zrank,
@@ -82,6 +83,10 @@ data Api key a = Api
     --
     -- https://redis.io/commands/zadd
     zadd :: key -> NonEmptyDict.NonEmptyDict a Float -> Internal.Query Int,
+    -- | Returns the number of members of the sorted set.
+    --
+    -- https://redis.io/commands/zcard
+    zcard :: key -> Internal.Query Int,
     -- | Returns the specified range of elements in the sorted set. The order of
     -- elements is from the lowest to the highest score. Elements with the same
     -- score are ordered lexicographically. The <start> and <stop> arguments
@@ -150,6 +155,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       zadd = \key vals ->
         Internal.Zadd (toKey key) (Data.Map.Strict.mapKeys codecEncoder (NonEmptyDict.toDict vals)),
+      zcard = \key -> Internal.Zcard (toKey key),
       zrange = \key start stop ->
         Internal.Zrange (toKey key) start stop
           |> Internal.WithResult (Prelude.traverse codecDecoder),

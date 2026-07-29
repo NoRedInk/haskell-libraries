@@ -117,6 +117,7 @@ cmds query'' =
     Smembers key -> [unwords ["SMEMBERS", key]]
     Ttl key -> [unwords ["TTL", key]]
     Zadd key vals -> [unwords ("ZADD" : key : List.concatMap (\(_, val) -> ["*****", Text.fromFloat val]) (Dict.toList vals))]
+    Zcard key -> [unwords ["ZCARD", key]]
     Zrange key start stop -> [unwords ["ZRANGE", key, Text.fromInt start, Text.fromInt stop]]
     ZrangeByScoreWithScores key start stop -> [unwords ["ZRANGE", key, "BYSCORE", Text.fromFloat start, Text.fromFloat stop, "WITHSCORES"]]
     Zrank key _ -> [unwords ["ZRANK", key, "*****"]]
@@ -175,6 +176,7 @@ data Query a where
   Smembers :: Text -> Query (List ByteString)
   Ttl :: Text -> Query Int
   Zadd :: Text -> Dict.Dict ByteString Float -> Query Int
+  Zcard :: Text -> Query Int
   Zrange :: Text -> Int -> Int -> Query [ByteString]
   ZrangeByScoreWithScores :: Text -> Float -> Float -> Query [(ByteString, Float)]
   Zrank :: Text -> ByteString -> Query (Maybe Int)
@@ -329,6 +331,7 @@ mapKeys fn query' =
     Smembers key -> Task.map Smembers (fn key)
     Ttl key -> Task.map Ttl (fn key)
     Zadd key vals -> Task.map (\newKey -> Zadd newKey vals) (fn key)
+    Zcard key -> Task.map Zcard (fn key)
     Zrange key start stop -> Task.map (\newKey -> Zrange newKey start stop) (fn key)
     ZrangeByScoreWithScores key start stop -> Task.map (\newKey -> ZrangeByScoreWithScores newKey start stop) (fn key)
     Zrank key member -> Task.map (\newKey -> Zrank newKey member) (fn key)
@@ -373,6 +376,7 @@ mapReturnedKeys fn query' =
     Smembers key -> Smembers key
     Ttl key -> Ttl key
     Zadd key vals -> Zadd key vals
+    Zcard key -> Zcard key
     Zrange key start stop -> Zrange key start stop
     ZrangeByScoreWithScores key start stop -> ZrangeByScoreWithScores key start stop
     Zrank key member -> Zrank key member
@@ -434,6 +438,7 @@ keysTouchedByQuery query' =
     -- so it doesn't auto-extending the TTL.
     Ttl _ -> Set.empty
     Zadd key _ -> Set.singleton key
+    Zcard key -> Set.singleton key
     Zrange key _ _ -> Set.singleton key
     ZrangeByScoreWithScores key _ _ -> Set.singleton key
     Zrank key _ -> Set.singleton key
