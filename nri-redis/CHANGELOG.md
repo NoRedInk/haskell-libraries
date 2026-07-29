@@ -1,3 +1,7 @@
+# 0.4.2.0
+
+- Adds `zcard`, `zrem`, and `zremrangebyscore` to `Redis.SortedSet`.
+
 # 0.4.1.1
 
 - Require `nri-prelude >= 0.7.0.0`
