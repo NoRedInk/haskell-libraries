@@ -358,6 +358,23 @@ queryTests redisHandler =
       Redis.SortedSet.zcard sortedSetApi "zcard-missing-key"
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal 0),
+    Test.test "zremrangebyscore removes members in the inclusive score range" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zremrangebyscore-trims" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zremrangebyscore-trims"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        Redis.SortedSet.zremrangebyscore sortedSetApi "zremrangebyscore-trims" 0 2
+          |> Redis.query redisHandler
+          |> Expect.andCheck (Expect.equal 2)
+      Redis.SortedSet.zrange sortedSetApi "zremrangebyscore-trims" 0 (-1)
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal ["three"]),
     Test.test "zrank works as expected" <| \() -> do
       _ <-
         Redis.SortedSet.del sortedSetApi ("zrank-works" :| [])
