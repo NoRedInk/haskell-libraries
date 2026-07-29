@@ -326,6 +326,10 @@ doRawQuery query =
         |> Database.Redis.zadd (toB key)
         |> PreparedQuery
         |> map (Ok << Prelude.fromIntegral)
+    Internal.Zcard key ->
+      Database.Redis.zcard (toB key)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
     Internal.Zrange key start stop ->
       Database.Redis.zrange
         (toB key)
@@ -344,6 +348,14 @@ doRawQuery query =
       Database.Redis.zrank (toB key) member
         |> PreparedQuery
         |> map (Ok << map Prelude.fromIntegral)
+    Internal.Zrem key vals ->
+      Database.Redis.zrem (toB key) (NonEmpty.toList vals)
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
+    Internal.ZremRangeByScore key lower upper ->
+      Database.Redis.zremrangebyscore (toB key) lower upper
+        |> PreparedQuery
+        |> map (Ok << Prelude.fromIntegral)
     Internal.Zrevrank key member ->
       Database.Redis.zrevrank (toB key) member
         |> PreparedQuery

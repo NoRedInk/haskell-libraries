@@ -25,9 +25,12 @@ module Redis.SortedSet
     expire,
     ping,
     zadd,
+    zcard,
     zrange,
     zrangeByScoreWithScores,
     zrank,
+    zrem,
+    zremRangeByScore,
     zrevrank,
 
     -- * Running Redis queries
@@ -82,6 +85,10 @@ data Api key a = Api
     --
     -- https://redis.io/commands/zadd
     zadd :: key -> NonEmptyDict.NonEmptyDict a Float -> Internal.Query Int,
+    -- | Returns the number of members of the sorted set.
+    --
+    -- https://redis.io/commands/zcard
+    zcard :: key -> Internal.Query Int,
     -- | Returns the specified range of elements in the sorted set. The order of
     -- elements is from the lowest to the highest score. Elements with the same
     -- score are ordered lexicographically. The <start> and <stop> arguments
@@ -107,6 +114,16 @@ data Api key a = Api
     --
     -- https://redis.io/commands/zrank
     zrank :: key -> a -> Internal.Query (Maybe Int),
+    -- | Removes the specified members from the sorted set. Members that are
+    -- not part of the set are ignored. Returns the number of members removed.
+    --
+    -- https://redis.io/commands/zrem
+    zrem :: key -> NonEmpty a -> Internal.Query Int,
+    -- | Removes all members in the sorted set with a score between the two
+    -- bounds (inclusive). Returns the number of members removed.
+    --
+    -- https://redis.io/commands/zremrangebyscore
+    zremRangeByScore :: key -> Float -> Float -> Internal.Query Int,
     -- | Returns the rank of member in the sorted set stored at key, with the
     -- scores ordered from high to low. The rank (or index) is 0-based, which
     -- means that the member with the highest score has rank 0.
@@ -150,6 +167,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
       ping = Internal.Ping |> map (\_ -> ()),
       zadd = \key vals ->
         Internal.Zadd (toKey key) (Data.Map.Strict.mapKeys codecEncoder (NonEmptyDict.toDict vals)),
+      zcard = \key -> Internal.Zcard (toKey key),
       zrange = \key start stop ->
         Internal.Zrange (toKey key) start stop
           |> Internal.WithResult (Prelude.traverse codecDecoder),
@@ -162,5 +180,7 @@ makeApi Codec.Codec {Codec.codecEncoder, Codec.codecDecoder} toKey =
                 )
             ),
       zrank = \key member -> Internal.Zrank (toKey key) (codecEncoder member),
+      zrem = \key vals -> Internal.Zrem (toKey key) (NonEmpty.map codecEncoder vals),
+      zremRangeByScore = \key lower upper -> Internal.ZremRangeByScore (toKey key) lower upper,
       zrevrank = \key member -> Internal.Zrevrank (toKey key) (codecEncoder member)
     }

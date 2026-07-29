@@ -117,9 +117,12 @@ cmds query'' =
     Smembers key -> [unwords ["SMEMBERS", key]]
     Ttl key -> [unwords ["TTL", key]]
     Zadd key vals -> [unwords ("ZADD" : key : List.concatMap (\(_, val) -> ["*****", Text.fromFloat val]) (Dict.toList vals))]
+    Zcard key -> [unwords ["ZCARD", key]]
     Zrange key start stop -> [unwords ["ZRANGE", key, Text.fromInt start, Text.fromInt stop]]
     ZrangeByScoreWithScores key start stop -> [unwords ["ZRANGE", key, "BYSCORE", Text.fromFloat start, Text.fromFloat stop, "WITHSCORES"]]
     Zrank key _ -> [unwords ["ZRANK", key, "*****"]]
+    Zrem key vals -> [unwords ("ZREM" : key : List.map (\_ -> "*****") (NonEmpty.toList vals))]
+    ZremRangeByScore key lower upper -> [unwords ["ZREMRANGEBYSCORE", key, Text.fromFloat lower, Text.fromFloat upper]]
     Zrevrank key _ -> [unwords ["ZREVRANK", key, "*****"]]
     Pure _ -> []
     Apply f x -> cmds f ++ cmds x
@@ -175,9 +178,12 @@ data Query a where
   Smembers :: Text -> Query (List ByteString)
   Ttl :: Text -> Query Int
   Zadd :: Text -> Dict.Dict ByteString Float -> Query Int
+  Zcard :: Text -> Query Int
   Zrange :: Text -> Int -> Int -> Query [ByteString]
   ZrangeByScoreWithScores :: Text -> Float -> Float -> Query [(ByteString, Float)]
   Zrank :: Text -> ByteString -> Query (Maybe Int)
+  Zrem :: Text -> NonEmpty ByteString -> Query Int
+  ZremRangeByScore :: Text -> Float -> Float -> Query Int
   Zrevrank :: Text -> ByteString -> Query (Maybe Int)
   -- The constructors below are not Redis-related, but support using functions
   -- like `map` and `map2` on queries.
@@ -329,9 +335,12 @@ mapKeys fn query' =
     Smembers key -> Task.map Smembers (fn key)
     Ttl key -> Task.map Ttl (fn key)
     Zadd key vals -> Task.map (\newKey -> Zadd newKey vals) (fn key)
+    Zcard key -> Task.map Zcard (fn key)
     Zrange key start stop -> Task.map (\newKey -> Zrange newKey start stop) (fn key)
     ZrangeByScoreWithScores key start stop -> Task.map (\newKey -> ZrangeByScoreWithScores newKey start stop) (fn key)
     Zrank key member -> Task.map (\newKey -> Zrank newKey member) (fn key)
+    Zrem key vals -> Task.map (\newKey -> Zrem newKey vals) (fn key)
+    ZremRangeByScore key lower upper -> Task.map (\newKey -> ZremRangeByScore newKey lower upper) (fn key)
     Zrevrank key member -> Task.map (\newKey -> Zrevrank newKey member) (fn key)
     Pure x -> Task.succeed (Pure x)
     Apply f x -> Task.map2 Apply (mapKeys fn f) (mapKeys fn x)
@@ -373,9 +382,12 @@ mapReturnedKeys fn query' =
     Smembers key -> Smembers key
     Ttl key -> Ttl key
     Zadd key vals -> Zadd key vals
+    Zcard key -> Zcard key
     Zrange key start stop -> Zrange key start stop
     ZrangeByScoreWithScores key start stop -> ZrangeByScoreWithScores key start stop
     Zrank key member -> Zrank key member
+    Zrem key vals -> Zrem key vals
+    ZremRangeByScore key lower upper -> ZremRangeByScore key lower upper
     Zrevrank key member -> Zrevrank key member
     Pure x -> Pure x
     Apply f x -> Apply (mapReturnedKeys fn f) (mapReturnedKeys fn x)
@@ -434,9 +446,12 @@ keysTouchedByQuery query' =
     -- so it doesn't auto-extending the TTL.
     Ttl _ -> Set.empty
     Zadd key _ -> Set.singleton key
+    Zcard key -> Set.singleton key
     Zrange key _ _ -> Set.singleton key
     ZrangeByScoreWithScores key _ _ -> Set.singleton key
     Zrank key _ -> Set.singleton key
+    Zrem key _ -> Set.singleton key
+    ZremRangeByScore key _ _ -> Set.singleton key
     Zrevrank key _ -> Set.singleton key
     WithResult _ q -> keysTouchedByQuery q
 

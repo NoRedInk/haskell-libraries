@@ -337,6 +337,44 @@ queryTests redisHandler =
       Redis.SortedSet.zrange sortedSetApi "zrange-works" (-2) (-1)
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal ["two", "three"]),
+    Test.test "zcard returns the number of members" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zcard-returns-count" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zcard-returns-count"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      Redis.SortedSet.zcard sortedSetApi "zcard-returns-count"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal 3),
+    Test.test "zcard on a missing key returns 0" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zcard-missing-key" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      Redis.SortedSet.zcard sortedSetApi "zcard-missing-key"
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal 0),
+    Test.test "zremRangeByScore removes members in the inclusive score range" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zremRangeByScore-trims" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zremRangeByScore-trims"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        Redis.SortedSet.zremRangeByScore sortedSetApi "zremRangeByScore-trims" 0 2
+          |> Redis.query redisHandler
+          |> Expect.andCheck (Expect.equal 2)
+      Redis.SortedSet.zrange sortedSetApi "zremRangeByScore-trims" 0 (-1)
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal ["three"]),
     Test.test "zrank works as expected" <| \() -> do
       _ <-
         Redis.SortedSet.del sortedSetApi ("zrank-works" :| [])
@@ -365,6 +403,23 @@ queryTests redisHandler =
       Redis.SortedSet.zrank sortedSetApi "zrank-works-nothing-stored" "foobar"
         |> Redis.query redisHandler
         |> Expect.andCheck (Expect.equal Nothing),
+    Test.test "zrem removes only the named members" <| \() -> do
+      _ <-
+        Redis.SortedSet.del sortedSetApi ("zrem-removes-named" :| [])
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        NonEmptyDict.init "one" 1 (Dict.fromList [("two", 2), ("three", 3)])
+          |> Redis.SortedSet.zadd sortedSetApi "zrem-removes-named"
+          |> Redis.query redisHandler
+          |> Expect.succeeds
+      _ <-
+        Redis.SortedSet.zrem sortedSetApi "zrem-removes-named" ("one" :| ["not-a-member"])
+          |> Redis.query redisHandler
+          |> Expect.andCheck (Expect.equal 1)
+      Redis.SortedSet.zrange sortedSetApi "zrem-removes-named" 0 (-1)
+        |> Redis.query redisHandler
+        |> Expect.andCheck (Expect.equal ["two", "three"]),
     Test.test "scan iterates over all matching keys in batches" <| \() -> do
       let firstKey = "scanTest::key1"
       let firstValue = "value 1"
