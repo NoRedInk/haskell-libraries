@@ -438,6 +438,7 @@ toBatchEvents span =
                 -- Else, it will create traces with no parent sharing the same TraceId
                 -- Which makes Honeycomb's UI confused
                 |> Honeycomb.addField "trace.trace_id" "request-id-123"
+                |> Honeycomb.addField "request.id" "incoming-request-id-456"
           }
    in Honeycomb.toBatchEvents commonFields span
 

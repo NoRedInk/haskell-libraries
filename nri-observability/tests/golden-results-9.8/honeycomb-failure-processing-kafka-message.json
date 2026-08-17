@@ -21,6 +21,7 @@
             "kafka.time_since_last_rebalance": 0,
             "kafka.topic": "topic",
             "name": "Processing Kafka Message",
+            "request.id": "incoming-request-id-456",
             "revision": "gitref",
             "service_name": "some service",
             "source_location": null,

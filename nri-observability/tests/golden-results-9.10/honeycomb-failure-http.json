@@ -13,6 +13,7 @@
             "making_http_request.method": "GET",
             "making_http_request.path": "/bulletin",
             "name": "Making HTTP request",
+            "request.id": "incoming-request-id-456",
             "revision": "gitref",
             "service_name": "some service",
             "source_location": null,

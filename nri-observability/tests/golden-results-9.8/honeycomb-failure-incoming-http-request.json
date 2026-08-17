@@ -18,6 +18,7 @@
             "http.query_string": "?top=flat",
             "http.status": 500,
             "name": "Incoming HTTP Request",
+            "request.id": "incoming-request-id-456",
             "revision": "gitref",
             "service_name": "some service",
             "source_location": null,
