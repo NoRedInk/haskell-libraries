@@ -9,6 +9,7 @@
             "failed": true,
             "hostname": "some-service-oaiefiowh-aoidawi",
             "name": "MySQL Query",
+            "request.id": "incoming-request-id-456",
             "revision": "gitref",
             "service_name": "some service",
             "source_location": null,

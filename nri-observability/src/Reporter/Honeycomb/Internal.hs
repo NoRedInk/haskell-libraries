@@ -38,8 +38,8 @@ batchApiEndpoint datasetName = "https://api.honeycomb.io/1/batch/" ++ datasetNam
 
 -- | Report a tracing span to Honeycomb.
 report :: Handler -> Text -> Platform.TracingSpan -> Prelude.IO ()
-report handler' _requestId span = do
-  sendOrSample <- makeSharedTraceData handler' span
+report handler' requestId span = do
+  sendOrSample <- makeSharedTraceData handler' requestId span
   case sendOrSample of
     SampledOut -> Prelude.pure ()
     SendToHoneycomb sharedTraceData -> sendToHoneycomb handler' sharedTraceData span
@@ -467,7 +467,7 @@ newtype SpanId = SpanId Text
 data Handler = Handler
   { http :: HTTP.Manager,
     settings :: Settings,
-    makeSharedTraceData :: Platform.TracingSpan -> Prelude.IO SendOrSample
+    makeSharedTraceData :: Text -> Platform.TracingSpan -> Prelude.IO SendOrSample
   }
 
 data SendOrSample
@@ -495,7 +495,7 @@ handler settings = do
     Handler
       { http = http,
         settings = settings,
-        makeSharedTraceData = \span -> do
+        makeSharedTraceData = \incomingRequestId span -> do
           -- This is an initial implementation of sampling, based on
           -- https://docs.honeycomb.io/working-with-your-data/best-practices/sampling/
           -- using Dynamic Sampling based on whether the request was successful or not.
@@ -529,10 +529,18 @@ handler settings = do
                       initSpan =
                         baseSpan
                           |> addField "apdex" (calculateApdex settings span)
-                          -- Don't use requestId if we don't do Distributed Tracing
-                          -- Else, it will create traces with no parent sharing the same TraceId
-                          -- Which makes Honeycomb's UI confused
+                          -- Don't use the incoming request id as trace id if we
+                          -- don't do Distributed Tracing. Else, it will create
+                          -- traces with no parent sharing the same TraceId,
+                          -- which makes Honeycomb's UI confused.
                           |> addField "trace.trace_id" (Data.UUID.toText uuid)
+                          -- The request id shown to users on error pages and
+                          -- propagated via X-Request-ID, so traces can be
+                          -- looked up by it.
+                          |> ( if Text.isEmpty incomingRequestId
+                                 then identity
+                                 else addField "request.id" incomingRequestId
+                             )
                     }
       }
 

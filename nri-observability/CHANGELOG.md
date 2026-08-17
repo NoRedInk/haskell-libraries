@@ -1,3 +1,9 @@
+# 0.4.1.0
+
+- Honeycomb reporter: report the request id as a `request.id` field on every
+  span, so traces can be looked up by the request id shown to users (e.g. the
+  "Error code" on error pages) and propagated via `X-Request-ID`.
+
 # 0.4.0.1
 
 - Require `nri-prelude >= 0.7.0.0`
