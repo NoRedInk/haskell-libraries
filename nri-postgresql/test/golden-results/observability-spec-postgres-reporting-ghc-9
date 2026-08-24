@@ -57,9 +57,9 @@ TracingSpan
                             { srcLocPackage = "nri-postgresql-0.4.0.1-inplace-tests"
                             , srcLocModule = "Postgres"
                             , srcLocFile = "src/Postgres.hs"
-                            , srcLocStartLine = 225
+                            , srcLocStartLine = 226
                             , srcLocStartCol = 9
-                            , srcLocEndLine = 225
+                            , srcLocEndLine = 226
                             , srcLocEndCol = 24
                             }
                         )

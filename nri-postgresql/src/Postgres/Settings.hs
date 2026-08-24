@@ -30,6 +30,7 @@ module Postgres.Settings
     PgPoolMaxIdleTime (PgPoolMaxIdleTime, unPgPoolMaxIdleTime),
     PgPoolSize (PgPoolSize, unPgPoolSize),
     defaultSettings,
+    setPoolSize,
     toPGDatabase,
   )
 where
@@ -83,6 +84,25 @@ defaultSettings =
             pgPoolStripes = PgPoolStripes 1
           },
       pgQueryTimeout = Time.fromSeconds 5
+    }
+
+-- | Overwrite the connection pool size of a 'Settings' value.
+--
+-- Useful for carving a small dedicated pool out of the same settings the main
+-- pool uses, for example so readiness probes keep a couple of connections of
+-- their own and still work when the request pool is saturated.
+--
+-- This resets the stripe count to 1, so the number passed in is the exact
+-- maximum amount of connections the pool will hold (a pool's real ceiling is
+-- stripes times pool size).
+setPoolSize :: Int -> Settings -> Settings
+setPoolSize size settings =
+  settings
+    { pgPool =
+        (pgPool settings)
+          { pgPoolSize = PgPoolSize size,
+            pgPoolStripes = PgPoolStripes 1
+          }
     }
 
 data ConnectionSettings = ConnectionSettings
