@@ -12,6 +12,7 @@ module Postgres
     Settings.Settings,
     Settings.decoder,
     Settings.decoderWithPrefix,
+    Settings.setPoolSize,
     -- Querying
     Query.Query,
     Query.Error (..),

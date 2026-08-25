@@ -1,3 +1,8 @@
+# 0.4.1.0
+
+- Add `Postgres.setPoolSize` for overriding the connection pool size of a
+  `Settings` value, e.g. to create a small dedicated pool for readiness probes.
+
 # 0.4.0.1
 
 - Require `nri-prelude >= 0.7.0.0`

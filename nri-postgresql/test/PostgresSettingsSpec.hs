@@ -11,7 +11,8 @@ tests :: Test
 tests =
   describe
     "Postgres.Settings"
-    [ decodingTests
+    [ decodingTests,
+      setPoolSizeTests
     ]
 
 decodingTests :: Test
@@ -43,4 +44,30 @@ decodingTests =
                         Postgres.Settings.pgQueryTimeout = Time.fromSeconds 20
                       }
                 )
+    ]
+
+setPoolSizeTests :: Test
+setPoolSizeTests =
+  describe
+    "setPoolSize"
+    [ test "sets the pool size, resets stripes and leaves other settings alone" <| \() ->
+        let settings =
+              Postgres.Settings.defaultSettings
+                { Postgres.Settings.pgPool =
+                    Postgres.Settings.PoolSettings
+                      { Postgres.Settings.pgPoolSize = Postgres.Settings.PgPoolSize 500,
+                        Postgres.Settings.pgPoolMaxIdleTime = Postgres.Settings.PgPoolMaxIdleTime 60,
+                        Postgres.Settings.pgPoolStripes = Postgres.Settings.PgPoolStripes 4
+                      },
+                  Postgres.Settings.pgQueryTimeout = Time.fromSeconds 20
+                }
+         in Postgres.Settings.setPoolSize 2 settings
+              |> Expect.equal
+                settings
+                  { Postgres.Settings.pgPool =
+                      (Postgres.Settings.pgPool settings)
+                        { Postgres.Settings.pgPoolSize = Postgres.Settings.PgPoolSize 2,
+                          Postgres.Settings.pgPoolStripes = Postgres.Settings.PgPoolStripes 1
+                        }
+                  }
     ]
