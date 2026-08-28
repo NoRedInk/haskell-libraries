@@ -161,7 +161,7 @@ tryRespond [] req =
       handleCustomResponse :: (Internal.Response s -> Result e expect) -> Task e (a, expect)
       handleCustomResponse f = case f (Internal.NetworkError_ msg) of
         Err err -> Task.fail err
-        Ok _ -> Debug.todo "Since we manually craft the Response as an Error, this case will not run."
+        Ok _ -> Debug.todo msg
    in case Internal.expect req of
         Internal.ExpectJson ->
           Task.fail (Internal.NetworkError msg)
@@ -178,7 +178,7 @@ tryRespond (Stub respond : rest) req =
     |> Maybe.andThen Dynamic.fromDynamic
     |> Maybe.withDefault (tryRespond rest req)
 
-printType :: (Dynamic.Typeable expect) => proxy expect -> Text
+printType :: (Dynamic.Typeable expect) => expect -> Text
 printType expect =
-  Type.Reflection.someTypeRep expect
+  Type.Reflection.typeOf expect
     |> Debug.toString
