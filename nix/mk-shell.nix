@@ -61,7 +61,6 @@ in pkgs.mkShell {
         vty
       ]))
     (workaround140774 pkgs.haskellPackages.ghcid)
-    (workaround140774 pkgs.haskellPackages.niv)
     (workaround140774 pkgs.haskellPackages.ormolu)
     pkgs.apacheKafka_3_8 # for nri-kafka
     pkgs.cabal-install
@@ -69,6 +68,7 @@ in pkgs.mkShell {
     pkgs.gnumake
     pkgs.haskellPackages.haskell-language-server
     pkgs.haskellPackages.hpack
+    pkgs.niv
     pkgs.pcre
     pkgs.postgresql # for nri-postgres
     pkgs.redis # for nri-redis
