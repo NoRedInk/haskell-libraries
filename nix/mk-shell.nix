@@ -1,11 +1,5 @@
 { pkgs, haskellPackages }:
-
-# Fix from https://github.com/srid/haskell-template
-let
-  workaround140774 = hpkg:
-    with pkgs.haskell.lib;
-    overrideCabal hpkg (drv: { enableSeparateBinOutput = false; });
-in pkgs.mkShell {
+pkgs.mkShell {
   buildInputs = [
     (haskellPackages.ghcWithPackages (haskellPackages:
       with haskellPackages; [
@@ -60,15 +54,15 @@ in pkgs.mkShell {
         vector
         vty
       ]))
-    (workaround140774 pkgs.haskellPackages.ghcid)
-    (workaround140774 pkgs.haskellPackages.ormolu)
-    pkgs.apacheKafka_3_8 # for nri-kafka
+    pkgs.apacheKafka_3_9 # for nri-kafka (4.0 removes zookeeper support)
     pkgs.cabal-install
     pkgs.cachix
+    pkgs.haskellPackages.ghcid
     pkgs.gnumake
-    pkgs.haskellPackages.haskell-language-server
+    haskellPackages.haskell-language-server # `haskellPackages`, not `pkgs.haskellPackages`
     pkgs.haskellPackages.hpack
     pkgs.niv
+    pkgs.haskellPackages.ormolu
     pkgs.pcre
     pkgs.postgresql # for nri-postgres
     pkgs.redis # for nri-redis

@@ -4,15 +4,15 @@ let
   commonHaskellOverrides = import ./nix/common-haskell-overrides.nix { inherit sources pkgs; };
 in import nix/mk-shell.nix {
   pkgs = pkgs;
-  haskellPackages = pkgs.haskell.packages.ghc9122.extend (self: super:
+  haskellPackages = pkgs.haskell.packages.ghc9124.extend (self: super:
     commonHaskellOverrides self super // {
-      # package version bounds are nonsense without these flags set;
-      # see https://github.com/hdbc/hdbc/blob/hdbc-2.4.0.2/HDBC.cabal
-      #
-      # note: still need to jailbreak via patch for `time >= 1.14`;
-      # see https://github.com/NixOS/jailbreak-cabal/issues/7
-      HDBC = with pkgs.haskell.lib;
-        appendPatch (disableCabalFlag (enableCabalFlag (doJailbreak super.HDBC) "splitBase") "buildtests") ./nix/patches/hdbc-time-1.14.patch;
+      # HDBC @ 2.4.0.4 requires time <1.14, but ghc 9.12.4 uses time ==1.14.  this
+      # is fixed with HDBC @ 2.4.0.5
+      HDBC =
+        if super.HDBC.version != "2.4.0.4" then
+          throw "expected HDBC from nixpkgs to be 2.4.0.4, got ${super.HDBC.version} instead.  this could be good!  if it's newer, please remove the niv source for HDBC and use the one directly from nixpkgs"
+        else
+          self.callCabal2nix "HDBC" sources.HDBC-2_4_0_5 { };
 
       # almost all tests pass
       xml-conduit = pkgs.haskell.lib.dontCheck super.xml-conduit;
