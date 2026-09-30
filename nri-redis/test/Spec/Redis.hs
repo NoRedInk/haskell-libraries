@@ -573,8 +573,8 @@ noNamespaceTests noNs nsHandler =
       let scanPrefix = "noNs::scanTest::"
       let firstKey = scanPrefix ++ "k1"
       let nonEmptyDict =
-            NonEmptyDict.init firstKey "v1"
-              <| Dict.fromList [(scanPrefix ++ "k2", "v2")]
+            NonEmptyDict.init firstKey "v1" <|
+              Dict.fromList [(scanPrefix ++ "k2", "v2")]
       let expectedKeys =
             NonEmptyDict.toDict nonEmptyDict
               |> Dict.keys

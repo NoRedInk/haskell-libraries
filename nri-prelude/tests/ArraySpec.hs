@@ -190,8 +190,7 @@ transformTests =
         initialize size_ identity
           |> foldl (:) []
           |> Expect.equal
-            ( List.reverse (List.range 0 (size_ - 1))
-            ),
+            (List.reverse (List.range 0 (size_ - 1))),
       fuzz size "foldr" <| \size_ ->
         initialize size_ identity
           |> foldr (:) []
@@ -244,8 +243,7 @@ sliceTests =
             let arr = initialize size_ identity
              in slice (abs n) (length arr) arr
                   |> Expect.equal
-                    ( initialize (size_ + n) (\idx -> idx - n)
-                    ),
+                    (initialize (size_ + n) (\idx -> idx - n)),
           fuzz2 (Fuzz.intRange (-50) (-1)) (toLimit 100) "right" <| \n size_ ->
             initialize size_ identity
               |> slice 0 n

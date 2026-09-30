@@ -264,7 +264,7 @@ fuzz3 (Fuzzer genA) (Fuzzer genB) (Fuzzer genC) name expectation =
 
 -- | Run a fuzz test using a hedgehog generator
 hedgehog :: (Stack.HasCallStack, Show a) => Hedgehog.Gen a -> Text -> (a -> Expectation) -> Test
-hedgehog gen name expectation = 
+hedgehog gen name expectation =
   Test
     [ SingleTest
         { describes = [],
@@ -275,7 +275,6 @@ hedgehog gen name expectation =
           body = fuzzBody gen expectation
         }
     ]
-
 
 fuzzBody :: (Show a) => Hedgehog.Gen a -> (a -> Expectation) -> Expectation
 fuzzBody gen expectation = do
@@ -449,7 +448,7 @@ run request (Test all) = do
     ( case request of
         All -> toRun
         Some tests -> List.filter (subset tests) toRun
-      )
+    )
       |> groupBy runStrategy
       |> Dict.toList
       |> List.map runGroup
