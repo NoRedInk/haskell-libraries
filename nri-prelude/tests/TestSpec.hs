@@ -676,14 +676,12 @@ runExpectationTests =
         log <- Expect.fromIO Platform.silentHandler
         result <-
           Expect.fromIO
-            ( Internal.runExpectation log (Expect.succeeds (Task.succeed 42))
-            )
+            (Internal.runExpectation log (Expect.succeeds (Task.succeed 42)))
         Expect.ok result,
       test "throws Failure exception on assertion failure" <| \_ -> do
         log <- Expect.fromIO Platform.silentHandler
         result <-
           Expect.fromIO
-            ( Internal.runExpectation log (Expect.fail "test failure")
-            )
+            (Internal.runExpectation log (Expect.fail "test failure"))
         Expect.err result
     ]

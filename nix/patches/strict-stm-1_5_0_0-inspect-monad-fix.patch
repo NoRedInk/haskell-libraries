@@ -1,0 +1,71 @@
+--- a/src/Control/Concurrent/Class/MonadSTM/Strict/TBQueue.hs
++++ b/src/Control/Concurrent/Class/MonadSTM/Strict/TBQueue.hs
+@@ -59,13 +59,13 @@ labelTBQueueIO (StrictTBQueue queue) = Lazy.labelTBQueueIO queue
+ traceTBQueue :: MonadTraceSTM m
+              => proxy m
+              -> StrictTBQueue m a
+-             -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
++             -> ((Maybe [a]) -> [a] -> InspectMonadSTM m TraceValue)
+              -> STM m ()
+ traceTBQueue p (StrictTBQueue queue) = Lazy.traceTBQueue p queue
+
+ traceTBQueueIO :: MonadTraceSTM m
+                => StrictTBQueue m a
+-               -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
++               -> ((Maybe [a]) -> [a] -> InspectMonadSTM m TraceValue)
+                -> m ()
+ traceTBQueueIO (StrictTBQueue queue) = Lazy.traceTBQueueIO queue
+
+--- a/src/Control/Concurrent/Class/MonadSTM/Strict/TMVar.hs
++++ b/src/Control/Concurrent/Class/MonadSTM/Strict/TMVar.hs
+@@ -55,13 +55,13 @@ labelTMVarIO v = atomically . labelTMVar v
+ traceTMVar :: MonadTraceSTM m
+            => proxy m
+            -> StrictTMVar m a
+-           -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
++           -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonadSTM m TraceValue)
+            -> STM m ()
+ traceTMVar p (StrictTMVar var) = Lazy.traceTMVar p var
+
+ traceTMVarIO :: MonadTraceSTM m
+              => StrictTMVar m a
+-             -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonad m TraceValue)
++             -> (Maybe (Maybe a) -> (Maybe a) -> InspectMonadSTM m TraceValue)
+              -> m ()
+ traceTMVarIO (StrictTMVar var) = Lazy.traceTMVarIO var
+
+--- a/src/Control/Concurrent/Class/MonadSTM/Strict/TQueue.hs
++++ b/src/Control/Concurrent/Class/MonadSTM/Strict/TQueue.hs
+@@ -56,13 +56,13 @@ labelTQueueIO (StrictTQueue queue) = Lazy.labelTQueueIO queue
+ traceTQueue :: MonadTraceSTM m
+             => proxy m
+             -> StrictTQueue m a
+-            -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
++            -> ((Maybe [a]) -> [a] -> InspectMonadSTM m TraceValue)
+             -> STM m ()
+ traceTQueue p (StrictTQueue queue) = Lazy.traceTQueue p queue
+
+ traceTQueueIO :: MonadTraceSTM m
+               => StrictTQueue m a
+-              -> ((Maybe [a]) -> [a] -> InspectMonad m TraceValue)
++              -> ((Maybe [a]) -> [a] -> InspectMonadSTM m TraceValue)
+               -> m ()
+ traceTQueueIO (StrictTQueue queue) = Lazy.traceTQueueIO queue
+
+--- a/src/Control/Concurrent/Class/MonadSTM/Strict/TVar.hs
++++ b/src/Control/Concurrent/Class/MonadSTM/Strict/TVar.hs
+@@ -47,13 +47,13 @@ labelTVarIO v = atomically . labelTVar v
+ traceTVar :: MonadTraceSTM m
+           => proxy m
+           -> StrictTVar m a
+-          -> (Maybe a -> a -> InspectMonad m TraceValue)
++          -> (Maybe a -> a -> InspectMonadSTM m TraceValue)
+           -> STM m ()
+ traceTVar p StrictTVar {tvar} = Lazy.traceTVar p tvar
+
+ traceTVarIO :: MonadTraceSTM m
+             => StrictTVar m a
+-            -> (Maybe a -> a -> InspectMonad m TraceValue)
++            -> (Maybe a -> a -> InspectMonadSTM m TraceValue)
+             -> m ()
+ traceTVarIO StrictTVar {tvar} = Lazy.traceTVarIO tvar
