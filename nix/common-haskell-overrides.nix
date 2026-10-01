@@ -64,6 +64,16 @@ self: super:
       ) ./patches/strict-stm-1_5_0_0-inspect-monad-fix.patch
     );
 
+    # nixpkgs provides `tls@2.1.8` but this is actually deprecated according to
+    # hackage anyway (lol).  we don't over-upgrade to `2.3.x` or `2.4.x` because
+    # those have `crypton-* >=1.9.0` and `ram` as constraints (relevant for our monorepo)
+    tls = self.callHackage "tls" "2.2.2" { };
+
+    # required by the above
+    crypton-x509 = self.callHackage "crypton-x509" "1.8.0" { };
+    crypton-x509-validation = self.callHackage "crypton-x509-validation" "1.8.0" { };
+    crypton-x509-store = self.callHackage "crypton-x509-store" "1.8.0" { };
+
     # support for hls + ghc 9.12.4; we shouldn't need to do all of this
     # in nixpkgs >= 26.11 as long as hls >= 2.14.0.0 is provided.
     # optimizations are disabled for some packages as a workaround to
