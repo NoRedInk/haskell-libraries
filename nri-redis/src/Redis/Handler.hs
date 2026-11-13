@@ -434,7 +434,10 @@ platformRedisScript script connection anything queryTimeout = do
     |> Task.onError
       ( \err ->
           case err of
-            Internal.RedisError "NOSCRIPT No matching script. Please use EVAL." -> do
+            -- Match on the "NOSCRIPT" prefix rather than the full message:
+            -- Redis returns "NOSCRIPT No matching script. Please use EVAL."
+            -- while Valkey returns "NOSCRIPT No matching script." (no suffix).
+            Internal.RedisError msg | Text.startsWith "NOSCRIPT" msg -> do
               -- If it fails with NOSCRIPT, load the script and try again
               loadScript script connection anything queryTimeout
               evalsha script connection anything queryTimeout

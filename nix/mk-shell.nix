@@ -65,7 +65,7 @@ pkgs.mkShell {
     pkgs.haskellPackages.ormolu
     pkgs.pcre
     pkgs.postgresql # for nri-postgres
-    pkgs.redis # for nri-redis
+    pkgs.valkey # redis equivalent (cheaper on AWS than vanilla redis) for nri-redis
     pkgs.zlib
     pkgs.zookeeper # for nri-kafka
   ];
