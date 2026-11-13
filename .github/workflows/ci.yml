@@ -18,7 +18,7 @@ jobs:
         runner:
           - os: macos-26 # macos tahoe on m1; 3 vcpu, 7 GB memory
             base-nixpkgs-channel: nixpkgs-26.05-darwin
-          - os: ubuntu-24.04 # linux x86_64; 4 vcpu, 16 GB memory
+          - os: ubuntu-26.04 # linux x86_64; 4 vcpu, 16 GB memory
             base-nixpkgs-channel: nixos-26.05
         ghc:
           - ghc-9-12
@@ -27,7 +27,7 @@ jobs:
       # GitHub-hosted ubuntu runners don't have enough free disk for the nix
       # store; this removes preinstalled software to make room.
       - name: Reclaim space
-        if: matrix.runner.os == 'ubuntu-24.04'
+        if: matrix.runner.os == 'ubuntu-26.04'
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
           tool-cache: false
@@ -37,6 +37,12 @@ jobs:
           large-packages: false
           docker-images: true
           swap-storage: true
+
+      # Echo free space so the first ubuntu-26.04 runs make space regressions
+      # obvious before Nix realization starts eating into it.
+      - name: Show disk usage after reclaim
+        if: runner.os == 'Linux'
+        run: df -h /
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
