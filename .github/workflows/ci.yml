@@ -49,8 +49,8 @@ jobs:
         with:
           nix_path: nixpkgs=channel:${{ matrix.runner.base-nixpkgs-channel }}
           extra_nix_config: |
-            extra-substituters = https://nri.cachix.org https://nix-script.cachix.org
-            trusted-public-keys = nri.cachix.org-1:9/BMj3Obc+uio3O5rYGT+egHzkBzDunAzlZZfhCGj6o= nix-script.cachix.org-1:czo3tF6XERpkDdMd6m84XjmgeHQXNeIooSt7b0560+c= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+            extra-substituters = https://nri-nix.cachix.org https://nri.cachix.org https://nix-script.cachix.org
+            trusted-public-keys = nri-nix.cachix.org-1:ih79QV6uTh3Pa2AggYm5X6dR7CPPFP9Fscx1VZpHFo4= nri.cachix.org-1:9/BMj3Obc+uio3O5rYGT+egHzkBzDunAzlZZfhCGj6o= nix-script.cachix.org-1:czo3tF6XERpkDdMd6m84XjmgeHQXNeIooSt7b0560+c= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
 
       - name: Install cachix
         run: nix-env -f '<nixpkgs>' -iA cachix
@@ -61,7 +61,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run tests and push shell closures
-        run: cachix watch-exec nri -- nix-shell shell-${{ matrix.ghc }}.nix --run "./run-tests.sh"
+        run: cachix watch-exec nri-nix -- nix-shell shell-${{ matrix.ghc }}.nix --run "./run-tests.sh"
         env:
-          CACHIX_SIGNING_KEY: ${{ secrets.CACHIX_SIGNING_KEY }}
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
           PGPORT: "8088"

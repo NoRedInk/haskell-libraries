@@ -35,7 +35,7 @@ Documentation comments use the [Haddock][haddock] format to ensure they are rend
 Our default `shell.nix` sets up an environment around the most recent version of GHC that we support. CI used to support running tests against a different versions of GHC. To test using any of these versions locally:
 
 ```sh
-cachix use nri              # set up cache so the next step goes faster
+cachix use nri-nix          # set up cache so the next step goes faster
 nix-shell shell-ghc-X-Y.nix # where X and Y correspond to any of the shells at the root of this repo
 ```
 
