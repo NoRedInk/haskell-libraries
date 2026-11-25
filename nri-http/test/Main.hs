@@ -124,6 +124,32 @@ tests =
             )
         urlsAccessed
           |> Expect.equal ["example.com/one", "example.com/two"],
+      test "Http.Mock.stub binary" <| \_ -> do
+        urlsAccessed <-
+          Http.Mock.stub
+            [ Http.Mock.mkStub
+                ( \(req :: Http.Request Text) ->
+                    -- Note the error type here                    👇
+                    -- doesn't match the code under test
+                    Task.succeed (Http.url req, "dsa") :: Task Http.Error (Text, Text)
+                )
+            ]
+            ( \http ->
+                Expect.succeeds <| do
+                  _ <-
+                    Http.get
+                      http
+                      "example.com/one"
+                      ( Http.expectBytesResponse
+                          ( \_ ->
+                              -- see? a different error type 👇
+                              (Ok ("asd" :: Text)) :: Result () Text
+                          )
+                      )
+                  Task.succeed ()
+            )
+        urlsAccessed
+          |> Expect.equal ["example.com/one"],
       test "Using expectTextResponse, metadata returns the correct status" <| \() ->
         withServer
           (constant "Some text" Status.ok200)
